@@ -1,0 +1,32 @@
+:root {
+  --ultran-bg: #0b0d10;
+  --ultran-surface: #14181d;
+  --ultran-border: #232a32;
+  --ultran-text: #e6edf3;
+  --ultran-muted: #8b98a5;
+  --ultran-accent: #5b9dff;
+  --ultran-radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--ultran-bg);
+  color: var(--ultran-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--ultran-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

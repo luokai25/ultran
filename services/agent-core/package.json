@@ -1,0 +1,40 @@
+{
+  "name": "@ultran/agent-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ultran local agent runtime - brain runtime, orchestrator, and tool sandbox.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./brain": {
+      "types": "./dist/brain/index.d.ts",
+      "import": "./dist/brain/index.js"
+    },
+    "./orchestrator": {
+      "types": "./dist/orchestrator/index.d.ts",
+      "import": "./dist/orchestrator/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "lint": "echo lint pending",
+    "typecheck": "tsc --noEmit",
+    "test": "echo no tests yet",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ultran/connectors": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "typescript": "^5.6.2"
+  }
+}

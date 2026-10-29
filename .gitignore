@@ -18,10 +18,9 @@ out/
 !.env.example
 *.pem
 *.key
-!infra/**/*.pub
 .secrets/
 
-# Python
+# Python (agent-core native backends)
 __pycache__/
 *.py[cod]
 .venv/
@@ -31,18 +30,15 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# Local AI brain runtime artifacts
+# Local AI brain runtime artifacts - model weights never belong in git
 models/
-!.gitkeep
 *.gguf
 *.safetensors
 *.onnx
-*.bin
 *.mlmodel
 .ultran/
 cache/models/
 embeddings/
-!.gitkeep
 
 # Databases & local state
 *.sqlite
@@ -86,7 +82,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
-!.vscode/settings.json.example
 *.swp
 *~
 

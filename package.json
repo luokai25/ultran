@@ -2,7 +2,7 @@
   "name": "ultran",
   "version": "0.1.0",
   "private": true,
-  "description": "Ultran \u2014 local-first AI agent platform monorepo",
+  "description": "Ultran - local-first AI agent platform monorepo",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20.11.0",

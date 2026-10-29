@@ -1,0 +1,27 @@
+{
+  "name": "@ultran/connectors",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ultran connector SDK - manifest schema, registry, and built-in connectors.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./manifest.json": "./schema/manifest.schema.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "echo lint pending",
+    "typecheck": "tsc --noEmit",
+    "test": "echo no tests yet",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

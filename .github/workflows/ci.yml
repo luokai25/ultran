@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  structure:
+    name: Guard monorepo structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The layer boundaries are load-bearing. Fail fast if a top-level
+      # workspace directory disappears or is renamed.
+      - name: Required directories exist
+        run: |
+          set -euo pipefail
+          required=(
+            apps/mobile
+            apps/web
+            services/api
+            services/agent-core
+            packages/connectors
+            packages/ui
+            infra
+            docs
+          )
+          for dir in "${required[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "::error::missing required directory: $dir"
+              exit 1
+            fi
+          done
+          echo "all required directories present"
+
+      - name: No committed secrets, state or model weights
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(\.env$|\.tfstate$|\.pem$|\.gguf$|\.safetensors$)'; then
+            echo "::error::forbidden file type committed"
+            exit 1
+          fi
+          echo "no forbidden files tracked"

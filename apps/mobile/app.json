@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Ultran",
+    "slug": "ultran",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "ultran",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0d10"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.ultran.mobile"
+    },
+    "android": {
+      "package": "app.ultran.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0b0d10"
+      }
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

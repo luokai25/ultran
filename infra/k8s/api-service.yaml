@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ultran
+  labels:
+    app.kubernetes.io/part-of: ultran
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ultran-api
+  namespace: ultran
+  labels:
+    app.kubernetes.io/name: ultran-api
+    app.kubernetes.io/part-of: ultran
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ultran-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ultran-api
+  namespace: ultran
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ultran-api

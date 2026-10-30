@@ -110,6 +110,8 @@ class AgentService:
     ) -> Agent:
         if not name.strip():
             raise ValidationFailed("agent name must not be empty")
+        if brain not in {"echo", "ollama", "openai", *PROVIDER_CHAT_BASE_URLS.keys()}:
+            raise ValidationFailed("unsupported agent brain provider", details={"provider": brain})
         tool_list = [t for t in (tools or []) if t.strip()]
         for tool_id in tool_list:
             # fail fast: an agent may only be given connectors that exist
@@ -143,6 +145,11 @@ class AgentService:
             if not str(changes["name"]).strip():
                 raise ValidationFailed("agent name must not be empty")
             agent.name = str(changes["name"]).strip()
+        if changes.get("brain") is not None:
+            brain = str(changes["brain"])
+            if brain not in {"echo", "ollama", "openai", *PROVIDER_CHAT_BASE_URLS.keys()}:
+                raise ValidationFailed("unsupported agent brain provider", details={"provider": brain})
+            agent.brain = brain
         if changes.get("persona") is not None:
             agent.persona = changes["persona"]
         if changes.get("model") is not None:

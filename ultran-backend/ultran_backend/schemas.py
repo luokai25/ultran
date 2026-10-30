@@ -76,6 +76,27 @@ class ChatTurn(_Strict):
     max_tool_calls: int = Field(default=4, ge=0, le=16)
 
 
+class SessionMessage(BaseModel):
+    role: str
+    content: str
+
+
+class SessionSummary(BaseModel):
+    id: str
+    agent_id: str
+    created_at: datetime
+    turns: int = 0
+    preview: str = ""
+
+
+class SessionOut(BaseModel):
+    id: str
+    agent_id: str
+    created_at: datetime
+    turns: int = 0
+    messages: list[SessionMessage] = Field(default_factory=list)
+
+
 class ToolCallRecord(BaseModel):
     connector: str
     action: str

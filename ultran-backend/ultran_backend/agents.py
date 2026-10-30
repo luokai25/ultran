@@ -23,6 +23,25 @@ class Session:
     created_at: datetime = field(default_factory=utcnow)
     turns: int = 0
 
+    def public(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "agent_id": self.agent_id,
+            "created_at": self.created_at,
+            "turns": self.turns,
+            "messages": [{"role": m.role, "content": m.content} for m in self.messages],
+        }
+
+    def summary(self) -> dict[str, Any]:
+        last = self.messages[-1].content if self.messages else ""
+        return {
+            "id": self.id,
+            "agent_id": self.agent_id,
+            "created_at": self.created_at,
+            "turns": self.turns,
+            "preview": last[:120],
+        }
+
     def append(self, role: str, content: str) -> None:
         self.messages.append(BrainMessage(role=role, content=content))
         # keep the tail bounded so a long session cannot blow the context window
@@ -161,6 +180,26 @@ class AgentService:
         sess = Session(id=f"ss_{uuid.uuid4().hex[:12]}", agent_id=agent_id)
         self._sessions[sess.id] = sess
         return sess
+
+    def list_sessions(self, agent_id: str) -> list[Session]:
+        """Sessions for one agent, newest first."""
+        self.get(agent_id)
+        rows = [s for s in self._sessions.values() if s.agent_id == agent_id]
+        return sorted(rows, key=lambda s: s.created_at, reverse=True)
+
+    def get_session(self, agent_id: str, session_id: str) -> Session:
+        return self.session(agent_id, session_id)
+
+    def clear_session(self, agent_id: str, session_id: str) -> Session:
+        """Drop the transcript but keep the session id, so a client can reset context."""
+        sess = self.session(agent_id, session_id)
+        sess.messages = []
+        sess.turns = 0
+        return sess
+
+    def delete_session(self, agent_id: str, session_id: str) -> None:
+        sess = self.session(agent_id, session_id)
+        del self._sessions[sess.id]
 
     def chat(
         self,

@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from ..schemas import AgentCreate, AgentOut, AgentUpdate, ChatReply, ChatTurn
+from ..schemas import (
+    AgentCreate,
+    AgentOut,
+    AgentUpdate,
+    ChatReply,
+    ChatTurn,
+    SessionOut,
+    SessionSummary,
+)
 from .deps import ContainerDep, WorkspaceDep
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -64,3 +72,24 @@ def chat(
     # meter the turn against the workspace plan before returning
     container.billing.meter(workspace, result["tokens_in"] + result["tokens_out"])
     return result
+
+
+@router.get("/{agent_id}/sessions", response_model=list[SessionSummary])
+def list_sessions(agent_id: str, container: ContainerDep):
+    return [s.summary() for s in container.agents.list_sessions(agent_id)]
+
+
+@router.get("/{agent_id}/sessions/{session_id}", response_model=SessionOut)
+def get_session(agent_id: str, session_id: str, container: ContainerDep):
+    return container.agents.get_session(agent_id, session_id).public()
+
+
+@router.post("/{agent_id}/sessions/{session_id}/clear", response_model=SessionOut)
+def clear_session(agent_id: str, session_id: str, container: ContainerDep):
+    return container.agents.clear_session(agent_id, session_id).public()
+
+
+@router.delete("/{agent_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(agent_id: str, session_id: str, container: ContainerDep):
+    container.agents.delete_session(agent_id, session_id)
+    return None

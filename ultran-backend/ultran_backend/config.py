@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Mapping
 
 _TRUTHY = {"1", "true", "yes", "on"}
-_VALID_BRAINS = {"echo", "ollama"}
+_VALID_BRAINS = {"echo", "ollama", "openai"}
 
 
 def _flag(value: str | None, default: bool = False) -> bool:
@@ -35,6 +35,13 @@ def _float(value: str | None, default: float) -> float:
         return default
 
 
+def _names(value: str | None) -> tuple[str, ...]:
+    """Parse a comma-separated list of names, lower-cased, order preserved."""
+    if value is None or not value.strip():
+        return ()
+    return tuple(n.strip().lower() for n in value.split(",") if n.strip())
+
+
 def _origins(value: str | None, default: tuple[str, ...]) -> tuple[str, ...]:
     """Parse a comma-separated CORS allow-list, falling back to ``default``."""
     if value is None or not value.strip():
@@ -56,6 +63,14 @@ class Settings:
     brain_endpoint: str = "http://127.0.0.1:11434"
     brain_model: str = "llama3.1:8b"
     brain_timeout_s: float = 30.0
+    #: Self-hosted OpenAI-compatible server (llama.cpp, LM Studio, vLLM).
+    brain_openai_endpoint: str = "http://127.0.0.1:1234"
+    brain_openai_api_key: str = ""
+    #: Ordered fallbacks tried after ``brain_backend``; echo is always the floor.
+    brain_fallbacks: tuple[str, ...] = ()
+    brain_retries: int = 1
+    brain_breaker_threshold: int = 3
+    brain_breaker_cooldown_s: float = 30.0
     sandbox_max_ttl_s: int = 900
     sandbox_cpu_ms_budget: int = 2000
     free_plan_monthly_tokens: int = 100_000
@@ -84,6 +99,11 @@ class Settings:
             raise ValueError(
                 f"brain_backend must be one of {sorted(_VALID_BRAINS)}, got {self.brain_backend!r}"
             )
+        unknown = [b for b in self.brain_fallbacks if b not in _VALID_BRAINS]
+        if unknown:
+            raise ValueError(f"unknown brain fallback(s): {unknown}")
+        if self.brain_retries < 0 or self.brain_breaker_threshold < 1:
+            raise ValueError("brain_retries must be >= 0 and brain_breaker_threshold >= 1")
         if not self.api_prefix.startswith("/"):
             raise ValueError("api_prefix must start with '/'")
         if self.sandbox_max_ttl_s <= 0:
@@ -111,6 +131,12 @@ class Settings:
             brain_endpoint=e.get("ULTRAN_BRAIN_ENDPOINT", "http://127.0.0.1:11434"),
             brain_model=e.get("ULTRAN_BRAIN_MODEL", "llama3.1:8b"),
             brain_timeout_s=_float(e.get("ULTRAN_BRAIN_TIMEOUT_S"), 30.0),
+            brain_openai_endpoint=e.get("ULTRAN_BRAIN_OPENAI_ENDPOINT", "http://127.0.0.1:1234"),
+            brain_openai_api_key=e.get("ULTRAN_BRAIN_OPENAI_API_KEY", ""),
+            brain_fallbacks=_names(e.get("ULTRAN_BRAIN_FALLBACKS")),
+            brain_retries=_int(e.get("ULTRAN_BRAIN_RETRIES"), 1),
+            brain_breaker_threshold=_int(e.get("ULTRAN_BRAIN_BREAKER_THRESHOLD"), 3),
+            brain_breaker_cooldown_s=_float(e.get("ULTRAN_BRAIN_BREAKER_COOLDOWN_S"), 30.0),
             sandbox_max_ttl_s=_int(e.get("ULTRAN_SANDBOX_MAX_TTL_S"), 900),
             sandbox_cpu_ms_budget=_int(e.get("ULTRAN_SANDBOX_CPU_MS_BUDGET"), 2000),
             free_plan_monthly_tokens=_int(e.get("ULTRAN_FREE_PLAN_MONTHLY_TOKENS"), 100_000),

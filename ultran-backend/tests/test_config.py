@@ -51,7 +51,7 @@ def test_int_parsing_is_forgiving(raw, expected):
 
 def test_unknown_brain_backend_rejected():
     with pytest.raises(ValueError, match="brain_backend"):
-        Settings(brain_backend="openai")
+        Settings(brain_backend="gpt-cloud")
 
 
 def test_api_prefix_must_be_absolute():

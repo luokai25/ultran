@@ -315,3 +315,4 @@ UI responsive and makes the brain independently testable.
 | ADR-003 | Capability grants over allow-all tools | Least privilege is the only defensible default for local agents. |
 | ADR-004 | Append-only event log as run truth | Enables replay, audit, and crash recovery from one mechanism. |
 | ADR-005 | Monetization as an observer layer | Keeps billing failures from breaking the agent loop. |
+| ADR-006 | Brain failover chain with an offline floor | No single model daemon may stall the agent: ordered backends, retries, per-backend circuit breaker, and `echo` as the last resort. Local-first is preserved - every backend is self-hosted. |

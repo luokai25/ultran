@@ -70,3 +70,15 @@ test('converts embeddings to Float32Array and checks response shape', async () =
   assert.ok(embeddings[0] instanceof Float32Array);
   assert.equal(embeddings[1][1], Math.fround(0.4));
 });
+
+test('lists installed models with normalized SHA-256 digests', async () => {
+  const backend = new OllamaBackend({
+    fetcher: async () => jsonResponse({
+      models: [
+        { name: 'qwen2.5:3b', digest: `sha256:${digest}` },
+        { name: 'broken:latest', digest: 'not-a-digest' },
+      ],
+    }),
+  });
+  assert.deepEqual(await backend.listModels(), [{ id: 'qwen2.5:3b', sha256: digest }]);
+});

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from .brain import BrainMessage, BrainRuntime, OpenAICompatBackend
-from .provider_connections import PROVIDER_CHAT_BASE_URLS, OpenAICompatBackend\nfrom .provider_connections import PROVIDER_CHAT_BASE_URLS
+from .provider_connections import PROVIDER_CHAT_BASE_URLS
 from .connectors.credentials import utcnow
 from .errors import NotFound, ValidationFailed
 from .sandbox import ToolSandbox

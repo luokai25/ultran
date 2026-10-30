@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import agents, billing, builder, connectors, deploys, forge, system, workspace
+from .api import agents, billing, builder, connectors, deploys, forge, mcp, system, workspace
 from .config import Settings
 from .container import Container
 from .errors import UltranError
@@ -15,6 +18,7 @@ ROUTERS = (
     system.router,
     agents.router,
     connectors.router,
+    mcp.router,
     workspace.router,
     builder.router,
     forge.router,
@@ -25,17 +29,27 @@ ROUTERS = (
 
 def create_app(settings: Settings | None = None, container: Container | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    built = container or Container.build(settings)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        # MCP sessions are child processes; leaving them running after the daemon
+        # exits is how you accumulate orphaned servers.
+        built.close()
+
     app = FastAPI(
         title="Ultran Control Plane",
         version=settings.version,
         description=(
             "Local-first AI agent workspace: connector marketplace, local brain runtime, "
-            "tool sandbox, builder, forge, billing and atomic deploys."
+            "tool sandbox, MCP connector runtime, builder, forge, billing and atomic deploys."
         ),
         docs_url="/docs" if not settings.is_production else None,
         redoc_url=None,
+        lifespan=lifespan,
     )
-    app.state.container = container or Container.build(settings)
+    app.state.container = built
     app.state.container.seed_default_workspace()
 
     # The web workspace runs on its own origin, so without this every fetch from

@@ -14,7 +14,8 @@ import { UsageLedger } from './monetization/ledger.js';
 import { PolicyGate } from './monetization/policy-gate.js';
 
 const PORT = Number(process.env.ULTRAN_PORT ?? 7700);
-const HOST = process.env.ULTRAN_HOST ?? '127.0.0.1';
+// Keep this unauthenticated local control surface loopback-only.
+const HOST = '127.0.0.1';
 const OLLAMA_URL = process.env.ULTRAN_OLLAMA_URL ?? 'http://127.0.0.1:11434';
 
 const brain = new BrainRuntime({ backends: [new OllamaBackend({ endpoint: OLLAMA_URL })] });

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ultran palette. The app is a dark, gold-on-obsidian console. -->
+    <color name="colorPrimary">#D4AF37</color>
+    <color name="colorPrimaryDark">#050505</color>
+    <color name="colorAccent">#F5D76E</color>
+    <color name="ic_launcher_background">#0B0B0D</color>
+</resources>

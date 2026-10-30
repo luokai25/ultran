@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Ultran mark: a faceted gold diamond. Kept as a vector so the adaptive icon
+  stays crisp at every density and the artwork is reviewable as code.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer diamond -->
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M54,26 L82,54 L54,82 L26,54 Z" />
+
+    <!-- Inner facet -->
+    <path
+        android:fillColor="#8A6D1F"
+        android:pathData="M54,40 L68,54 L54,68 L40,54 Z" />
+
+    <!-- Highlight sliver -->
+    <path
+        android:fillColor="#F5D76E"
+        android:pathData="M54,26 L71,43 L54,50 Z" />
+</vector>

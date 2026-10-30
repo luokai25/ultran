@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ultran</string>
+    <string name="title_activity_main">Ultran</string>
+    <string name="package_name">app.ultran.mobile</string>
+    <string name="custom_url_scheme">app.ultran.mobile</string>
+</resources>

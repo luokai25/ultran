@@ -310,7 +310,6 @@ payload-cms|Payload CMS|content|api_key|free|find,create|Code-first headless CMS
 # ---- model providers ----
 google-ai-studio|Google AI Studio|ai|api_key|free|chat_completion,list_models|Gemini API through Google AI Studio.
 cerebras|Cerebras|ai|api_key|free|chat_completion,list_models|High-speed inference API.
-mistral-ai|Mistral AI|ai|api_key|free|chat_completion,list_models|Mistral models and hosted inference.
 # ---- ai ----
 groq|Groq|ai|api_key|free|chat_completion,transcribe|Fast LLM inference.
 mistral|Mistral AI|ai|api_key|free|chat_completion,embed|Hosted open-weight and frontier models.

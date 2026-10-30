@@ -1,13 +1,13 @@
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
-import './globals.css';
+import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Ultran',
-  description: 'Local-first AI agent platform',
+  title: "Ultran - Local AI Agentic Workspace",
+  description:
+    "A local-first agent workspace: connector marketplace, local AI brains, builder, forge, billing and 3D Ultran avatar.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>{children}</body>

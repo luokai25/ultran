@@ -77,6 +77,16 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
+      # Gradle is installed by the action rather than through a committed
+      # gradle-wrapper.jar: the wrapper jar is a 63 KB binary, and the repository
+      # deliberately carries no opaque binaries. The version is pinned here and
+      # must stay in step with the AGP version in android/build.gradle (AGP 8.2.1
+      # requires Gradle 8.2+).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.2.1"
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -126,8 +136,7 @@ jobs:
           ULTRAN_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
-          chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon --console=plain --max-workers=2 2>&1 | tee build.log
+          gradle assembleRelease --no-daemon --console=plain --max-workers=2 2>&1 | tee build.log
 
       - name: Verify APK
         id: verify

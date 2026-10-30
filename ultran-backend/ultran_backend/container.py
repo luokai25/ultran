@@ -74,7 +74,7 @@ class Container:
             vault=vault,
             sandbox=sandbox,
             brain=brain,
-            agents=AgentService(brain, sandbox),
+            agents=AgentService(brain, sandbox, vault),
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),

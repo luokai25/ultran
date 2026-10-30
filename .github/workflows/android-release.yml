@@ -50,8 +50,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # No lockfile is committed yet, so resolution is unpinned and a transient
+      # registry 404 on a freshly published tarball can fail the whole release.
+      # Retry the install rather than treating a CDN miss as a build failure.
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if pnpm install --no-frozen-lockfile --fetch-retries=5 --fetch-retry-maxtimeout=60000; then
+              exit 0
+            fi
+            echo "::warning::pnpm install failed (attempt $attempt of 3), retrying in 20s"
+            sleep 20
+          done
+          echo "::error::pnpm install failed after 3 attempts"
+          exit 1
 
       - name: Resolve version
         id: version
@@ -232,4 +245,4 @@ jobs:
       - name: Remove keystore
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/release.keystore" || true
+          rm -f "$RUNNER_TEMP/keystore" "$RUNNER_TEMP/release.keystore" || true

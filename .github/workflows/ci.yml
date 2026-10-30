@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   # The Python backend is a first-class part of this monorepo and carries the
-  # deploy planner, tool sandbox, forge diagnostics and billing ledger. It used
-  # to be skipped entirely, which is how a missing module and a schema
-  # regression both reached main unnoticed.
+  # deploy planner, tool sandbox, forge diagnostics, billing ledger and the MCP
+  # connector runtime. It used to be skipped entirely, which is how a missing
+  # module and a schema regression both reached main unnoticed.
   backend:
     name: Backend (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -33,11 +33,11 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install -e . pytest httpx
+          pip install -e . pytest pytest-asyncio httpx
 
       - name: Import check
         working-directory: ultran-backend
-        run: python -c "import ultran_backend; print('import ok')"
+        run: python -c "import ultran_backend; import ultran_backend.mcp; print('import ok')"
 
       - name: Test
         working-directory: ultran-backend
@@ -59,12 +59,17 @@ jobs:
         with:
           node-version: 20.11
 
-      # No pnpm-lock.yaml is committed yet, so the install is not frozen and
-      # setup-node's pnpm cache is off (it requires a lockfile to key on).
-      # Committing a lockfile is tracked as a follow-up; until then this job
-      # must not fail on a missing one.
+      # Frozen once the lockfile exists: resolving the tree on every run is what
+      # let a stale registry edge fail two release builds in a row. The fallback
+      # keeps the very first run on a branch without a lockfile working.
       - name: Install
-        run: pnpm install --no-frozen-lockfile
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            echo "::warning::no lockfile on this ref - resolving unpinned"
+            pnpm install --no-frozen-lockfile
+          fi
 
       - name: Typecheck
         run: pnpm typecheck
@@ -111,7 +116,7 @@ jobs:
       - name: No committed secrets, state or model weights
         run: |
           set -euo pipefail
-          if git ls-files | grep -E '(\.env$|\.tfstate$|\.pem$|\.gguf$|\.safetensors$)'; then
+          if git ls-files | grep -E '(\.env$|\.tfstate$|\.pem$|\.gguf$|\.safetensors$|\.jks$|\.keystore$)'; then
             echo "::error::forbidden file type committed"
             exit 1
           fi

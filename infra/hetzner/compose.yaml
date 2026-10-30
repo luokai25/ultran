@@ -26,6 +26,9 @@ services:
       dockerfile: Dockerfile
     image: ultran-api:local
     restart: unless-stopped
+    depends_on:
+      init-data-volume:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -76,8 +79,6 @@ services:
       - backend
       - edge
     depends_on:
-      init-data-volume:
-        condition: service_completed_successfully
       api:
         condition: service_healthy
     cap_drop:

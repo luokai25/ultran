@@ -575,36 +575,36 @@ a {
 
 
 /* Mobile-first AI model hub */
-.ultran-model-hub{margin-top:42px;padding:clamp(16px,3vw,26px);border:1px solid var(--ultran-border);border-radius:22px;background:linear-gradient(145deg,rgba(212,175,55,.075),transparent 48%),var(--ultran-surface);color:var(--ultran-text)}
+.ultran-model-hub{margin-top:42px;padding:clamp(16px,3vw,26px);border:1px solid var(--hairline);border-radius:22px;background:linear-gradient(145deg,rgba(212,175,55,.075),transparent 48%),var(--carbon);color:var(--ink)}
 .ultran-model-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .ultran-model-heading h2{font-size:clamp(25px,5vw,34px);margin:6px 0}
-.ultran-model-heading p,.ultran-model-hint,.ultran-local-feature p,.ultran-provider-form p,.ultran-airllm-note p{color:var(--ultran-muted);font-size:13px;line-height:1.55;margin:5px 0}
-.ultran-eyebrow{font-size:10px;letter-spacing:.16em;color:var(--ultran-gold,#d6b45a)}
-.ultran-model-count{font-size:11px;color:var(--ultran-muted);border:1px solid var(--ultran-border);padding:7px 10px;border-radius:999px}
+.ultran-model-heading p,.ultran-model-hint,.ultran-local-feature p,.ultran-provider-form p,.ultran-airllm-note p{color:var(--muted);font-size:13px;line-height:1.55;margin:5px 0}
+.ultran-eyebrow{font-size:10px;letter-spacing:.16em;color:var(--gold,#d6b45a)}
+.ultran-model-count{font-size:11px;color:var(--muted);border:1px solid var(--hairline);padding:7px 10px;border-radius:999px}
 .ultran-model-tabs{display:flex;gap:7px;overflow-x:auto;padding:18px 0 12px;scrollbar-width:none}
-.ultran-model-tabs button,.ultran-model-search button,.ultran-provider-form button,.ultran-install-command button{border:1px solid var(--ultran-border);background:var(--ultran-surface);color:var(--ultran-text);border-radius:12px;padding:11px 14px;font:inherit;font-size:13px;white-space:nowrap}
-.ultran-model-tabs button[aria-selected=true],.ultran-model-search button,.ultran-provider-form button{background:var(--ultran-gold,#c9a64b);color:#17130a;border-color:transparent;font-weight:700}
-.ultran-model-panel{border-top:1px solid var(--ultran-border);padding-top:16px}
+.ultran-model-tabs button,.ultran-model-search button,.ultran-provider-form button,.ultran-install-command button{border:1px solid var(--hairline);background:var(--carbon);color:var(--ink);border-radius:12px;padding:11px 14px;font:inherit;font-size:13px;white-space:nowrap}
+.ultran-model-tabs button[aria-selected=true],.ultran-model-search button,.ultran-provider-form button{background:var(--gold,#c9a64b);color:#17130a;border-color:transparent;font-weight:700}
+.ultran-model-panel{border-top:1px solid var(--hairline);padding-top:16px}
 .ultran-model-search{display:flex;gap:8px}
-.ultran-model-search input,.ultran-provider-form input,.ultran-model-panel>input{min-width:0;flex:1;background:rgba(0,0,0,.18);border:1px solid var(--ultran-border);border-radius:12px;padding:12px 13px;color:var(--ultran-text);font:inherit;font-size:14px}
+.ultran-model-search input,.ultran-provider-form input,.ultran-model-panel>input{min-width:0;flex:1;background:rgba(0,0,0,.18);border:1px solid var(--hairline);border-radius:12px;padding:12px 13px;color:var(--ink);font:inherit;font-size:14px}
 .ultran-model-results{display:grid;gap:9px;margin-top:14px}
-.ultran-model-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center;padding:13px;border:1px solid var(--ultran-border);border-radius:14px;background:rgba(0,0,0,.12);min-width:0}
+.ultran-model-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center;padding:13px;border:1px solid var(--hairline);border-radius:14px;background:rgba(0,0,0,.12);min-width:0}
 .ultran-model-card>div{min-width:0;display:grid;gap:5px}
 .ultran-model-card strong{font-size:13px;overflow-wrap:anywhere}
-.ultran-model-card span,.ultran-provider-card span,.ultran-provider-card small{font-size:11px;color:var(--ultran-muted)}
-.ultran-model-card a,.ultran-provider-form>a,.ultran-airllm-note a,.ultran-model-panel>a{font-size:12px;color:var(--ultran-gold,#d6b45a);text-decoration:none}
-.ultran-model-secondary{border:1px solid var(--ultran-border);background:transparent;color:var(--ultran-text);border-radius:10px;padding:8px 12px}
-.ultran-model-empty{padding:22px;text-align:center;color:var(--ultran-muted);border:1px dashed var(--ultran-border);border-radius:14px;font-size:13px}
+.ultran-model-card span,.ultran-provider-card span,.ultran-provider-card small{font-size:11px;color:var(--muted)}
+.ultran-model-card a,.ultran-provider-form>a,.ultran-airllm-note a,.ultran-model-panel>a{font-size:12px;color:var(--gold,#d6b45a);text-decoration:none}
+.ultran-model-secondary{border:1px solid var(--hairline);background:transparent;color:var(--ink);border-radius:10px;padding:8px 12px}
+.ultran-model-empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed var(--hairline);border-radius:14px;font-size:13px}
 .ultran-model-error{color:#ff8d8d;font-size:13px}
 .ultran-provider-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-.ultran-provider-card{display:grid;text-align:left;gap:5px;padding:12px;min-width:0;border:1px solid var(--ultran-border);border-radius:13px;background:rgba(0,0,0,.12);color:var(--ultran-text)}
+.ultran-provider-card{display:grid;text-align:left;gap:5px;padding:12px;min-width:0;border:1px solid var(--hairline);border-radius:13px;background:rgba(0,0,0,.12);color:var(--ink)}
 .ultran-provider-card strong{font-size:13px}
-.ultran-provider-card.active{border-color:var(--ultran-gold,#d6b45a);background:rgba(214,180,90,.1)}
-.ultran-provider-form{display:grid;gap:10px;margin-top:18px;padding:15px;border:1px solid var(--ultran-border);border-radius:15px}
+.ultran-provider-card.active{border-color:var(--gold,#d6b45a);background:rgba(214,180,90,.1)}
+.ultran-provider-form{display:grid;gap:10px;margin-top:18px;padding:15px;border:1px solid var(--hairline);border-radius:15px}
 .ultran-provider-form>div{display:grid;gap:4px}
-.ultran-provider-form label,.ultran-model-label{font-size:12px;color:var(--ultran-muted)}
-.ultran-provider-form>small{font-size:11px;color:var(--ultran-muted);line-height:1.5}
-.ultran-local-feature,.ultran-airllm-note{padding:14px;border:1px solid var(--ultran-border);border-radius:14px;margin-bottom:15px}
+.ultran-provider-form label,.ultran-model-label{font-size:12px;color:var(--muted)}
+.ultran-provider-form>small{font-size:11px;color:var(--muted);line-height:1.5}
+.ultran-local-feature,.ultran-airllm-note{padding:14px;border:1px solid var(--hairline);border-radius:14px;margin-bottom:15px}
 .ultran-model-label{display:block;margin:14px 0 7px}
 .ultran-install-command{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:12px 0;padding:10px;border-radius:12px;background:rgba(0,0,0,.25);min-width:0}
 .ultran-install-command code{font-size:12px;overflow-wrap:anywhere}

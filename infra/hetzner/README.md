@@ -106,7 +106,7 @@ Fernet key. Review the plan carefully: Terraform can create billable resources.
 
 ## First deployment
 
-Clone the repository on the server, then:
+Clone the repository on the server at `/opt/ultran`, then:
 
 ```bash
 cd ultran/infra/hetzner
@@ -167,6 +167,64 @@ recovery store, not beside the backup. Test restoration to a fresh volume before
 calling the backup process reliable. Set a retention policy (for example,
 daily backups for 7 days and weekly backups for 4 weeks) and alert on failed
 backup jobs or low disk space.
+
+## Automated encrypted off-server backups
+
+The Terraform bootstrap installs Restic. The repository includes a daily
+systemd backup timer that takes a transactionally consistent SQLite snapshot,
+then sends the vault database and deployment environment file to an encrypted
+Restic repository. The example configuration is
+[`restic.env.example`](restic.env.example).
+
+Use a separate off-server target such as a Hetzner Storage Box or another
+SFTP-compatible backup host. Create the remote repository account and install
+an SSH key for root on the VPS. Pin the provider's SSH host key in
+`/root/.ssh/known_hosts`; do not disable SSH host-key checking.
+
+On the VPS, clone the repository to `/opt/ultran` and configure:
+
+```bash
+install -d -m 0700 /etc/ultran
+install -m 0600 /opt/ultran/infra/hetzner/restic.env.example /etc/ultran-backup.env
+install -m 0600 /dev/null /etc/ultran-restic-password
+```
+
+Generate a long random Restic repository password and place it in
+`/etc/ultran-restic-password` using a secure method. Store a separate recovery
+copy offline. Edit `/etc/ultran-backup.env` with the real SFTP repository
+address and password-file path. Ensure root's SSH client can reach the backup
+host with the pinned host key and private key.
+
+Initialize the remote repository once:
+
+```bash
+set -a
+. /etc/ultran-backup.env
+set +a
+restic init
+```
+
+Install and enable the timer:
+
+```bash
+chmod 0755 /opt/ultran/infra/hetzner/backup.sh
+install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.service /etc/systemd/system/
+install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now ultran-backup.timer
+systemctl start ultran-backup.service
+systemctl status ultran-backup.service
+```
+
+The timer runs daily at approximately 02:30 server time, with a randomized
+delay. Retention is 7 daily, 4 weekly, and 6 monthly snapshots. Check recent
+runs with `journalctl -u ultran-backup.service` and verify remote snapshots
+with `restic snapshots`.
+
+For a recovery drill, restore the latest snapshot to a separate directory
+first, inspect the database and environment file, and verify that the Fernet
+key decrypts a test credential. Never overwrite the live database during the
+first restore test. A backup is not proven until a restore has succeeded.
 
 ## Updates and rollback
 

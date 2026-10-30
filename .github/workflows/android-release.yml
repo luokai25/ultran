@@ -10,6 +10,12 @@ on:
     paths:
       - "apps/phone/**"
       - ".github/workflows/android-release.yml"
+      # A root dependency change alters what the APK is built against, so it must
+      # rebuild the release too. Without this, a rollup pin or a workspace bump
+      # silently leaves the published APK stale.
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
     inputs:
       version:
@@ -245,4 +251,4 @@ jobs:
       - name: Remove keystore
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/keystore" "$RUNNER_TEMP/release.keystore" || true
+          rm -f "$RUNNER_TEMP/release.keystore" || true

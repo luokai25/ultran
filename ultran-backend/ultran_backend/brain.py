@@ -228,8 +228,9 @@ class OpenAICompatBackend:
             "stream": False,
         }
         client = self._get_client()
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
-            resp = client.post(f"{self.endpoint}/v1/chat/completions", json=payload)
+            resp = client.post(f"{self.endpoint}/v1/chat/completions", json=payload, headers=headers)
         except Exception as exc:  # noqa: BLE001 - normalised below
             raise DependencyUnavailable(
                 "local model runtime is unreachable", details={"endpoint": self.endpoint}
@@ -419,10 +420,12 @@ class BrainRuntime:
         *,
         model: str | None = None,
         temperature: float = 0.4,
+        backend_override: BrainBackend | None = None,
     ) -> BrainReply:
         if not 0.0 <= temperature <= 2.0:
             raise ValidationFailed("temperature must be between 0 and 2")
-        reply = self.backend.complete(
+        backend = backend_override or self.backend
+        reply = backend.complete(
             messages, model=model or self.default_model, temperature=temperature
         )
         self.calls += 1

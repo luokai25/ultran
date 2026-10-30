@@ -39,7 +39,8 @@ export default function ModelHub() {
   const [selectedHubModel, setSelectedHubModel] = useState("");
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]["id"]>("groq");
   const [key, setKey] = useState("");
-  const [saving, setSaving] = useState(false);\n  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [notice, setNotice] = useState("");
   const [ollamaHost, setOllamaHost] = useState("http://127.0.0.1:11434");
 

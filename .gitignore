@@ -93,3 +93,18 @@ apps/mobile/ios/build/
 *.ipa
 *.apk
 *.aab
+
+# Android signing - the keystore and its passwords never enter the repository
+apps/phone/android/app-release.keystore
+apps/phone/android/*.keystore
+apps/phone/android/*.jks
+apps/phone/android/keystore.properties
+apps/phone/android/app/build/
+apps/phone/android/build/
+apps/phone/android/.gradle/
+apps/phone/android/local.properties
+apps/phone/android/app/src/main/assets/public/
+
+# Generated Android raster assets - produced by apps/phone/android/tools/generate_assets.py
+apps/phone/android/app/src/main/res/mipmap-*/ic_launcher*.png
+apps/phone/android/app/src/main/res/drawable*/splash.png

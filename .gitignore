@@ -63,6 +63,8 @@ test-results/
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+*.tfvars
+!*.tfvars.example
 crash.log
 *.tfplan
 override.tf

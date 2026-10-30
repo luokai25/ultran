@@ -59,7 +59,7 @@ class Settings:
     environment: str = "dev"
     api_prefix: str = "/v1"
     data_dir: Path = Path(".ultran-data")
-    brain_backend: str = "echo"
+    brain_backend: str = "ollama"
     brain_endpoint: str = "http://127.0.0.1:11434"
     brain_model: str = "llama3.1:8b"
     brain_timeout_s: float = 30.0
@@ -67,7 +67,7 @@ class Settings:
     brain_openai_endpoint: str = "http://127.0.0.1:1234"
     brain_openai_api_key: str = ""
     #: Ordered fallbacks tried after ``brain_backend``; echo is always the floor.
-    brain_fallbacks: tuple[str, ...] = ()
+    brain_fallbacks: tuple[str, ...] = ("echo",)
     brain_retries: int = 1
     brain_breaker_threshold: int = 3
     brain_breaker_cooldown_s: float = 30.0
@@ -130,13 +130,13 @@ class Settings:
             environment=e.get("ULTRAN_ENV", "dev"),
             api_prefix=e.get("ULTRAN_API_PREFIX", "/v1"),
             data_dir=Path(e.get("ULTRAN_DATA_DIR", ".ultran-data")),
-            brain_backend=e.get("ULTRAN_BRAIN_BACKEND", "echo").strip().lower(),
+            brain_backend=e.get("ULTRAN_BRAIN_BACKEND", "ollama").strip().lower(),
             brain_endpoint=e.get("ULTRAN_BRAIN_ENDPOINT", "http://127.0.0.1:11434"),
             brain_model=e.get("ULTRAN_BRAIN_MODEL", "llama3.1:8b"),
             brain_timeout_s=_float(e.get("ULTRAN_BRAIN_TIMEOUT_S"), 30.0),
             brain_openai_endpoint=e.get("ULTRAN_BRAIN_OPENAI_ENDPOINT", "http://127.0.0.1:1234"),
             brain_openai_api_key=e.get("ULTRAN_BRAIN_OPENAI_API_KEY", ""),
-            brain_fallbacks=_names(e.get("ULTRAN_BRAIN_FALLBACKS")),
+            brain_fallbacks=_names(e.get("ULTRAN_BRAIN_FALLBACKS", "echo")),
             brain_retries=_int(e.get("ULTRAN_BRAIN_RETRIES"), 1),
             brain_breaker_threshold=_int(e.get("ULTRAN_BRAIN_BREAKER_THRESHOLD"), 3),
             brain_breaker_cooldown_s=_float(e.get("ULTRAN_BRAIN_BREAKER_COOLDOWN_S"), 30.0),

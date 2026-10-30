@@ -3,19 +3,22 @@
 /**
  * AvatarScene3D - the Ultran avatar rendered with three.js.
  *
- * The head is a faceted graphite shell with a wireframe cage, two emissive eye
- * plates, a segmented jaw, a halo ring and an orbiting particle field. Scene,
- * accent colour and emotion rig come from the server, so moving the avatar
- * through the API moves it here too.
+ * The head is a 499,280-triangle geodesic mesh sculpted on the GPU (see
+ * avatar/faceGeometry.ts and avatar/faceShader.ts): brow, sockets, nose, a jaw
+ * that opens, armour plating and energy veins. Around it orbits the Legion - 32
+ * smaller faces drawn in one instanced call that speak and glow in chorus. A
+ * coarse wire cage, halo ring and particle field complete the scene.
  *
  * Animation model
  * - One renderer for the lifetime of the component. Props (scene, emotion,
  *   speaking) are mirrored into refs and eased toward each frame, so changing
  *   them never rebuilds WebGL state or causes a visible pop.
- * - All motion is driven by real elapsed time, not frame counts, so it looks
- *   the same at 30, 60 or 144 Hz.
+ * - All motion is driven by real elapsed time, not frame counts.
+ * - The face materialises from a low-poly mesh and refines to full detail.
+ * - A frame-time governor steps the head down a quality tier on slow GPUs.
  * - The loop pauses while the tab is hidden or the stage is off screen.
  * - `prefers-reduced-motion` keeps a still, softly lit pose with no drift.
+ * - If the face shader fails to compile, a plain metal head takes over.
  *
  * Everything is disposed on unmount; no WebGL context is leaked between routes.
  */
@@ -23,37 +26,64 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { emotions, palette, scenes, type EmotionId, type SceneId } from "@/theme/palette";
+import {
+  FACE_TIERS,
+  LEGION_SEGMENTS,
+  TIER_ORDER,
+  createFaceGeometry,
+  faceCount,
+  type FaceTierId,
+} from "./avatar/faceGeometry";
+import { createFaceMaterial, type FaceMaterial } from "./avatar/faceShader";
+
+export type AvatarQuality = "auto" | FaceTierId;
 
 export type AvatarScene3DProps = {
   scene: SceneId;
   emotion: EmotionId;
   speaking?: boolean;
   height?: number;
+  /** Head detail. "auto" picks by device; "ultra" is the full 499,280-face mesh. */
+  quality?: AvatarQuality;
 };
 
 const PARTICLE_COUNT = 220;
+const LEGION_COUNT = 32;
+const LEGION_RADIUS = 2.7;
+const REVEAL_SECONDS = 2.4;
+const BROW_BY_EMOTION: Record<EmotionId, number> = { calm: 0, focused: 0.8, alert: -0.5, triumphant: 0.25 };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** Frame-rate independent exponential smoothing. `rate` is roughly 1/seconds. */
 const damp = (current: number, target: number, rate: number, dt: number) =>
   current + (target - current) * (1 - Math.exp(-rate * dt));
 
+function pickTier(): FaceTierId {
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const mobile =
+    /Android|iPhone|iPad|iPod/i.test(nav.userAgent) || (nav.maxTouchPoints > 1 && window.innerWidth < 900);
+  const memory = nav.deviceMemory ?? 8;
+  const cores = nav.hardwareConcurrency ?? 4;
+  if (mobile || memory <= 4 || cores <= 2) return "high";
+  return "ultra";
+}
+
 type Rig = {
   head: THREE.Group;
-  shell: THREE.Mesh;
+  face: THREE.Mesh;
+  faceMat: FaceMaterial;
+  legionGroup: THREE.Group;
+  legion: THREE.InstancedMesh;
   cage: THREE.Mesh;
   cageMat: THREE.MeshBasicMaterial;
   eyes: THREE.Mesh[];
   eyeMat: THREE.MeshStandardMaterial;
-  jaw: THREE.Mesh;
-  jawMat: THREE.MeshStandardMaterial;
   halo: THREE.Mesh;
   haloMat: THREE.MeshBasicMaterial;
   particles: THREE.Points;
   particleMat: THREE.PointsMaterial;
   particleSeed: Float32Array;
   grid: THREE.GridHelper;
-  gridMat: THREE.Material;
   key: THREE.DirectionalLight;
   rim: THREE.PointLight;
   fog: THREE.Fog;
@@ -62,19 +92,15 @@ type Rig = {
 function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color): Rig {
   const head = new THREE.Group();
 
-  const shell = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1, 1),
-    new THREE.MeshStandardMaterial({
-      color: new THREE.Color(palette.graphite),
-      metalness: 0.92,
-      roughness: 0.28,
-      flatShading: true,
-    }),
-  );
-  head.add(shell);
+  // Start at the lowest tier so the first frame is instant; the real mesh is swapped in after.
+  const faceMat = createFaceMaterial(accent);
+  const face = new THREE.Mesh(createFaceGeometry(FACE_TIERS.low), faceMat);
+  face.frustumCulled = false;
+  head.add(face);
 
-  const cageMat = new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.28 });
-  const cage = new THREE.Mesh(new THREE.IcosahedronGeometry(1.06, 1), cageMat);
+  // Coarse lattice around the dense core: low-poly cage versus 500k-face skin.
+  const cageMat = new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.2 });
+  const cage = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), cageMat);
   head.add(cage);
 
   const eyeMat = new THREE.MeshStandardMaterial({
@@ -88,17 +114,11 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const eyes: THREE.Mesh[] = [];
   for (const x of [-0.34, 0.34]) {
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(x, 0.14, 0.94);
+    eye.position.set(x, 0.14, 0.9);
     head.add(eye);
     eyes.push(eye);
   }
 
-  const jawMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.8, roughness: 0.35 });
-  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.16), jawMat);
-  jaw.position.set(0, -0.42, 0.86);
-  head.add(jaw);
-
-  // Halo ring behind the head, slowly precessing.
   const haloMat = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.55 });
   const halo = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.012, 8, 128), haloMat);
   halo.position.z = -0.4;
@@ -106,7 +126,15 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
 
   world.add(head);
 
-  // Orbiting particle field: each point has its own radius, phase and speed.
+  // The Legion: many faces, one draw call. They share the head's material, so
+  // expression, glow and reveal uniforms drive the whole choir at once.
+  const legionGroup = new THREE.Group();
+  legionGroup.rotation.z = 0.32;
+  const legion = new THREE.InstancedMesh(createFaceGeometry(LEGION_SEGMENTS), faceMat, LEGION_COUNT);
+  legion.frustumCulled = false;
+  legionGroup.add(legion);
+  world.add(legionGroup);
+
   const positions = new Float32Array(PARTICLE_COUNT * 3);
   const particleSeed = new Float32Array(PARTICLE_COUNT * 3);
   for (let i = 0; i < PARTICLE_COUNT; i += 1) {
@@ -146,12 +174,47 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const fog = new THREE.Fog(fogColor, 6, 16);
   world.fog = fog;
 
-  return { head, shell, cage, cageMat, eyes, eyeMat, jaw, jawMat, halo, haloMat, particles, particleMat, particleSeed, grid, gridMat, key, rim, fog };
+  return { head, face, faceMat, legionGroup, legion, cage, cageMat, eyes, eyeMat, halo, haloMat, particles, particleMat, particleSeed, grid, key, rim, fog };
 }
 
-export default function AvatarScene3D({ scene, emotion, speaking = false, height = 460 }: AvatarScene3DProps) {
+/** Counts up to `value` without re-rendering React on every tick. */
+function FaceCount({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const shown = useRef(0);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still) {
+      shown.current = value;
+      node.textContent = value.toLocaleString();
+      return;
+    }
+    const from = shown.current;
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const k = clamp01((now - start) / 1400);
+      shown.current = Math.round(from + (value - from) * (1 - Math.pow(1 - k, 3)));
+      node.textContent = shown.current.toLocaleString();
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+
+  return (
+    <span className="ultran-chip ultran-chip--free" title={`Head mesh. Legion adds ${(LEGION_COUNT * faceCount(LEGION_SEGMENTS)).toLocaleString()} more.`}>
+      <span ref={ref}>0</span> faces
+    </span>
+  );
+}
+
+export default function AvatarScene3D({ scene, emotion, speaking = false, height = 460, quality = "auto" }: AvatarScene3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [faces, setFaces] = useState(faceCount(FACE_TIERS.low));
 
   // Live props, read by the animation loop without re-running the effect.
   const live = useRef({ scene, emotion, speaking });
@@ -177,6 +240,40 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
     const world = new THREE.Scene();
     const rig = buildRig(world, initialAccent, initialFog);
 
+    // ---- Quality tier: refine after first paint, step down if the GPU struggles.
+    const target: FaceTierId = quality === "auto" ? pickTier() : quality;
+    let tierIndex = 0; // currently on "low"
+    const swapTier = (id: FaceTierId) => {
+      const next = createFaceGeometry(FACE_TIERS[id]);
+      const prev = rig.face.geometry;
+      rig.face.geometry = next;
+      prev.dispose();
+      tierIndex = TIER_ORDER.indexOf(id);
+      setFaces(faceCount(FACE_TIERS[id]));
+    };
+    const upgradeTimer = target === "low" ? 0 : window.setTimeout(() => swapTier(target), 120);
+    let governorLocked = false;
+    let slowFrames = 0;
+    let sampledFrames = 0;
+
+    // ---- Shader safety net: if the face program fails, fall back to plain metal.
+    let shaderFailed = false;
+    let fallbackApplied = false;
+    renderer.debug.onShaderError = () => {
+      shaderFailed = true;
+    };
+    const applyFallback = () => {
+      fallbackApplied = true;
+      const metal = new THREE.MeshStandardMaterial({ color: new THREE.Color(palette.graphite), metalness: 0.92, roughness: 0.28, flatShading: true });
+      rig.face.material = metal;
+      rig.legion.material = metal;
+      rig.face.geometry.dispose();
+      rig.face.geometry = new THREE.IcosahedronGeometry(1, 3);
+      rig.legion.geometry.dispose();
+      rig.legion.geometry = new THREE.IcosahedronGeometry(1, 1);
+      setFaces(80 * 4);
+    };
+
     // Smoothed state.
     const accent = initialAccent.clone();
     const fogTarget = new THREE.Color();
@@ -186,6 +283,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       intensity: 0.55,
       mouth: 0.02,
       speakEnergy: 0,
+      brow: 0,
       blink: 0,
       nextBlink: 1.8,
       gazeX: 0,
@@ -193,9 +291,9 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       targetGazeX: 0,
       targetGazeY: 0,
       spawn: new THREE.Vector3(),
-      cameraLift: 0,
     };
     const spawnTarget = new THREE.Vector3();
+    const dummy = new THREE.Object3D();
 
     const onPointerMove = (e: PointerEvent) => {
       const rect = mount.getBoundingClientRect();
@@ -217,12 +315,27 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
     let elapsed = 0;
 
     const frame = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000);
+      const rawDt = (now - last) / 1000;
+      const dt = Math.min(0.1, rawDt);
       last = now;
       elapsed += dt;
       const t = elapsed;
       const still = reduced.matches;
       const { scene: sceneId, emotion: emotionId, speaking: isSpeaking } = live.current;
+
+      if (shaderFailed && !fallbackApplied) applyFallback();
+
+      // --- Frame-time governor: drop a tier if the head is too heavy here -----
+      if (!governorLocked && elapsed > REVEAL_SECONDS + 0.5 && rawDt < 0.25) {
+        sampledFrames += 1;
+        if (rawDt > 1 / 28) slowFrames += 1;
+        if (sampledFrames >= 90) {
+          if (slowFrames > 45 && tierIndex > 1) swapTier(TIER_ORDER[tierIndex - 1] ?? "medium");
+          else if (slowFrames <= 45) governorLocked = true;
+          sampledFrames = 0;
+          slowFrames = 0;
+        }
+      }
 
       // --- Ease toward the current scene / emotion targets -----------------
       const emo = emotions[emotionId] ?? emotions.calm;
@@ -237,7 +350,6 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.cageMat.color.copy(accent);
       rig.eyeMat.color.copy(accent);
       rig.eyeMat.emissive.copy(accent);
-      rig.jawMat.color.copy(accent);
       rig.haloMat.color.copy(accent);
       rig.particleMat.color.copy(accent);
       rig.key.color.copy(accent);
@@ -245,6 +357,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
 
       state.pulseHz = damp(state.pulseHz, emo.pulseHz, 2.5, dt);
       state.intensity = damp(state.intensity, emo.intensity, 2.5, dt);
+      state.brow = damp(state.brow, BROW_BY_EMOTION[emotionId] ?? 0, 4, dt);
       state.spawn.lerp(spawnTarget, 1 - Math.exp(-2 * dt));
 
       // --- Head: idle drift, breathing, gaze --------------------------------
@@ -258,13 +371,11 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.head.rotation.y = Math.sin(t * 0.35) * 0.22 * drift + state.gazeX * 0.35;
       rig.head.rotation.x = state.gazeY * 0.18 + Math.sin(t * 0.5) * 0.03 * drift;
       rig.head.rotation.z = Math.sin(t * 0.27) * 0.02 * drift;
-      // A speaking head nods subtly with the syllable rhythm.
       rig.head.rotation.x += Math.sin(t * 5.5) * 0.025 * state.speakEnergy * drift;
 
       rig.cage.rotation.y = t * 0.12 * drift;
       rig.cage.rotation.x = Math.sin(t * 0.2) * 0.1 * drift;
-      const cageScale = 1 + 0.015 * Math.sin(t * state.pulseHz * 3) * drift + 0.02 * state.speakEnergy;
-      rig.cage.scale.setScalar(cageScale);
+      rig.cage.scale.setScalar(1 + 0.015 * Math.sin(t * state.pulseHz * 3) * drift + 0.02 * state.speakEnergy);
 
       // --- Eyes: blink + saccade + emotion pulse ----------------------------
       state.nextBlink -= dt;
@@ -273,7 +384,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
         state.nextBlink = 2.2 + Math.random() * 3.6 - (emotionId === "alert" ? 1.2 : 0);
       }
       state.blink = Math.max(0, state.blink - dt * 7);
-      const lid = 1 - Math.sin(state.blink * Math.PI); // 1 = open, dips to 0 mid-blink
+      const lid = 1 - Math.sin(state.blink * Math.PI);
       const squint = emotionId === "focused" ? 0.78 : emotionId === "alert" ? 1.15 : 1;
       for (const eye of rig.eyes) {
         eye.scale.y = Math.max(0.08, lid * squint);
@@ -283,14 +394,34 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.eyeMat.emissiveIntensity =
         1.2 + state.intensity * (1 + Math.sin(t * state.pulseHz * 3)) * 1.1 + state.speakEnergy * 0.5;
 
-      // --- Jaw: layered syllable envelope while speaking --------------------
-      // Two incommensurate sines plus a slow envelope read as speech cadence.
+      // --- Mouth: layered syllable envelope while speaking ------------------
       const syllable = Math.abs(Math.sin(t * 9.5)) * 0.65 + Math.abs(Math.sin(t * 5.3 + 1.1)) * 0.35;
       const envelope = 0.55 + 0.45 * Math.sin(t * 1.7);
       const mouthTarget = 0.02 + state.speakEnergy * (0.04 + syllable * envelope * 0.18);
       state.mouth = damp(state.mouth, mouthTarget, 30, dt);
-      rig.jaw.position.y = -0.42 - state.mouth;
-      rig.jaw.scale.x = 1 - state.mouth * 0.6;
+
+      // --- Face uniforms (shared by the head and every Legion face) ---------
+      const u = rig.faceMat.uniforms;
+      u.uTime.value = t;
+      u.uMouth.value = clamp01((state.mouth - 0.02) / 0.2);
+      u.uBrow.value = state.brow;
+      u.uSpeak.value = state.speakEnergy;
+      u.uEnergy.value = state.intensity;
+      u.uReveal.value = still ? 1 : clamp01(t / REVEAL_SECONDS);
+      u.uAccent.value.copy(accent);
+
+      // --- The Legion: a tilted ring of faces that turn to watch the head ----
+      rig.legionGroup.rotation.y = t * 0.12 * drift;
+      for (let i = 0; i < LEGION_COUNT; i += 1) {
+        const a = (i / LEGION_COUNT) * Math.PI * 2;
+        const bob = Math.sin(t * 0.8 + i * 1.7) * 0.12 * drift;
+        dummy.position.set(Math.cos(a) * LEGION_RADIUS, bob, Math.sin(a) * LEGION_RADIUS);
+        dummy.lookAt(0, 0, 0);
+        dummy.scale.setScalar(0.11 * (1 + 0.1 * Math.sin(t * 2 + i) * drift + 0.15 * state.speakEnergy));
+        dummy.updateMatrix();
+        rig.legion.setMatrixAt(i, dummy.matrix);
+      }
+      rig.legion.instanceMatrix.needsUpdate = true;
 
       // --- Halo, particles, rim light ---------------------------------------
       rig.halo.rotation.z = t * 0.25 * drift;
@@ -311,7 +442,6 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
 
       rig.rim.intensity = 20 + Math.sin(t * state.pulseHz * 2) * 4 * drift + state.speakEnergy * 6;
 
-      // Slow camera dolly so the scene never feels pinned.
       camera.position.x = Math.sin(t * 0.12) * 0.25 * drift + state.gazeX * 0.15;
       camera.position.y = 0.6 + Math.cos(t * 0.1) * 0.08 * drift - state.gazeY * 0.08;
       camera.lookAt(0, 0, 0);
@@ -364,11 +494,13 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
 
     return () => {
       stop();
+      window.clearTimeout(upgradeTimer);
       intersection.disconnect();
       resize.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointermove", onPointerMove);
+      renderer.debug.onShaderError = null;
       world.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.LineSegments) {
           obj.geometry.dispose();
@@ -377,10 +509,11 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
           else mat.dispose();
         }
       });
+      rig.legion.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
-  }, [height]);
+  }, [height, quality]);
 
   return (
     <div className="ultran-stage" ref={mountRef} style={{ height }} aria-label="3D Ultran avatar">
@@ -390,6 +523,8 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
           <div className="ultran-stage-scene">{scenes[scene]?.label ?? "Obsidian Palace"}</div>
         </div>
         <div>
+          <FaceCount value={faces} />
+          <span className="ultran-chip ultran-chip--free">legion x{LEGION_COUNT}</span>
           <span
             key={emotion}
             className={`ultran-chip ultran-chip--pop ${emotion === "alert" ? "ultran-chip--paid" : "ultran-chip--free"}`}

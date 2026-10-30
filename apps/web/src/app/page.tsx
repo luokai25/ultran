@@ -1,3 +1,5 @@
+import AvatarHero from '@/components/AvatarHero';
+
 const LAYERS: ReadonlyArray<readonly [string, string]> = [
   ['Brain runtime', 'Local inference, verified model cache.'],
   ['Connector registry', 'Capability-scoped access to the world.'],
@@ -28,6 +30,8 @@ export default function HomePage() {
         A local-first AI agent platform. The brain runs on your device. The cloud
         is optional.
       </p>
+
+      <AvatarHero />
 
       <div
         style={{

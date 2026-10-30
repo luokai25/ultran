@@ -59,6 +59,19 @@ export class OllamaBackend implements BrainBackend {
     return response;
   }
 
+  /** List locally installed models and their Ollama-reported content digests. */
+  async listModels(): Promise<Array<{ id: string; sha256: string }>> {
+    const response = await this.request('/api/tags');
+    const payload = (await response.json()) as OllamaTags;
+    return (payload.models ?? [])
+      .filter((model) => typeof model.digest === 'string' && !!(model.name || model.model))
+      .map((model) => ({
+        id: model.name ?? model.model ?? '',
+        sha256: normalizedDigest(model.digest),
+      }))
+      .filter((model) => !!model.id && /^[a-f0-9]{64}$/.test(model.sha256));
+  }
+
   async load(ref: ModelRef, _opts: LoadOptions): Promise<ModelHandle> {
     if (!ref.sha256 || !/^[a-f0-9]{64}$/i.test(normalizedDigest(ref.sha256))) {
       throw new Error(`refusing to load "${ref.id}": a valid SHA-256 digest is required`);

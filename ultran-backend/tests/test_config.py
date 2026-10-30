@@ -11,8 +11,8 @@ from ultran_backend.config import Settings
 
 def test_defaults_are_sane():
     s = Settings()
-    assert s.brain_backend == "ollama"
-    assert s.brain_fallbacks == ("echo",)
+    assert s.brain_backend == "echo"
+    assert s.brain_fallbacks == ()
     assert s.api_prefix == "/v1"
     assert s.sandbox_max_ttl_s > 0
     assert s.is_production is False
@@ -79,3 +79,9 @@ def test_settings_are_immutable_and_overridable():
     assert copy.environment == "staging"
     assert s.environment == "dev"
     assert copy is not s
+
+
+def test_environment_defaults_to_local_ollama_with_echo_fallback():
+    settings = Settings.from_env({})
+    assert settings.brain_backend == "ollama"
+    assert settings.brain_fallbacks == ("echo",)

@@ -138,3 +138,13 @@ jobs:
 
       - name: Build production API image
         run: docker build -f ultran-backend/Dockerfile -t ultran-api:ci ultran-backend
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Validate Hetzner Terraform
+        run: |
+          terraform -chdir=infra/hetzner/terraform fmt -check -recursive
+          terraform -chdir=infra/hetzner/terraform init -backend=false -input=false
+          terraform -chdir=infra/hetzner/terraform validate

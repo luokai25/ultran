@@ -59,7 +59,7 @@ class Settings:
     environment: str = "dev"
     api_prefix: str = "/v1"
     data_dir: Path = Path(".ultran-data")
-    brain_backend: str = "ollama"
+    brain_backend: str = "echo"
     brain_endpoint: str = "http://127.0.0.1:11434"
     brain_model: str = "llama3.1:8b"
     brain_timeout_s: float = 30.0
@@ -67,7 +67,7 @@ class Settings:
     brain_openai_endpoint: str = "http://127.0.0.1:1234"
     brain_openai_api_key: str = ""
     #: Ordered fallbacks tried after ``brain_backend``; echo is always the floor.
-    brain_fallbacks: tuple[str, ...] = ("echo",)
+    brain_fallbacks: tuple[str, ...] = ()
     brain_retries: int = 1
     brain_breaker_threshold: int = 3
     brain_breaker_cooldown_s: float = 30.0

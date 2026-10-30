@@ -151,9 +151,10 @@ but end-to-end agent actions remain unfinished.
 
 ## Deploy the API on Hetzner Cloud
 
-Ultran now includes a single-server deployment baseline in
-[`infra/hetzner`](infra/hetzner/README.md). It uses Ubuntu 24.04 LTS, Docker
-Compose, and Caddy for automatic HTTPS. The API container runs as a non-root
+Ultran now includes a single-server deployment baseline and Terraform provisioning
+in [`infra/hetzner`](infra/hetzner/README.md). It uses Ubuntu 24.04 LTS, Docker
+Compose, and Caddy for automatic HTTPS. Terraform creates the VPS, restricted
+Cloud Firewall, non-root operator account, and initial host hardening. The API container runs as a non-root
 user, has a read-only root filesystem, and stores its encrypted credential vault
 on a persistent Docker volume. Only ports 80 and 443 are exposed by Compose;
 the API's port 8080 stays private.
@@ -165,11 +166,12 @@ service is provisioned by this repository change. Follow the full
 
 Quick outline:
 
-1. Create an Ubuntu 24.04 VPS and attach a Hetzner Cloud Firewall.
-2. Allow inbound TCP 22 only from your administration IP, plus TCP 80/443.
-   Do not expose 8080, database ports, or model-server ports.
-3. Install Docker Engine and Compose, harden SSH, enable security updates and
-   fail2ban, and configure host firewall rules.
+1. Set `HCLOUD_TOKEN` in your local environment and prepare
+   `infra/hetzner/terraform/terraform.tfvars` using its example file.
+2. Review and apply the Terraform plan to create an Ubuntu 24.04 VPS and
+   restricted Hetzner Cloud Firewall. SSH is allowed only from your admin IP.
+3. Connect as the non-root operator, install Docker Engine and Compose, and
+   verify the host hardening completed successfully.
 4. Point an API DNS A record at the VPS, copy
    `infra/hetzner/.env.example` to `.env`, and set the domain, ACME email,
    and exact web-app CORS origins.

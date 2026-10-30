@@ -52,7 +52,7 @@ def test_probe_reports_invalid_key_without_echoing_it():
 
 def test_probe_rejects_unsupported_provider():
     with pytest.raises(ValidationFailed, match="does not yet support"):
-        probe_provider("anthropic", "secret-api-key-123", client=Client())
+        probe_provider("unknown-provider", "secret-api-key-123", client=Client())
 
 
 def test_probe_normalizes_network_errors_without_leaking_credentials():

@@ -72,7 +72,7 @@ export class OllamaBackend implements BrainBackend {
       .filter((model) => !!model.id && /^[a-f0-9]{64}$/.test(model.sha256));
   }
 
-  async load(ref: ModelRef, _opts: LoadOptions): Promise<ModelHandle> {
+  async load(ref: ModelRef, _opts: LoadOptions = {}): Promise<ModelHandle> {
     if (!ref.sha256 || !/^[a-f0-9]{64}$/i.test(normalizedDigest(ref.sha256))) {
       throw new Error(`refusing to load "${ref.id}": a valid SHA-256 digest is required`);
     }

@@ -48,6 +48,18 @@
   "description": "OpenAI models on Azure."
  },
  {
+  "id": "cerebras",
+  "name": "Cerebras",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models"
+  ],
+  "description": "High-speed inference API."
+ },
+ {
   "id": "cohere",
   "name": "Cohere",
   "category": "ai",
@@ -130,6 +142,18 @@
    "embed"
   ],
   "description": "Fast open-model inference."
+ },
+ {
+  "id": "google-ai-studio",
+  "name": "Google AI Studio",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models"
+  ],
+  "description": "Gemini API through Google AI Studio."
  },
  {
   "id": "google-gemini",

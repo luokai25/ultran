@@ -23,7 +23,7 @@ class _Strict(BaseModel):
 class AgentCreate(_Strict):
     name: str = Field(min_length=2, max_length=64)
     persona: str = Field(default="ultran", min_length=2, max_length=64)
-    brain: Literal["echo", "ollama"] = "echo"
+    brain: str = Field(default="echo", min_length=2, max_length=64)
     model: str = Field(default="llama3.1:8b", max_length=96)
     tools: list[str] = Field(default_factory=list)
     system_prompt: str = Field(default="", max_length=8000)
@@ -47,6 +47,7 @@ class AgentCreate(_Strict):
 
 
 class AgentUpdate(_Strict):
+    brain: str | None = Field(default=None, min_length=2, max_length=64)
     name: str | None = Field(default=None, min_length=2, max_length=64)
     persona: str | None = None
     model: str | None = None

@@ -18,7 +18,8 @@ const PORT = Number(process.env.ULTRAN_PORT ?? 7700);
 const HOST = '127.0.0.1';
 const OLLAMA_URL = process.env.ULTRAN_OLLAMA_URL ?? 'http://127.0.0.1:11434';
 
-const brain = new BrainRuntime({ backends: [new OllamaBackend({ endpoint: OLLAMA_URL })] });
+const ollama = new OllamaBackend({ endpoint: OLLAMA_URL });
+const brain = new BrainRuntime({ backends: [ollama] });
 const grants = new InMemoryGrantStore();
 const sandbox = new ToolSandbox(grants);
 const ledger = new UsageLedger();
@@ -56,6 +57,11 @@ const server = createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/health') {
       send(200, { service: '@ultran/agent-core', ...(await brain.health()) });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/models') {
+      send(200, { models: await ollama.listModels() });
       return;
     }
 

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#050505" />
+    <meta name="color-scheme" content="dark" />
+    <title>Ultran</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <span class="wordmark">ULTRAN</span>
+        </div>
+        <span id="status" class="status" data-state="idle">local</span>
+      </header>
+
+      <main class="stage">
+        <canvas id="avatar" aria-label="Ultran avatar"></canvas>
+        <div class="halo" aria-hidden="true"></div>
+      </main>
+
+      <section class="console">
+        <p id="line" class="line">Ultran online. All systems nominal.</p>
+
+        <div class="chips" role="group" aria-label="Scenes">
+          <button class="chip" data-scene="palace" aria-pressed="true">Palace</button>
+          <button class="chip" data-scene="forge" aria-pressed="false">Forge</button>
+          <button class="chip" data-scene="marketplace" aria-pressed="false">Vault</button>
+          <button class="chip" data-scene="war-room" aria-pressed="false">War Room</button>
+        </div>
+
+        <form id="speak-form" class="composer">
+          <input
+            id="prompt"
+            type="text"
+            autocomplete="off"
+            placeholder="Speak to Ultran…"
+            aria-label="Message"
+          />
+          <button type="submit" class="send" aria-label="Speak">Speak</button>
+        </form>
+
+        <p class="footnote">
+          On-device voice · nothing leaves this phone
+        </p>
+      </section>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

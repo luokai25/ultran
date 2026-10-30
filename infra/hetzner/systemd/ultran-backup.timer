@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted Ultran backup schedule
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=30m
+Unit=ultran-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -190,7 +190,10 @@ export function initConnectors(deps: Deps): void {
       statusEl.textContent = `${enabled.size} enabled on your backend.`;
       statusEl.dataset.tone = "ok";
     } catch {
+      // Never present a stale "On" badge as current backend state after a failed
+      // refresh. The catalog remains browsable, but connection state is unknown.
       remoteKnown = false;
+      enabled = new Set();
       statusEl.textContent = "Could not reach your backend. Showing the catalog only.";
       statusEl.dataset.tone = "bad";
     }
@@ -268,12 +271,14 @@ export function initConnectors(deps: Deps): void {
             act.disabled = false;
             return;
           }
+          // Clear the secret before the request yields control. A timeout or
+          // backend error must not leave a credential sitting in the phone UI.
+          if (keyInput) keyInput.value = "";
           const res = await deps.api("/v1/connectors/connect", {
             method: "POST",
             body: JSON.stringify({ connector_id: entry.id, api_key: value, plan: entry.tier }),
           });
           if (!res.ok) throw new Error(`${res.status}`);
-          if (keyInput) keyInput.value = "";
         }
         await refreshEnabled();
         closeDetail();

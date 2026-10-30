@@ -141,13 +141,13 @@ export default function ModelHub() {
           </button>)}
         </div>
         <form className="ultran-provider-form" onSubmit={saveProviderKey}>
-          <div><strong>Connect {chosen.name}</strong><p>Get a key from the provider, then save it to Ultran&apos;s credential vault.</p></div>
+          <div><strong>Connect {chosen.name}</strong><p>Get a key from the provider, then save it to Ultran&apos;s backend credential store.</p></div>
           <a href={chosen.url} target="_blank" rel="noreferrer">Get API key ↗</a>
           <label htmlFor="ultran-provider-key">API key</label>
           <input id="ultran-provider-key" type="password" autoComplete="off" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your API key" />
           <button type="submit" disabled={saving || key.trim().length < 8}>{saving ? "Saving securely…" : "Connect provider"}</button>
           {notice && <p role="status">{notice}</p>}
-          <small>Keys are sent to your configured Ultran backend, never placed in browser storage. Use HTTPS for remote deployments.</small>
+          <small>Keys are sent to your configured Ultran backend and never placed in browser storage. Use HTTPS for remote deployments. Provider verification is a separate step.</small>
         </form>
       </div>}
 

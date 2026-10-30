@@ -11,7 +11,8 @@ from ultran_backend.config import Settings
 
 def test_defaults_are_sane():
     s = Settings()
-    assert s.brain_backend == "echo"
+    assert s.brain_backend == "ollama"
+    assert s.brain_fallbacks == ("echo",)
     assert s.api_prefix == "/v1"
     assert s.sandbox_max_ttl_s > 0
     assert s.is_production is False
@@ -33,6 +34,7 @@ def test_from_env_reads_every_knob():
     assert s.is_production is True
     assert s.api_prefix == "/api"
     assert s.brain_backend == "ollama"
+    assert s.brain_fallbacks == ("echo",)
     assert s.brain_timeout_s == 12.5
     assert s.sandbox_max_ttl_s == 60
     assert s.free_plan_monthly_tokens == 4242

@@ -20,7 +20,7 @@ export default function HomePage() {
         Pre-alpha
       </p>
 
-      <h1 style={{ fontSize: 52, lineHeight: 1.05, margin: '16px 0 0' }}>
+      <h1 className="ultran-title-sheen" style={{ fontSize: 52, lineHeight: 1.05, margin: '16px 0 0' }}>
         Ultran
       </h1>
 
@@ -37,10 +37,12 @@ export default function HomePage() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         }}
       >
-        {LAYERS.map(([title, body]) => (
+        {LAYERS.map(([title, body], i) => (
           <div
             key={title}
+            className="ultran-reveal ultran-card-hover"
             style={{
+              ['--reveal-delay' as string]: `${120 + i * 90}ms`,
               background: 'var(--ultran-surface)',
               border: '1px solid var(--ultran-border)',
               borderRadius: 'var(--ultran-radius)',

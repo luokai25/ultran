@@ -470,3 +470,105 @@ a {
     font-size: 30px;
   }
 }
+
+/* ---------------------------------------------------------------- motion */
+
+@keyframes ultran-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ultran-chip-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ultran-stage-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ultran-sheen {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.ultran-reveal {
+  opacity: 0;
+  animation: ultran-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+.ultran-chip--pop {
+  animation: ultran-chip-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ultran-stage {
+  animation: ultran-stage-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ultran-card-hover {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.ultran-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold-deep);
+  box-shadow: 0 10px 30px -12px var(--gold-glow, rgba(212, 175, 55, 0.35));
+}
+
+.ultran-title-sheen {
+  background: linear-gradient(100deg, var(--ink) 35%, var(--gold-bright) 50%, var(--ink) 65%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ultran-sheen 6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ultran-reveal,
+  .ultran-chip--pop,
+  .ultran-stage,
+  .ultran-title-sheen {
+    animation: none;
+    opacity: 1;
+  }
+  .ultran-title-sheen {
+    color: var(--ink);
+    background: none;
+  }
+  .ultran-card-hover,
+  .ultran-card-hover:hover {
+    transition: none;
+    transform: none;
+  }
+}

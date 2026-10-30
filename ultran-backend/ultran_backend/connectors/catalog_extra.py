@@ -307,6 +307,17 @@ squarespace|Squarespace|content|oauth2|paid|list_products,list_orders|Site build
 wix|Wix|content|oauth2|free|list_items,create_item|Site platform.
 directus|Directus|content|api_key|free|list_items,create_item|Open-source data platform.
 payload-cms|Payload CMS|content|api_key|free|find,create|Code-first headless CMS.
+# ---- model providers ----
+groq|Groq|ai|api_key|free|chat_completion,list_models|Fast hosted inference with an OpenAI-compatible API.
+google-ai-studio|Google AI Studio|ai|api_key|free|chat_completion,list_models|Gemini API through Google AI Studio.
+openrouter|OpenRouter|ai|api_key|free|chat_completion,list_models|One API for models from many providers.
+together-ai|Together AI|ai|api_key|paid|chat_completion,list_models|Hosted open-source model inference.
+deepseek|DeepSeek|ai|api_key|free|chat_completion,list_models|DeepSeek chat and reasoning models.
+fireworks-ai|Fireworks AI|ai|api_key|paid|chat_completion,list_models|Hosted fast inference for open models.
+cerebras|Cerebras|ai|api_key|free|chat_completion,list_models|High-speed inference API.
+mistral-ai|Mistral AI|ai|api_key|free|chat_completion,list_models|Mistral models and hosted inference.
+cohere|Cohere|ai|api_key|free|chat_completion,list_models|Command models and embeddings.
+xai|xAI|ai|api_key|paid|chat_completion,list_models|Grok API access.
 # ---- ai ----
 groq|Groq|ai|api_key|free|chat_completion,transcribe|Fast LLM inference.
 mistral|Mistral AI|ai|api_key|free|chat_completion,embed|Hosted open-weight and frontier models.

@@ -40,7 +40,10 @@ class Container:
     def build(cls, settings: Settings | None = None) -> Container:
         settings = settings or Settings.from_env()
         registry = ConnectorRegistry(load_catalog())
-        vault = CredentialVault()
+        vault = CredentialVault(
+            db_path=settings.data_dir / "credentials.sqlite3" if settings.credential_encryption_key else None,
+            encryption_key=settings.credential_encryption_key or None,
+        )
         sandbox = ToolSandbox(
             registry,
             vault,

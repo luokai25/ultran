@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .brain import BrainMessage, BrainRuntime, OpenAICompatBackend\nfrom .provider_connections import PROVIDER_CHAT_BASE_URLS
+from .brain import BrainMessage, BrainRuntime, OpenAICompatBackend
+from .provider_connections import PROVIDER_CHAT_BASE_URLS, OpenAICompatBackend\nfrom .provider_connections import PROVIDER_CHAT_BASE_URLS
 from .connectors.credentials import utcnow
 from .errors import NotFound, ValidationFailed
 from .sandbox import ToolSandbox
@@ -88,9 +89,10 @@ class Agent:
 class AgentService:
     """Owns agents and their sessions. Every mutation is validated first."""
 
-    def __init__(self, brain: BrainRuntime, sandbox: ToolSandbox) -> None:
+    def __init__(self, brain: BrainRuntime, sandbox: ToolSandbox, vault=None) -> None:
         self.brain = brain
         self.sandbox = sandbox
+        self.vault = vault
         self._agents: dict[str, Agent] = {}
         self._sessions: dict[str, Session] = {}
 
@@ -222,7 +224,23 @@ class AgentService:
         session.turns += 1
 
         messages = [BrainMessage("system", agent.system_message()), *session.messages]
-        backend_override = None\n        if agent.brain in PROVIDER_CHAT_BASE_URLS:\n            if self.vault is None:\n                raise ValidationFailed("provider credentials are unavailable")\n            credential = self.vault.get(workspace_id, agent.brain)\n            backend_override = OpenAICompatBackend(\n                PROVIDER_CHAT_BASE_URLS[agent.brain],\n                self.brain_timeout_s if hasattr(self, "brain_timeout_s") else 30.0,\n                api_key=credential.reveal(),\n            )\n            backend_override.name = agent.brain\n            credential.touch()\n        elif agent.brain not in {"echo", "ollama", "openai"}:\n            raise ValidationFailed("unsupported agent brain provider", details={"provider": agent.brain})\n        reply = self.brain.complete(\n            messages, model=agent.model, temperature=agent.temperature,\n            backend_override=backend_override,\n        )
+        backend_override = None
+        if agent.brain in PROVIDER_CHAT_BASE_URLS:
+            if self.vault is None:
+                raise ValidationFailed("provider credentials are unavailable")
+            credential = self.vault.get(workspace_id, agent.brain)
+            backend_override = OpenAICompatBackend(
+                PROVIDER_CHAT_BASE_URLS[agent.brain],
+                api_key=credential.reveal(),
+            )
+            backend_override.name = agent.brain
+            credential.touch()
+        elif agent.brain not in {"echo", "ollama", "openai"}:
+            raise ValidationFailed("unsupported agent brain provider", details={"provider": agent.brain})
+        reply = self.brain.complete(
+            messages, model=agent.model, temperature=agent.temperature,
+            backend_override=backend_override,
+        )
         session.append("assistant", reply.content)
 
         tool_calls: list[dict[str, Any]] = []

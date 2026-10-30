@@ -121,3 +121,20 @@ jobs:
             exit 1
           fi
           echo "no forbidden files tracked"
+
+  hetzner-infra:
+    name: Hetzner deployment validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        working-directory: infra/hetzner
+        env:
+          ULTRAN_DOMAIN: api.example.com
+          ACME_EMAIL: ops@example.com
+        run: docker compose -f compose.yaml config --quiet
+
+      - name: Build production API image
+        run: docker build -f ultran-backend/Dockerfile -t ultran-api:ci ultran-backend

@@ -11,7 +11,7 @@ name: Lockfile
 # Run manually after changing workspace manifests. CI continues to install
 # without a lockfile until this workflow has generated and committed one.
 
-on:
+"on":
   workflow_dispatch:
 
 concurrency:

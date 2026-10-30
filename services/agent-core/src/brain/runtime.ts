@@ -22,6 +22,10 @@ export interface BrainRuntimeOptions {
   memoryBudgetMb?: number;
 }
 
+function digestKey(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/^sha256:/, "");
+}
+
 export class BrainRuntime {
   private readonly backends = new Map<string, BrainBackend>();
   private readonly loaded = new Map<string, ModelHandle>();
@@ -47,7 +51,19 @@ export class BrainRuntime {
     }
 
     const cached = this.loaded.get(ref.id);
-    if (cached) return cached;
+    if (cached) {
+      // Never let a cache hit bypass the identity check. A model ID can be
+      // repointed to different bytes; backend and digest are part of identity.
+      if (
+        cached.ref.backend !== ref.backend ||
+        digestKey(cached.ref.sha256) !== digestKey(ref.sha256)
+      ) {
+        throw new Error(
+          `model "${ref.id}" is already loaded with a different backend or SHA-256 digest`,
+        );
+      }
+      return cached;
+    }
 
     const backend = this.backends.get(ref.backend);
     if (!backend) {

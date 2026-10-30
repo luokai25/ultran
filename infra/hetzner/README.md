@@ -53,6 +53,53 @@ On the server:
 Do not enable UFW before confirming the SSH allow rule. Keep Hetzner's firewall
 as the outer network boundary as well.
 
+## Provision the VPS with Terraform
+
+The adjacent `terraform/` directory provisions the Hetzner server and Cloud
+Firewall. It also creates a non-root operator account, installs unattended
+security updates and fail2ban, and enables a host firewall. The Cloud Firewall
+allows SSH only from the administrator's IPv4 CIDR and exposes HTTP/HTTPS.
+
+Install Terraform 1.6+ and set the Hetzner API token in your local shell:
+
+```bash
+export HCLOUD_TOKEN="YOUR_HETZNER_CLOUD_API_TOKEN"
+cd infra/hetzner/terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with:
+- Your public IPv4 address in CIDR form (usually `x.x.x.x/32`).
+- Your SSH **public** key (never the private key).
+- A suitable Hetzner location and server type.
+
+Then review before creating anything:
+
+```bash
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan -out=ultran.tfplan
+terraform show ultran.tfplan
+```
+
+Only after reviewing the plan, apply it:
+
+```bash
+terraform apply ultran.tfplan
+terraform output
+```
+
+The output gives the server IPv4 address. Point the API DNS A record at it.
+Connect as the non-root operator shown in `admin_user`, install Docker Engine
+and the Compose plugin, then follow **First deployment** below.
+
+Keep `HCLOUD_TOKEN`, `terraform.tfvars`, Terraform state, and plan files
+private. The repository ignores Terraform state and plan files; never force-add
+them. The server has Hetzner automated backups enabled, but that is not a
+substitute for encrypted, off-server backups of the credential volume and its
+Fernet key. Review the plan carefully: Terraform can create billable resources.
+
 ## First deployment
 
 Clone the repository on the server, then:

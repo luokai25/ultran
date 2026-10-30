@@ -45,10 +45,10 @@ def list_connectors(
 @router.post("/{connector_id}/test")
 def test_connection(connector_id: str, container: ContainerDep, workspace: WorkspaceDep):
     """Verify a saved AI provider key without generating a billable completion."""
-    from ..provider_connections import PROVIDER_BASE_URLS, probe_provider
+    from ..provider_connections import PROVIDER_PROBES, probe_provider
     from ..errors import ValidationFailed
 
-    if connector_id not in PROVIDER_BASE_URLS:
+    if connector_id not in PROVIDER_PROBES:
         raise ValidationFailed(
             "Connection testing is not available for this provider yet.",
             details={"provider": connector_id},

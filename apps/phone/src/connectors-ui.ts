@@ -80,6 +80,7 @@ export function initConnectors(deps: Deps): void {
   let shown = PAGE;
   let enabled = new Set<string>();
   let remoteKnown = false;
+  let detailReturnFocus: HTMLElement | null = null;
 
   const categories = [...new Set(CATALOG.map((c) => c.category))].sort();
 
@@ -184,7 +185,16 @@ export function initConnectors(deps: Deps): void {
     try {
       const res = await deps.api("/v1/connectors/enabled/list", {}, 8_000);
       if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { enabled: string[] };
+      const body: unknown = await res.json();
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        !("enabled" in body) ||
+        !Array.isArray(body.enabled) ||
+        !body.enabled.every((id): id is string => typeof id === "string")
+      ) {
+        throw new Error("Invalid enabled-connectors response");
+      }
       enabled = new Set(body.enabled);
       remoteKnown = true;
       statusEl.textContent = `${enabled.size} enabled on your backend.`;
@@ -205,13 +215,22 @@ export function initConnectors(deps: Deps): void {
   function closeDetail(): void {
     detailWrap.hidden = true;
     detailEl.replaceChildren();
+    const returnFocus = detailReturnFocus;
+    detailReturnFocus = null;
+    if (returnFocus?.isConnected) returnFocus.focus();
   }
 
   function openDetail(entry: CatalogEntry): void {
+    if (detailWrap.hidden) {
+      detailReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     detailEl.replaceChildren();
     const on = enabled.has(entry.id);
 
-    detailEl.append(el("h2", undefined, entry.name));
+    const title = el("h2", undefined, entry.name);
+    title.id = "connector-detail-title";
+    detailEl.setAttribute("aria-labelledby", title.id);
+    detailEl.append(title);
     detailEl.append(el("p", "conn-detail-desc", entry.description));
 
     const meta = el("div", "conn-meta");
@@ -312,6 +331,8 @@ export function initConnectors(deps: Deps): void {
     buttons.append(act);
     detailEl.append(buttons, note);
     detailWrap.hidden = false;
+    // Put keyboard and screen-reader focus inside the modal as soon as it opens.
+    (keyInput ?? close).focus();
   }
 
   /* ---------------- open / close ---------------- */
@@ -333,6 +354,33 @@ export function initConnectors(deps: Deps): void {
   need<HTMLButtonElement>("#connectors-back").addEventListener("click", close);
   detailWrap.addEventListener("click", (event) => {
     if (event.target === detailWrap) closeDetail();
+  });
+  detailWrap.addEventListener("keydown", (event) => {
+    if (detailWrap.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDetail();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = [...detailEl.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    )].filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+    if (focusable.length === 0) {
+      event.preventDefault();
+      detailEl.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !detailEl.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   });
   moreBtn.addEventListener("click", () => {
     shown += PAGE;

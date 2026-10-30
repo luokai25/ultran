@@ -21,7 +21,7 @@ def service(*, connectors=("github",)) -> AgentService:
     )
     vault = CredentialVault()
     sb = ToolSandbox(reg, vault)
-    return AgentService(BrainRuntime(EchoBackend()), sb)
+    return AgentService(BrainRuntime(EchoBackend()), sb, vault)
 
 
 # ------------------------------------------------------------------- CRUD
@@ -307,3 +307,40 @@ def test_public_payload_shape():
         "total_runs",
         "total_tokens",
     }
+
+
+
+def test_provider_brain_requires_a_saved_workspace_key():
+    svc = service()
+    agent = svc.create(name="Cloud agent", brain="groq", model="llama-3.3-70b")
+    with pytest.raises(NotFound, match="no credential stored"):
+        svc.chat(agent.id, "hello", workspace_id="local")
+
+
+def test_provider_brain_routes_chat_using_workspace_credential(monkeypatch):
+    from ultran_backend import agents as agents_module
+    from ultran_backend.brain import BrainReply
+
+    svc = service()
+    svc.vault.put("local", "groq", KEY)
+    agent = svc.create(name="Cloud agent", brain="groq", model="llama-3.3-70b")
+    captured = {}
+
+    class FakeProviderBackend:
+        name = "openai"
+
+        def __init__(self, endpoint, timeout_s=30.0, api_key=None):
+            captured["endpoint"] = endpoint
+            captured["api_key"] = api_key
+
+        def complete(self, messages, *, model, temperature):
+            captured["model"] = model
+            return BrainReply("cloud response", 2, 3, model, self.name)
+
+    monkeypatch.setattr(agents_module, "OpenAICompatBackend", FakeProviderBackend)
+    result = svc.chat(agent.id, "hello", workspace_id="local", allow_tools=False)
+    assert result["content"] == "cloud response"
+    assert captured["endpoint"] == "https://api.groq.com/openai"
+    assert captured["api_key"] == KEY
+    assert captured["model"] == "llama-3.3-70b"
+    assert svc.vault.get("local", "groq").uses == 1

@@ -79,12 +79,21 @@ Feat features(vec3 d) {
   f.socket = gauss(m, vec3(0.34, 0.14, 0.93), vec3(0.20, 0.10, 0.30));
   h -= 0.085 * f.socket;
   // brow ridge: heavier and lower when focused (uBrow > 0), lifted when alert
-  h += (0.05 + 0.03 * uBrow) * gauss(m, vec3(0.30, 0.31 - 0.03 * uBrow, 0.90), vec3(0.28, 0.06, 0.30));
+  h += (0.075 + 0.03 * uBrow) * gauss(m, vec3(0.30, 0.31 - 0.03 * uBrow, 0.90), vec3(0.30, 0.045, 0.30));
+  h += 0.035 * gauss(d, vec3(0.0, 0.46, 0.82), vec3(0.42, 0.12, 0.2)); // angular forehead crown
   h += 0.075 * gauss(d, vec3(0.0, -0.02, 1.0), vec3(0.07, 0.22, 0.25));      // nose
-  h += 0.035 * gauss(m, vec3(0.50, -0.16, 0.84), vec3(0.18, 0.12, 0.25));    // cheekbones
+  // Hard, swept cheek armour and angular temple plates give the skull its
+  // recognisable machine-built silhouette instead of a smooth human mask.
+  h += 0.085 * gauss(m, vec3(0.53, -0.12, 0.82), vec3(0.22, 0.075, 0.24));
+  h += 0.045 * gauss(m, vec3(0.73, 0.02, 0.58), vec3(0.13, 0.25, 0.24));
+  h -= 0.035 * gauss(m, vec3(0.62, -0.28, 0.78), vec3(0.11, 0.12, 0.2)); // cheek recess
+  h += 0.035 * gauss(m, vec3(0.50, -0.16, 0.84), vec3(0.18, 0.12, 0.25)); // cheekbone
 
   f.jaw = (1.0 - smoothstep(-0.50, -0.30, d.y)) * smoothstep(-0.20, 0.35, d.z);
   h += 0.03 * f.jaw;
+  // Tapered chin and layered jawline with a pronounced centre chin plate.
+  h += 0.055 * gauss(d, vec3(0.0, -0.66, 0.76), vec3(0.25, 0.12, 0.24));
+  h -= 0.028 * gauss(m, vec3(0.36, -0.53, 0.78), vec3(0.08, 0.09, 0.16));
   float slot = 0.018 + uMouth * 0.10;
   f.mouth = gauss(d, vec3(0.0, -0.40, 0.91), vec3(0.30, slot, 0.30));
   h -= 0.10 * f.mouth;
@@ -186,15 +195,21 @@ void main() {
   float fres = pow(1.0 - ndv, 3.0);
   float spec = pow(max(dot(N, H), 0.0), 48.0);
 
-  vec3 col = uBase * (0.18 + 0.9 * ndl);
-  col += uAccent * spec * 0.9;
-  col += uAccent * fres * (0.55 + uEnergy * 0.9);
+  // Layered cool titanium: broad studio highlights, dark machined recesses,
+  // and tight polished-metal specular reflections.
+  float studio = max(dot(N, normalize(vec3(-0.65, 0.25, 0.7))), 0.0);
+  float lowerFill = max(dot(N, normalize(vec3(0.1, -0.8, 0.4))), 0.0);
+  vec3 steel = mix(vec3(0.16, 0.19, 0.23), vec3(0.72, 0.77, 0.82), clamp(0.24 + ndl * 0.42 + studio * 0.34, 0.0, 1.0));
+  vec3 col = steel * (0.34 + 0.72 * ndl + 0.22 * lowerFill);
+  col += vec3(0.88, 0.93, 1.0) * pow(max(dot(N, H), 0.0), 72.0) * 1.25;
+  col += vec3(0.34, 0.43, 0.55) * spec * 0.9;
+  col += uAccent * fres * (0.25 + uEnergy * 0.7);
 
   // Energy veins: thin lines where noise crosses 0.5, with pulses running along them.
   float vn = vnoise(vDir * 6.5 + vec3(0.0, uTime * 0.05, 0.0));
   float vein = 1.0 - smoothstep(0.0, 0.03, abs(vn - 0.5));
   float travel = 0.5 + 0.5 * sin(vDir.y * 10.0 - uTime * (1.2 + uSpeak * 5.0) + vn * 6.0);
-  col += uAccent * vein * (0.25 + travel * 1.1) * (0.4 + uEnergy);
+  col += uAccent * vein * (0.18 + travel * 0.9) * (0.25 + uEnergy);
 
   // Slow scan line.
   float sweepY = fract(uTime * 0.11) * 2.6 - 1.3;
@@ -236,7 +251,7 @@ export function createFaceMaterial(accent: THREE.Color): FaceMaterial {
       uEnergy: { value: 0.55 },
       uReveal: { value: 0 },
       uAccent: { value: accent.clone() },
-      uBase: { value: new THREE.Color(palette.graphite) },
+      uBase: { value: new THREE.Color("#aeb8c4") },
     },
   }) as FaceMaterial;
 }

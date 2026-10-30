@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
+import { BrainRuntime } from './runtime.js';
 import { OllamaBackend } from './ollama-backend.js';
 import type { ModelRef } from './types.js';
 
@@ -81,4 +82,16 @@ test('lists installed models with normalized SHA-256 digests', async () => {
     }),
   });
   assert.deepEqual(await backend.listModels(), [{ id: 'qwen2.5:3b', sha256: digest }]);
+});
+
+test('a cached model id cannot be reused with a different digest', async () => {
+  const backend = new OllamaBackend({
+    fetcher: async () => jsonResponse({ models: [{ name: ref.id, digest }] }),
+  });
+  const runtime = new BrainRuntime({ backends: [backend] });
+  await runtime.load(ref);
+  await assert.rejects(
+    () => runtime.load({ ...ref, sha256: 'b'.repeat(64) }),
+    /already loaded with a different backend or SHA-256 digest/,
+  );
 });

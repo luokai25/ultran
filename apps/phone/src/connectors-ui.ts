@@ -374,6 +374,13 @@ export function initConnectors(deps: Deps): void {
     }
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
+    // Array indexing remains optional under noUncheckedIndexedAccess, even
+    // after the length guard. Keep the focus trap defensive for empty DOMs.
+    if (!first || !last) {
+      event.preventDefault();
+      detailEl.focus();
+      return;
+    }
     if (event.shiftKey && (document.activeElement === first || !detailEl.contains(document.activeElement))) {
       event.preventDefault();
       last.focus();

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .brain import BrainMessage, BrainRuntime
+from .brain import BrainMessage, BrainRuntime, OpenAICompatBackend\nfrom .provider_connections import PROVIDER_CHAT_BASE_URLS
 from .connectors.credentials import utcnow
 from .errors import NotFound, ValidationFailed
 from .sandbox import ToolSandbox
@@ -222,7 +222,7 @@ class AgentService:
         session.turns += 1
 
         messages = [BrainMessage("system", agent.system_message()), *session.messages]
-        reply = self.brain.complete(messages, model=agent.model, temperature=agent.temperature)
+        backend_override = None\n        if agent.brain in PROVIDER_CHAT_BASE_URLS:\n            if self.vault is None:\n                raise ValidationFailed("provider credentials are unavailable")\n            credential = self.vault.get(workspace_id, agent.brain)\n            backend_override = OpenAICompatBackend(\n                PROVIDER_CHAT_BASE_URLS[agent.brain],\n                self.brain_timeout_s if hasattr(self, "brain_timeout_s") else 30.0,\n                api_key=credential.reveal(),\n            )\n            backend_override.name = agent.brain\n            credential.touch()\n        elif agent.brain not in {"echo", "ollama", "openai"}:\n            raise ValidationFailed("unsupported agent brain provider", details={"provider": agent.brain})\n        reply = self.brain.complete(\n            messages, model=agent.model, temperature=agent.temperature,\n            backend_override=backend_override,\n        )
         session.append("assistant", reply.content)
 
         tool_calls: list[dict[str, Any]] = []

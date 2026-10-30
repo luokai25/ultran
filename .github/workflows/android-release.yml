@@ -1,0 +1,226 @@
+name: Android Release
+
+# The APK is built here and nowhere else. A sandbox build is not reproducible and
+# leaves no audit trail; this workflow is the single source of truth for the
+# Ultran Android release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/phone/**"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version name to stamp on the APK (defaults to apps/phone/package.json)"
+        required: false
+        type: string
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "20.11"
+  PNPM_VERSION: "9.12.0"
+  JAVA_VERSION: "17"
+  WORKDIR: apps/phone
+
+jobs:
+  release:
+    name: Build signed APK and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./${{ env.WORKDIR }}/package.json').version")
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="$PKG_VERSION"; fi
+          # versionCode must increase monotonically for Android to accept an update.
+          VERSION_CODE=$(( 1000 + ${{ github.run_number }} ))
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=android-v${VERSION}-b${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "Building $VERSION (code $VERSION_CODE)"
+
+      - name: Build web assets
+        working-directory: ${{ env.WORKDIR }}
+        run: pnpm build
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Sync Capacitor
+        working-directory: ${{ env.WORKDIR }}
+        run: npx cap sync android
+
+      # The launcher icons and splash screens are generated, not committed, so
+      # the repository carries no opaque binaries. Regenerate them before Gradle
+      # resolves resources.
+      - name: Generate Android assets
+        working-directory: ${{ env.WORKDIR }}/android
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 tools/generate_assets.py
+
+      - name: Decode release keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set - the APK will be UNSIGNED."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "path=$RUNNER_TEMP/release.keystore" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APK
+        working-directory: ${{ env.WORKDIR }}/android
+        env:
+          APP_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          APP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          APP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          APP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ULTRAN_VERSION_NAME: ${{ steps.version.outputs.name }}
+          ULTRAN_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --console=plain --max-workers=2 2>&1 | tee build.log
+
+      - name: Verify APK
+        id: verify
+        working-directory: ${{ env.WORKDIR }}/android
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "::error::release APK was not produced"
+            exit 1
+          fi
+
+          # Discover build-tools newest-first rather than hardcoding a version.
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "Using build-tools: $BT"
+
+          if [ "${{ steps.keystore.outputs.signed }}" = "true" ]; then
+            "$BT/apksigner" verify --print-certs "$APK"
+            echo "::notice::APK signature verified"
+          else
+            echo "::warning::APK is unsigned (no keystore secret configured)"
+          fi
+
+          "$BT/aapt2" dump badging "$APK" | head -20
+
+          SIZE=$(stat -c%s "$APK")
+          echo "APK size: $SIZE bytes"
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "::error::APK is implausibly small ($SIZE bytes) - the web assets are probably missing"
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/out"
+          cp "$APK" "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
+          echo "apk=$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Package Capacitor project
+        run: |
+          set -euo pipefail
+          cd "${{ env.WORKDIR }}"
+          # Ship the native project so the APK can be rebuilt from the release
+          # alone, without cloning and re-running cap add.
+          zip -r "$RUNNER_TEMP/out/ultran-capacitor-android-${{ steps.version.outputs.name }}.zip" \
+            android \
+            capacitor.config.ts \
+            package.json \
+            -x "android/.gradle/*" \
+            -x "android/build/*" \
+            -x "android/app/build/*" \
+            -x "android/local.properties" \
+            -x "android/app/src/main/assets/public/*" \
+            -x "android/*.keystore" \
+            -x "android/keystore.properties"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Ultran Android ${{ steps.version.outputs.name }} (build ${{ github.run_number }})
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            Signed Android release built by CI from `${{ github.sha }}`.
+
+            | | |
+            | --- | --- |
+            | Version | `${{ steps.version.outputs.name }}` |
+            | versionCode | `${{ steps.version.outputs.code }}` |
+            | Package | `app.ultran.mobile` |
+            | Signed | `${{ steps.keystore.outputs.signed }}` |
+            | Commit | `${{ github.sha }}` |
+
+            **Assets**
+
+            - `ultran-${{ steps.version.outputs.name }}.apk` - installable release APK
+            - `ultran-capacitor-android-${{ steps.version.outputs.name }}.zip` - the full
+              Capacitor Android project, so the APK can be rebuilt from this release alone
+
+            Install with `adb install -r ultran-${{ steps.version.outputs.name }}.apk`.
+          files: |
+            ${{ runner.temp }}/out/ultran-${{ steps.version.outputs.name }}.apk
+            ${{ runner.temp }}/out/ultran-capacitor-android-${{ steps.version.outputs.name }}.zip
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: ${{ env.WORKDIR }}/android/build.log
+          if-no-files-found: ignore
+
+      - name: Remove keystore
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/release.keystore" || true

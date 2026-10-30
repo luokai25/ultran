@@ -1,24 +1,49 @@
 # Ultran infrastructure
 
-Infrastructure as code for the **cloud control plane only**. The local agent
-runtime (`services/agent-core`) is never deployed by this module - it ships
-inside the client binaries.
+Infrastructure as code for Ultran's hosted control plane. The repository keeps
+its original AWS reference architecture separate from the active Hetzner VPS
+deployment target. The local-first agent runtime can still run on user devices
+or a separately managed model host.
 
 ## Layout
 
 ```
 infra/
-├── terraform/       # Cloud resources: database, network, security groups
-│   ├── main.tf
-│   ├── variables.tf
-│   └── outputs.tf
-├── k8s/             # Workload manifests for the control plane
-│   ├── api-deployment.yaml
-│   └── api-service.yaml
-└── docker/          # Build definitions
-    ├── api.Dockerfile
-    └── web.Dockerfile
+├── hetzner/         # Active single-VPS API deployment
+│   ├── terraform/   # VPS, firewall, SSH operator, cloud-init hardening
+│   ├── systemd/    # Scheduled encrypted off-server backups
+│   ├── compose.yaml
+│   ├── Caddyfile
+│   └── backup.sh
+├── terraform/       # Existing AWS reference architecture
+├── k8s/             # Kubernetes workload manifests
+└── docker/          # Shared Docker build definitions
 ```
+
+## Hetzner deployment (active target)
+
+The initial production target is a single Ubuntu 24.04 VPS provisioned with
+Terraform under [`hetzner/`](hetzner/README.md). It creates a restricted
+Hetzner Cloud Firewall, a non-root SSH operator, host firewall rules, fail2ban,
+automatic security updates, Docker Engine and Compose. Docker Compose runs the
+FastAPI service behind Caddy with automatic HTTPS.
+
+The deployment guide includes:
+- Persistent encrypted SQLite credential storage and key recovery.
+- Encrypted Restic backups to an off-server SFTP repository, with a daily
+  systemd timer and tested-restore instructions.
+- Health checks, deployment/rollback steps, and operational security checks.
+
+The infrastructure is **not live yet**. A Hetzner account, project API token,
+SSH public key, administrator IP/CIDR, and DNS name are still needed before
+provisioning. Keep the Hetzner token in an environment variable or secret
+manager, never in Terraform variables or Git.
+
+## Existing AWS reference
+
+The original `terraform/` directory remains an AWS-oriented reference design
+for VPC, private subnets, and an encrypted RDS database. It is not the active
+Hetzner deployment path and must not be applied as if it provisions Hetzner.
 
 ## Environments
 

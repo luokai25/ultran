@@ -344,3 +344,23 @@ def test_provider_brain_routes_chat_using_workspace_credential(monkeypatch):
     assert captured["api_key"] == KEY
     assert captured["model"] == "llama-3.3-70b"
     assert svc.vault.get("local", "groq").uses == 1
+
+
+
+def test_agent_create_accepts_connected_provider_brains():
+    svc = service()
+    agent = svc.create(name="Groq agent", brain="groq", model="llama-3.3-70b")
+    assert agent.brain == "groq"
+
+
+def test_agent_update_can_change_provider_brain():
+    svc = service()
+    agent = svc.create(name="Switchable agent")
+    updated = svc.update(agent.id, brain="deepseek")
+    assert updated.brain == "deepseek"
+
+
+def test_agent_rejects_unknown_brain_provider():
+    svc = service()
+    with pytest.raises(ValidationFailed, match="unsupported agent brain"):
+        svc.create(name="Unknown agent", brain="made-up-provider")

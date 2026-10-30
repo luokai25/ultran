@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from ultran_backend.errors import DependencyUnavailable, ValidationFailed
-from ultran_backend.provider_connections import PROVIDER_BASE_URLS, probe_provider
+from ultran_backend.provider_connections import PROVIDER_PROBES, probe_provider
 
 
 class Response:
@@ -29,15 +29,15 @@ class Client:
         return self.response
 
 
-@pytest.mark.parametrize("provider", sorted(PROVIDER_BASE_URLS))
+@pytest.mark.parametrize("provider", sorted(PROVIDER_PROBES))
 def test_probe_uses_bearer_auth_and_only_returns_public_metadata(provider):
     client = Client()
     result = probe_provider(provider, "secret-api-key-123", client=client)
     assert result.ok is True
     assert result.status == "connected"
     assert result.models_count == 2
-    assert client.calls[0][0] == f"{PROVIDER_BASE_URLS[provider]}/models"
-    assert client.calls[0][1]["Authorization"] == "Bearer secret-api-key-123"
+    assert client.calls[0][0] == PROVIDER_PROBES[provider][0]
+    auth_header = PROVIDER_PROBES[provider][1]\n    expected = "Bearer secret-api-key-123" if auth_header == "Authorization" else "secret-api-key-123"\n    assert client.calls[0][1][auth_header] == expected
     assert "secret-api-key-123" not in str(result.public())
 
 

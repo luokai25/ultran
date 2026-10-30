@@ -11,16 +11,19 @@ from typing import Any
 
 from .errors import DependencyUnavailable, ValidationFailed
 
-PROVIDER_BASE_URLS: dict[str, str] = {
-    "openai": "https://api.openai.com/v1",
-    "groq": "https://api.groq.com/openai/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-    "together-ai": "https://api.together.xyz/v1",
-    "deepseek": "https://api.deepseek.com/v1",
-    "fireworks-ai": "https://api.fireworks.ai/inference/v1",
-    "cerebras": "https://api.cerebras.ai/v1",
-    "mistral": "https://api.mistral.ai/v1",
-    "xai": "https://api.x.ai/v1",
+PROVIDER_PROBES: dict[str, tuple[str, str, dict[str, str]]] = {
+    "openai": ("https://api.openai.com/v1/models", "Authorization", {"Accept": "application/json"}),
+    "groq": ("https://api.groq.com/openai/v1/models", "Authorization", {"Accept": "application/json"}),
+    "openrouter": ("https://openrouter.ai/api/v1/models", "Authorization", {"Accept": "application/json"}),
+    "together-ai": ("https://api.together.xyz/v1/models", "Authorization", {"Accept": "application/json"}),
+    "deepseek": ("https://api.deepseek.com/v1/models", "Authorization", {"Accept": "application/json"}),
+    "fireworks-ai": ("https://api.fireworks.ai/inference/v1/models", "Authorization", {"Accept": "application/json"}),
+    "cerebras": ("https://api.cerebras.ai/v1/models", "Authorization", {"Accept": "application/json"}),
+    "mistral": ("https://api.mistral.ai/v1/models", "Authorization", {"Accept": "application/json"}),
+    "xai": ("https://api.x.ai/v1/models", "Authorization", {"Accept": "application/json"}),
+    "google-ai-studio": ("https://generativelanguage.googleapis.com/v1beta/models", "x-goog-api-key", {"Accept": "application/json"}),
+    "anthropic": ("https://api.anthropic.com/v1/models", "x-api-key", {"anthropic-version": "2023-06-01", "Accept": "application/json"}),
+    "cohere": ("https://api.cohere.com/v1/models", "Authorization", {"Accept": "application/json"}),
 }
 
 @dataclass(frozen=True)
@@ -44,8 +47,8 @@ class ProviderProbe:
 
 
 def probe_provider(provider: str, api_key: str, *, client=None, timeout_s: float = 12.0) -> ProviderProbe:
-    base = PROVIDER_BASE_URLS.get(provider)
-    if not base:
+    probe = PROVIDER_PROBES.get(provider)
+    if not probe:
         raise ValidationFailed(
             "This provider does not yet support the OpenAI-compatible connection probe.",
             details={"provider": provider},
@@ -55,7 +58,7 @@ def probe_provider(provider: str, api_key: str, *, client=None, timeout_s: float
     if client is None:
         import httpx
         client = httpx.Client(timeout=timeout_s)
-    started = monotonic()
+    url, auth_header, extra_headers = probe\n    started = monotonic()
     try:
         response = client.get(
             f"{base}/models",
@@ -78,7 +81,7 @@ def probe_provider(provider: str, api_key: str, *, client=None, timeout_s: float
     except Exception as exc:  # noqa: BLE001
         raise DependencyUnavailable("Provider returned an invalid response.",
                                     details={"provider": provider}) from exc
-    rows = body.get("data", []) if isinstance(body, dict) else []
+    rows = body.get("data", body.get("models", [])) if isinstance(body, dict) else []
     if not isinstance(rows, list):
         rows = []
     return ProviderProbe(provider, True, "connected", models_count=len(rows),

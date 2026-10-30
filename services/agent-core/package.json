@@ -27,7 +27,7 @@
     "start": "node dist/main.js",
     "lint": "echo lint pending",
     "typecheck": "tsc --noEmit",
-    "test": "echo no tests yet",
+    "test": "pnpm build && node --test dist/brain/ollama-backend.test.js",
     "clean": "rm -rf dist"
   },
   "dependencies": {

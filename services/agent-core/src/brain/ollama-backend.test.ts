@@ -68,7 +68,7 @@ test('converts embeddings to Float32Array and checks response shape', async () =
   const embeddings = await backend.embed(handle, ['one', 'two']);
   assert.equal(embeddings.length, 2);
   assert.ok(embeddings[0] instanceof Float32Array);
-  assert.equal(embeddings[1][1], Math.fround(0.4));
+  assert.equal(embeddings[1]?.[1], Math.fround(0.4));
 });
 
 test('lists installed models with normalized SHA-256 digests', async () => {

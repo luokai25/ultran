@@ -117,12 +117,20 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
     metalness: 0.25,
     roughness: 0.16,
   });
-  const eyeGeo = new THREE.BoxGeometry(0.3, 0.09, 0.08);
   const eyes: THREE.Mesh[] = [];
-  for (const x of [-0.34, 0.34]) {
-    const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(x, 0.14, 0.94);
-    eye.scale.set(1.12, 1.0, 1.0);
+  for (const side of [-1, 1]) {
+    // Angular tapered optic aperture rather than a rectangular LED block.
+    const slit = new THREE.Shape();
+    slit.moveTo(-0.17, -0.025);
+    slit.lineTo(-0.11, 0.055);
+    slit.lineTo(0.15, 0.035);
+    slit.lineTo(0.19, -0.018);
+    slit.lineTo(0.02, -0.045);
+    slit.closePath();
+    const eye = new THREE.Mesh(new THREE.ShapeGeometry(slit), eyeMat);
+    eye.position.set(side * 0.34, 0.14, 0.965);
+    eye.rotation.y = side * -0.08;
+    eye.scale.x = side;
     head.add(eye);
     eyes.push(eye);
   }
@@ -231,9 +239,19 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const key = new THREE.DirectionalLight(accent, 2.1);
   key.position.set(3, 4, 5);
   world.add(key);
-  const rim = new THREE.PointLight(new THREE.Color(palette.goldBright), 24, 14);
-  rim.position.set(-3, -1.5, -3);
+  const rim = new THREE.PointLight(new THREE.Color("#ff1b2d"), 32, 18);
+  rim.position.set(-3, 1.4, -2.5);
   world.add(rim);
+  const coldRim = new THREE.PointLight(new THREE.Color("#8bb9ef"), 26, 16);
+  coldRim.position.set(3.2, 0.8, -1.8);
+  world.add(coldRim);
+  const faceFill = new THREE.DirectionalLight(new THREE.Color("#e5efff"), 1.15);
+  faceFill.position.set(-1.5, 1.2, 5);
+  world.add(faceFill);
+  const topLight = new THREE.SpotLight(new THREE.Color("#ffffff"), 42, 18, Math.PI / 5, 0.55, 1.2);
+  topLight.position.set(0, 5, 3);
+  topLight.target.position.set(0, 0, 0);
+  world.add(topLight, topLight.target);
 
   const fog = new THREE.Fog(fogColor, 6, 16);
   world.fog = fog;
@@ -292,13 +310,16 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
     const initialAccent = new THREE.Color(scenes[live.current.scene]?.accent ?? palette.gold);
     const initialFog = new THREE.Color(scenes[live.current.scene]?.fog ?? palette.void);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.22;
     renderer.setSize(mount.clientWidth, height);
     mount.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(38, mount.clientWidth / height, 0.1, 100);
-    camera.position.set(0, 0.6, 4.4);
+    camera.position.set(0, 0.05, 5.75);
     camera.lookAt(0, 0, 0);
 
     const world = new THREE.Scene();
@@ -517,7 +538,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.rim.intensity = 20 + Math.sin(t * state.pulseHz * 2) * 4 * drift + state.speakEnergy * 6;
 
       camera.position.x = Math.sin(t * 0.12) * 0.25 * drift + state.gazeX * 0.15;
-      camera.position.y = 0.6 + Math.cos(t * 0.1) * 0.08 * drift - state.gazeY * 0.08;
+      camera.position.y = 0.05 + Math.cos(t * 0.1) * 0.08 * drift - state.gazeY * 0.08;
       camera.lookAt(0, 0, 0);
 
       renderer.render(world, camera);

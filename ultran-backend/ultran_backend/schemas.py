@@ -107,6 +107,11 @@ class ConnectorOut(BaseModel):
     tier: str
     actions: list[str] = Field(default_factory=list)
     description: str = ""
+    #: ``builtin`` (frozen catalog) or ``mcp`` (a discovered MCP server).
+    source: str = "builtin"
+    mcp_server_id: str = ""
+    transport: str = ""
+    capabilities: list[str] = Field(default_factory=list)
 
 
 class ConnectorConnect(_Strict):
@@ -129,6 +134,78 @@ class ConnectorInvoke(_Strict):
     connector_id: str = Field(min_length=2, max_length=64)
     action: str = Field(min_length=1, max_length=64)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------- #
+# MCP
+# --------------------------------------------------------------------------- #
+
+#: MCP server ids become connector ids, so they share the connector alphabet.
+MCP_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,47}$")
+
+
+class McpServerRegister(_Strict):
+    """Register a stdio or Streamable HTTP MCP server.
+
+    ``env`` and ``headers`` carry the server's own credentials. They are stored
+    with the server spec and handed to the child process - never to a tool call.
+    """
+
+    id: str = Field(min_length=1, max_length=48)
+    name: str = Field(default="", max_length=96)
+    transport: Literal["stdio", "http"] = "stdio"
+    command: str = Field(default="", max_length=512)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    cwd: str | None = Field(default=None, max_length=1024)
+    url: str = Field(default="", max_length=2048)
+    headers: dict[str, str] = Field(default_factory=dict)
+    trust_level: Literal["untrusted", "third_party", "verified", "curated", "local"] = "third_party"
+    pinned_hash: str = Field(default="", max_length=80)
+    enabled: bool = True
+    timeout_s: float = Field(default=30.0, gt=0, le=600)
+    connect_timeout_s: float = Field(default=10.0, gt=0, le=120)
+    egress: dict[str, Any] = Field(default_factory=dict)
+    capabilities: list[str] = Field(default_factory=list)
+    description: str = Field(default="", max_length=512)
+    #: Handshake immediately. ``False`` registers a server you will probe later.
+    connect: bool = True
+
+    @field_validator("id")
+    @classmethod
+    def _valid_id(cls, value: str) -> str:
+        if not MCP_ID_RE.match(value):
+            raise ValueError("server id must be lowercase alphanumeric with '.', '_' or '-'")
+        return value
+
+    @field_validator("command")
+    @classmethod
+    def _no_shell_metachars(cls, value: str) -> str:
+        # The command is exec'd, not shell'd, but a stray ';' in a config file is
+        # almost always a mistake worth catching at the boundary.
+        if any(ch in value for ch in (";", "|", "&", "`", "$(")):
+            raise ValueError("command must not contain shell metacharacters")
+        return value
+
+
+class McpInvoke(_Strict):
+    tool: str = Field(min_length=1, max_length=160)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    grant_id: str | None = Field(default=None, max_length=64)
+    approval_id: str | None = Field(default=None, max_length=64)
+    timeout_s: float | None = Field(default=None, gt=0, le=600)
+
+
+class GrantIssue(_Strict):
+    tool: str = Field(min_length=1, max_length=160)
+    capabilities: list[str] | None = None
+    ttl_s: int | None = Field(default=None, ge=1, le=86_400)
+    single_use: bool = False
+
+
+class ApprovalDecision(_Strict):
+    approved: bool
+    decided_by: str = Field(default="user", max_length=64)
 
 
 # --------------------------------------------------------------------------- #

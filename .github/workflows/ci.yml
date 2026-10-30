@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   # The Python backend is a first-class part of this monorepo and carries the
   # deploy planner, tool sandbox, forge diagnostics, billing ledger and the MCP
@@ -69,6 +72,22 @@ jobs:
           else
             echo "::warning::no lockfile on this ref - resolving unpinned"
             pnpm install --no-frozen-lockfile
+          fi
+
+      - name: Commit generated pnpm lockfile
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          if [ ! -f pnpm-lock.yaml ] || git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1; then
+            echo "No new lockfile to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore: generate pnpm lockfile from workspace manifests"
+          if ! git push origin HEAD:main; then
+            echo "::warning::main advanced during CI; lockfile will be generated on a later run"
           fi
 
       - name: Typecheck

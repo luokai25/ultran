@@ -1,0 +1,16 @@
+[Unit]
+Description=Ultran API, HTTPS, disk and backup health check
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/ultran/infra/hetzner/monitor.sh
+Nice=10
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/docker
+NoNewPrivileges=true

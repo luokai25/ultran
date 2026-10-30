@@ -11,7 +11,7 @@ name: Lockfile
 # Runs when manifests change, and on demand. Commits with GITHUB_TOKEN, which
 # does not re-trigger workflows, so this cannot loop.
 
-on:
+"on":
   workflow_dispatch:
   push:
     branches: [main]

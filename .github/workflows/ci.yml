@@ -147,6 +147,6 @@ jobs:
 
       - name: Validate Hetzner Terraform
         run: |
-          terraform -chdir=infra/hetzner/terraform fmt -check -recursive
+          terraform -chdir=infra/hetzner/terraform fmt -check -diff -recursive
           terraform -chdir=infra/hetzner/terraform init -backend=false -input=false
           terraform -chdir=infra/hetzner/terraform validate

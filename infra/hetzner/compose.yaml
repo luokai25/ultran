@@ -1,6 +1,25 @@
 name: ultran
 
 services:
+  # Named Docker volumes are root-owned on first creation. Prepare permissions
+  # before the non-root API process starts.
+  init-data-volume:
+    image: ultran-api:local
+    build:
+      context: ../../ultran-backend
+      dockerfile: Dockerfile
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /data && chown -R 10001:10001 /data"]
+    volumes:
+      - ultran-data:/data
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   api:
     build:
       context: ../../ultran-backend
@@ -57,6 +76,8 @@ services:
       - backend
       - edge
     depends_on:
+      init-data-volume:
+        condition: service_completed_successfully
       api:
         condition: service_healthy
     cap_drop:

@@ -134,7 +134,9 @@ jobs:
         env:
           ULTRAN_DOMAIN: api.example.com
           ACME_EMAIL: ops@example.com
-        run: docker compose -f compose.yaml config --quiet
+        run: |
+          cp .env.example .env
+          docker compose -f compose.yaml config --quiet
 
       - name: Build production API image
         run: docker build -f ultran-backend/Dockerfile -t ultran-api:ci ultran-backend

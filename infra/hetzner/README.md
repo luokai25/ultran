@@ -212,18 +212,31 @@ Install and enable the timer:
 
 ```bash
 chmod 0755 /opt/ultran/infra/hetzner/backup.sh
+chmod 0755 /opt/ultran/infra/hetzner/backup.sh /opt/ultran/infra/hetzner/monitor.sh
 install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.service /etc/systemd/system/
 install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.timer /etc/systemd/system/
+install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-monitor.service /etc/systemd/system/
+install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-monitor.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now ultran-backup.timer
 systemctl start ultran-backup.service
+systemctl enable --now ultran-monitor.timer
 systemctl status ultran-backup.service
+systemctl status ultran-monitor.timer
 ```
 
-The timer runs daily at approximately 02:30 server time, with a randomized
-delay. Retention is 7 daily, 4 weekly, and 6 monthly snapshots. Check recent
-runs with `journalctl -u ultran-backup.service` and verify remote snapshots
-with `restic snapshots`.
+The backup timer runs daily at approximately 02:30 server time, with a
+randomized delay. Retention is 7 daily, 4 weekly, and 6 monthly snapshots. Check
+recent runs with `journalctl -u ultran-backup.service` and verify remote
+snapshots with `restic snapshots`.
+
+The monitoring timer runs every five minutes. It checks the API container's
+Docker health, Caddy's running state, the public HTTPS health endpoint, root
+disk usage, and whether the backup timer is active. Results and failures are
+recorded in the systemd journal; inspect them with
+`journalctl -u ultran-monitor.service`. This is local health monitoring, not
+off-host alerting. External notifications still need a separately connected
+monitoring or alert provider.
 
 For a recovery drill, restore the latest snapshot to a separate directory
 first, inspect the database and environment file, and verify that the Fernet

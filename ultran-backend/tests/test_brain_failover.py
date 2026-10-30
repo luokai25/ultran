@@ -34,8 +34,8 @@ class _Client:
     def __init__(self, response=None, raises: Exception | None = None):
         self.response, self.raises, self.calls = response, raises, []
 
-    def post(self, url, json=None):
-        self.calls.append((url, json))
+    def post(self, url, json=None, headers=None):
+        self.calls.append((url, json, headers or {}))
         if self.raises:
             raise self.raises
         return self.response
@@ -85,6 +85,7 @@ def test_openai_posts_to_chat_completions_and_parses_usage():
     )
     assert client.calls[0][0] == "http://h/v1/chat/completions"
     assert client.calls[0][1]["temperature"] == 0.3
+    assert client.calls[0][2] == {}
     assert (reply.content, reply.tokens_in, reply.tokens_out) == ("yo", 9, 4)
     assert reply.finish_reason == "length"
     assert reply.backend == "openai"

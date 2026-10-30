@@ -161,7 +161,7 @@ jobs:
           ULTRAN_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
-          gradle assembleRelease --no-daemon --console=plain --max-workers=2 2>&1 | tee build.log
+          gradle assembleRelease --no-daemon --console=plain --stacktrace --max-workers=2 2>&1 | tee build.log
 
       - name: Verify APK
         id: verify

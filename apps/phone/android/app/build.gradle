@@ -30,31 +30,49 @@ def resolveSigning = { String propKey, String envKey, String propsKey, String fa
 
 def ksPath = resolveSigning('keystorePath', 'APP_KEYSTORE_PATH', 'storeFile', 'app-release.keystore')
 def ksFile = file(ksPath).isAbsolute() ? file(ksPath) : rootProject.file(ksPath)
-def hasKeystore = ksFile.exists()
+
+def storePasswordValue = resolveSigning('keystorePassword', 'APP_KEYSTORE_PASSWORD', 'storePassword', null)
+def keyAliasValue = resolveSigning('keyAlias', 'APP_KEY_ALIAS', 'keyAlias', null)
+def keyPasswordValue = resolveSigning('keyPassword', 'APP_KEY_PASSWORD', 'keyPassword', null)
+
+// Sign only when the keystore AND all three credentials are present. Passing a
+// null password into the signing config fails the whole build with the opaque
+// "Value is null" instead of producing an unsigned APK.
+def canSign = ksFile.exists() &&
+        storePasswordValue != null && !storePasswordValue.isEmpty() &&
+        keyAliasValue != null && !keyAliasValue.isEmpty() &&
+        keyPasswordValue != null && !keyPasswordValue.isEmpty()
+
+if (ksFile.exists() && !canSign) {
+    logger.warn("Keystore found at ${ksFile} but credentials are incomplete - building UNSIGNED")
+}
+
+// Version values are resolved as plain locals before the DSL block. Passing an
+// expression straight into `versionCode (...)` is parsed as a method call and
+// fails with "Value is null" rather than a useful message.
+def appVersionCode = (System.getenv('ULTRAN_VERSION_CODE') ?: '1').toInteger()
+def appVersionName = System.getenv('ULTRAN_VERSION_NAME') ?: '0.1.0'
 
 android {
     namespace "app.ultran.mobile"
     compileSdk rootProject.ext.compileSdkVersion
+
     defaultConfig {
         applicationId "app.ultran.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv('ULTRAN_VERSION_CODE') ?: '1').toInteger()
-        versionName (System.getenv('ULTRAN_VERSION_NAME') ?: '0.1.0')
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-        }
     }
+
     signingConfigs {
         release {
-            if (hasKeystore) {
+            if (canSign) {
                 storeFile ksFile
-                storePassword resolveSigning('keystorePassword', 'APP_KEYSTORE_PASSWORD', 'storePassword', null)
-                keyAlias resolveSigning('keyAlias', 'APP_KEY_ALIAS', 'keyAlias', null)
-                keyPassword resolveSigning('keyPassword', 'APP_KEY_PASSWORD', 'keyPassword', null)
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
             }
         }
     }
@@ -65,7 +83,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             // Sign when a keystore is present; otherwise emit an unsigned APK so
             // forks and pull requests can still build and inspect the artifact.
-            if (hasKeystore) {
+            if (canSign) {
                 signingConfig signingConfigs.release
             }
         }

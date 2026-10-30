@@ -9,6 +9,7 @@ from ultran_backend.brain import (
     BrainRuntime,
     EchoBackend,
     OllamaBackend,
+    OpenAICompatBackend,
     estimate_tokens,
     words,
 )
@@ -134,8 +135,8 @@ class _StubClient:
         self.raises = raises
         self.calls: list[tuple[str, dict]] = []
 
-    def post(self, url, json=None):
-        self.calls.append((url, json))
+    def post(self, url, json=None, headers=None):
+        self.calls.append((url, json, headers or {}))
         if self.raises:
             raise self.raises
         return self.response
@@ -250,3 +251,26 @@ def test_runtime_does_not_count_failed_calls():
     with pytest.raises(ValidationFailed):
         rt.complete(user("hi"))
     assert rt.stats()["calls"] == 0
+
+
+
+def test_openai_compatible_backend_sends_bearer_key():
+    client = _StubClient(_StubResponse(200, {
+        "choices": [{"message": {"content": "provider reply"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 4, "completion_tokens": 3},
+    }))
+    backend = OpenAICompatBackend("https://api.groq.com/openai", api_key="secret-provider-key", client=client)
+    reply = backend.complete(user("hello"), model="llama-3.3-70b", temperature=0.2)
+    assert reply.content == "provider reply"
+    assert client.calls[0][0] == "https://api.groq.com/openai/v1/chat/completions"
+    assert client.calls[0][2]["Authorization"] == "Bearer secret-provider-key"
+
+
+def test_runtime_can_use_a_per_call_provider_backend_without_changing_default():
+    runtime = BrainRuntime(EchoBackend(), default_model="local-model")
+    provider = EchoBackend()
+    provider.name = "provider-test"
+    reply = runtime.complete(user("hello"), backend_override=provider)
+    assert reply.backend == "provider-test"
+    assert runtime.default_model == "local-model"
+    assert runtime.stats()["calls"] == 1

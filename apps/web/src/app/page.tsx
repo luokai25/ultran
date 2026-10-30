@@ -1,4 +1,5 @@
 import AvatarHero from '@/components/AvatarHero';
+import ModelHub from '@/components/ModelHub';
 
 const LAYERS: ReadonlyArray<readonly [string, string]> = [
   ['Brain runtime', 'Local inference, verified model cache.'],
@@ -32,6 +33,8 @@ export default function HomePage() {
       </p>
 
       <AvatarHero />
+
+      <ModelHub />
 
       <div
         style={{

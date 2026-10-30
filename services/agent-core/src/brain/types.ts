@@ -5,7 +5,7 @@
  * knows whether tokens come from llama.cpp, MLX, ONNX, or a remote fallback.
  */
 
-export type BackendKind = 'llama.cpp' | 'mlx' | 'onnx' | 'remote';
+export type BackendKind = 'ollama' | 'llama.cpp' | 'mlx' | 'onnx' | 'remote';
 
 export interface ModelRef {
   /** Stable identifier, e.g. "qwen2.5-7b-instruct-q4_k_m". */

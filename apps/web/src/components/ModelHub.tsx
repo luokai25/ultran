@@ -27,7 +27,7 @@ const PROVIDERS = [
 ] as const;
 
 const API = process.env.NEXT_PUBLIC_ULTRAN_API_URL ?? "http://127.0.0.1:8080/v1";
-const PROBE_SUPPORTED = new Set(["openai", "groq", "openrouter", "together-ai", "deepseek", "fireworks-ai", "cerebras", "mistral", "xai"]);
+const PROBE_SUPPORTED = new Set(["openai", "groq", "openrouter", "together-ai", "deepseek", "fireworks-ai", "cerebras", "mistral", "xai", "google-ai-studio", "anthropic", "cohere"]);
 
 export default function ModelHub() {
   const [tab, setTab] = useState<"discover" | "providers" | "local">("discover");

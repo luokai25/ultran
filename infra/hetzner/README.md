@@ -73,43 +73,44 @@ Edit `terraform.tfvars` with:
 - Your SSH **public** key (never the private key).
 - A suitable Hetzner location and server type.
 
-Then review before creating anything:
+Run the guarded provisioning script from this directory:
 
 ```bash
-terraform init
-terraform fmt -check
-terraform validate
-terraform plan -out=ultran.tfplan
-terraform show ultran.tfplan
+export HCLOUD_TOKEN="YOUR_HETZNER_CLOUD_API_TOKEN"
+./provision.sh
 ```
 
-Only after reviewing the plan, apply it:
+It initializes Terraform, validates the configuration, displays the exact plan,
+and requires you to type `CREATE ULTRAN VPS` before applying it. If you do not
+confirm, it exits without creating resources. The token is read from the
+environment and never written to the Terraform variables file.
 
-```bash
-terraform apply ultran.tfplan
-terraform output
-```
+Terraform state is stored locally in this directory and is ignored by Git.
+Keep the state file private and backed up securely; do not delete it while the
+server exists, because Terraform uses it to track the resources it owns. The
+generated `.terraform.lock.hcl` should be reviewed and committed for repeatable
+provider selection.
 
 The output gives the server IPv4 address. Point the API DNS A record at it.
 Connect as the non-root operator shown in `admin_user`. Cloud-init installs
-Docker Engine, the Compose plugin, unattended security updates, fail2ban, and
-UFW during first boot. Verify them with `docker --version`,
-`docker compose version`, `systemctl status fail2ban`, and `sudo ufw status`,
-then follow **First deployment** below. Log out and back in once so the operator
-session picks up Docker group membership.
+Docker Engine, the Compose plugin, Restic, unattended security updates,
+fail2ban, and UFW during first boot. Verify them with `docker --version`,
+`docker compose version`, `restic version`, `systemctl status fail2ban`, and
+`sudo ufw status`, then follow **First deployment** below. Log out and back in
+once so the operator session picks up Docker group membership.
 
 Keep `HCLOUD_TOKEN`, `terraform.tfvars`, Terraform state, and plan files
 private. The repository ignores Terraform state and plan files; never force-add
-them. The server has Hetzner automated backups enabled, but that is not a
-substitute for encrypted, off-server backups of the credential volume and its
-Fernet key. Review the plan carefully: Terraform can create billable resources.
+them. Hetzner server backups are enabled, but they are not a substitute for
+encrypted, off-server backups of the credential volume and its Fernet key.
+Review the plan carefully: Terraform can create billable resources.
 
 ## First deployment
 
 Clone the repository on the server at `/opt/ultran`, then:
 
 ```bash
-cd ultran/infra/hetzner
+cd /opt/ultran/infra/hetzner
 cp .env.example .env
 chmod 600 .env
 ```
@@ -118,7 +119,7 @@ Edit `.env`:
 - Set `ULTRAN_DOMAIN` to a DNS name whose A record points to this server.
 - Set `ACME_EMAIL` to an address for TLS certificate notices.
 - Set `ULTRAN_CORS_ORIGINS` to the exact HTTPS origin(s) of the web app.
-- Generate the Fernet key on the server after Python/cryptography is available,
+- Generate the Fernet key on the server with Python's standard library,
   then put it in `.env`. Do not paste it into chat, commit it, or put it in
   shell history.
 

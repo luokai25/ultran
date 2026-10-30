@@ -462,7 +462,7 @@ function localReply(text: string): ChatReply {
     content =
       "Running on-device with no brain linked, I can:\n\n- Keep your conversations on this phone\n- Read the time and date\n- Speak replies aloud\n\nFor real reasoning, link your Ultran backend in **Settings → Brain endpoint**.";
   } else if (/\b(who|what) are you\b/.test(low)) {
-    content = "I am Ultran, a local-first agent console. The brain lives on your hardware, not in someone else's cloud.";
+    content = "I am Ultran, a local-first agent console. This lightweight on-device fallback is not a language model; full reasoning needs a configured model through your linked Ultran backend.";
   } else {
     content =
       "No brain is linked, so I can't reason about that yet. Open **Settings** and enter your Ultran backend address, and I will route this to it. Your message is saved on this device.";
@@ -760,7 +760,36 @@ async function testLink(): Promise<void> {
   try {
     const res = await fetch(`${url}/v1/health`, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    setNote("Linked. The brain answered.", "ok");
+
+    // A healthy API can still be running the deterministic Echo fallback.
+    // Inspect the capability report so the UI never mistakes liveness for AI.
+    const capabilitiesRes = await fetch(`${url}/v1/capabilities`, { signal: controller.signal });
+    if (!capabilitiesRes.ok) {
+      setNote("Backend is reachable, but its brain status could not be inspected.", "ok");
+      return;
+    }
+    const capabilities = (await capabilitiesRes.json()) as {
+      brain?: {
+        backend?: string;
+        model?: string;
+        chain?: Array<{ backend?: string; served?: number }>;
+      };
+    };
+    const brain = capabilities.brain;
+    if (brain?.backend === "echo") {
+      setNote("Backend linked, but it is using Echo, a deterministic fallback rather than a language model. Configure Ollama and install the selected model for real reasoning.", "bad");
+    } else if (brain?.backend === "failover") {
+      const modelBackend = brain.chain?.find((entry) => entry.backend && entry.backend !== "echo");
+      const modelHasServed = brain.chain?.some((entry) => entry.backend !== "echo" && (entry.served ?? 0) > 0);
+      setNote(
+        modelHasServed
+          ? `Linked. ${brain.model ?? modelBackend?.backend ?? "Local model"} has served inference; Echo remains the offline fallback.`
+          : `Backend linked. ${modelBackend?.backend ?? "A local model"} is preferred, but inference has not yet confirmed it works. Install ${brain.model ?? "the configured model"} in your local runtime.`,
+        "ok",
+      );
+    } else {
+      setNote(`Linked. Brain backend: ${brain?.backend ?? "unknown"}; model: ${brain?.model ?? "not reported"}.`, "ok");
+    }
   } catch (error) {
     const why = error instanceof Error ? error.message : "no answer";
     setNote(`Could not reach it (${why}). Is the backend running on that address and port?`, "bad");

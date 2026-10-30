@@ -18,6 +18,7 @@ dependencies = [
   # rule: the SDK surface is resolved in ultran_backend/mcp/transports.py only.
   "mcp>=1.2,<3",
   "jsonschema>=4.20",
+  "cryptography>=42.0",
 ]
 
 [project.optional-dependencies]

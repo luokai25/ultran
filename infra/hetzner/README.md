@@ -76,6 +76,7 @@ Edit `terraform.tfvars` with:
 Run the guarded provisioning script from this directory:
 
 ```bash
+chmod 0755 provision.sh
 export HCLOUD_TOKEN="YOUR_HETZNER_CLOUD_API_TOKEN"
 ./provision.sh
 ```

@@ -37,7 +37,9 @@ def test_probe_uses_bearer_auth_and_only_returns_public_metadata(provider):
     assert result.status == "connected"
     assert result.models_count == 2
     assert client.calls[0][0] == PROVIDER_PROBES[provider][0]
-    auth_header = PROVIDER_PROBES[provider][1]\n    expected = "Bearer secret-api-key-123" if auth_header == "Authorization" else "secret-api-key-123"\n    assert client.calls[0][1][auth_header] == expected
+    auth_header = PROVIDER_PROBES[provider][1]
+    expected = "Bearer secret-api-key-123" if auth_header == "Authorization" else "secret-api-key-123"
+    assert client.calls[0][1][auth_header] == expected
     assert "secret-api-key-123" not in str(result.public())
 
 

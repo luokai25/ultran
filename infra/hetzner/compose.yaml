@@ -1,0 +1,73 @@
+name: ultran
+
+services:
+  api:
+    build:
+      context: ../../ultran-backend
+      dockerfile: Dockerfile
+    image: ultran-api:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ULTRAN_ENV: production
+      ULTRAN_DATA_DIR: /srv/ultran/.ultran-data
+      ULTRAN_DEBUG: "false"
+    volumes:
+      - ultran-data:/srv/ultran/.ultran-data
+    expose:
+      - "8080"
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import httpx,sys; sys.exit(0 if httpx.get('http://127.0.0.1:8080/v1/health', timeout=3).status_code == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      ULTRAN_DOMAIN: ${ULTRAN_DOMAIN:?Set ULTRAN_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - backend
+    depends_on:
+      api:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  backend:
+    internal: true
+
+volumes:
+  ultran-data:
+  caddy-data:
+  caddy-config:

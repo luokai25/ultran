@@ -19,7 +19,7 @@ const PROVIDERS = [
   { id: "deepseek", name: "DeepSeek", note: "Reasoning and chat", url: "https://platform.deepseek.com/api_keys", plan: "free" },
   { id: "fireworks-ai", name: "Fireworks AI", note: "Hosted open models", url: "https://fireworks.ai/account/api-keys", plan: "paid" },
   { id: "cerebras", name: "Cerebras", note: "High-speed inference", url: "https://cloud.cerebras.ai/", plan: "free" },
-  { id: "mistral-ai", name: "Mistral AI", note: "Mistral models", url: "https://console.mistral.ai/api-keys/", plan: "free" },
+  { id: "mistral", name: "Mistral AI", note: "Mistral models", url: "https://console.mistral.ai/api-keys/", plan: "free" },
   { id: "cohere", name: "Cohere", note: "Command and embeddings", url: "https://dashboard.cohere.com/api-keys", plan: "free" },
   { id: "xai", name: "xAI", note: "Grok models", url: "https://console.x.ai/", plan: "paid" },
   { id: "openai", name: "OpenAI", note: "GPT models", url: "https://platform.openai.com/api-keys", plan: "paid" },

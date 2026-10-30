@@ -235,3 +235,52 @@ def test_workspace_token_is_prefixed_and_unique():
     assert a.startswith("ult_")
     assert a != b
     assert len(a) > 20
+
+
+
+def test_persistent_vault_encrypts_and_survives_restart(tmp_path):
+    from cryptography.fernet import Fernet
+
+    key = Fernet.generate_key().decode("ascii")
+    db_path = tmp_path / "credentials.sqlite3"
+    first = CredentialVault(db_path=db_path, encryption_key=key)
+    first.put("ws", "groq", KEY, plan="paid")
+    raw = db_path.read_bytes()
+    assert KEY.encode("utf-8") not in raw
+
+    restarted = CredentialVault(db_path=db_path, encryption_key=key)
+    assert restarted.get("ws", "groq").reveal() == KEY
+    assert restarted.get("ws", "groq").plan == "paid"
+    assert restarted.count("ws") == 1
+
+
+def test_persistent_vault_keeps_workspaces_isolated(tmp_path):
+    from cryptography.fernet import Fernet
+
+    vault = CredentialVault(db_path=tmp_path / "vault.sqlite3",
+                             encryption_key=Fernet.generate_key().decode("ascii"))
+    vault.put("ws-a", "groq", KEY)
+    assert vault.has("ws-a", "groq")
+    assert not vault.has("ws-b", "groq")
+
+
+def test_persistent_vault_revoke_survives_restart(tmp_path):
+    from cryptography.fernet import Fernet
+
+    key = Fernet.generate_key().decode("ascii")
+    path = tmp_path / "vault.sqlite3"
+    CredentialVault(db_path=path, encryption_key=key).put("ws", "groq", KEY)
+    CredentialVault(db_path=path, encryption_key=key).revoke("ws", "groq")
+    assert not CredentialVault(db_path=path, encryption_key=key).has("ws", "groq")
+
+
+def test_persistent_vault_requires_both_path_and_key():
+    with pytest.raises(ValueError, match="configured together"):
+        CredentialVault(db_path="vault.sqlite3")
+
+
+def test_production_requires_credential_encryption_key():
+    from ultran_backend.config import Settings
+
+    with pytest.raises(ValueError, match="ULTRAN_CREDENTIAL_ENCRYPTION_KEY"):
+        Settings(environment="production")

@@ -1,7 +1,8 @@
 # Ultran
 
-**A local-first AI agent platform.** The brain runs on your device. The cloud
-is optional.
+**A local-first AI agent platform.** Local inference is the target; the current
+Android shell does not bundle model weights and needs a linked backend for full
+language-model reasoning. The cloud is optional.
 
 Ultran is a monorepo for building and operating autonomous agents that think
 locally, reach the outside world only through capability-scoped connectors,
@@ -22,8 +23,9 @@ default, and your agent stops working when the network does.
 
 Ultran inverts the default:
 
-- **Inference is local.** Models load from a verified local cache. No round-trip
-  is required to plan, act, or remember.
+- **Local inference is preferred.** The Python control plane tries a local
+  Ollama model by default and falls back to a deterministic Echo responder when
+  no model is available. The Android APK does not bundle model weights.
 - **Tools are sandboxed.** Every side effect happens in an isolated worker
   under a signed, expiring capability grant.
 - **The cloud is a service, not a dependency.** Sync, marketplace, and billing
@@ -107,6 +109,41 @@ pnpm typecheck    # strict TS across the monorepo
 pnpm lint         # lint every workspace
 pnpm format       # prettier
 ```
+
+### Enable real local-model reasoning
+
+The Android shell is a chat client, not a bundled LLM. For actual language-model
+responses, run Ollama and the Python control plane on a trusted computer or
+local server, then enter that server's LAN address in **Settings → Brain
+endpoint** in the phone app.
+
+```bash
+# Install Ollama separately, then fetch the model once:
+ollama pull llama3.1:8b
+
+# In the repository root:
+cd ultran-backend
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+
+# Prefer local Ollama; Echo is an explicit degraded/offline fallback.
+ULTRAN_BRAIN_BACKEND=ollama \
+ULTRAN_BRAIN_MODEL=llama3.1:8b \
+ULTRAN_BRAIN_FALLBACKS=echo \
+python -m ultran_backend
+```
+
+The backend listens on `127.0.0.1:8080` by default. To reach it from a phone,
+set `ULTRAN_HOST=0.0.0.0` and connect using the computer's LAN IP, but only on
+a trusted network and with firewall access limited to your devices. Do not
+expose this development backend directly to the public internet.
+
+The separate TypeScript `@ultran/agent-core` now has an experimental Ollama
+adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
+That runtime is not yet wired into the phone chat or a complete tool-execution
+orchestrator; model discovery, digest verification, and inference are implemented
+but end-to-end agent actions remain unfinished.
 
 ---
 

@@ -35,6 +35,14 @@ def _float(value: str | None, default: float) -> float:
         return default
 
 
+def _origins(value: str | None, default: tuple[str, ...]) -> tuple[str, ...]:
+    """Parse a comma-separated CORS allow-list, falling back to ``default``."""
+    if value is None or not value.strip():
+        return default
+    parsed = tuple(o.strip() for o in value.split(",") if o.strip())
+    return parsed or default
+
+
 @dataclass(frozen=True)
 class Settings:
     """Immutable runtime settings. Build with :meth:`from_env`."""
@@ -52,6 +60,15 @@ class Settings:
     sandbox_cpu_ms_budget: int = 2000
     free_plan_monthly_tokens: int = 100_000
     debug: bool = False
+    # The web workspace is served from a different origin (3000) than the API
+    # (8080), so the browser needs an explicit CORS allow-list. Dev gets the
+    # local origins; production must set ULTRAN_CORS_ORIGINS explicitly.
+    cors_origins: tuple[str, ...] = (
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    )
 
     def __post_init__(self) -> None:
         if self.brain_backend not in _VALID_BRAINS:
@@ -89,4 +106,5 @@ class Settings:
             sandbox_cpu_ms_budget=_int(e.get("ULTRAN_SANDBOX_CPU_MS_BUDGET"), 2000),
             free_plan_monthly_tokens=_int(e.get("ULTRAN_FREE_PLAN_MONTHLY_TOKENS"), 100_000),
             debug=_flag(e.get("ULTRAN_DEBUG"), False),
+            cors_origins=_origins(e.get("ULTRAN_CORS_ORIGINS"), cls().cors_origins),
         )

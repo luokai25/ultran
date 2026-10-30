@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .api import agents, billing, builder, connectors, deploys, forge, system, workspace
@@ -36,6 +37,18 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     )
     app.state.container = container or Container.build(settings)
     app.state.container.seed_default_workspace()
+
+    # The web workspace runs on its own origin, so without this every fetch from
+    # the browser dies as an opaque CORS failure before the handler is reached.
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_origins),
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["Content-Length"],
+        )
 
     @app.exception_handler(UltranError)
     async def _ultran_error(_: Request, exc: UltranError) -> JSONResponse:

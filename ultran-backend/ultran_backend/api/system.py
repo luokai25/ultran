@@ -26,7 +26,7 @@ def readiness(container: ContainerDep):
     """Readiness reflects *capability*, not just liveness."""
     checks = {
         "connectors": len(container.registry) > 0,
-        "brain": container.brain.name in {"echo", "ollama"},
+        "brain": container.brain.name in {"echo", "ollama", "openai", "failover"},
         "deploy_root": True,
     }
     return {"ready": all(checks.values()), "checks": checks}

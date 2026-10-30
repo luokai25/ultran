@@ -24,9 +24,10 @@ one of them may be installed on a device at a time.
 
 ```
 apps/phone/
-├── index.html            # the shell: top bar, avatar stage, voice console
-├── src/main.ts           # three.js avatar + on-device speech
-├── src/styles.css        # the golden-black design system
+├── index.html            # the shell: conversation thread, composer, drawer, settings
+├── src/main.ts           # chat client, local store, brain link, avatar, voice
+├── src/mark.ts           # the Ultran helm mark (same geometry as the launcher icon)
+├── src/styles.css        # the gold-on-obsidian design system
 ├── capacitor.config.ts   # appId app.ultran.mobile, webDir dist
 └── android/              # the generated Capacitor Android project (committed)
 ```
@@ -59,6 +60,14 @@ cd apps/phone/android && ./gradlew assembleRelease
 - `server.androidScheme: 'https'` in `capacitor.config.ts` is required. With the
   default `file://` origin the WebView applies CORS to ES-module imports and the
   app renders a blank screen.
+- The app is a conversation console. Chats are stored on the device
+  (`localStorage`); with no brain linked an on-device responder answers a few
+  basics and says plainly what it cannot do. Enter your backend address in
+  **Settings → Brain endpoint** to route turns to `/v1/agents/{id}/chat`.
+  `allowMixedContent` and cleartext traffic are enabled so a plain-http LAN
+  backend is reachable; point it at a trusted network only.
+- The launcher icon, splash screens and adaptive-icon vector are all generated
+  from one set of polygons in `android/tools/generate_assets.py`.
 - Speech uses the on-device Web Speech API. Nothing is sent anywhere; if the
   engine is missing the jaw still animates so the line reads as delivered.
 - The avatar is disposed with the page; no WebGL context survives a reload.

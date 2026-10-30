@@ -14,7 +14,10 @@ const config: CapacitorConfig = {
   webDir: "dist",
   android: {
     backgroundColor: "#050505",
-    allowMixedContent: false,
+    // The brain is a user-chosen server on their own network, usually plain
+    // http on a LAN address. The page origin is https://localhost, so without
+    // this the WebView blocks every call to it as mixed content.
+    allowMixedContent: true,
   },
   server: {
     androidScheme: "https",

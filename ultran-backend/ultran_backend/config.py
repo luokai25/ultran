@@ -92,6 +92,9 @@ class Settings:
         "http://127.0.0.1:3000",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        # The Android shell (Capacitor, androidScheme=https) calls from this origin.
+        "https://localhost",
+        "capacitor://localhost",
     )
 
     def __post_init__(self) -> None:

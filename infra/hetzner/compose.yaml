@@ -53,6 +53,7 @@ services:
       - caddy-config:/config
     networks:
       - backend
+      - edge
     depends_on:
       api:
         condition: service_healthy
@@ -66,6 +67,7 @@ services:
 networks:
   backend:
     internal: true
+  edge:
 
 volumes:
   ultran-data:

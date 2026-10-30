@@ -22,6 +22,7 @@ def test_from_env_reads_every_knob():
     s = Settings.from_env(
         {
             "ULTRAN_ENV": "production",
+            "ULTRAN_CREDENTIAL_ENCRYPTION_KEY": "test-key-is-present-for-config-only",
             "ULTRAN_API_PREFIX": "/api",
             "ULTRAN_BRAIN_BACKEND": "OLLAMA",
             "ULTRAN_BRAIN_TIMEOUT_S": "12.5",

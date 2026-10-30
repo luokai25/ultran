@@ -156,6 +156,7 @@ jobs:
         run: |
           cp .env.example .env
           docker compose -f compose.yaml config --quiet
+          bash -n backup.sh monitor.sh terraform/provision.sh
 
       - name: Build production API image
         run: docker build -f ultran-backend/Dockerfile -t ultran-api:ci ultran-backend

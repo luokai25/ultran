@@ -91,6 +91,7 @@ type Rig = {
   reactor: THREE.Mesh;
   reactorMat: THREE.MeshStandardMaterial;
   energyArcs: THREE.Mesh[];
+  arms: THREE.Group[];
 };
 
 function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color): Rig {
@@ -198,6 +199,57 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   }
   world.add(body);
 
+  // Articulated arms: separate shoulder, elbow, wrist and finger groups let
+  // the brain direct a real pointing gesture instead of rotating a flat icon.
+  const arms: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.position.set(side * 1.02, 0.28, 0.02);
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.62, 12), darkSteel);
+    upper.position.set(side * 0.12, -0.36, 0);
+    upper.rotation.z = side * -0.18;
+    arm.add(upper);
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), silver);
+    shoulder.position.set(0, -0.06, 0.03);
+    shoulder.scale.set(1, 0.88, 0.9);
+    arm.add(shoulder);
+    const elbow = new THREE.Group();
+    elbow.position.set(side * 0.22, -0.68, 0.02);
+    const joint = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), silver);
+    elbow.add(joint);
+    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.15, 0.58, 12), silver);
+    forearm.position.y = -0.29;
+    forearm.rotation.z = side * -0.12;
+    elbow.add(forearm);
+    const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 10), darkSteel);
+    wrist.position.y = -0.62;
+    elbow.add(wrist);
+    const palm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 0.12), silver);
+    palm.position.set(0, -0.79, 0.02);
+    elbow.add(palm);
+    // Four articulated fingers and an opposable thumb, each visibly segmented.
+    for (let finger = 0; finger < 4; finger += 1) {
+      const x = (finger - 1.5) * 0.052;
+      const length = finger === 1 || finger === 2 ? 0.22 : 0.17;
+      const digit = new THREE.Group();
+      digit.position.set(x, -0.9, 0.03);
+      const proximal = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, length, 8), darkSteel);
+      proximal.position.y = -length / 2;
+      digit.add(proximal);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.027, 8, 6), silver);
+      tip.position.y = -length;
+      digit.add(tip);
+      elbow.add(digit);
+    }
+    const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.04, 0.19, 8), silver);
+    thumb.position.set(side * 0.14, -0.82, 0.04);
+    thumb.rotation.z = side * -0.8;
+    elbow.add(thumb);
+    arm.add(elbow);
+    body.add(arm);
+    arms.push(arm);
+  }
+
   // The Legion: many faces, one draw call. They share the head's material, so
   // expression, glow and reveal uniforms drive the whole choir at once.
   const legionGroup = new THREE.Group();
@@ -256,7 +308,7 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const fog = new THREE.Fog(fogColor, 6, 16);
   world.fog = fog;
 
-  return { head, face, faceMat, legionGroup, legion, cage, cageMat, eyes, eyeMat, halo, haloMat, particles, particleMat, particleSeed, grid, key, rim, fog, body, reactor, reactorMat: redCore, energyArcs };
+  return { head, face, faceMat, legionGroup, legion, cage, cageMat, eyes, eyeMat, halo, haloMat, particles, particleMat, particleSeed, grid, key, rim, fog, body, reactor, reactorMat: redCore, energyArcs, arms };
 }
 
 /** Counts up to `value` without re-rendering React on every tick. */
@@ -393,6 +445,18 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     document.addEventListener("pointerleave", onPointerLeave);
 
+    const gestureState = { current: { gesture: "idle", side: "right" as "left" | "right", target: "" } };
+    const onAvatarGesture = (event: Event) => {
+      const detail = (event as CustomEvent<{ gesture?: string; side?: "left" | "right"; target?: string }>).detail;
+      if (!detail) return;
+      gestureState.current = {
+        gesture: detail.gesture ?? "idle",
+        side: detail.side ?? "right",
+        target: detail.target ?? "",
+      };
+    };
+    window.addEventListener("ultran:avatar-gesture", onAvatarGesture);
+
     let raf = 0;
     let running = false;
     let visible = true;
@@ -460,6 +524,19 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.head.rotation.z = Math.sin(t * 0.27) * 0.02 * drift;
       rig.body.rotation.y = Math.sin(t * 0.35 + 0.7) * 0.035 * drift + state.gazeX * 0.08;
       rig.body.rotation.x = Math.sin(t * 0.55) * 0.012 * drift;
+      // Hands settle into a relaxed idle pose, then reach toward the target
+      // when the brain dispatches a semantic point gesture.
+      const gesture = gestureState.current;
+      const pointing = gesture.gesture === "point" || gesture.gesture === "open";
+      for (let index = 0; index < rig.arms.length; index += 1) {
+        const arm = rig.arms[index]!;
+        const isChosen = gesture.side === (index === 0 ? "left" : "right");
+        const reach = pointing && isChosen ? 1 : 0;
+        const side = index === 0 ? -1 : 1;
+        arm.rotation.z = damp(arm.rotation.z, side * (0.08 + reach * 0.62), 5.5, dt);
+        arm.rotation.x = damp(arm.rotation.x, reach * -0.5, 5.5, dt);
+        arm.rotation.y = damp(arm.rotation.y, reach * 0.22, 5.5, dt);
+      }
       rig.head.rotation.x += Math.sin(t * 5.5) * 0.025 * state.speakEnergy * drift;
 
       rig.cage.rotation.y = t * 0.12 * drift;
@@ -595,6 +672,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("ultran:avatar-gesture", onAvatarGesture);
       renderer.debug.onShaderError = null;
       world.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.LineSegments) {

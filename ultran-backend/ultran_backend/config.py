@@ -59,6 +59,7 @@ class Settings:
     environment: str = "dev"
     api_prefix: str = "/v1"
     data_dir: Path = Path(".ultran-data")
+    credential_encryption_key: str = ""
     brain_backend: str = "echo"
     brain_endpoint: str = "http://127.0.0.1:11434"
     brain_model: str = "llama3.1:8b"
@@ -111,6 +112,8 @@ class Settings:
             raise ValueError("api_prefix must start with '/'")
         if self.sandbox_max_ttl_s <= 0:
             raise ValueError("sandbox_max_ttl_s must be positive")
+        if self.is_production and not self.credential_encryption_key:
+            raise ValueError("ULTRAN_CREDENTIAL_ENCRYPTION_KEY is required in production")
         if self.free_plan_monthly_tokens < 0:
             raise ValueError("free_plan_monthly_tokens must be >= 0")
 
@@ -130,6 +133,7 @@ class Settings:
             environment=e.get("ULTRAN_ENV", "dev"),
             api_prefix=e.get("ULTRAN_API_PREFIX", "/v1"),
             data_dir=Path(e.get("ULTRAN_DATA_DIR", ".ultran-data")),
+            credential_encryption_key=e.get("ULTRAN_CREDENTIAL_ENCRYPTION_KEY", ""),
             brain_backend=e.get("ULTRAN_BRAIN_BACKEND", "ollama").strip().lower(),
             brain_endpoint=e.get("ULTRAN_BRAIN_ENDPOINT", "http://127.0.0.1:11434"),
             brain_model=e.get("ULTRAN_BRAIN_MODEL", "llama3.1:8b"),

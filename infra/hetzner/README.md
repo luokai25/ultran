@@ -122,14 +122,17 @@ Edit `.env`:
   then put it in `.env`. Do not paste it into chat, commit it, or put it in
   shell history.
 
-Generate the key without printing it into a shell command history:
+Generate the key with Python's standard library, then write it directly into
+`.env` without printing it or putting it in shell history:
 
 ```bash
 python3 - <<'PY'
-from cryptography.fernet import Fernet
+import base64
+import secrets
 from pathlib import Path
+
 p = Path(".env")
-key = Fernet.generate_key().decode()
+key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
 text = p.read_text()
 text = text.replace("ULTRAN_CREDENTIAL_ENCRYPTION_KEY=", f"ULTRAN_CREDENTIAL_ENCRYPTION_KEY={key}")
 p.write_text(text)

@@ -34,7 +34,8 @@ export default function ModelHub() {
   const [models, setModels] = useState<HubModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState("qwen2.5:3b");
+  const [selectedHubModel, setSelectedHubModel] = useState("");
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]["id"]>("groq");
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -109,7 +110,7 @@ export default function ModelHub() {
         <div className="ultran-model-results">
           {models.map((model) => <article className="ultran-model-card" key={model.id}>
             <div><strong>{model.id}</strong><span>{model.pipeline_tag ?? "Text generation"} · {(model.downloads ?? 0).toLocaleString()} downloads · ♥ {model.likes ?? 0}</span></div>
-            <button className="ultran-model-secondary" onClick={() => { setSelected(model.id); setTab("local"); }}>Select</button>
+            <button className="ultran-model-secondary" onClick={() => { setSelectedHubModel(model.id); setTab("local"); }}>Select</button>
             <a href={`https://huggingface.co/${model.id}`} target="_blank" rel="noreferrer">Model card ↗</a>
           </article>)}
           {!models.length && !loading && <div className="ultran-model-empty">Search hundreds of community models. Start with Qwen GGUF or Llama GGUF.</div>}
@@ -134,7 +135,7 @@ export default function ModelHub() {
       </div>}
 
       {tab === "local" && <div className="ultran-model-panel">
-        <div className="ultran-local-feature"><strong>Run models locally with Ollama</strong><p>Download a quantized model once, then use it without a cloud API key. The device needs enough free RAM and storage.</p></div>
+        <div className="ultran-local-feature"><strong>Run models locally with Ollama</strong><p>Download a quantized model once, then use it without a cloud API key. The device needs enough free RAM and storage.</p>{selectedHubModel && <p>Selected Hugging Face model: <strong>{selectedHubModel}</strong>. This is a model-card selection, not an Ollama tag. Check the card for a compatible GGUF file, or choose an Ollama model tag below.</p>}</div>
         <label className="ultran-model-label" htmlFor="ultran-model-id">Ollama model name or tag</label>
         <input id="ultran-model-id" value={selected} onChange={(event) => setSelected(event.target.value)} placeholder="qwen2.5:3b" />
         <label className="ultran-model-label" htmlFor="ultran-ollama-host">Ollama endpoint</label>

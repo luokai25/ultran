@@ -12,6 +12,19 @@ from typing import Any
 from .errors import DependencyUnavailable, ValidationFailed
 
 # provider -> (catalogue URL, auth header, additional headers)
+# Only OpenAI-compatible chat APIs are routed through the generic chat adapter.
+PROVIDER_CHAT_BASE_URLS: dict[str, str] = {
+    "openai": "https://api.openai.com",
+    "groq": "https://api.groq.com/openai",
+    "openrouter": "https://openrouter.ai/api",
+    "together-ai": "https://api.together.xyz",
+    "deepseek": "https://api.deepseek.com",
+    "fireworks-ai": "https://api.fireworks.ai/inference",
+    "cerebras": "https://api.cerebras.ai",
+    "mistral": "https://api.mistral.ai",
+    "xai": "https://api.x.ai",
+}
+
 PROVIDER_PROBES: dict[str, tuple[str, str, dict[str, str]]] = {
     "openai": ("https://api.openai.com/v1/models", "Authorization", {}),
     "groq": ("https://api.groq.com/openai/v1/models", "Authorization", {}),

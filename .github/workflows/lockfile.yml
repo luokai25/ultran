@@ -8,19 +8,11 @@ name: Lockfile
 # stale registry edge serving rollup 4.67.2. `--frozen-lockfile` in CI and in the
 # Android release is only meaningful once this file is on the branch.
 #
-# Runs when manifests change, and on demand. Commits with GITHUB_TOKEN, which
-# does not re-trigger workflows, so this cannot loop.
+# Run manually after changing workspace manifests. CI continues to install
+# without a lockfile until this workflow has generated and committed one.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - "apps/*/package.json"
-      - "packages/*/package.json"
-      - "services/*/package.json"
 
 concurrency:
   group: lockfile-${{ github.ref }}

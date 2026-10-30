@@ -42,6 +42,23 @@ def list_connectors(
     ]
 
 
+@router.post("/{connector_id}/test")
+def test_connection(connector_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Verify a saved AI provider key without generating a billable completion."""
+    from ..provider_connections import PROVIDER_BASE_URLS, probe_provider
+    from ..errors import ValidationFailed
+
+    if connector_id not in PROVIDER_BASE_URLS:
+        raise ValidationFailed(
+            "Connection testing is not available for this provider yet.",
+            details={"provider": connector_id},
+        )
+    credential = container.vault.get(workspace, connector_id)
+    result = probe_provider(connector_id, credential.reveal())
+    credential.touch()
+    return result.public()
+
+
 @router.get("/{connector_id}", response_model=ConnectorOut)
 def get_connector(connector_id: str, container: ContainerDep):
     m = container.registry.get(connector_id)

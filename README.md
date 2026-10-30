@@ -1,8 +1,10 @@
 # Ultran
 
-**A local-first AI agent platform.** Local inference is the target; the current
-Android shell does not bundle model weights and needs a linked backend for full
-language-model reasoning. The cloud is optional.
+**A local-first AI agent platform.** Local inference is the long-term target. The
+Android shell does not bundle model weights; full language-model reasoning
+requires a linked local runtime or a configured hosted model provider. Ultran's
+cloud control plane is optional for local-only use, but is required for shared
+workspaces and hosted agent services.
 
 Ultran is a monorepo for building and operating autonomous agents that think
 locally, reach the outside world only through capability-scoped connectors,
@@ -147,6 +149,41 @@ but end-to-end agent actions remain unfinished.
 
 ---
 
+## Deploy the API on Hetzner Cloud
+
+Ultran now includes a single-server deployment baseline in
+[`infra/hetzner`](infra/hetzner/README.md). It uses Ubuntu 24.04 LTS, Docker
+Compose, and Caddy for automatic HTTPS. The API container runs as a non-root
+user, has a read-only root filesystem, and stores its encrypted credential vault
+on a persistent Docker volume. Only ports 80 and 443 are exposed by Compose;
+the API's port 8080 stays private.
+
+**This is deployment infrastructure, not a claim that a server is already
+running.** No Hetzner VPS, DNS record, production encryption key, or live
+service is provisioned by this repository change. Follow the full
+[Hetzner operations guide](infra/hetzner/README.md) before exposing the API.
+
+Quick outline:
+
+1. Create an Ubuntu 24.04 VPS and attach a Hetzner Cloud Firewall.
+2. Allow inbound TCP 22 only from your administration IP, plus TCP 80/443.
+   Do not expose 8080, database ports, or model-server ports.
+3. Install Docker Engine and Compose, harden SSH, enable security updates and
+   fail2ban, and configure host firewall rules.
+4. Point an API DNS A record at the VPS, copy
+   `infra/hetzner/.env.example` to `.env`, and set the domain, ACME email,
+   and exact web-app CORS origins.
+5. Generate the Fernet credential-encryption key on the server and back it up
+   securely outside the VPS. Never commit it or paste it into chat.
+6. Start the stack with `docker compose up -d --build`, then verify HTTPS,
+   health checks, private API access, backup restoration, and monitoring.
+
+The SQLite credential vault is designed for one API instance with persistent
+storage. Do not scale this Compose service horizontally until the vault and
+transactional state have been migrated to a shared database. The current
+deployment guide also covers encrypted off-server backups, recovery, updates,
+and rollback.
+
 ## Core Concepts
 
 <details>
@@ -218,9 +255,13 @@ content ever leaves the device for metering.
 
 ## Project Status
 
-**Pre-alpha.** The repository is a skeleton: directory structure, workspace
-tooling, and architecture are in place; implementations are stubs behind
-documented interfaces. Expect breaking changes until `v0.1.0`.
+**Pre-alpha.** The repository contains working components and tests, including
+a Python control plane, provider credential vault and verification, agent
+runtime integrations, and an initial Hetzner deployment baseline. The full
+product is not production-ready: hosted infrastructure has not been provisioned,
+and end-to-end operational verification, broader runtime integration, and
+production hardening remain in progress. Expect breaking changes until
+`v0.1.0`.
 
 ---
 
@@ -228,9 +269,9 @@ documented interfaces. Expect breaking changes until `v0.1.0`.
 
 1. Read [`docs/architecture.md`](docs/architecture.md) — layer boundaries are
    load-bearing and changes that cross them need an ADR.
-2. Branch from `main`: `feat/<scope>`, `fix/<scope>`, `docs/<scope>`.
+2. Keep changes focused and coordinate edits against the latest `main`.
 3. Keep commits conventional (`feat:`, `fix:`, `chore:`, `docs:`).
-4. `pnpm typecheck && pnpm test` must pass before opening a PR.
+4. `pnpm typecheck && pnpm test` must pass before considering a change ready.
 
 Architectural decisions are recorded as ADRs in the decision log at the end of
 the architecture document.

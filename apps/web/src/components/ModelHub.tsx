@@ -27,6 +27,7 @@ const PROVIDERS = [
 ] as const;
 
 const API = process.env.NEXT_PUBLIC_ULTRAN_API_URL ?? "http://127.0.0.1:8080/v1";
+const PROBE_SUPPORTED = new Set(["openai", "groq", "openrouter", "together-ai", "deepseek", "fireworks-ai", "cerebras", "mistral", "xai"]);
 
 export default function ModelHub() {
   const [tab, setTab] = useState<"discover" | "providers" | "local">("discover");
@@ -38,7 +39,7 @@ export default function ModelHub() {
   const [selectedHubModel, setSelectedHubModel] = useState("");
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]["id"]>("groq");
   const [key, setKey] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);\n  const [testing, setTesting] = useState(false);
   const [notice, setNotice] = useState("");
   const [ollamaHost, setOllamaHost] = useState("http://127.0.0.1:11434");
 
@@ -83,6 +84,21 @@ export default function ModelHub() {
       setNotice(err instanceof Error ? err.message : "Could not save this provider.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function testProviderConnection() {
+    setTesting(true);
+    setNotice("");
+    try {
+      const response = await fetch(`${API}/connectors/${provider}/test`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error?.message ?? body?.detail ?? `Test failed (${response.status})`);
+      setNotice(`${chosen.name} verified: API key accepted, ${body.models_count} models listed in ${body.latency_ms} ms.`);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Could not verify this provider.");
+    } finally {
+      setTesting(false);
     }
   }
 

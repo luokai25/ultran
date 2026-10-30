@@ -91,8 +91,12 @@ terraform output
 ```
 
 The output gives the server IPv4 address. Point the API DNS A record at it.
-Connect as the non-root operator shown in `admin_user`, install Docker Engine
-and the Compose plugin, then follow **First deployment** below.
+Connect as the non-root operator shown in `admin_user`. Cloud-init installs
+Docker Engine, the Compose plugin, unattended security updates, fail2ban, and
+UFW during first boot. Verify them with `docker --version`,
+`docker compose version`, `systemctl status fail2ban`, and `sudo ufw status`,
+then follow **First deployment** below. Log out and back in once so the operator
+session picks up Docker group membership.
 
 Keep `HCLOUD_TOKEN`, `terraform.tfvars`, Terraform state, and plan files
 private. The repository ignores Terraform state and plan files; never force-add

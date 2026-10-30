@@ -1,0 +1,20 @@
+[Unit]
+Description=Encrypted off-server backup for Ultran
+Wants=docker.service
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/ultran-backup.env
+ExecStart=/opt/ultran/infra/hetzner/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/ultran /var/lib/docker
+NoNewPrivileges=true

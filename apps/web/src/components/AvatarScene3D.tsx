@@ -87,6 +87,10 @@ type Rig = {
   key: THREE.DirectionalLight;
   rim: THREE.PointLight;
   fog: THREE.Fog;
+  body: THREE.Group;
+  reactor: THREE.Mesh;
+  reactorMat: THREE.MeshStandardMaterial;
+  energyArcs: THREE.Mesh[];
 };
 
 function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color): Rig {
@@ -103,18 +107,22 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const cage = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), cageMat);
   head.add(cage);
 
+  // Ultron's signature optics are crimson, not scene-coloured. Keep them
+  // independently driven so the environment can remain gold/black.
+  const opticRed = new THREE.Color("#ff1728");
   const eyeMat = new THREE.MeshStandardMaterial({
-    color: accent,
-    emissive: accent,
-    emissiveIntensity: 2.4,
-    metalness: 0.1,
-    roughness: 0.2,
+    color: "#5b0710",
+    emissive: opticRed,
+    emissiveIntensity: 4.2,
+    metalness: 0.25,
+    roughness: 0.16,
   });
   const eyeGeo = new THREE.BoxGeometry(0.3, 0.09, 0.08);
   const eyes: THREE.Mesh[] = [];
   for (const x of [-0.34, 0.34]) {
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(x, 0.14, 0.9);
+    eye.position.set(x, 0.14, 0.94);
+    eye.scale.set(1.12, 1.0, 1.0);
     head.add(eye);
     eyes.push(eye);
   }
@@ -125,6 +133,62 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   head.add(halo);
 
   world.add(head);
+
+  // A full upper-body silhouette turns the floating mask into a mechanical
+  // humanoid. Every plate is separate so the torso can subtly articulate.
+  const body = new THREE.Group();
+  body.position.set(0, -1.48, -0.02);
+  const silver = new THREE.MeshStandardMaterial({
+    color: "#aeb5bd", metalness: 0.94, roughness: 0.24,
+  });
+  const darkSteel = new THREE.MeshStandardMaterial({
+    color: "#303943", metalness: 0.9, roughness: 0.3,
+  });
+  const redCore = new THREE.MeshStandardMaterial({
+    color: "#650713", metalness: 0.55, roughness: 0.18,
+    emissive: "#ff1028", emissiveIntensity: 3.5,
+  });
+  const addPlate = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, scale: [number, number, number], rotation = 0) => {
+    const plate = new THREE.Mesh(geometry, material);
+    plate.position.set(x, y, z);
+    plate.scale.set(...scale);
+    plate.rotation.z = rotation;
+    body.add(plate);
+    return plate;
+  };
+  // Neck pistons and collar.
+  addPlate(new THREE.CylinderGeometry(0.25, 0.34, 0.55, 10), darkSteel, 0, 0.75, 0, [1, 1, 0.8]);
+  addPlate(new THREE.CylinderGeometry(0.39, 0.31, 0.16, 10), silver, 0, 0.48, 0, [1, 1, 0.9]);
+  // Tapered chest and abdomen, with overlapping breastplate segments.
+  addPlate(new THREE.SphereGeometry(0.82, 24, 18), darkSteel, 0, -0.12, -0.04, [1.0, 0.92, 0.52]);
+  addPlate(new THREE.SphereGeometry(0.7, 24, 18), silver, 0, -0.03, 0.13, [1.0, 0.76, 0.34]);
+  addPlate(new THREE.BoxGeometry(0.34, 0.48, 0.12), darkSteel, 0, -0.62, 0.34, [1, 1, 1]);
+  for (const side of [-1, 1]) {
+    addPlate(new THREE.SphereGeometry(0.47, 18, 14), silver, side * 0.83, 0.28, 0, [1.2, 0.82, 0.78], side * -0.16);
+    addPlate(new THREE.BoxGeometry(0.42, 0.52, 0.2), darkSteel, side * 0.72, -0.35, 0.22, [1, 1, 1], side * -0.18);
+    addPlate(new THREE.BoxGeometry(0.2, 0.58, 0.16), silver, side * 0.42, -0.34, 0.34, [1, 1, 1], side * 0.12);
+    // Layered shoulder caps and exposed actuator joints.
+    addPlate(new THREE.SphereGeometry(0.43, 18, 14), darkSteel, side * 1.02, 0.32, 0, [1.0, 0.8, 0.9]);
+    addPlate(new THREE.SphereGeometry(0.34, 18, 14), silver, side * 1.08, 0.36, 0.12, [1.0, 0.78, 0.86]);
+    addPlate(new THREE.CylinderGeometry(0.13, 0.16, 0.34, 10), darkSteel, side * 1.12, -0.16, 0, [1, 1, 1], Math.PI / 2);
+  }
+  // Red reactor lens, concentric mechanical bezel and animated energy arcs.
+  const reactor = new THREE.Mesh(new THREE.SphereGeometry(0.19, 24, 18), redCore);
+  reactor.position.set(0, 0.02, 0.43);
+  body.add(reactor);
+  const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.045, 10, 48), silver);
+  bezel.position.copy(reactor.position);
+  body.add(bezel);
+  const energyArcs: THREE.Mesh[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const arcMat = new THREE.MeshBasicMaterial({ color: "#ff2038", transparent: true, opacity: 0.72 });
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.34 + i * 0.09, 0.009, 6, 64, Math.PI * 1.35), arcMat);
+    arc.position.copy(reactor.position);
+    arc.rotation.set(0.15 + i * 0.45, i * 0.7, i * 1.1);
+    body.add(arc);
+    energyArcs.push(arc);
+  }
+  world.add(body);
 
   // The Legion: many faces, one draw call. They share the head's material, so
   // expression, glow and reveal uniforms drive the whole choir at once.
@@ -174,7 +238,7 @@ function buildRig(world: THREE.Scene, accent: THREE.Color, fogColor: THREE.Color
   const fog = new THREE.Fog(fogColor, 6, 16);
   world.fog = fog;
 
-  return { head, face, faceMat, legionGroup, legion, cage, cageMat, eyes, eyeMat, halo, haloMat, particles, particleMat, particleSeed, grid, key, rim, fog };
+  return { head, face, faceMat, legionGroup, legion, cage, cageMat, eyes, eyeMat, halo, haloMat, particles, particleMat, particleSeed, grid, key, rim, fog, body, reactor, reactorMat: redCore, energyArcs };
 }
 
 /** Counts up to `value` without re-rendering React on every tick. */
@@ -348,8 +412,10 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       accent.lerp(accentTarget, 1 - Math.exp(-3 * dt));
       rig.fog.color.lerp(fogTarget, 1 - Math.exp(-3 * dt));
       rig.cageMat.color.copy(accent);
-      rig.eyeMat.color.copy(accent);
-      rig.eyeMat.emissive.copy(accent);
+      // Red optics and reactor are a fixed character signature; only the
+      // surrounding armour reflections follow the selected scene accent.
+      rig.eyeMat.color.set("#5b0710");
+      rig.eyeMat.emissive.set("#ff1728");
       rig.haloMat.color.copy(accent);
       rig.particleMat.color.copy(accent);
       rig.key.color.copy(accent);
@@ -371,6 +437,8 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       rig.head.rotation.y = Math.sin(t * 0.35) * 0.22 * drift + state.gazeX * 0.35;
       rig.head.rotation.x = state.gazeY * 0.18 + Math.sin(t * 0.5) * 0.03 * drift;
       rig.head.rotation.z = Math.sin(t * 0.27) * 0.02 * drift;
+      rig.body.rotation.y = Math.sin(t * 0.35 + 0.7) * 0.035 * drift + state.gazeX * 0.08;
+      rig.body.rotation.x = Math.sin(t * 0.55) * 0.012 * drift;
       rig.head.rotation.x += Math.sin(t * 5.5) * 0.025 * state.speakEnergy * drift;
 
       rig.cage.rotation.y = t * 0.12 * drift;
@@ -392,7 +460,13 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
         eye.position.y = 0.14 - state.gazeY * 0.02;
       }
       rig.eyeMat.emissiveIntensity =
-        1.2 + state.intensity * (1 + Math.sin(t * state.pulseHz * 3)) * 1.1 + state.speakEnergy * 0.5;
+        2.8 + state.intensity * (1 + Math.sin(t * state.pulseHz * 3)) * 1.8 + state.speakEnergy * 0.8;
+      rig.reactorMat.emissiveIntensity = 2.4 + state.intensity * 2.8 + state.speakEnergy * 1.4 + Math.sin(t * state.pulseHz * 4) * 0.8;
+      for (let i = 0; i < rig.energyArcs.length; i += 1) {
+        const arc = rig.energyArcs[i]!;
+        arc.rotation.z += dt * (i % 2 === 0 ? 0.7 : -0.9) * (0.5 + state.intensity);
+        (arc.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * (2.4 + i) + i));
+      }
 
       // --- Mouth: layered syllable envelope while speaking ------------------
       const syllable = Math.abs(Math.sin(t * 9.5)) * 0.65 + Math.abs(Math.sin(t * 5.3 + 1.1)) * 0.35;

@@ -108,3 +108,4 @@ apps/phone/android/app/src/main/assets/public/
 # Generated Android raster assets - produced by apps/phone/android/tools/generate_assets.py
 apps/phone/android/app/src/main/res/mipmap-*/ic_launcher*.png
 apps/phone/android/app/src/main/res/drawable*/splash.png
+.test-out/

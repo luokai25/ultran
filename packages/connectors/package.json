@@ -18,7 +18,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "echo lint pending",
     "typecheck": "tsc --noEmit",
-    "test": "echo no tests yet",
+    "test": "tsc -p tsconfig.test.json && node --test .test-out/src/connectors.test.js",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

@@ -1,5 +1,9 @@
 import type { ConnectorManifest } from '../manifest.js';
+import { filesManifest } from './files.js';
 import { githubManifest } from './github.js';
+import { slackManifest } from './slack.js';
+
+export { filesManifest, githubManifest, slackManifest };
 
 /** Every first-party connector, ready to hand to ConnectorRegistry.load(). */
-export const BUILTIN_CONNECTORS: ConnectorManifest[] = [githubManifest];
+export const BUILTIN_CONNECTORS: ConnectorManifest[] = [githubManifest, slackManifest, filesManifest];

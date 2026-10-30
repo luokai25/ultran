@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars. This file contains no access token.
+# Keep your real terraform.tfvars and Terraform state out of Git.
+
+server_name       = "ultran-api"
+server_type       = "cx23"
+location          = "nbg1"
+admin_user        = "ultranops"
+admin_ipv4_cidr   = "REPLACE_WITH_YOUR_PUBLIC_IP/32"
+ssh_public_key    = "ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY"

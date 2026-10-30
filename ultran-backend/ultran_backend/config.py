@@ -59,6 +59,15 @@ class Settings:
     sandbox_max_ttl_s: int = 900
     sandbox_cpu_ms_budget: int = 2000
     free_plan_monthly_tokens: int = 100_000
+    # ---- MCP connector runtime (v2) ----
+    #: Servers declared as code: a JSON array of ServerSpec dicts.
+    mcp_servers_json: str = ""
+    #: A tool is never invoked without a valid grant (spec invariant).
+    mcp_require_grants: bool = True
+    mcp_grant_ttl_s: int = 900
+    mcp_approval_ttl_s: int = 300
+    mcp_wall_ms: int = 30_000
+    mcp_egress_bytes: int = 32 * 1024 * 1024
     debug: bool = False
     # The web workspace is served from a different origin (3000) than the API
     # (8080), so the browser needs an explicit CORS allow-list. Dev gets the
@@ -105,6 +114,12 @@ class Settings:
             sandbox_max_ttl_s=_int(e.get("ULTRAN_SANDBOX_MAX_TTL_S"), 900),
             sandbox_cpu_ms_budget=_int(e.get("ULTRAN_SANDBOX_CPU_MS_BUDGET"), 2000),
             free_plan_monthly_tokens=_int(e.get("ULTRAN_FREE_PLAN_MONTHLY_TOKENS"), 100_000),
+            mcp_servers_json=e.get("ULTRAN_MCP_SERVERS", ""),
+            mcp_require_grants=_flag(e.get("ULTRAN_MCP_REQUIRE_GRANTS"), True),
+            mcp_grant_ttl_s=_int(e.get("ULTRAN_MCP_GRANT_TTL_S"), 900),
+            mcp_approval_ttl_s=_int(e.get("ULTRAN_MCP_APPROVAL_TTL_S"), 300),
+            mcp_wall_ms=_int(e.get("ULTRAN_MCP_WALL_MS"), 30_000),
+            mcp_egress_bytes=_int(e.get("ULTRAN_MCP_EGRESS_BYTES"), 32 * 1024 * 1024),
             debug=_flag(e.get("ULTRAN_DEBUG"), False),
             cors_origins=_origins(e.get("ULTRAN_CORS_ORIGINS"), cls().cors_origins),
         )

@@ -3,7 +3,7 @@
 v2 keeps this module as the single answer to "what can Ultran call?", but the
 answer now has two sources:
 
-* **builtin** - the frozen 74-manifest catalog (read-only in v2, removed in
+* **builtin** - the frozen builtin catalog (several hundred manifests) (read-only in v2, removed in
   Phase 5 once MCP covers the surface);
 * **mcp** - a registered MCP server, whose tools are discovered at handshake
   time and projected into the same registry as a synthetic manifest.

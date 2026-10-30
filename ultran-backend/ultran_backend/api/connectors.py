@@ -22,7 +22,7 @@ def list_connectors(
     tier: str | None = None,
     auth_kind: str | None = None,
     search: str | None = None,
-    limit: int = Query(default=104, ge=1, le=200),
+    limit: int = Query(default=500, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
     rows = container.registry.list(

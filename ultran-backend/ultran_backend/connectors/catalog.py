@@ -1,6 +1,8 @@
 """The built-in connector catalog.
 
-Every entry is a real, documented integration point. ``tier`` marks whether the
+Every entry is a real, documented integration point. The core set is declared
+below; the larger extension lives in :mod:`.catalog_extra` and is merged here so
+there is still exactly one ordered, duplicate-checked catalog. ``tier`` marks whether the
 upstream provider can be used without a paid account (``free``) or requires one
 (``paid``); ``auth_kind`` records how Ultran authenticates to it.
 
@@ -14,6 +16,7 @@ from __future__ import annotations
 
 from typing import Iterator
 
+from .catalog_extra import EXTRA_ROWS
 from .registry import ConnectorManifest
 
 # (id, name, category, auth_kind, tier, actions, description)
@@ -107,7 +110,7 @@ _ROWS: tuple[tuple[str, str, str, str, str, tuple[str, ...], str], ...] = (
 def _build() -> tuple[ConnectorManifest, ...]:
     out: list[ConnectorManifest] = []
     seen: set[str] = set()
-    for cid, name, category, auth_kind, tier, actions, description in _ROWS:
+    for cid, name, category, auth_kind, tier, actions, description in (*_ROWS, *EXTRA_ROWS):
         if cid in seen:  # pragma: no cover - guards against copy/paste slips
             raise RuntimeError(f"duplicate connector id in catalog: {cid}")
         seen.add(cid)

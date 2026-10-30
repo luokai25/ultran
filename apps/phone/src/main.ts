@@ -9,6 +9,7 @@
  */
 
 import * as THREE from "three";
+import { initConnectors } from "./connectors-ui";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -866,6 +867,7 @@ if (synth) {
  * Boot
  * ------------------------------------------------------------------ */
 
+initConnectors({ linked: () => baseUrl() !== "", api, closeDrawer });
 buildThemes();
 applyTheme(settings.theme);
 setLink("offline", settings.endpoint ? "ready" : "local");

@@ -1,0 +1,5537 @@
+[
+ {
+  "id": "aws-bedrock",
+  "name": "Amazon Bedrock",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "invoke_model",
+   "list_models"
+  ],
+  "description": "Foundation models on AWS."
+ },
+ {
+  "id": "anthropic",
+  "name": "Anthropic",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion",
+   "count_tokens"
+  ],
+  "description": "Claude model API."
+ },
+ {
+  "id": "assemblyai",
+  "name": "AssemblyAI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "transcribe",
+   "get_transcript"
+  ],
+  "description": "Speech to text."
+ },
+ {
+  "id": "azure-openai",
+  "name": "Azure OpenAI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion",
+   "embed"
+  ],
+  "description": "OpenAI models on Azure."
+ },
+ {
+  "id": "cohere",
+  "name": "Cohere",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat",
+   "embed",
+   "rerank"
+  ],
+  "description": "Language models for enterprise."
+ },
+ {
+  "id": "comfyui",
+  "name": "ComfyUI",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "queue_prompt",
+   "get_history"
+  ],
+  "description": "Local node-based image generation."
+ },
+ {
+  "id": "deepgram",
+  "name": "Deepgram",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "transcribe",
+   "speak"
+  ],
+  "description": "Speech recognition and synthesis."
+ },
+ {
+  "id": "deepl",
+  "name": "DeepL",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "translate",
+   "list_languages"
+  ],
+  "description": "Machine translation."
+ },
+ {
+  "id": "deepseek",
+  "name": "DeepSeek",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion"
+  ],
+  "description": "Reasoning and chat models."
+ },
+ {
+  "id": "elevenlabs",
+  "name": "ElevenLabs",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "text_to_speech",
+   "clone_voice"
+  ],
+  "description": "Voice synthesis and cloning."
+ },
+ {
+  "id": "fireworks-ai",
+  "name": "Fireworks AI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion",
+   "embed"
+  ],
+  "description": "Fast open-model inference."
+ },
+ {
+  "id": "google-gemini",
+  "name": "Google Gemini",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "generate_content",
+   "embed"
+  ],
+  "description": "Gemini models."
+ },
+ {
+  "id": "google-translate",
+  "name": "Google Translate",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "translate",
+   "detect_language"
+  ],
+  "description": "Machine translation."
+ },
+ {
+  "id": "groq",
+  "name": "Groq",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "transcribe"
+  ],
+  "description": "Fast LLM inference."
+ },
+ {
+  "id": "huggingface",
+  "name": "Hugging Face",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "inference",
+   "search_models"
+  ],
+  "description": "Model hub and inference endpoints."
+ },
+ {
+  "id": "langfuse",
+  "name": "Langfuse",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "log_trace",
+   "list_traces"
+  ],
+  "description": "LLM observability."
+ },
+ {
+  "id": "leonardo-ai",
+  "name": "Leonardo.Ai",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "generate_image",
+   "list_models"
+  ],
+  "description": "Image generation."
+ },
+ {
+  "id": "libretranslate",
+  "name": "LibreTranslate",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "translate",
+   "detect"
+  ],
+  "description": "Self-hosted translation."
+ },
+ {
+  "id": "llama-cpp-server",
+  "name": "llama.cpp Server",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "embed"
+  ],
+  "description": "Local inference server."
+ },
+ {
+  "id": "lm-studio",
+  "name": "LM Studio",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models"
+  ],
+  "description": "Local OpenAI-compatible server."
+ },
+ {
+  "id": "mistral",
+  "name": "Mistral AI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "embed"
+  ],
+  "description": "Hosted open-weight and frontier models."
+ },
+ {
+  "id": "ollama",
+  "name": "Ollama",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models",
+   "embed"
+  ],
+  "description": "Local model runtime - no key required."
+ },
+ {
+  "id": "openai",
+  "name": "OpenAI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion",
+   "embed",
+   "transcribe"
+  ],
+  "description": "Hosted LLM, embeddings and speech."
+ },
+ {
+  "id": "openrouter",
+  "name": "OpenRouter",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models"
+  ],
+  "description": "One API for many models."
+ },
+ {
+  "id": "perplexity",
+  "name": "Perplexity",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion"
+  ],
+  "description": "Search-grounded answers."
+ },
+ {
+  "id": "pinecone",
+  "name": "Pinecone",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "upsert",
+   "query"
+  ],
+  "description": "Managed vector index."
+ },
+ {
+  "id": "qdrant",
+  "name": "Qdrant",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "upsert",
+   "search"
+  ],
+  "description": "Self-hostable vector search."
+ },
+ {
+  "id": "replicate",
+  "name": "Replicate",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "run_model",
+   "get_prediction"
+  ],
+  "description": "Hosted model runs."
+ },
+ {
+  "id": "roboflow",
+  "name": "Roboflow",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "infer",
+   "list_projects"
+  ],
+  "description": "Computer vision."
+ },
+ {
+  "id": "runway",
+  "name": "Runway",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "text_to_video",
+   "get_task"
+  ],
+  "description": "Video generation."
+ },
+ {
+  "id": "stability-ai",
+  "name": "Stability AI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "text_to_image",
+   "upscale"
+  ],
+  "description": "Image generation."
+ },
+ {
+  "id": "automatic1111",
+  "name": "Stable Diffusion WebUI",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "txt2img",
+   "img2img"
+  ],
+  "description": "Local image generation API."
+ },
+ {
+  "id": "together-ai",
+  "name": "Together AI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion",
+   "embed"
+  ],
+  "description": "Hosted open models."
+ },
+ {
+  "id": "vllm",
+  "name": "vLLM",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "chat_completion",
+   "list_models"
+  ],
+  "description": "Self-hosted high-throughput serving."
+ },
+ {
+  "id": "weights-and-biases",
+  "name": "Weights & Biases",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "log_run",
+   "list_runs"
+  ],
+  "description": "Experiment tracking."
+ },
+ {
+  "id": "whisper-cpp",
+  "name": "whisper.cpp Server",
+  "category": "ai",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "transcribe"
+  ],
+  "description": "Local offline speech to text."
+ },
+ {
+  "id": "xai",
+  "name": "xAI",
+  "category": "ai",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "chat_completion"
+  ],
+  "description": "Grok models."
+ },
+ {
+  "id": "amplitude",
+  "name": "Amplitude",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "track",
+   "query"
+  ],
+  "description": "Product analytics."
+ },
+ {
+  "id": "fathom",
+  "name": "Fathom Analytics",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "get_aggregation",
+   "list_sites"
+  ],
+  "description": "Privacy-friendly analytics."
+ },
+ {
+  "id": "fullstory",
+  "name": "FullStory",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_sessions",
+   "get_session"
+  ],
+  "description": "Session replay."
+ },
+ {
+  "id": "google-analytics",
+  "name": "Google Analytics",
+  "category": "analytics",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "run_report",
+   "list_properties"
+  ],
+  "description": "Web analytics (GA4)."
+ },
+ {
+  "id": "google-search-console",
+  "name": "Google Search Console",
+  "category": "analytics",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "query_analytics",
+   "list_sitemaps"
+  ],
+  "description": "Search performance."
+ },
+ {
+  "id": "heap",
+  "name": "Heap",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "track",
+   "identify"
+  ],
+  "description": "Autocapture analytics."
+ },
+ {
+  "id": "hotjar",
+  "name": "Hotjar",
+  "category": "analytics",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_surveys",
+   "get_responses"
+  ],
+  "description": "Heatmaps and feedback."
+ },
+ {
+  "id": "matomo",
+  "name": "Matomo",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_visits",
+   "track_event"
+  ],
+  "description": "Self-hostable analytics."
+ },
+ {
+  "id": "mixpanel",
+  "name": "Mixpanel",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "track",
+   "query"
+  ],
+  "description": "Product analytics."
+ },
+ {
+  "id": "plausible",
+  "name": "Plausible",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "get_stats",
+   "get_breakdown"
+  ],
+  "description": "Privacy-friendly analytics."
+ },
+ {
+  "id": "segment",
+  "name": "Segment",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "track",
+   "identify"
+  ],
+  "description": "Customer data pipeline."
+ },
+ {
+  "id": "umami",
+  "name": "Umami",
+  "category": "analytics",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_stats",
+   "get_pageviews"
+  ],
+  "description": "Open-source analytics."
+ },
+ {
+  "id": "adyen",
+  "name": "Adyen",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_session",
+   "capture"
+  ],
+  "description": "Global payments."
+ },
+ {
+  "id": "bigcommerce",
+  "name": "BigCommerce",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_products",
+   "create_order"
+  ],
+  "description": "Hosted commerce."
+ },
+ {
+  "id": "braintree",
+  "name": "Braintree",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_transaction",
+   "find_customer"
+  ],
+  "description": "PayPal payments gateway."
+ },
+ {
+  "id": "chargebee",
+  "name": "Chargebee",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_subscription",
+   "list_invoices"
+  ],
+  "description": "Subscription billing."
+ },
+ {
+  "id": "coinbase-commerce",
+  "name": "Coinbase Commerce",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_charge",
+   "list_charges"
+  ],
+  "description": "Accept crypto payments."
+ },
+ {
+  "id": "easypost",
+  "name": "EasyPost",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_shipment",
+   "track"
+  ],
+  "description": "Shipping API."
+ },
+ {
+  "id": "ebay",
+  "name": "eBay",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "search_items",
+   "create_listing"
+  ],
+  "description": "Marketplace listings."
+ },
+ {
+  "id": "etsy",
+  "name": "Etsy",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_listings",
+   "get_receipts"
+  ],
+  "description": "Marketplace shop API."
+ },
+ {
+  "id": "flutterwave",
+  "name": "Flutterwave",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_payment",
+   "verify_transaction"
+  ],
+  "description": "Payments across Africa."
+ },
+ {
+  "id": "freshbooks",
+  "name": "FreshBooks",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "create_invoice",
+   "list_clients"
+  ],
+  "description": "Invoicing and accounting."
+ },
+ {
+  "id": "gocardless",
+  "name": "GoCardless",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_mandate",
+   "create_payment"
+  ],
+  "description": "Direct debit payments."
+ },
+ {
+  "id": "gumroad",
+  "name": "Gumroad",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_products",
+   "create_product"
+  ],
+  "description": "Sell digital products direct."
+ },
+ {
+  "id": "klarna",
+  "name": "Klarna",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_session",
+   "capture_order"
+  ],
+  "description": "Buy now pay later."
+ },
+ {
+  "id": "lemonsqueezy",
+  "name": "Lemon Squeezy",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_checkout",
+   "list_orders"
+  ],
+  "description": "Merchant of record for digital goods."
+ },
+ {
+  "id": "mercadopago",
+  "name": "Mercado Pago",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_preference",
+   "get_payment"
+  ],
+  "description": "Payments in Latin America."
+ },
+ {
+  "id": "mollie",
+  "name": "Mollie",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_payment",
+   "list_payments"
+  ],
+  "description": "European payments."
+ },
+ {
+  "id": "paddle",
+  "name": "Paddle",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_checkout",
+   "list_transactions"
+  ],
+  "description": "Subscription billing and tax."
+ },
+ {
+  "id": "paypal",
+  "name": "PayPal",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "create_order",
+   "capture_order"
+  ],
+  "description": "Global checkout and payouts."
+ },
+ {
+  "id": "paystack",
+  "name": "Paystack",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "initialize_transaction",
+   "verify_transaction"
+  ],
+  "description": "Payments in Africa."
+ },
+ {
+  "id": "plaid",
+  "name": "Plaid",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "link_token",
+   "get_transactions"
+  ],
+  "description": "Bank account connectivity."
+ },
+ {
+  "id": "printful",
+  "name": "Printful",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_products",
+   "create_order"
+  ],
+  "description": "Print on demand."
+ },
+ {
+  "id": "printify",
+  "name": "Printify",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_products",
+   "create_order"
+  ],
+  "description": "Print on demand marketplace."
+ },
+ {
+  "id": "quickbooks",
+  "name": "QuickBooks",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "create_invoice",
+   "list_customers"
+  ],
+  "description": "Accounting."
+ },
+ {
+  "id": "razorpay",
+  "name": "Razorpay",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_order",
+   "fetch_payment"
+  ],
+  "description": "Payments in India."
+ },
+ {
+  "id": "recurly",
+  "name": "Recurly",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_subscriptions",
+   "create_account"
+  ],
+  "description": "Subscription management."
+ },
+ {
+  "id": "shippo",
+  "name": "Shippo",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_shipment",
+   "get_rates"
+  ],
+  "description": "Shipping labels and tracking."
+ },
+ {
+  "id": "shipstation",
+  "name": "ShipStation",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_orders",
+   "create_label"
+  ],
+  "description": "Order fulfilment."
+ },
+ {
+  "id": "shopify",
+  "name": "Shopify",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_products",
+   "create_product",
+   "list_orders"
+  ],
+  "description": "Storefront products and orders."
+ },
+ {
+  "id": "snipcart",
+  "name": "Snipcart",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_orders",
+   "get_order"
+  ],
+  "description": "Cart for static sites."
+ },
+ {
+  "id": "square",
+  "name": "Square",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "create_payment",
+   "list_orders"
+  ],
+  "description": "Payments and point of sale."
+ },
+ {
+  "id": "stripe",
+  "name": "Stripe",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_charge",
+   "list_customers",
+   "create_checkout"
+  ],
+  "description": "Payments, subscriptions and billing."
+ },
+ {
+  "id": "wise",
+  "name": "Wise",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_quote",
+   "create_transfer"
+  ],
+  "description": "International transfers."
+ },
+ {
+  "id": "woocommerce",
+  "name": "WooCommerce",
+  "category": "commerce",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_products",
+   "create_order"
+  ],
+  "description": "WordPress storefront."
+ },
+ {
+  "id": "xero",
+  "name": "Xero",
+  "category": "commerce",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "create_invoice",
+   "list_contacts"
+  ],
+  "description": "Accounting."
+ },
+ {
+  "id": "ses",
+  "name": "Amazon SES",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_email",
+   "verify_domain"
+  ],
+  "description": "Bulk email on AWS."
+ },
+ {
+  "id": "brevo",
+  "name": "Brevo",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "add_contact"
+  ],
+  "description": "Email and SMS marketing."
+ },
+ {
+  "id": "discord",
+  "name": "Discord",
+  "category": "communication",
+  "auth": "webhook",
+  "tier": "free",
+  "actions": [
+   "post_message",
+   "list_guilds"
+  ],
+  "description": "Community chat with bot and webhook access."
+ },
+ {
+  "id": "expo-push",
+  "name": "Expo Push",
+  "category": "communication",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "send_push",
+   "get_receipts"
+  ],
+  "description": "Push for Expo apps."
+ },
+ {
+  "id": "firebase-cloud-messaging",
+  "name": "Firebase Cloud Messaging",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "subscribe_topic"
+  ],
+  "description": "Push delivery for Android and web."
+ },
+ {
+  "id": "gotify",
+  "name": "Gotify",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "list_messages"
+  ],
+  "description": "Self-hosted push server."
+ },
+ {
+  "id": "line-messaging",
+  "name": "LINE Messaging API",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "push_message",
+   "reply_message"
+  ],
+  "description": "Bot messaging on LINE."
+ },
+ {
+  "id": "mailgun",
+  "name": "Mailgun",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "list_events"
+  ],
+  "description": "Email delivery API."
+ },
+ {
+  "id": "mailjet",
+  "name": "Mailjet",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "list_contacts"
+  ],
+  "description": "Email delivery and campaigns."
+ },
+ {
+  "id": "matrix",
+  "name": "Matrix",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "list_rooms"
+  ],
+  "description": "Open federated messaging."
+ },
+ {
+  "id": "mattermost",
+  "name": "Mattermost",
+  "category": "communication",
+  "auth": "webhook",
+  "tier": "free",
+  "actions": [
+   "post_message",
+   "list_channels"
+  ],
+  "description": "Self-hosted team chat."
+ },
+ {
+  "id": "messagebird",
+  "name": "MessageBird",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "send_whatsapp"
+  ],
+  "description": "Omnichannel messaging."
+ },
+ {
+  "id": "microsoft-teams",
+  "name": "Microsoft Teams",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "post_message",
+   "list_channels"
+  ],
+  "description": "Enterprise chat and meeting rooms."
+ },
+ {
+  "id": "ntfy",
+  "name": "ntfy",
+  "category": "communication",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "publish",
+   "subscribe"
+  ],
+  "description": "Simple pub-sub notifications."
+ },
+ {
+  "id": "onesignal",
+  "name": "OneSignal",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_notification",
+   "list_players"
+  ],
+  "description": "Push and in-app messaging."
+ },
+ {
+  "id": "plivo",
+  "name": "Plivo",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "make_call"
+  ],
+  "description": "Programmable SMS and voice."
+ },
+ {
+  "id": "postmark",
+  "name": "Postmark",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_email",
+   "list_templates"
+  ],
+  "description": "Transactional email."
+ },
+ {
+  "id": "pushbullet",
+  "name": "Pushbullet",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "push_note",
+   "list_devices"
+  ],
+  "description": "Push between devices."
+ },
+ {
+  "id": "pushover",
+  "name": "Pushover",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_notification"
+  ],
+  "description": "Push notifications to devices."
+ },
+ {
+  "id": "resend",
+  "name": "Resend",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "list_domains"
+  ],
+  "description": "Developer-first transactional email."
+ },
+ {
+  "id": "ringcentral",
+  "name": "RingCentral",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "list_calls"
+  ],
+  "description": "Cloud phone and messaging."
+ },
+ {
+  "id": "rocket-chat",
+  "name": "Rocket.Chat",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "post_message",
+   "list_channels"
+  ],
+  "description": "Open-source team chat."
+ },
+ {
+  "id": "sendgrid",
+  "name": "SendGrid",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "list_templates"
+  ],
+  "description": "Transactional email delivery."
+ },
+ {
+  "id": "sinch",
+  "name": "Sinch",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "send_batch"
+  ],
+  "description": "Messaging and voice APIs."
+ },
+ {
+  "id": "slack",
+  "name": "Slack",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "post_message",
+   "list_channels",
+   "upload_file"
+  ],
+  "description": "Team chat, channels and workflow webhooks."
+ },
+ {
+  "id": "sparkpost",
+  "name": "SparkPost",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_email",
+   "list_templates"
+  ],
+  "description": "High-volume email delivery."
+ },
+ {
+  "id": "telegram",
+  "name": "Telegram",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "get_updates"
+  ],
+  "description": "Bot API messaging for channels and chats."
+ },
+ {
+  "id": "twilio-sms",
+  "name": "Twilio SMS",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "get_message"
+  ],
+  "description": "Programmable SMS and voice."
+ },
+ {
+  "id": "twitch-chat",
+  "name": "Twitch Chat",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "send_chat",
+   "list_followers"
+  ],
+  "description": "Live stream chat."
+ },
+ {
+  "id": "viber",
+  "name": "Viber Bots",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "set_webhook"
+  ],
+  "description": "Bot messaging on Viber."
+ },
+ {
+  "id": "vonage",
+  "name": "Vonage",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_sms",
+   "start_verify"
+  ],
+  "description": "SMS, voice and verification."
+ },
+ {
+  "id": "webex",
+  "name": "Webex",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_meeting",
+   "post_message"
+  ],
+  "description": "Cisco meetings and messaging."
+ },
+ {
+  "id": "whatsapp-cloud",
+  "name": "WhatsApp Cloud API",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_message",
+   "send_template"
+  ],
+  "description": "Meta Cloud API for WhatsApp Business."
+ },
+ {
+  "id": "zoom",
+  "name": "Zoom",
+  "category": "communication",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_meeting",
+   "list_recordings"
+  ],
+  "description": "Video meetings."
+ },
+ {
+  "id": "zulip",
+  "name": "Zulip",
+  "category": "communication",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_message",
+   "list_streams"
+  ],
+  "description": "Threaded team chat."
+ },
+ {
+  "id": "contentful",
+  "name": "Contentful",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_entries",
+   "create_entry"
+  ],
+  "description": "Headless CMS."
+ },
+ {
+  "id": "directus",
+  "name": "Directus",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_items",
+   "create_item"
+  ],
+  "description": "Open-source data platform."
+ },
+ {
+  "id": "hygraph",
+  "name": "Hygraph",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "mutate"
+  ],
+  "description": "GraphQL content platform."
+ },
+ {
+  "id": "payload-cms",
+  "name": "Payload CMS",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "find",
+   "create"
+  ],
+  "description": "Code-first headless CMS."
+ },
+ {
+  "id": "prismic",
+  "name": "Prismic",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "get_document"
+  ],
+  "description": "Headless website builder."
+ },
+ {
+  "id": "sanity",
+  "name": "Sanity",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "create_document"
+  ],
+  "description": "Structured content platform."
+ },
+ {
+  "id": "squarespace",
+  "name": "Squarespace",
+  "category": "content",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_products",
+   "list_orders"
+  ],
+  "description": "Site builder commerce API."
+ },
+ {
+  "id": "storyblok",
+  "name": "Storyblok",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_stories",
+   "create_story"
+  ],
+  "description": "Visual headless CMS."
+ },
+ {
+  "id": "strapi",
+  "name": "Strapi",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_entries",
+   "create_entry"
+  ],
+  "description": "Open-source headless CMS."
+ },
+ {
+  "id": "webflow",
+  "name": "Webflow",
+  "category": "content",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_sites",
+   "create_item"
+  ],
+  "description": "Visual site builder CMS."
+ },
+ {
+  "id": "wix",
+  "name": "Wix",
+  "category": "content",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_items",
+   "create_item"
+  ],
+  "description": "Site platform."
+ },
+ {
+  "id": "apollo-io",
+  "name": "Apollo.io",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_people",
+   "enrich_organization"
+  ],
+  "description": "Sales intelligence."
+ },
+ {
+  "id": "attio",
+  "name": "Attio",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_records",
+   "create_record"
+  ],
+  "description": "Flexible CRM."
+ },
+ {
+  "id": "close-crm",
+  "name": "Close",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_leads",
+   "create_lead"
+  ],
+  "description": "Inside sales CRM."
+ },
+ {
+  "id": "copper",
+  "name": "Copper",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_people",
+   "create_opportunity"
+  ],
+  "description": "CRM for Google Workspace."
+ },
+ {
+  "id": "docusign",
+  "name": "DocuSign",
+  "category": "crm",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "send_envelope",
+   "get_envelope"
+  ],
+  "description": "Electronic signatures."
+ },
+ {
+  "id": "dropbox-sign",
+  "name": "Dropbox Sign",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_request",
+   "get_request"
+  ],
+  "description": "Electronic signatures."
+ },
+ {
+  "id": "freshsales",
+  "name": "Freshsales",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_contacts",
+   "create_deal"
+  ],
+  "description": "Sales CRM."
+ },
+ {
+  "id": "hunter-io",
+  "name": "Hunter",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "domain_search",
+   "verify_email"
+  ],
+  "description": "Email finding and verification."
+ },
+ {
+  "id": "insightly",
+  "name": "Insightly",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_contacts",
+   "create_lead"
+  ],
+  "description": "CRM and project management."
+ },
+ {
+  "id": "lemlist",
+  "name": "lemlist",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_campaigns",
+   "add_lead"
+  ],
+  "description": "Cold email outreach."
+ },
+ {
+  "id": "pandadoc",
+  "name": "PandaDoc",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_document",
+   "send_document"
+  ],
+  "description": "Proposals and e-signature."
+ },
+ {
+  "id": "pipedrive",
+  "name": "Pipedrive",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_deals",
+   "create_deal"
+  ],
+  "description": "Sales pipeline CRM."
+ },
+ {
+  "id": "salesforce",
+  "name": "Salesforce",
+  "category": "crm",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "query",
+   "create_record"
+  ],
+  "description": "Enterprise CRM."
+ },
+ {
+  "id": "yousign",
+  "name": "Yousign",
+  "category": "crm",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_request",
+   "get_request"
+  ],
+  "description": "European e-signature."
+ },
+ {
+  "id": "algolia",
+  "name": "Algolia",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "save_object"
+  ],
+  "description": "Hosted search API."
+ },
+ {
+  "id": "appwrite",
+  "name": "Appwrite",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_documents",
+   "create_document"
+  ],
+  "description": "Open-source backend platform."
+ },
+ {
+  "id": "baserow",
+  "name": "Baserow",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_rows",
+   "create_row"
+  ],
+  "description": "Open-source no-code database."
+ },
+ {
+  "id": "chroma",
+  "name": "Chroma",
+  "category": "data",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "add",
+   "query"
+  ],
+  "description": "Local-first embedding database."
+ },
+ {
+  "id": "clickhouse",
+  "name": "ClickHouse",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "insert"
+  ],
+  "description": "Column-store analytics database."
+ },
+ {
+  "id": "cockroachdb",
+  "name": "CockroachDB",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "list_clusters"
+  ],
+  "description": "Distributed SQL database."
+ },
+ {
+  "id": "databricks",
+  "name": "Databricks",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "run_sql",
+   "list_jobs"
+  ],
+  "description": "Lakehouse analytics platform."
+ },
+ {
+  "id": "duckdb",
+  "name": "DuckDB",
+  "category": "data",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "query",
+   "load_csv"
+  ],
+  "description": "Embedded analytical database."
+ },
+ {
+  "id": "elasticsearch",
+  "name": "Elasticsearch",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "index_document"
+  ],
+  "description": "Self-hosted search and analytics engine."
+ },
+ {
+  "id": "firebase-firestore",
+  "name": "Firebase Firestore",
+  "category": "data",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_document",
+   "set_document",
+   "query"
+  ],
+  "description": "Document database from Google."
+ },
+ {
+  "id": "bigquery",
+  "name": "Google BigQuery",
+  "category": "data",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "run_query",
+   "list_datasets"
+  ],
+  "description": "Serverless data warehouse."
+ },
+ {
+  "id": "influxdb",
+  "name": "InfluxDB",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "write_points"
+  ],
+  "description": "Time-series database."
+ },
+ {
+  "id": "meilisearch",
+  "name": "Meilisearch",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "add_documents"
+  ],
+  "description": "Fast typo-tolerant search engine."
+ },
+ {
+  "id": "milvus",
+  "name": "Milvus",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "insert",
+   "search"
+  ],
+  "description": "Open-source vector database."
+ },
+ {
+  "id": "mysql",
+  "name": "MySQL",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "execute"
+  ],
+  "description": "Direct SQL against a MySQL server."
+ },
+ {
+  "id": "neo4j",
+  "name": "Neo4j",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "run_cypher",
+   "list_labels"
+  ],
+  "description": "Graph database."
+ },
+ {
+  "id": "neon",
+  "name": "Neon",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "list_branches"
+  ],
+  "description": "Serverless PostgreSQL."
+ },
+ {
+  "id": "nocodb",
+  "name": "NocoDB",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_records",
+   "create_record"
+  ],
+  "description": "Open-source spreadsheet database."
+ },
+ {
+  "id": "opensearch",
+  "name": "OpenSearch",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "index_document"
+  ],
+  "description": "Open-source search suite."
+ },
+ {
+  "id": "planetscale",
+  "name": "PlanetScale",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "query",
+   "list_branches"
+  ],
+  "description": "Managed MySQL-compatible database."
+ },
+ {
+  "id": "pocketbase",
+  "name": "PocketBase",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_records",
+   "create_record"
+  ],
+  "description": "Single-file self-hosted backend."
+ },
+ {
+  "id": "snowflake",
+  "name": "Snowflake",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "run_query",
+   "list_warehouses"
+  ],
+  "description": "Cloud data warehouse."
+ },
+ {
+  "id": "sqlite",
+  "name": "SQLite",
+  "category": "data",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "query",
+   "execute"
+  ],
+  "description": "Local file database, no server."
+ },
+ {
+  "id": "timescaledb",
+  "name": "TimescaleDB",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "execute"
+  ],
+  "description": "Time-series on PostgreSQL."
+ },
+ {
+  "id": "turso",
+  "name": "Turso",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "execute"
+  ],
+  "description": "Edge SQLite database."
+ },
+ {
+  "id": "typesense",
+  "name": "Typesense",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "upsert_document"
+  ],
+  "description": "Open-source search engine."
+ },
+ {
+  "id": "upstash",
+  "name": "Upstash",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "redis_command",
+   "publish"
+  ],
+  "description": "Serverless Redis and Kafka."
+ },
+ {
+  "id": "weaviate",
+  "name": "Weaviate",
+  "category": "data",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "upsert",
+   "query"
+  ],
+  "description": "Open-source vector database."
+ },
+ {
+  "id": "azure-devops",
+  "name": "Azure DevOps",
+  "category": "devtools",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_repos",
+   "get_file",
+   "queue_build"
+  ],
+  "description": "Repos, boards and pipelines from Microsoft."
+ },
+ {
+  "id": "betterstack",
+  "name": "Better Stack",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_monitors",
+   "create_incident"
+  ],
+  "description": "Uptime monitoring and log management."
+ },
+ {
+  "id": "bugsnag",
+  "name": "Bugsnag",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_errors",
+   "get_error"
+  ],
+  "description": "Application stability monitoring."
+ },
+ {
+  "id": "buildkite",
+  "name": "Buildkite",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_builds",
+   "create_build"
+  ],
+  "description": "CI that runs on your own agents."
+ },
+ {
+  "id": "circleci",
+  "name": "CircleCI",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_pipelines",
+   "trigger_pipeline"
+  ],
+  "description": "Hosted continuous integration."
+ },
+ {
+  "id": "codecov",
+  "name": "Codecov",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_coverage",
+   "list_commits"
+  ],
+  "description": "Test coverage reporting."
+ },
+ {
+  "id": "codesandbox",
+  "name": "CodeSandbox",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_sandboxes",
+   "create_sandbox"
+  ],
+  "description": "Cloud development sandboxes."
+ },
+ {
+  "id": "crates-io",
+  "name": "crates.io",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_crate",
+   "search"
+  ],
+  "description": "Rust package registry."
+ },
+ {
+  "id": "drone-ci",
+  "name": "Drone CI",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_builds",
+   "promote_build"
+  ],
+  "description": "Container-native self-hosted CI."
+ },
+ {
+  "id": "elastic-cloud",
+  "name": "Elastic Cloud",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "index_document"
+  ],
+  "description": "Hosted Elasticsearch and Kibana."
+ },
+ {
+  "id": "healthchecks-io",
+  "name": "Healthchecks.io",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_checks",
+   "ping_check"
+  ],
+  "description": "Cron job and heartbeat monitoring."
+ },
+ {
+  "id": "honeybadger",
+  "name": "Honeybadger",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_faults",
+   "get_fault"
+  ],
+  "description": "Error and uptime monitoring."
+ },
+ {
+  "id": "jenkins",
+  "name": "Jenkins",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_jobs",
+   "build_job"
+  ],
+  "description": "Self-hosted automation server."
+ },
+ {
+  "id": "launchdarkly",
+  "name": "LaunchDarkly",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_flags",
+   "toggle_flag"
+  ],
+  "description": "Feature flag management."
+ },
+ {
+  "id": "new-relic",
+  "name": "New Relic",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "run_nrql",
+   "list_applications"
+  ],
+  "description": "Full-stack observability."
+ },
+ {
+  "id": "ngrok",
+  "name": "ngrok",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tunnels",
+   "create_endpoint"
+  ],
+  "description": "Secure tunnels to local services."
+ },
+ {
+  "id": "npm-registry",
+  "name": "npm Registry",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_package",
+   "search",
+   "list_versions"
+  ],
+  "description": "JavaScript package registry."
+ },
+ {
+  "id": "opsgenie",
+  "name": "Opsgenie",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_alert",
+   "close_alert"
+  ],
+  "description": "Alerting and on-call schedules."
+ },
+ {
+  "id": "posthog",
+  "name": "PostHog",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "capture",
+   "query",
+   "list_flags"
+  ],
+  "description": "Product analytics and feature flags."
+ },
+ {
+  "id": "postman",
+  "name": "Postman",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_collections",
+   "run_collection"
+  ],
+  "description": "API collections and monitors."
+ },
+ {
+  "id": "pypi",
+  "name": "PyPI",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_project",
+   "list_releases"
+  ],
+  "description": "Python package index."
+ },
+ {
+  "id": "rollbar",
+  "name": "Rollbar",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_items",
+   "get_occurrence"
+  ],
+  "description": "Real-time error tracking."
+ },
+ {
+  "id": "snyk",
+  "name": "Snyk",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_issues",
+   "list_projects"
+  ],
+  "description": "Dependency and code vulnerability scanning."
+ },
+ {
+  "id": "sonarcloud",
+  "name": "SonarCloud",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_issues",
+   "get_quality_gate"
+  ],
+  "description": "Static analysis and code quality."
+ },
+ {
+  "id": "sourcehut",
+  "name": "SourceHut",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_repos",
+   "get_file"
+  ],
+  "description": "Minimalist hosted git and build service."
+ },
+ {
+  "id": "statuspage",
+  "name": "Statuspage",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_incident",
+   "update_component"
+  ],
+  "description": "Public status pages."
+ },
+ {
+  "id": "uptimerobot",
+  "name": "UptimeRobot",
+  "category": "devtools",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_monitors",
+   "create_monitor"
+  ],
+  "description": "Website uptime checks."
+ },
+ {
+  "id": "canvas-lms",
+  "name": "Canvas LMS",
+  "category": "education",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_courses",
+   "list_assignments"
+  ],
+  "description": "Learning management."
+ },
+ {
+  "id": "google-classroom",
+  "name": "Google Classroom",
+  "category": "education",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_courses",
+   "list_coursework"
+  ],
+  "description": "Classroom coursework."
+ },
+ {
+  "id": "moodle",
+  "name": "Moodle",
+  "category": "education",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_courses",
+   "get_grades"
+  ],
+  "description": "Open-source learning management."
+ },
+ {
+  "id": "alpha-vantage",
+  "name": "Alpha Vantage",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "time_series",
+   "quote",
+   "search"
+  ],
+  "description": "Stock and forex data."
+ },
+ {
+  "id": "binance",
+  "name": "Binance",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "ticker",
+   "place_order"
+  ],
+  "description": "Crypto exchange."
+ },
+ {
+  "id": "coinbase",
+  "name": "Coinbase",
+  "category": "finance",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_accounts",
+   "get_price"
+  ],
+  "description": "Crypto exchange and wallet."
+ },
+ {
+  "id": "coingecko",
+  "name": "CoinGecko",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "price",
+   "market_chart",
+   "list_coins"
+  ],
+  "description": "Crypto prices."
+ },
+ {
+  "id": "coinmarketcap",
+  "name": "CoinMarketCap",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "latest_listings",
+   "quotes"
+  ],
+  "description": "Crypto market data."
+ },
+ {
+  "id": "exchangerate-api",
+  "name": "ExchangeRate-API",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "latest",
+   "convert"
+  ],
+  "description": "Currency conversion rates."
+ },
+ {
+  "id": "finnhub",
+  "name": "Finnhub",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "quote",
+   "company_news"
+  ],
+  "description": "Real-time stock data."
+ },
+ {
+  "id": "frankfurter",
+  "name": "Frankfurter",
+  "category": "finance",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "latest",
+   "historical"
+  ],
+  "description": "Open ECB exchange rates."
+ },
+ {
+  "id": "fred",
+  "name": "FRED",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_series",
+   "search_series"
+  ],
+  "description": "US economic data."
+ },
+ {
+  "id": "kraken",
+  "name": "Kraken",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "ticker",
+   "add_order"
+  ],
+  "description": "Crypto exchange."
+ },
+ {
+  "id": "openexchangerates",
+  "name": "Open Exchange Rates",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "latest",
+   "historical"
+  ],
+  "description": "Currency data."
+ },
+ {
+  "id": "polygon-io",
+  "name": "Polygon.io",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "aggregates",
+   "last_trade"
+  ],
+  "description": "Market data."
+ },
+ {
+  "id": "sec-edgar",
+  "name": "SEC EDGAR",
+  "category": "finance",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get_filings",
+   "get_company_facts"
+  ],
+  "description": "US company filings."
+ },
+ {
+  "id": "twelve-data",
+  "name": "Twelve Data",
+  "category": "finance",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "time_series",
+   "quote"
+  ],
+  "description": "Market data API."
+ },
+ {
+  "id": "world-bank",
+  "name": "World Bank Data",
+  "category": "finance",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get_indicator",
+   "list_countries"
+  ],
+  "description": "Open development indicators."
+ },
+ {
+  "id": "amadeus",
+  "name": "Amadeus",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_flights",
+   "search_hotels"
+  ],
+  "description": "Travel search."
+ },
+ {
+  "id": "flightaware",
+  "name": "FlightAware AeroAPI",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "get_flight",
+   "list_airport_flights"
+  ],
+  "description": "Flight tracking."
+ },
+ {
+  "id": "geonames",
+  "name": "GeoNames",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "find_nearby"
+  ],
+  "description": "Geographical database."
+ },
+ {
+  "id": "google-maps",
+  "name": "Google Maps Platform",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "geocode",
+   "directions",
+   "places_search"
+  ],
+  "description": "Maps, places and routes."
+ },
+ {
+  "id": "here-maps",
+  "name": "HERE",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "geocode",
+   "route"
+  ],
+  "description": "Location platform."
+ },
+ {
+  "id": "ipinfo",
+  "name": "ipinfo.io",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "lookup_ip"
+  ],
+  "description": "IP geolocation."
+ },
+ {
+  "id": "mapbox",
+  "name": "Mapbox",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "geocode",
+   "directions"
+  ],
+  "description": "Maps and routing."
+ },
+ {
+  "id": "open-meteo",
+  "name": "Open-Meteo",
+  "category": "geo",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "forecast",
+   "historical"
+  ],
+  "description": "Open weather data."
+ },
+ {
+  "id": "opencage",
+  "name": "OpenCage",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "geocode",
+   "reverse_geocode"
+  ],
+  "description": "Geocoding."
+ },
+ {
+  "id": "opensky",
+  "name": "OpenSky Network",
+  "category": "geo",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "states",
+   "flights_by_aircraft"
+  ],
+  "description": "Live air traffic data."
+ },
+ {
+  "id": "nominatim",
+  "name": "OpenStreetMap Nominatim",
+  "category": "geo",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search",
+   "reverse"
+  ],
+  "description": "Open geocoding."
+ },
+ {
+  "id": "openweathermap",
+  "name": "OpenWeatherMap",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "current",
+   "forecast"
+  ],
+  "description": "Weather data."
+ },
+ {
+  "id": "overpass",
+  "name": "Overpass API",
+  "category": "geo",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "query"
+  ],
+  "description": "Read OpenStreetMap data."
+ },
+ {
+  "id": "tomtom",
+  "name": "TomTom",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "route"
+  ],
+  "description": "Maps and traffic."
+ },
+ {
+  "id": "weatherapi",
+  "name": "WeatherAPI",
+  "category": "geo",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "current",
+   "forecast"
+  ],
+  "description": "Weather and astronomy."
+ },
+ {
+  "id": "fitbit",
+  "name": "Fitbit",
+  "category": "health",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_activity",
+   "get_sleep"
+  ],
+  "description": "Activity and sleep data."
+ },
+ {
+  "id": "nutritionix",
+  "name": "Nutritionix",
+  "category": "health",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_foods",
+   "get_nutrients"
+  ],
+  "description": "Food and nutrition database."
+ },
+ {
+  "id": "open-food-facts",
+  "name": "Open Food Facts",
+  "category": "health",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get_product",
+   "search"
+  ],
+  "description": "Open food product database."
+ },
+ {
+  "id": "openfda",
+  "name": "openFDA",
+  "category": "health",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_drugs",
+   "search_events"
+  ],
+  "description": "US drug and device data."
+ },
+ {
+  "id": "oura",
+  "name": "Oura",
+  "category": "health",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_sleep",
+   "get_readiness"
+  ],
+  "description": "Ring sleep and readiness data."
+ },
+ {
+  "id": "strava",
+  "name": "Strava",
+  "category": "health",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_activities",
+   "get_activity"
+  ],
+  "description": "Workout tracking."
+ },
+ {
+  "id": "whoop",
+  "name": "WHOOP",
+  "category": "health",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_recovery",
+   "get_workouts"
+  ],
+  "description": "Recovery and strain data."
+ },
+ {
+  "id": "withings",
+  "name": "Withings",
+  "category": "health",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_measures",
+   "get_activity"
+  ],
+  "description": "Body and sleep metrics."
+ },
+ {
+  "id": "aws-dynamodb",
+  "name": "Amazon DynamoDB",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "get_item",
+   "put_item",
+   "query"
+  ],
+  "description": "Managed key-value store."
+ },
+ {
+  "id": "aws-s3",
+  "name": "Amazon S3",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "put_object",
+   "get_object",
+   "list_objects"
+  ],
+  "description": "Object storage."
+ },
+ {
+  "id": "aws-sns",
+  "name": "Amazon SNS",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "publish",
+   "list_topics"
+  ],
+  "description": "Pub/sub notifications."
+ },
+ {
+  "id": "aws-sqs",
+  "name": "Amazon SQS",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "send_message",
+   "receive_message"
+  ],
+  "description": "Managed message queues."
+ },
+ {
+  "id": "aws-lambda",
+  "name": "AWS Lambda",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "invoke",
+   "list_functions"
+  ],
+  "description": "Serverless functions on AWS."
+ },
+ {
+  "id": "azure-blob",
+  "name": "Azure Blob Storage",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "upload_blob",
+   "list_blobs"
+  ],
+  "description": "Object storage on Azure."
+ },
+ {
+  "id": "backblaze-b2",
+  "name": "Backblaze B2",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "upload_file",
+   "list_files"
+  ],
+  "description": "Low-cost object storage."
+ },
+ {
+  "id": "bunny-net",
+  "name": "bunny.net",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "purge_url",
+   "list_pull_zones"
+  ],
+  "description": "CDN and storage."
+ },
+ {
+  "id": "cloudflare",
+  "name": "Cloudflare",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "purge_cache",
+   "list_zones",
+   "create_dns_record"
+  ],
+  "description": "DNS, CDN and Workers."
+ },
+ {
+  "id": "cloudflare-r2",
+  "name": "Cloudflare R2",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "put_object",
+   "list_objects"
+  ],
+  "description": "Object storage with no egress fees."
+ },
+ {
+  "id": "cloudflare-workers",
+  "name": "Cloudflare Workers",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "deploy_script",
+   "list_scripts"
+  ],
+  "description": "Edge compute."
+ },
+ {
+  "id": "datadog",
+  "name": "Datadog",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "submit_metric",
+   "list_monitors"
+  ],
+  "description": "Observability and alerting."
+ },
+ {
+  "id": "deno-deploy",
+  "name": "Deno Deploy",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_projects",
+   "create_deployment"
+  ],
+  "description": "Edge JavaScript hosting."
+ },
+ {
+  "id": "digitalocean",
+  "name": "DigitalOcean",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_droplets",
+   "create_droplet"
+  ],
+  "description": "Virtual servers and managed services."
+ },
+ {
+  "id": "docker-hub",
+  "name": "Docker Hub",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tags",
+   "inspect_image"
+  ],
+  "description": "Container registry."
+ },
+ {
+  "id": "fastly",
+  "name": "Fastly",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "purge_url",
+   "list_services"
+  ],
+  "description": "Edge cloud and CDN."
+ },
+ {
+  "id": "flyio",
+  "name": "Fly.io",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_apps",
+   "create_machine"
+  ],
+  "description": "Global app hosting."
+ },
+ {
+  "id": "gcp-storage",
+  "name": "Google Cloud Storage",
+  "category": "infra",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "upload_object",
+   "list_objects"
+  ],
+  "description": "Object storage on Google Cloud."
+ },
+ {
+  "id": "grafana",
+  "name": "Grafana",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query_datasource",
+   "list_dashboards"
+  ],
+  "description": "Dashboards over any datasource."
+ },
+ {
+  "id": "heroku",
+  "name": "Heroku",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_apps",
+   "restart_dyno"
+  ],
+  "description": "Platform as a service."
+ },
+ {
+  "id": "hetzner-cloud",
+  "name": "Hetzner Cloud",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_servers",
+   "create_server"
+  ],
+  "description": "Low-cost European cloud servers."
+ },
+ {
+  "id": "kubernetes",
+  "name": "Kubernetes",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_pods",
+   "apply_manifest"
+  ],
+  "description": "Cluster API for container workloads."
+ },
+ {
+  "id": "linode",
+  "name": "Linode (Akamai)",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_instances",
+   "create_instance"
+  ],
+  "description": "Cloud compute."
+ },
+ {
+  "id": "minio",
+  "name": "MinIO",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "put_object",
+   "list_objects"
+  ],
+  "description": "Self-hosted S3-compatible storage."
+ },
+ {
+  "id": "mongodb-atlas",
+  "name": "MongoDB Atlas",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "find",
+   "insert_one"
+  ],
+  "description": "Document database."
+ },
+ {
+  "id": "mqtt",
+  "name": "MQTT Broker",
+  "category": "infra",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "publish",
+   "subscribe"
+  ],
+  "description": "Publish/subscribe for devices."
+ },
+ {
+  "id": "nats",
+  "name": "NATS",
+  "category": "infra",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "publish",
+   "request"
+  ],
+  "description": "Lightweight messaging."
+ },
+ {
+  "id": "netlify",
+  "name": "Netlify",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_sites",
+   "create_deploy"
+  ],
+  "description": "Static hosting and functions."
+ },
+ {
+  "id": "pagerduty",
+  "name": "PagerDuty",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "trigger_incident",
+   "resolve_incident"
+  ],
+  "description": "On-call paging."
+ },
+ {
+  "id": "portainer",
+  "name": "Portainer",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_containers",
+   "restart_container"
+  ],
+  "description": "Container management UI."
+ },
+ {
+  "id": "postgres",
+  "name": "PostgreSQL",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "execute"
+  ],
+  "description": "Direct SQL against a local or hosted cluster."
+ },
+ {
+  "id": "rabbitmq",
+  "name": "RabbitMQ",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "publish",
+   "list_queues"
+  ],
+  "description": "Message broker."
+ },
+ {
+  "id": "railway",
+  "name": "Railway",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_projects",
+   "deploy_service"
+  ],
+  "description": "App hosting platform."
+ },
+ {
+  "id": "redis",
+  "name": "Redis",
+  "category": "infra",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get",
+   "set",
+   "publish"
+  ],
+  "description": "In-memory cache and pub/sub."
+ },
+ {
+  "id": "render",
+  "name": "Render",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_services",
+   "create_deploy"
+  ],
+  "description": "Managed app hosting."
+ },
+ {
+  "id": "scaleway",
+  "name": "Scaleway",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_servers",
+   "create_server"
+  ],
+  "description": "European cloud provider."
+ },
+ {
+  "id": "sentry",
+  "name": "Sentry",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_issues",
+   "create_event"
+  ],
+  "description": "Error and performance monitoring."
+ },
+ {
+  "id": "supabase",
+  "name": "Supabase",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query",
+   "insert",
+   "storage_upload"
+  ],
+  "description": "Postgres, auth and storage."
+ },
+ {
+  "id": "syncthing",
+  "name": "Syncthing",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_folders",
+   "get_status"
+  ],
+  "description": "Peer-to-peer file sync, local REST."
+ },
+ {
+  "id": "tailscale",
+  "name": "Tailscale",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_devices",
+   "authorize_device"
+  ],
+  "description": "Private mesh network."
+ },
+ {
+  "id": "terraform-cloud",
+  "name": "Terraform Cloud",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_workspaces",
+   "create_run"
+  ],
+  "description": "Infrastructure-as-code runs."
+ },
+ {
+  "id": "vercel",
+  "name": "Vercel",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_deployments",
+   "create_deployment"
+  ],
+  "description": "Edge hosting and deployments."
+ },
+ {
+  "id": "vultr",
+  "name": "Vultr",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_instances",
+   "create_instance"
+  ],
+  "description": "Global cloud compute."
+ },
+ {
+  "id": "wasabi",
+  "name": "Wasabi",
+  "category": "infra",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "put_object",
+   "list_objects"
+  ],
+  "description": "S3-compatible hot storage."
+ },
+ {
+  "id": "esphome",
+  "name": "ESPHome",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_state",
+   "call_service"
+  ],
+  "description": "Firmware for ESP devices."
+ },
+ {
+  "id": "home-assistant",
+  "name": "Home Assistant",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "call_service",
+   "get_states"
+  ],
+  "description": "Local home automation."
+ },
+ {
+  "id": "octoprint",
+  "name": "OctoPrint",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_job",
+   "start_print"
+  ],
+  "description": "3D printer control."
+ },
+ {
+  "id": "philips-hue",
+  "name": "Philips Hue",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_lights",
+   "set_light"
+  ],
+  "description": "Smart lights over the local bridge."
+ },
+ {
+  "id": "pi-hole",
+  "name": "Pi-hole",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_summary",
+   "disable_blocking"
+  ],
+  "description": "Network-wide ad blocking."
+ },
+ {
+  "id": "smartthings",
+  "name": "SmartThings",
+  "category": "iot",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_devices",
+   "execute_command"
+  ],
+  "description": "Samsung smart home."
+ },
+ {
+  "id": "tuya",
+  "name": "Tuya",
+  "category": "iot",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_device",
+   "send_command"
+  ],
+  "description": "Smart device cloud."
+ },
+ {
+  "id": "zigbee2mqtt",
+  "name": "Zigbee2MQTT",
+  "category": "iot",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "list_devices",
+   "set_state"
+  ],
+  "description": "Local Zigbee bridge over MQTT."
+ },
+ {
+  "id": "bunny-stream",
+  "name": "Bunny Stream",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_video",
+   "list_videos"
+  ],
+  "description": "Video hosting."
+ },
+ {
+  "id": "cloudflare-stream",
+  "name": "Cloudflare Stream",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "upload_video",
+   "list_videos"
+  ],
+  "description": "Video delivery."
+ },
+ {
+  "id": "cloudinary",
+  "name": "Cloudinary",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "upload",
+   "transform"
+  ],
+  "description": "Image and video transformations."
+ },
+ {
+  "id": "deezer",
+  "name": "Deezer",
+  "category": "media",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_track"
+  ],
+  "description": "Music catalog."
+ },
+ {
+  "id": "flickr",
+  "name": "Flickr",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_photos",
+   "get_info"
+  ],
+  "description": "Photo sharing."
+ },
+ {
+  "id": "genius",
+  "name": "Genius",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_song"
+  ],
+  "description": "Song metadata and annotations."
+ },
+ {
+  "id": "giphy",
+  "name": "GIPHY",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "trending"
+  ],
+  "description": "Animated GIFs."
+ },
+ {
+  "id": "imgix",
+  "name": "imgix",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "transform"
+  ],
+  "description": "Real-time image CDN."
+ },
+ {
+  "id": "imgur",
+  "name": "Imgur",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "upload_image",
+   "get_album"
+  ],
+  "description": "Image hosting."
+ },
+ {
+  "id": "lastfm",
+  "name": "Last.fm",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_top_tracks",
+   "scrobble"
+  ],
+  "description": "Listening history."
+ },
+ {
+  "id": "listen-notes",
+  "name": "Listen Notes",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_podcast"
+  ],
+  "description": "Podcast search."
+ },
+ {
+  "id": "musicbrainz",
+  "name": "MusicBrainz",
+  "category": "media",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_artist",
+   "get_release"
+  ],
+  "description": "Open music encyclopedia."
+ },
+ {
+  "id": "mux",
+  "name": "Mux",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_asset",
+   "get_asset"
+  ],
+  "description": "Video infrastructure."
+ },
+ {
+  "id": "omdb",
+  "name": "OMDb",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_title"
+  ],
+  "description": "Movie database."
+ },
+ {
+  "id": "pexels",
+  "name": "Pexels",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_photos",
+   "search_videos"
+  ],
+  "description": "Free stock media."
+ },
+ {
+  "id": "pixabay",
+  "name": "Pixabay",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_images",
+   "search_videos"
+  ],
+  "description": "Free stock media."
+ },
+ {
+  "id": "podcast-index",
+  "name": "Podcast Index",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_podcasts",
+   "get_episodes"
+  ],
+  "description": "Open podcast directory."
+ },
+ {
+  "id": "shutterstock",
+  "name": "Shutterstock",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "search_images",
+   "license_image"
+  ],
+  "description": "Stock media."
+ },
+ {
+  "id": "soundcloud",
+  "name": "SoundCloud",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "search_tracks",
+   "get_track"
+  ],
+  "description": "Audio platform."
+ },
+ {
+  "id": "spotify",
+  "name": "Spotify",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "search",
+   "create_playlist"
+  ],
+  "description": "Music catalog and playback control."
+ },
+ {
+  "id": "steam-web",
+  "name": "Steam Web API",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_owned_games",
+   "get_player"
+  ],
+  "description": "Game library data."
+ },
+ {
+  "id": "tenor",
+  "name": "Tenor",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "trending"
+  ],
+  "description": "GIF search."
+ },
+ {
+  "id": "tmdb",
+  "name": "TMDB",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_movies",
+   "get_details"
+  ],
+  "description": "Movie and TV metadata."
+ },
+ {
+  "id": "trakt",
+  "name": "Trakt",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_history",
+   "search"
+  ],
+  "description": "TV and movie tracking."
+ },
+ {
+  "id": "twitch",
+  "name": "Twitch",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_streams",
+   "get_clips"
+  ],
+  "description": "Live streaming metadata."
+ },
+ {
+  "id": "unsplash",
+  "name": "Unsplash",
+  "category": "media",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_photos",
+   "get_photo"
+  ],
+  "description": "Free photography."
+ },
+ {
+  "id": "vimeo",
+  "name": "Vimeo",
+  "category": "media",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "upload",
+   "list_videos"
+  ],
+  "description": "Video hosting."
+ },
+ {
+  "id": "airtable",
+  "name": "Airtable",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_records",
+   "create_record",
+   "update_record"
+  ],
+  "description": "Spreadsheet-database hybrid."
+ },
+ {
+  "id": "anki-connect",
+  "name": "AnkiConnect",
+  "category": "productivity",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "add_note",
+   "find_cards"
+  ],
+  "description": "Local flashcard automation via add-on."
+ },
+ {
+  "id": "asana",
+  "name": "Asana",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task",
+   "complete_task"
+  ],
+  "description": "Team task tracking."
+ },
+ {
+  "id": "basecamp",
+  "name": "Basecamp",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_projects",
+   "create_todo"
+  ],
+  "description": "Project communication."
+ },
+ {
+  "id": "box",
+  "name": "Box",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_files",
+   "upload",
+   "create_shared_link"
+  ],
+  "description": "Enterprise file storage."
+ },
+ {
+  "id": "cal-com",
+  "name": "Cal.com",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_bookings",
+   "create_booking"
+  ],
+  "description": "Open scheduling infrastructure."
+ },
+ {
+  "id": "calendly",
+  "name": "Calendly",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_event_types",
+   "create_invite"
+  ],
+  "description": "Scheduling links and bookings."
+ },
+ {
+  "id": "canva",
+  "name": "Canva",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_designs",
+   "create_design"
+  ],
+  "description": "Design platform."
+ },
+ {
+  "id": "clickup",
+  "name": "ClickUp",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task"
+  ],
+  "description": "All-in-one work management."
+ },
+ {
+  "id": "clockify",
+  "name": "Clockify",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_entries",
+   "start_timer"
+  ],
+  "description": "Free time tracker."
+ },
+ {
+  "id": "coda",
+  "name": "Coda",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_docs",
+   "insert_rows"
+  ],
+  "description": "Docs that work like apps."
+ },
+ {
+  "id": "confluence",
+  "name": "Confluence",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "create_page"
+  ],
+  "description": "Atlassian wiki."
+ },
+ {
+  "id": "dropbox",
+  "name": "Dropbox",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_files",
+   "upload",
+   "share_link"
+  ],
+  "description": "File sync and sharing."
+ },
+ {
+  "id": "evernote",
+  "name": "Evernote",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_note",
+   "search_notes"
+  ],
+  "description": "Note taking."
+ },
+ {
+  "id": "figma",
+  "name": "Figma",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_file",
+   "list_comments"
+  ],
+  "description": "Design files and comments."
+ },
+ {
+  "id": "gmail",
+  "name": "Gmail",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_messages",
+   "send_email",
+   "apply_label"
+  ],
+  "description": "Mailbox search, send and label."
+ },
+ {
+  "id": "google-calendar",
+  "name": "Google Calendar",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_events",
+   "create_event"
+  ],
+  "description": "Scheduling and availability."
+ },
+ {
+  "id": "google-contacts",
+  "name": "Google Contacts",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_contacts",
+   "create_contact"
+  ],
+  "description": "Address book."
+ },
+ {
+  "id": "google-docs",
+  "name": "Google Docs",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_document",
+   "append_text"
+  ],
+  "description": "Collaborative documents."
+ },
+ {
+  "id": "google-drive",
+  "name": "Google Drive",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_files",
+   "upload",
+   "share"
+  ],
+  "description": "Cloud file storage and sharing."
+ },
+ {
+  "id": "google-forms",
+  "name": "Google Forms",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "get_form",
+   "list_responses"
+  ],
+  "description": "Surveys and quizzes."
+ },
+ {
+  "id": "google-sheets",
+  "name": "Google Sheets",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "read_range",
+   "append_row",
+   "update_cell"
+  ],
+  "description": "Spreadsheet read and write."
+ },
+ {
+  "id": "google-slides",
+  "name": "Google Slides",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_presentation",
+   "append_slide"
+  ],
+  "description": "Presentations."
+ },
+ {
+  "id": "google-tasks",
+  "name": "Google Tasks",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task"
+  ],
+  "description": "Simple task lists."
+ },
+ {
+  "id": "harvest",
+  "name": "Harvest",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_entries",
+   "create_entry"
+  ],
+  "description": "Time and invoicing."
+ },
+ {
+  "id": "ifttt-webhooks",
+  "name": "IFTTT Webhooks",
+  "category": "productivity",
+  "auth": "webhook",
+  "tier": "free",
+  "actions": [
+   "trigger_event"
+  ],
+  "description": "Trigger applets with an event."
+ },
+ {
+  "id": "jira",
+  "name": "Jira",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_issues",
+   "create_issue",
+   "transition_issue"
+  ],
+  "description": "Atlassian project tracking."
+ },
+ {
+  "id": "jotform",
+  "name": "Jotform",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_forms",
+   "get_submissions"
+  ],
+  "description": "Online form builder."
+ },
+ {
+  "id": "linear",
+  "name": "Linear",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_issues",
+   "create_issue",
+   "update_issue"
+  ],
+  "description": "Issue tracking for product teams."
+ },
+ {
+  "id": "logseq-local",
+  "name": "Logseq Local API",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_page",
+   "insert_block"
+  ],
+  "description": "Local graph access."
+ },
+ {
+  "id": "lucidchart",
+  "name": "Lucidchart",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_documents",
+   "get_document"
+  ],
+  "description": "Diagrams."
+ },
+ {
+  "id": "make-webhooks",
+  "name": "Make Webhooks",
+  "category": "productivity",
+  "auth": "webhook",
+  "tier": "free",
+  "actions": [
+   "trigger_scenario"
+  ],
+  "description": "Trigger Make scenarios."
+ },
+ {
+  "id": "microsoft-todo",
+  "name": "Microsoft To Do",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task"
+  ],
+  "description": "Personal task lists."
+ },
+ {
+  "id": "miro",
+  "name": "Miro",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_boards",
+   "create_sticky"
+  ],
+  "description": "Online whiteboards."
+ },
+ {
+  "id": "monday",
+  "name": "monday.com",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_items",
+   "create_item"
+  ],
+  "description": "Work management boards."
+ },
+ {
+  "id": "n8n",
+  "name": "n8n",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_workflows",
+   "run_workflow"
+  ],
+  "description": "Self-hostable workflow automation."
+ },
+ {
+  "id": "nextcloud",
+  "name": "Nextcloud",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_files",
+   "upload"
+  ],
+  "description": "Self-hosted file sync."
+ },
+ {
+  "id": "notion",
+  "name": "Notion",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "search",
+   "create_page",
+   "append_block",
+   "query_database"
+  ],
+  "description": "Docs, wikis and structured databases."
+ },
+ {
+  "id": "obsidian-local-rest",
+  "name": "Obsidian Local REST",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "read_note",
+   "write_note",
+   "search"
+  ],
+  "description": "Local vault access via a community plugin."
+ },
+ {
+  "id": "onedrive",
+  "name": "OneDrive",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_files",
+   "upload"
+  ],
+  "description": "Microsoft cloud storage."
+ },
+ {
+  "id": "onenote",
+  "name": "OneNote",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_notebooks",
+   "create_page"
+  ],
+  "description": "Microsoft note taking."
+ },
+ {
+  "id": "outlook-mail",
+  "name": "Outlook Mail",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_messages",
+   "send_email"
+  ],
+  "description": "Microsoft 365 mailbox."
+ },
+ {
+  "id": "pipedream",
+  "name": "Pipedream",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "trigger_workflow",
+   "list_sources"
+  ],
+  "description": "Event-driven workflows."
+ },
+ {
+  "id": "raindrop-io",
+  "name": "Raindrop.io",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_bookmarks",
+   "create_bookmark"
+  ],
+  "description": "Bookmark manager."
+ },
+ {
+  "id": "readwise",
+  "name": "Readwise",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_highlights",
+   "add_highlight"
+  ],
+  "description": "Highlights and reading queue."
+ },
+ {
+  "id": "sharepoint",
+  "name": "SharePoint",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_sites",
+   "upload_file"
+  ],
+  "description": "Microsoft intranet and documents."
+ },
+ {
+  "id": "smartsheet",
+  "name": "Smartsheet",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_sheets",
+   "add_rows"
+  ],
+  "description": "Spreadsheet-style work management."
+ },
+ {
+  "id": "tally",
+  "name": "Tally",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_forms",
+   "get_submissions"
+  ],
+  "description": "Free form builder."
+ },
+ {
+  "id": "todoist",
+  "name": "Todoist",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task",
+   "complete_task"
+  ],
+  "description": "Personal task manager."
+ },
+ {
+  "id": "toggl-track",
+  "name": "Toggl Track",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_entries",
+   "start_timer"
+  ],
+  "description": "Time tracking."
+ },
+ {
+  "id": "trello",
+  "name": "Trello",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_boards",
+   "create_card",
+   "move_card"
+  ],
+  "description": "Kanban boards."
+ },
+ {
+  "id": "typeform",
+  "name": "Typeform",
+  "category": "productivity",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_forms",
+   "get_responses"
+  ],
+  "description": "Conversational forms."
+ },
+ {
+  "id": "wrike",
+  "name": "Wrike",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_tasks",
+   "create_task"
+  ],
+  "description": "Project management."
+ },
+ {
+  "id": "zapier-webhooks",
+  "name": "Zapier Webhooks",
+  "category": "productivity",
+  "auth": "webhook",
+  "tier": "free",
+  "actions": [
+   "catch_hook",
+   "trigger_zap"
+  ],
+  "description": "Trigger Zaps from a URL."
+ },
+ {
+  "id": "zoho-crm",
+  "name": "Zoho CRM",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_records",
+   "create_record"
+  ],
+  "description": "Customer relationship management."
+ },
+ {
+  "id": "zoho-mail",
+  "name": "Zoho Mail",
+  "category": "productivity",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_messages",
+   "send_email"
+  ],
+  "description": "Business email."
+ },
+ {
+  "id": "apify",
+  "name": "Apify",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "run_actor",
+   "get_dataset"
+  ],
+  "description": "Web scraping platform."
+ },
+ {
+  "id": "arxiv",
+  "name": "arXiv",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_paper"
+  ],
+  "description": "Preprint metadata and PDFs."
+ },
+ {
+  "id": "bing-search",
+  "name": "Bing Search",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "web_search",
+   "image_search"
+  ],
+  "description": "Microsoft web search."
+ },
+ {
+  "id": "brave-search",
+  "name": "Brave Search",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "web_search",
+   "news_search"
+  ],
+  "description": "Independent search index."
+ },
+ {
+  "id": "browserless",
+  "name": "Browserless",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "screenshot",
+   "content"
+  ],
+  "description": "Hosted headless browsers."
+ },
+ {
+  "id": "core-ac-uk",
+  "name": "CORE",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_works",
+   "get_work"
+  ],
+  "description": "Open access research papers."
+ },
+ {
+  "id": "crossref",
+  "name": "Crossref",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get_work",
+   "search_works"
+  ],
+  "description": "DOI metadata."
+ },
+ {
+  "id": "exa",
+  "name": "Exa",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_contents"
+  ],
+  "description": "Neural web search."
+ },
+ {
+  "id": "firecrawl",
+  "name": "Firecrawl",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "scrape",
+   "crawl"
+  ],
+  "description": "Web to markdown."
+ },
+ {
+  "id": "google-custom-search",
+  "name": "Google Custom Search",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search"
+  ],
+  "description": "Programmable search."
+ },
+ {
+  "id": "hacker-news",
+  "name": "Hacker News",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "top_stories",
+   "get_item"
+  ],
+  "description": "Tech news firebase API."
+ },
+ {
+  "id": "internet-archive",
+  "name": "Internet Archive",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_items",
+   "get_metadata"
+  ],
+  "description": "Books, media and web history."
+ },
+ {
+  "id": "jina-reader",
+  "name": "Jina Reader",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "read_url",
+   "search"
+  ],
+  "description": "Turn URLs into clean text."
+ },
+ {
+  "id": "nasa-open",
+  "name": "NASA Open APIs",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "apod",
+   "search_images"
+  ],
+  "description": "Space imagery and data."
+ },
+ {
+  "id": "newsapi",
+  "name": "NewsAPI",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "top_headlines",
+   "search"
+  ],
+  "description": "News headlines by topic."
+ },
+ {
+  "id": "open-library",
+  "name": "Open Library",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_books",
+   "get_edition"
+  ],
+  "description": "Book metadata."
+ },
+ {
+  "id": "openalex",
+  "name": "OpenAlex",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_works",
+   "get_author"
+  ],
+  "description": "Open scholarly index."
+ },
+ {
+  "id": "project-gutenberg",
+  "name": "Project Gutenberg",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_books",
+   "get_text"
+  ],
+  "description": "Public domain books."
+ },
+ {
+  "id": "pubmed",
+  "name": "PubMed",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search",
+   "fetch_abstract"
+  ],
+  "description": "Biomedical literature."
+ },
+ {
+  "id": "scrapingbee",
+  "name": "ScrapingBee",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "fetch_page",
+   "screenshot"
+  ],
+  "description": "Scraping API."
+ },
+ {
+  "id": "semantic-scholar",
+  "name": "Semantic Scholar",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_papers",
+   "get_paper"
+  ],
+  "description": "Paper search and citations."
+ },
+ {
+  "id": "serpapi",
+  "name": "SerpAPI",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "search",
+   "maps_search"
+  ],
+  "description": "Structured SERP results."
+ },
+ {
+  "id": "serper",
+  "name": "Serper",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "images"
+  ],
+  "description": "Google search API."
+ },
+ {
+  "id": "stack-exchange",
+  "name": "Stack Exchange",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search_questions",
+   "get_answers"
+  ],
+  "description": "Q&A across sites."
+ },
+ {
+  "id": "tavily",
+  "name": "Tavily",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "extract"
+  ],
+  "description": "Search built for agents."
+ },
+ {
+  "id": "usgs-earthquakes",
+  "name": "USGS Earthquakes",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "recent_events",
+   "query_events"
+  ],
+  "description": "Seismic event feeds."
+ },
+ {
+  "id": "wayback-machine",
+  "name": "Wayback Machine",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "get_snapshot",
+   "save_page"
+  ],
+  "description": "Web archive."
+ },
+ {
+  "id": "web-search",
+  "name": "Web Search",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "fetch_page"
+  ],
+  "description": "Search the open web and fetch pages."
+ },
+ {
+  "id": "wikidata",
+  "name": "Wikidata",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search_entities",
+   "run_sparql"
+  ],
+  "description": "Structured knowledge base."
+ },
+ {
+  "id": "wikipedia",
+  "name": "Wikipedia",
+  "category": "research",
+  "auth": "none",
+  "tier": "free",
+  "actions": [
+   "search",
+   "get_summary"
+  ],
+  "description": "Encyclopedia articles."
+ },
+ {
+  "id": "wolfram-alpha",
+  "name": "Wolfram Alpha",
+  "category": "research",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "query"
+  ],
+  "description": "Computational knowledge answers."
+ },
+ {
+  "id": "onepassword",
+  "name": "1Password",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "get_item",
+   "list_vaults"
+  ],
+  "description": "Password manager with a Connect server."
+ },
+ {
+  "id": "abuseipdb",
+  "name": "AbuseIPDB",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "check_ip",
+   "report_ip"
+  ],
+  "description": "IP reputation database."
+ },
+ {
+  "id": "auth0",
+  "name": "Auth0",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_users",
+   "create_user"
+  ],
+  "description": "Identity and access management."
+ },
+ {
+  "id": "bitwarden",
+  "name": "Bitwarden",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_items",
+   "get_item"
+  ],
+  "description": "Open-source password manager."
+ },
+ {
+  "id": "clerk",
+  "name": "Clerk",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_users",
+   "create_user"
+  ],
+  "description": "User management for apps."
+ },
+ {
+  "id": "cloudflare-turnstile",
+  "name": "Cloudflare Turnstile",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "verify_token"
+  ],
+  "description": "Privacy-friendly captcha verification."
+ },
+ {
+  "id": "doppler",
+  "name": "Doppler",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_secrets",
+   "set_secret"
+  ],
+  "description": "Secrets across environments."
+ },
+ {
+  "id": "hashicorp-vault",
+  "name": "HashiCorp Vault",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "read_secret",
+   "write_secret"
+  ],
+  "description": "Secrets management."
+ },
+ {
+  "id": "have-i-been-pwned",
+  "name": "Have I Been Pwned",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "check_breaches",
+   "check_password"
+  ],
+  "description": "Breach lookups."
+ },
+ {
+  "id": "infisical",
+  "name": "Infisical",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "get_secret",
+   "create_secret"
+  ],
+  "description": "Open-source secrets platform."
+ },
+ {
+  "id": "keycloak",
+  "name": "Keycloak",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_users",
+   "create_user"
+  ],
+  "description": "Self-hosted identity server."
+ },
+ {
+  "id": "okta",
+  "name": "Okta",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_users",
+   "deactivate_user"
+  ],
+  "description": "Workforce identity."
+ },
+ {
+  "id": "recaptcha",
+  "name": "reCAPTCHA",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "verify_token"
+  ],
+  "description": "Bot detection from Google."
+ },
+ {
+  "id": "shodan",
+  "name": "Shodan",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "host_lookup",
+   "search"
+  ],
+  "description": "Internet-exposed device search."
+ },
+ {
+  "id": "stytch",
+  "name": "Stytch",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_user",
+   "send_otp"
+  ],
+  "description": "Passwordless authentication."
+ },
+ {
+  "id": "virustotal",
+  "name": "VirusTotal",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "scan_url",
+   "get_file_report"
+  ],
+  "description": "File and URL reputation."
+ },
+ {
+  "id": "workos",
+  "name": "WorkOS",
+  "category": "security",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_connections",
+   "create_organization"
+  ],
+  "description": "Enterprise SSO and directory sync."
+ },
+ {
+  "id": "activecampaign",
+  "name": "ActiveCampaign",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "create_contact",
+   "add_to_list"
+  ],
+  "description": "Marketing and CRM."
+ },
+ {
+  "id": "beehiiv",
+  "name": "beehiiv",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_post",
+   "list_subscribers"
+  ],
+  "description": "Newsletter platform."
+ },
+ {
+  "id": "bluesky",
+  "name": "Bluesky",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_post",
+   "get_timeline"
+  ],
+  "description": "AT Protocol social network."
+ },
+ {
+  "id": "braze",
+  "name": "Braze",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "track_users",
+   "send_message"
+  ],
+  "description": "Customer engagement."
+ },
+ {
+  "id": "buttondown",
+  "name": "Buttondown",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "send_email",
+   "list_subscribers"
+  ],
+  "description": "Newsletters."
+ },
+ {
+  "id": "constant-contact",
+  "name": "Constant Contact",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_contacts",
+   "create_campaign"
+  ],
+  "description": "Email marketing."
+ },
+ {
+  "id": "customer-io",
+  "name": "Customer.io",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "identify",
+   "track"
+  ],
+  "description": "Behavior-driven messaging."
+ },
+ {
+  "id": "facebook-graph",
+  "name": "Facebook Graph",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "publish_post",
+   "list_pages"
+  ],
+  "description": "Pages and posts."
+ },
+ {
+  "id": "getresponse",
+  "name": "GetResponse",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "add_contact",
+   "send_newsletter"
+  ],
+  "description": "Email marketing."
+ },
+ {
+  "id": "ghost-cms",
+  "name": "Ghost",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_post",
+   "list_posts"
+  ],
+  "description": "Publishing and newsletters."
+ },
+ {
+  "id": "hubspot",
+  "name": "HubSpot",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_contacts",
+   "create_deal"
+  ],
+  "description": "CRM and marketing automation."
+ },
+ {
+  "id": "instagram-graph",
+  "name": "Instagram Graph",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "publish_media",
+   "list_media"
+  ],
+  "description": "Business account publishing."
+ },
+ {
+  "id": "kit",
+  "name": "Kit (ConvertKit)",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "add_subscriber",
+   "list_broadcasts"
+  ],
+  "description": "Creator email marketing."
+ },
+ {
+  "id": "klaviyo",
+  "name": "Klaviyo",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "track_event",
+   "list_profiles"
+  ],
+  "description": "Marketing automation."
+ },
+ {
+  "id": "linkedin",
+  "name": "LinkedIn",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "share_post",
+   "list_organizations"
+  ],
+  "description": "Professional network publishing."
+ },
+ {
+  "id": "mailchimp",
+  "name": "Mailchimp",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_audiences",
+   "add_subscriber",
+   "send_campaign"
+  ],
+  "description": "Email marketing lists."
+ },
+ {
+  "id": "mastodon",
+  "name": "Mastodon",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "post_status",
+   "search"
+  ],
+  "description": "Federated microblogging."
+ },
+ {
+  "id": "pinterest",
+  "name": "Pinterest",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_pin",
+   "list_boards"
+  ],
+  "description": "Pins and boards."
+ },
+ {
+  "id": "reddit",
+  "name": "Reddit",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "submit_post",
+   "list_hot"
+  ],
+  "description": "Community posting and reading."
+ },
+ {
+  "id": "threads",
+  "name": "Threads",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "publish_thread",
+   "get_insights"
+  ],
+  "description": "Meta text network."
+ },
+ {
+  "id": "tiktok",
+  "name": "TikTok",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "publish_video",
+   "get_user_info"
+  ],
+  "description": "Content posting."
+ },
+ {
+  "id": "tumblr",
+  "name": "Tumblr",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "create_post",
+   "get_blog_info"
+  ],
+  "description": "Blog posting."
+ },
+ {
+  "id": "wordpress",
+  "name": "WordPress",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "create_post",
+   "list_posts"
+  ],
+  "description": "Publishing via REST."
+ },
+ {
+  "id": "x-twitter",
+  "name": "X (Twitter)",
+  "category": "social",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "post_tweet",
+   "search",
+   "upload_media"
+  ],
+  "description": "Posting and search on X."
+ },
+ {
+  "id": "youtube-data",
+  "name": "YouTube Data",
+  "category": "social",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "search",
+   "list_videos",
+   "get_comments"
+  ],
+  "description": "Video metadata and comments."
+ },
+ {
+  "id": "bitbucket",
+  "name": "Bitbucket",
+  "category": "source-control",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_repos",
+   "get_file",
+   "commit"
+  ],
+  "description": "Atlassian git hosting with Pipelines."
+ },
+ {
+  "id": "gitea",
+  "name": "Gitea",
+  "category": "source-control",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_repos",
+   "get_file",
+   "commit"
+  ],
+  "description": "Lightweight self-hosted git service."
+ },
+ {
+  "id": "github",
+  "name": "GitHub",
+  "category": "source-control",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_repos",
+   "get_file",
+   "commit",
+   "open_pr"
+  ],
+  "description": "Repositories, pull requests, Actions and releases."
+ },
+ {
+  "id": "gitlab",
+  "name": "GitLab",
+  "category": "source-control",
+  "auth": "oauth2",
+  "tier": "free",
+  "actions": [
+   "list_projects",
+   "get_file",
+   "commit",
+   "open_mr"
+  ],
+  "description": "Self-hostable git with merge requests and CI."
+ },
+ {
+  "id": "crisp",
+  "name": "Crisp",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_conversations",
+   "send_message"
+  ],
+  "description": "Live chat and inbox."
+ },
+ {
+  "id": "freshdesk",
+  "name": "Freshdesk",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tickets",
+   "create_ticket"
+  ],
+  "description": "Helpdesk software."
+ },
+ {
+  "id": "freshservice",
+  "name": "Freshservice",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_tickets",
+   "create_ticket"
+  ],
+  "description": "IT service management."
+ },
+ {
+  "id": "front",
+  "name": "Front",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_conversations",
+   "send_reply"
+  ],
+  "description": "Shared inbox for teams."
+ },
+ {
+  "id": "helpscout",
+  "name": "Help Scout",
+  "category": "support",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_conversations",
+   "create_conversation"
+  ],
+  "description": "Shared inbox and help desk."
+ },
+ {
+  "id": "intercom",
+  "name": "Intercom",
+  "category": "support",
+  "auth": "oauth2",
+  "tier": "paid",
+  "actions": [
+   "list_conversations",
+   "reply"
+  ],
+  "description": "Customer messaging."
+ },
+ {
+  "id": "statuscake",
+  "name": "StatusCake",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "free",
+  "actions": [
+   "list_tests",
+   "create_test"
+  ],
+  "description": "Website and page speed monitoring."
+ },
+ {
+  "id": "zendesk",
+  "name": "Zendesk",
+  "category": "support",
+  "auth": "api_key",
+  "tier": "paid",
+  "actions": [
+   "list_tickets",
+   "create_ticket"
+  ],
+  "description": "Customer support platform."
+ }
+]

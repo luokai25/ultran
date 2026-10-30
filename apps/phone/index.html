@@ -76,12 +76,38 @@
       <div class="drawer-label">Recent</div>
       <nav id="history" class="history" aria-label="Recent conversations"></nav>
       <div class="drawer-foot">
+        <button id="connectors-btn" class="drawer-link">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
+          Connectors
+        </button>
         <button id="settings-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
           Settings
         </button>
       </div>
     </aside>
+
+    <section id="connectors-panel" class="panel" aria-label="Connectors" hidden>
+      <header class="panel-head">
+        <button id="connectors-back" class="icon-btn" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Connectors</h2>
+        <span id="connectors-count" class="panel-count"></span>
+      </header>
+      <div class="panel-tools">
+        <input id="connectors-search" type="search" inputmode="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search services or actions" aria-label="Search connectors" />
+        <div id="connectors-tiers" class="chips" role="group" aria-label="Plan"></div>
+        <div id="connectors-chips" class="chips" role="group" aria-label="Category"></div>
+        <small id="connectors-status" class="panel-status"></small>
+      </div>
+      <div id="connectors-list" class="conn-list"></div>
+      <button id="connectors-more" class="ghost conn-more" type="button" hidden>Show more</button>
+    </section>
+
+    <div id="connector-detail-wrap" class="sheet-wrap" hidden>
+      <div id="connector-detail" class="sheet" role="dialog" aria-modal="true"></div>
+    </div>
 
     <div id="sheet-wrap" class="sheet-wrap" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">

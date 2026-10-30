@@ -106,8 +106,14 @@ jobs:
         with:
           gradle-version: "8.2.1"
 
+      # `packages` must be explicit. The action's default is
+      # "tools platform-tools", and the legacy `tools` package no longer exists
+      # in Google's SDK repository - sdkmanager exits 1 with "Failed to find
+      # package 'tools'" and the whole job dies before Gradle ever runs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android platform and build tools
         run: |

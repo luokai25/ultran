@@ -184,11 +184,11 @@
               <button class="solid" type="submit">Explore</button>
             </form>
             <div class="model-quick-search" role="group" aria-label="Popular model families">
-              <button class="ghost" type="button" data-model-query="Qwen GGUF">Qwen</button>
-              <button class="ghost" type="button" data-model-query="Llama GGUF">Llama</button>
-              <button class="ghost" type="button" data-model-query="Gemma GGUF">Gemma</button>
-              <button class="ghost" type="button" data-model-query="Phi GGUF">Phi</button>
-              <button class="ghost" type="button" data-model-query="SmolLM GGUF">Tiny models</button>
+              <button class="ghost" type="button" data-model-query="Qwen">Qwen</button>
+              <button class="ghost" type="button" data-model-query="Llama">Llama</button>
+              <button class="ghost" type="button" data-model-query="Gemma">Gemma</button>
+              <button class="ghost" type="button" data-model-query="Phi">Phi</button>
+              <button class="ghost" type="button" data-model-query="SmolLM">Tiny models</button>
             </div>
             <label class="model-size-filter" for="model-size-filter">
               <span>Show model files</span>
@@ -199,7 +199,8 @@
               </select>
             </label>
             <p class="model-device-tip">For phones, start with a 1B–3B Q4 model. File size is only a rough guide: RAM, context length, and thermal throttling matter too.</p>
-            <p id="model-library-status" class="native-model-status" role="status">Search the Hugging Face catalog. Downloaded weights stay in Ultran's private app storage.</p>
+            <p id="model-library-status" class="native-model-status" role="status" aria-live="polite">Search the Hugging Face catalog. Downloaded weights stay in Ultran's private app storage.</p>
+            <progress id="model-download-progress" class="model-download-progress" max="100" value="0" aria-label="Model download progress" hidden></progress>
             <div id="model-library-results" class="model-library-results"></div>
             <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the on-device llama.cpp runtime.</small>
           </section>

@@ -222,6 +222,8 @@ class ComposioGateway:
                             "workspace_id": workspace_id,
                             "agent_id": agent_id,
                             "tool_name": name,
+                            "tool_title": spec.title or spec.name,
+                            "capabilities": sorted(spec.capabilities),
                             "arguments": cleaned,
                         }
                     results.append({
@@ -277,6 +279,8 @@ class ComposioGateway:
                     **approval.as_dict(),
                     "agent_id": pending.get("agent_id"),
                     "tool_name": pending.get("tool_name"),
+                    "tool_title": pending.get("tool_title"),
+                    "capabilities": pending.get("capabilities", []),
                     "arguments": pending.get("arguments", {}),
                 })
         return rows

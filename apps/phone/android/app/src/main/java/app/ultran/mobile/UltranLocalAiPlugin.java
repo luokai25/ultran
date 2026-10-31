@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.StatFs;
+import android.os.Build;
 import android.provider.OpenableColumns;
 
 import com.getcapacitor.annotation.ActivityCallback;
@@ -64,6 +65,27 @@ public class UltranLocalAiPlugin extends Plugin {
         result.put("modelDirectory", modelDirectory().getAbsolutePath());
         result.put("runtimeVersion", NativeLlama.nativeVersion());
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void getDeviceProfile(PluginCall call) {
+        try {
+            ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo();
+            ActivityManager manager = (ActivityManager) getContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            if (manager != null) manager.getMemoryInfo(memory);
+            StatFs storage = new StatFs(getContext().getFilesDir().getAbsolutePath());
+            String[] abis = Build.SUPPORTED_ABIS;
+            JSObject result = new JSObject();
+            result.put("deviceModel", Build.MANUFACTURER + " " + Build.MODEL);
+            result.put("totalRamBytes", memory.totalMem);
+            result.put("availableRamBytes", memory.availMem);
+            result.put("availableStorageBytes", storage.getAvailableBytes());
+            result.put("cpuCores", Runtime.getRuntime().availableProcessors());
+            result.put("abi", abis != null && abis.length > 0 ? abis[0] : "unknown");
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Could not inspect device capabilities." : error.getMessage());
+        }
     }
 
     @PluginMethod

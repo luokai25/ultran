@@ -279,7 +279,7 @@ async function searchHubModels(query: string): Promise<void> {
     filter: "gguf",
     sort: "downloads",
     direction: "-1",
-    limit: "30",
+    limit: "100",
   });
   if (clean) params.set("search", clean);
   try {
@@ -295,7 +295,7 @@ async function searchHubModels(query: string): Promise<void> {
       modelLibraryStatus.textContent = "No GGUF repositories found. Try a model family such as Qwen, Llama, Gemma, or Phi.";
       return;
     }
-    modelLibraryStatus.textContent = `Showing ${models.length} GGUF repositories. Search to discover more of the catalog.`;
+    modelLibraryStatus.textContent = `Showing up to ${models.length} GGUF repositories from the live catalog. Search to discover more models across Hugging Face.`;
     modelLibraryResults.replaceChildren(...models.map(modelCardNode));
   } catch (error) {
     modelLibraryStatus.textContent = "Model catalog unavailable: " + (error instanceof Error ? error.message : "network error");
@@ -310,7 +310,7 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
   status.textContent = "Loading repository files…";
   card.append(status);
   try {
-    const response = await fetch(`${HUB_API}/models/${encodeURIComponent(model.id)}`, {
+    const response = await fetch(`${HUB_API}/models/${encodeURIComponent(model.id)}?blobs=true`, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(15000),
     });

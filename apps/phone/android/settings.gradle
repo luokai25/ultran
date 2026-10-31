@@ -3,7 +3,5 @@ include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 
 apply from: 'capacitor.settings.gradle'
-// Vendored from the official Termux source at 8629e632fcb95da272221be327db653fb24befe.
-include ':ultran-termux-emulator', ':ultran-termux-view'
-project(':ultran-termux-emulator').projectDir = new File('./termux-upstream/terminal-emulator')
-project(':ultran-termux-view').projectDir = new File('./termux-upstream/terminal-view')
+// The upstream terminal UI sources remain vendored for provenance, but are not compiled.
+// Ultran uses the headless Termux-compatible runtime installed into private app storage.

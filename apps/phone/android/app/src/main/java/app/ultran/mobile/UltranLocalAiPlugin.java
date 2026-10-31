@@ -39,6 +39,8 @@ public class UltranLocalAiPlugin extends Plugin {
     // a file can never be replaced or removed while native code is reading it.
     private final ExecutorService inferenceExecutor = Executors.newSingleThreadExecutor();
     private volatile String loadedModelPath;
+    private volatile int loadedContextTokens;
+    private static final long MAX_MODEL_BYTES = 256L * 1024L * 1024L * 1024L;
 
     private File modelDirectory() {
         File directory = new File(getContext().getFilesDir(), "models");
@@ -138,8 +140,8 @@ public class UltranLocalAiPlugin extends Plugin {
             }
 
             long reportedSize = querySize(uri);
-            if (reportedSize > 8L * 1024L * 1024L * 1024L) {
-                call.reject("This model exceeds Ultran's 8 GB import limit.");
+            if (reportedSize > MAX_MODEL_BYTES) {
+                call.reject("This model exceeds Ultran's 256 GB safety limit.");
                 return;
             }
             StatFs storage = new StatFs(modelDirectory().getAbsolutePath());
@@ -159,8 +161,8 @@ public class UltranLocalAiPlugin extends Plugin {
                 while ((read = input.read(buffer)) != -1) {
                     output.write(buffer, 0, read);
                     copied += read;
-                    if (copied > 8L * 1024L * 1024L * 1024L || copied > availableAtStart) {
-                        throw new IllegalStateException("The model exceeds the available device storage limit.");
+                    if (copied > MAX_MODEL_BYTES || copied > availableAtStart) {
+                        throw new IllegalStateException("The model exceeds Ultran's safety limit or available device storage.");
                     }
                     JSObject progress = new JSObject();
                     progress.put("name", name);
@@ -280,8 +282,8 @@ public class UltranLocalAiPlugin extends Plugin {
                     break;
                 }
                 long total = connection.getContentLengthLong();
-                final long maxBytes = 8L * 1024L * 1024L * 1024L;
-                if (total > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 8 GB download limit.");
+                final long maxBytes = MAX_MODEL_BYTES;
+                if (total > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 256 GB safety limit.");
                 if (total > 0 && total > availableAtStart) throw new IllegalStateException("Not enough free device storage for this model.");
                 partial = new File(modelDirectory(), name + ".partial");
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -345,7 +347,7 @@ public class UltranLocalAiPlugin extends Plugin {
         }
 
         if (model.getAbsolutePath().equals(loadedModelPath)) {
-            call.resolve(new JSObject().put("loaded", true).put("name", name).put("contextTokens", 2048).put("device", "CPU"));
+            call.resolve(new JSObject().put("loaded", true).put("name", name).put("contextTokens", loadedContextTokens > 0 ? loadedContextTokens : 2048).put("device", "CPU").put("memoryMapped", true));
             return;
         }
 
@@ -358,25 +360,33 @@ public class UltranLocalAiPlugin extends Plugin {
                 ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo();
                 ActivityManager manager = (ActivityManager) getContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
                 if (manager != null) manager.getMemoryInfo(memory);
-                if (memory.availMem > 0 && model.length() > (long) (memory.availMem * 0.70)) {
-                    call.reject("This model is too large for currently available memory. Close other apps or choose a smaller quantized model.");
-                    return;
-                }
-                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath());
+                // Model weights are file-backed. Do not compare the complete checkpoint
+                // size with free RAM: mmap + lazy tensor loading lets the OS page weights
+                // in on demand. The KV cache is still resident, so adapt context to headroom.
+                final int contextTokens = memory.availMem > 0 && memory.availMem < 1024L * 1024L * 1024L
+                        ? 512
+                        : memory.availMem > 0 && memory.availMem < 2L * 1024L * 1024L * 1024L
+                        ? 1024 : 2048;
+                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens);
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;
+                    loadedContextTokens = 0;
                     call.reject(error);
                     return;
                 }
                 loadedModelPath = model.getAbsolutePath();
+                loadedContextTokens = contextTokens;
                 JSObject response = new JSObject();
                 response.put("loaded", true);
                 response.put("name", name);
-                response.put("contextTokens", 2048);
+                response.put("contextTokens", contextTokens);
                 response.put("device", "CPU");
+                response.put("memoryMapped", true);
+                response.put("largeModelMode", true);
                 call.resolve(response);
             } catch (Throwable error) {
                 loadedModelPath = null;
+                loadedContextTokens = 0;
                 call.reject(error.getMessage() == null ? "Native model loading failed." : error.getMessage());
             }
         });
@@ -439,6 +449,7 @@ public class UltranLocalAiPlugin extends Plugin {
         inferenceExecutor.execute(() -> {
             NativeLlama.nativeUnloadModel();
             loadedModelPath = null;
+            loadedContextTokens = 0;
             call.resolve(new JSObject().put("loaded", false));
         });
     }

@@ -9,6 +9,7 @@
  */
 
 import * as THREE from "three";
+import { Browser } from "@capacitor/browser";
 import { initConnectors } from "./connectors-ui";
 import { markDataUrl, markSvg } from "./mark";
 
@@ -896,7 +897,14 @@ if (synth) {
  * Boot
  * ------------------------------------------------------------------ */
 
-initConnectors({ linked: () => baseUrl() !== "", api, closeDrawer });
+initConnectors({
+  linked: () => baseUrl() !== "",
+  api,
+  closeDrawer,
+  openExternal: async (url) => {
+    await Browser.open({ url, presentationStyle: "popover" });
+  },
+});
 buildThemes();
 applyTheme(settings.theme);
 setLink("offline", settings.endpoint ? "ready" : "local");

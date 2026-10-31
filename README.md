@@ -35,6 +35,23 @@ Ultran inverts the default:
 - **Runs are replayable.** One append-only event log is the source of truth for
   every run — for debugging, audit, and crash recovery.
 
+## Capability is not the model
+
+Ultran treats the selected LLM as a replaceable reasoning engine, not as the
+entire agent. A shared capability contract supplies task-aware planning
+standards, bounded context and memory, truthfulness rules, untrusted-output
+handling, tool permissions, and independent review for complex or high-impact
+answers. The phone's on-device and Ollama paths use the same policy shape; the
+Python agent backend applies it across Echo, local models, and configured
+hosted providers.
+
+The orchestration layer owns tool discovery, argument validation, approval
+gates, execution limits, audit events, and result synthesis. Switching brains
+must not silently remove those capabilities. This does **not** make a smaller
+model equal to a frontier model in raw knowledge or reasoning. It keeps Ultran's
+workflow and safety standards consistent while the selected model sets the
+underlying reasoning ceiling.
+
 ---
 
 ## Architecture at a Glance

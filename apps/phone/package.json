@@ -19,7 +19,8 @@
   "dependencies": {
     "@capacitor/android": "^6.2.0",
     "@capacitor/core": "^6.2.0",
-    "three": "^0.169.0"
+    "three": "^0.169.0",
+    "@capacitor/browser": "^6.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",

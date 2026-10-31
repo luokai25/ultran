@@ -393,3 +393,52 @@ def test_composio_is_a_valid_virtual_agent_tool_and_enters_execution_loop():
     assert fake.called is True
     assert result["tool_calls"][0]["connector"] == "composio"
     assert "human approval" in agent.system_message().lower()
+
+
+def test_agent_final_answer_receives_composio_execution_results():
+    from ultran_backend.brain import BrainReply
+    from ultran_backend.connectors import ConnectorManifest
+
+    class CapturingBrain:
+        default_model = "test-model"
+        calls = []
+        tokens_in = 0
+        tokens_out = 0
+
+        def complete(self, messages, *, model, temperature, backend_override=None):
+            self.calls.append(messages)
+            self.tokens_in += 1
+            self.tokens_out += 1
+            if len(self.calls) == 2:
+                return BrainReply(
+                    '{"calls":[{"tool":"search_messages","arguments":{"query":"latest"}}]}',
+                    1, 1, model, "test",
+                )
+            return BrainReply("I found the message you asked for.", 1, 1, model, "test")
+
+    class FakeComposio:
+        def plan_and_execute(self, workspace, agent_id, message, planner, *, limit):
+            planner("plan using search_messages", message)
+            return [{
+                "connector": "composio", "action": "search_messages", "ok": True,
+                "detail": "Subject: Project update; sender: team@example.com",
+            }]
+
+    registry = ConnectorRegistry([
+        ConnectorManifest(id="unused", name="Unused", category="test", actions=("noop",))
+    ])
+    vault = CredentialVault()
+    brain = CapturingBrain()
+    svc = AgentService(brain, ToolSandbox(registry, vault), vault, composio=FakeComposio())
+    agent = svc.create(name="Connected agent", tools=["composio"])
+
+    result = svc.chat(agent.id, "find my latest email", workspace_id="workspace-a")
+
+    assert result["content"] == "I found the message you asked for."
+    assert result["tokens_in"] == 3
+    assert result["tokens_out"] == 3
+    final_messages = brain.calls[-1]
+    tool_context = final_messages[-1].content
+    assert "Project update" in tool_context
+    assert "untrusted data" in tool_context
+    assert len(svc.session(agent.id, result["session_id"]).messages) == 2

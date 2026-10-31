@@ -131,9 +131,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-    // Official Termux terminal emulator/view source, vendored under android/termux-upstream.
-    implementation project(':ultran-termux-view')
-    implementation project(':ultran-termux-emulator')
 }
 
 apply from: 'capacitor.build.gradle'

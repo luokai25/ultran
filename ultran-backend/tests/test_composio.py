@@ -317,3 +317,45 @@ def test_approval_decision_is_workspace_scoped_and_denial_never_executes():
     assert result["executed"] is False
     assert result["approval"]["state"] == "denied"
     assert approval.id not in gateway._pending_calls
+
+
+def test_composio_pending_write_approval_survives_restart_encrypted(tmp_path):
+    from cryptography.fernet import Fernet
+
+    key = Fernet.generate_key().decode("ascii")
+    path = tmp_path / "composio_approvals.sqlite3"
+    first = ComposioGateway(api_key="test-key", db_path=path, encryption_key=key)
+    approval = first._approval_gate.request(
+        "workspace-a", "composio.send_email", "fingerprint", reason="Send email"
+    )
+    payload = {
+        "workspace_id": "workspace-a", "agent_id": "agent-1",
+        "tool_name": "send_email", "tool_title": "Send email",
+        "capabilities": ["write"], "arguments": {"to": "private@example.com"},
+    }
+    first._save_pending_call(approval.id, payload)
+
+    raw = path.read_bytes() if path.exists() else b""
+    assert b"private@example.com" not in raw
+    restarted = ComposioGateway(api_key="test-key", db_path=path, encryption_key=key)
+    rows = restarted.pending_approvals("workspace-a")
+    assert rows[0]["id"] == approval.id
+    assert rows[0]["arguments"] == {"to": "private@example.com"}
+
+    denied = restarted.decide_approval("workspace-a", approval.id, approved=False)
+    assert denied["executed"] is False
+    again = ComposioGateway(api_key="test-key", db_path=path, encryption_key=key)
+    assert again.pending_approvals("workspace-a") == []
+
+
+def test_composio_pending_approval_wrong_key_fails_closed(tmp_path):
+    from cryptography.fernet import Fernet
+
+    path = tmp_path / "composio_approvals.sqlite3"
+    key = Fernet.generate_key().decode("ascii")
+    first = ComposioGateway(api_key="test-key", db_path=path, encryption_key=key)
+    approval = first._approval_gate.request("workspace-a", "composio.write", "hash")
+    first._save_pending_call(approval.id, {"workspace_id": "workspace-a", "arguments": {"x": 1}})
+    other_key = Fernet.generate_key().decode("ascii")
+    with pytest.raises(RuntimeError, match="Cannot decrypt pending Composio approvals"):
+        ComposioGateway(api_key="test-key", db_path=path, encryption_key=other_key)

@@ -119,7 +119,16 @@
     <section id="workspace-panel" class="workspace-panel" hidden aria-label="Agent workspace">
       <header class="workspace-head"><button id="workspace-back" class="icon-btn" type="button" aria-label="Back">‹</button><div><h2>Agent Workspace</h2><small>Tasks, execution and generated files</small></div><button id="workspace-refresh" class="ghost" type="button">Refresh</button></header>
       <div class="workspace-stats" id="workspace-stats"></div>
-      <div class="workspace-section-head"><h3>Background runs</h3><span id="workspace-task-count"></span></div><div id="workspace-tasks" class="workspace-list"><p class="workspace-empty">Loading agent tasks…</p></div>
+      <button id="workspace-team-open" class="workspace-team-open" type="button">＋ Launch an agent team</button>
+      <section id="workspace-team-builder" class="workspace-team-builder" hidden aria-label="Launch agent team">
+        <h3>Parallel agent run</h3><p>Choose 2–5 agents. Each receives the objective independently and runs in parallel.</p>
+        <textarea id="workspace-team-objective" rows="3" maxlength="16000" placeholder="Describe the objective for the team…"></textarea>
+        <div id="workspace-team-agents" class="workspace-team-agents"></div>
+        <div class="workspace-team-actions"><button id="workspace-team-cancel" type="button">Cancel</button><button id="workspace-team-submit" type="button">Launch team</button></div>
+      </section>
+      <div class="workspace-section-head"><h3>Background runs</h3><span id="workspace-task-count"></span></div>
+      <div class="workspace-synthesis-bar"><span id="workspace-selected-count">Select completed runs to compare</span><button id="workspace-synthesize" type="button" disabled>Synthesize results</button></div>
+      <div id="workspace-tasks" class="workspace-list"><p class="workspace-empty">Loading agent tasks…</p></div>
       <div class="workspace-section-head"><h3>Generated files</h3><span id="workspace-artifact-count"></span></div><div id="workspace-artifacts" class="workspace-list"><p class="workspace-empty">Loading artifacts…</p></div>
     </section>
 

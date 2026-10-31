@@ -516,14 +516,12 @@ public final class UltranRuntimePlugin extends Plugin {
             } catch (Exception ignored) { }
             call.resolve(new JSObject().put("installed", true).put("prefix", destination.getAbsolutePath()).put("entries", entryCount).put("uncompressedBytes", totalBytes));
         } catch (Exception error) {
-            try {
-                if (newPrefixActivated && (destination.exists() || isSymbolicLink(destination))) {
-                    deleteRecursively(destination);
-                }
-                if (previousPrefixBackedUp && (backup.exists() || isSymbolicLink(backup))) {
-                    backup.renameTo(destination);
-                }
-            } catch (Exception ignored) { }
+            if (newPrefixActivated && (destination.exists() || isSymbolicLink(destination))) {
+                try { deleteRecursively(destination); } catch (Exception ignored) { }
+            }
+            if (previousPrefixBackedUp && (backup.exists() || isSymbolicLink(backup))) {
+                try { backup.renameTo(destination); } catch (Exception ignored) { }
+            }
             try { deleteRecursively(staging); } catch (Exception ignored) { }
             call.reject(error.getMessage() == null ? "Could not install the Termux bootstrap." : error.getMessage(), error);
         }

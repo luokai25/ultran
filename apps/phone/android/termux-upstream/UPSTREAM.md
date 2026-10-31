@@ -1,8 +1,8 @@
-# Vendored Termux terminal libraries
+# Termux upstream integration for Ultran's headless runtime
 
-Source cloned from https://github.com/termux/termux-app at commit `8629e632fcb95da272221be327db653fb24befe` on 2026-10-31. The `terminal-emulator` and `terminal-view` modules are included from that exact source revision and wired as Android library modules in Ultran.
+Ultran's product target is the Termux execution environment, not a terminal emulator UI. The upstream `terminal-emulator` and `terminal-view` source snapshots are retained in this repository for provenance and licensing review, but they are no longer compiled, registered, or exposed as an app screen. The native runtime manager invokes the private Termux-compatible prefix directly, with no separate Termux app required after the runtime is installed.
 
-The upstream repository states that its terminal libraries use code from Android-Terminal-Emulator under Apache License 2.0; see `TERMUX-APP-LICENSE.md` and upstream notices. This is a source-vendoring step, not a claim that Termux's package bootstrap or all Termux packages are installed. The first integrated shell uses Android `/system/bin/sh`; adapting the Termux bootstrap and packages for Ultran's package identity and private paths remains required next work.
+The vendored terminal libraries originate from https://github.com/termux/termux-app at commit `8629e632fcb95da272221be327db653fb24befe`. Their upstream notices and license are retained for compliance. They are not dependencies of the Ultran APK.
 
 Upstream: https://github.com/termux/termux-app
 
@@ -15,7 +15,7 @@ The companion `termux/termux-packages` repository was inspected at commit `3bdd1
 
 `TerminalBitmap.java` uses numeric API level `35` rather than `Build.VERSION_CODES.VANILLA_ICE_CREAM`, preserving the upstream behavior while allowing the current Android build to compile against SDK 34. No runtime behavior changes for supported API levels.
 
-The native terminal now pre-creates `ultran-runtime/usr`, `home`, and `tmp` under Ultran private app data and exports Termux-compatible `PREFIX`, `TERMUX_PREFIX`, `TERMUX__PREFIX`, `TERMUX__ROOTFS`, `HOME`, `TMPDIR`, `PATH`, and `LD_LIBRARY_PATH` values. This prepares the exact install layout for a future Ultran-specific bootstrap; it does not claim that packages have been installed yet.
+The native runtime manager pre-creates `ultran-runtime/usr`, `home`, and `tmp` under Ultran private app data and exports Termux-compatible `PREFIX`, `TERMUX_PREFIX`, `TERMUX__PREFIX`, `TERMUX__ROOTFS`, `HOME`, `TMPDIR`, `PATH`, and `LD_LIBRARY_PATH` values. This prepares the exact install layout for a future Ultran-specific bootstrap; it does not claim that packages have been installed yet.
 
 ## Building an Ultran-specific Termux bootstrap
 
@@ -30,4 +30,9 @@ The `Build Ultran Termux Bootstrap` GitHub Actions workflow runs this builder on
 
 ## Local agent command tool
 
-The on-device llama.cpp chat path and configured local Ollama-compatible model path can request one `terminal.run` command per user turn using the internal `ULTRAN_TOOL_CALL:` JSON protocol. Ultran opens a native Android approval dialog showing the exact command before execution. Cancel means no command is started. Approved commands execute without root, with the working directory in Ultran's private `files/ultran-runtime/home`, a 30-second timeout, merged stdout/stderr, and a 48 KiB output cap. The model is told to treat terminal output as untrusted data. This tool is local to the Android client; it is not exposed to remote backend agents because the backend cannot directly access the phone's private runtime.
+The on-device llama.cpp chat path and configured local Ollama-compatible model path can request the local `runtime.exec` tool per user turn using the internal `ULTRAN_TOOL_CALL:` JSON protocol. Ultran opens a native Android approval dialog showing the exact command before execution. Cancel means no command is started. Approved commands execute without root, with the working directory in Ultran's private `files/ultran-runtime/home`, a 30-second timeout, merged stdout/stderr, and a 48 KiB output cap. The model is told to treat process output as untrusted data. This capability is local to the Android client; it is not exposed to remote backend agents because the backend cannot directly access the phone's private runtime.
+
+## Explicitly not complete yet
+
+The current bootstrap is a minimal seed environment, not the complete Termux application or package ecosystem. The in-app APT sources remain disabled until Ultran has a repository built for its own package prefix. A future background job supervisor must provide durable job IDs, status, cancellation, bounded output/log storage, and Android-compliant user-visible execution for longer tasks. Do not describe the current 30-second approved command runner as an always-on daemon or a fully integrated Termux installation.
+

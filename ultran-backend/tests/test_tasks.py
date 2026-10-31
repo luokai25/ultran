@@ -25,7 +25,7 @@ def test_task_runs_and_persists_encrypted_result(tmp_path):
     key = Fernet.generate_key().decode("ascii")
     path = tmp_path / "tasks.sqlite3"
     service = AgentTaskService(path, lambda agent, message, **kw: {"content": f"done: {message}"}, encryption_key=key)
-    task = service.submit("agent-1", "workspace-a", "private project data")
+    task = service.submit("agent-1", "workspace-a", "private project data", team_id="team_persisted")
     completed = wait_for(service, task.id, {"succeeded"})
     assert completed.result["content"] == "done: private project data"
     service.close()
@@ -33,6 +33,7 @@ def test_task_runs_and_persists_encrypted_result(tmp_path):
     assert b"private project data" not in raw
     restored = AgentTaskService(path, lambda *a, **kw: {}, encryption_key=key)
     assert restored.get("workspace-a", task.id).status == "succeeded"
+    assert restored.get("workspace-a", task.id).team_id == "team_persisted"
     with pytest.raises(NotFound):
         restored.get("workspace-b", task.id)
     restored.close()
@@ -191,8 +192,8 @@ def test_existing_task_database_migrates_session_column(tmp_path):
     service = AgentTaskService(path, lambda *a, **kw: {"ok": True})
     with sqlite3.connect(path) as db:
         columns = {row[1] for row in db.execute("PRAGMA table_info(agent_tasks)")}
-    assert "session_id" in columns
-    task = service.submit("agent-1", "workspace-a", "migrated")
+    assert "session_id" in columns and "team_id" in columns
+    task = service.submit("agent-1", "workspace-a", "migrated", team_id="team_migrated")
     assert wait_for(service, task.id, {"succeeded"}).status == "succeeded"
     service.close()
 
@@ -224,6 +225,12 @@ def test_batch_dispatches_distinct_agents_in_parallel_and_is_workspace_scoped(cl
     assert len(tasks) == 2
     assert {task["agent_id"] for task in tasks} == {agent["id"] for agent in agents}
     assert len({task["id"] for task in tasks}) == 2
+    team_ids = {task["team_id"] for task in tasks}
+    assert len(team_ids) == 1 and None not in team_ids
+    team_id = next(iter(team_ids))
+    team = client.get(f"/v1/tasks/teams/{team_id}", headers=headers)
+    assert team.status_code == 200 and team.json()["total"] == 2
+    assert client.get(f"/v1/tasks/teams/{team_id}", headers={"X-Ultran-Workspace": "other-workspace"}).status_code == 404
     assert client.get("/v1/tasks", headers={"X-Ultran-Workspace": "other-workspace"}).json() == []
 
 

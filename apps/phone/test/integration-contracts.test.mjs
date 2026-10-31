@@ -222,5 +222,5 @@ test("WhatsApp sending requires one-shot approval and exact composer match", () 
   assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);
   assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
   assert.match(main, /NativeCompanion\.openWhatsAppMessage/);
-  assert.match(main, /delivery status is not confirmed/i);
+  assert.match(main, /delivery status as unconfirmed/i);
 });

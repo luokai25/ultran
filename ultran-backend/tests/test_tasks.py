@@ -107,7 +107,11 @@ def test_task_api_scopes_submit_list_and_status(client):
     assert events.status_code == 200
     assert "task_queued" in events.text
     assert "task_succeeded" in events.text
+    snapshot = client.get(f"/v1/tasks/{task_id}/events?stream=false", headers=headers)
+    assert snapshot.status_code == 200
+    assert [event["type"] for event in snapshot.json()["events"]][0] == "task_queued"
     assert client.get(f"/v1/tasks/{task_id}/events", headers={"X-Ultran-Workspace": "workspace-b"}).status_code == 404
+    assert client.get(f"/v1/tasks/{task_id}/events?stream=false", headers={"X-Ultran-Workspace": "workspace-b"}).status_code == 404
 
 
 def test_queued_task_resumes_after_restart(tmp_path):

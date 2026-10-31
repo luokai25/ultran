@@ -34,14 +34,14 @@ type Conversation = {
 };
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
 type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; termuxBridgeEndpoint: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
-type NativeModel = { name: string; sizeBytes: number; loaded: boolean };
+type NativeModel = { name: string; sizeBytes: number; loaded: boolean; shards?: number };
 type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[] };
 type HubFile = { rfilename: string; size?: number; lfs?: { oid?: string; size?: number } };
 type NativeLocalAIPlugin = {
   getStatus(): Promise<{ supported: boolean; loaded: boolean; loadedModel: string; runtimeVersion: string }>;
   getDeviceProfile(): Promise<{ deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
-  pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
+  pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
   loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
   generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string }>;
   unloadModel(): Promise<{ loaded: boolean }>;
@@ -481,13 +481,13 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
 
 async function importNativeModel(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") return;
-  nativeModelStatus.textContent = "Choose a .gguf model. Ultran will copy it into private app storage.";
+  nativeModelStatus.textContent = "Choose one GGUF file or select every numbered shard of a split model. Ultran verifies the set before importing it.";
   try {
     const imported = await NativeLocalAI.pickModel();
     if (imported.cancelled) return;
     await refreshNativeModels();
     if (imported.name) nativeModelSelect.value = imported.name;
-    nativeModelStatus.textContent = "Imported " + (imported.name || "model") + " · " + formatBytes(imported.sizeBytes || 0) + ". Load it when ready.";
+    nativeModelStatus.textContent = "Imported " + (imported.name || "model") + (imported.shards ? " · " + imported.shards + " verified shards" : "") + " · " + formatBytes(imported.sizeBytes || 0) + ". Load it when ready.";
     nativeModelLoadButton.disabled = !nativeModelSelect.value;
     nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;
   } catch (error) {

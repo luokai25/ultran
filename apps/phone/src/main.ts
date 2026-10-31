@@ -370,7 +370,8 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelLibraryStatus.textContent = "This file has an unsupported filename and cannot be installed.";
     return;
   }
-  const sha = file.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
+  const rawSha = file.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
+  const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
   if (sizeBytes > 8 * 1024 * 1024 * 1024) {
     modelLibraryStatus.textContent = "This file exceeds Ultran's 8 GB download limit.";
     return;

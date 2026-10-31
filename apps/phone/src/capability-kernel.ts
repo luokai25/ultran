@@ -17,7 +17,7 @@ export type CapabilityProfile = {
   verifyDraft: boolean;
 };
 
-const CRITICAL_PATTERN = /\b(medical|diagnos|symptom|medication|dose|legal|lawsuit|contract|tax|investment|investing|financial|emergency|security incident|personal data|credential|production deploy|delete database|data loss)\b/i;
+const CRITICAL_PATTERN = /\b(medical|diagnos|symptom|medication|dose|legal|lawsuit|contract|tax|investment|investing|financial|emergency|security incident|personal data|credential|production deploy|delete|wipe|purge|erase|drop table|data loss)\b/i;
 const DEEP_PATTERN = /\b(build|implement|debug|refactor|architecture|design|compare|evaluate|research|investigate|audit|analy[sz]e|plan|roadmap|strategy|multi.?step|step.?by.?step|agent|workflow|connector|integration|code|program|script|test|deploy|migration|optimi[sz]e)\b/i;
 
 export function profileTask(task: string): CapabilityProfile {

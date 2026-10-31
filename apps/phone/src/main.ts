@@ -1704,11 +1704,14 @@ function plainSpeech(text: string): string { return prepareUltranSpeech(text); }
 function speak(text: string): void {
   if (!synth) return;
   synth.cancel();
-  const utterance = new SpeechSynthesisUtterance(plainSpeech(text));
+  const spokenText = plainSpeech(text);
+  const utterance = new SpeechSynthesisUtterance(spokenText);
   utterance.rate = ULTRAN_VOICE.rate;
   utterance.pitch = ULTRAN_VOICE.pitch;
   const voices = synth.getVoices();
-  const voice = voices.find((v) => ULTRAN_VOICE.preferredVoice.test(v.lang) && ULTRAN_VOICE.preferredName.test(v.name))
+  const preferredLanguage = /[\\u0600-\\u06FF]/.test(spokenText) ? "ar" : (navigator.language.split("-")[0] || "en");
+  const voice = voices.find((v) => v.lang.toLowerCase().startsWith(preferredLanguage.toLowerCase()) && ULTRAN_VOICE.preferredName.test(v.name))
+    ?? voices.find((v) => v.lang.toLowerCase().startsWith(preferredLanguage.toLowerCase()))
     ?? voices.find((v) => ULTRAN_VOICE.preferredVoice.test(v.lang))
     ?? voices.find((v) => /^en/i.test(v.lang));
   if (voice) utterance.voice = voice;

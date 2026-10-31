@@ -203,6 +203,7 @@ def test_chat_exposes_native_phone_tools_only_to_android_capable_clients(monkeyp
     system_prompt = captured[0].content
     assert "ANDROID PHONE ACTIONS" in system_prompt
     assert 'ULTRAN_TOOL_CALL:{"tool":"whatsapp.compose"' in system_prompt
+    assert 'ULTRAN_TOOL_CALL:{"tool":"telegram.compose"' in system_prompt
     assert "Never invent a recipient or phone number" in system_prompt
     assert "native approval" in system_prompt
 

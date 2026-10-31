@@ -13,6 +13,19 @@ Status: first native low-memory stage implemented; multi-shard model management,
 
 AirLLM's current implementation is a Hugging Face Transformers wrapper. It constructs model modules on the `meta` device so parameter allocation does not materialize the whole checkpoint, decomposes checkpoints into per-module SafeTensors shards, then attaches pre-forward and post-forward hooks. A hook loads the current module's tensor state from disk, moves it to the compute device, executes the normal Transformers module, and evicts the loaded tensors back to `meta`. A single-worker prefetch executor overlaps reading the next module with current compute. This preserves Transformers' forward, generation, attention, and KV-cache behavior instead of reimplementing each architecture's math.
 
+### Internal pipeline details reviewed
+
+The public source separates model-family discovery from the streaming engine:
+
+- `AutoModel` reads the Hugging Face config's declared architecture and selects a dedicated subclass only for non-standard module layouts (ChatGLM, QWen, Baichuan, InternLM, Kimi K3, Qwen3.5 and Qwen4-Exp). Standard causal-LM layouts use the generic base class. The macOS path is separate and uses an MLX Llama/Mistral implementation.
+- The checkpoint splitter reads the Hugging Face tensor index (or synthesizes one for a single SafeTensors/PyTorch checkpoint), maps parameter names to decoder modules, and writes one persistent shard per module. It sorts modules by the last source shard they touch so it can stream the original checkpoint sequentially without silently omitting tensors.
+- Already-per-layer source shards can be reused as hard links when the source format matches the SafeTensors persister, avoiding a second copy of enormous checkpoints. The splitter also checks free disk space and can delete original files only when explicitly configured.
+- The SafeTensors persister writes a completion marker per module and reuses a complete prior decomposition. The MLX persister is a separate NPZ-based path with Llama-style tensor-name conversion.
+- The generic loader instantiates Transformers modules on `meta`, keeps non-checkpoint buffers materialized, moves one module's tensors to the compute device before its forward call, then returns the module's parameters to `meta` after execution. The next module can be prefetched on a worker thread.
+- The expert path indexes tensor names inside a layer shard and reads only the selected expert tensors with SafeTensors random access. It falls back to whole-layer streaming when the architecture, persister, or compression mode cannot safely support expert hooks.
+- Large CPU-resident lookup tables are extracted into raw file-backed mmap storage and gathered from the host. This is a distinct path from ordinary decoder-layer streaming.
+- Compression, quantizer-specific parameter restoration, tied embeddings, multimodal resident modules, model-family path maps, and profiler timings are all separate compatibility concerns. They are not interchangeable with merely turning on mmap.
+
 For sparse mixture-of-experts models, AirLLM can attach hooks to individual experts. The router selects a subset per token, so only selected experts are loaded. It keeps non-expert layer tensors separate. The implementation also has special handling for oversized embeddings: file-backed memory maps and indexed row gathers avoid materializing huge lookup tables. A profiler tracks per-layer load and compute costs. Persistence adapters keep the decomposed representation for warm starts. Some model families still need architecture-specific module-name maps and exceptions.
 
 ## Why the Python implementation is not copied into Android
@@ -28,6 +41,16 @@ AirLLM depends on Python, PyTorch, Transformers, Accelerate, SafeTensors and opt
 - Prompt batches are limited to 64 tokens to reduce transient allocations.
 - Import and direct Hugging Face download have a 256 GB safety ceiling and still check actual free storage while writing a temporary file. Split GGUF imports are multi-selected, filename/count checked, staged, and committed as one set; the model list exposes only the first shard as the logical model. llama.cpp's pinned loader automatically discovers the remaining standard `-00001-of-000NN.gguf` files. This ceiling is not a promise that Android hardware can run a model of that size.
 - Existing GGUF validation, SHA-256 validation when supplied, atomic finalization, serialized load/inference/delete operations, and local-only model storage remain in place.
+
+## What Ultran's split import does and does not mean
+
+The new multi-select import supports llama.cpp's standard multi-file GGUF
+checkpoint convention. It validates and stores all files together so the
+native loader can discover the remaining parts from the first shard. This is
+**file sharding**, not AirLLM's **module decomposition**: it does not convert
+a Hugging Face checkpoint into one SafeTensors file per transformer layer,
+nor does it explicitly move a module to a device and return it to a meta state
+after every forward. Those are separate future stages.
 
 ## Important distinction: mmap is not magic
 

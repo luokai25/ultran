@@ -102,6 +102,29 @@ public class UltranLocalAiPlugin extends Plugin {
         File[] files = modelDirectory().listFiles((dir, name) -> name.toLowerCase().endsWith(".gguf"));
         if (files != null) {
             for (File file : files) {
+                Matcher shard = GGUF_SHARD.matcher(file.getName());
+                if (shard.matches()) {
+                    int index = Integer.parseInt(shard.group(2));
+                    int count = Integer.parseInt(shard.group(3));
+                    if (index != 1) continue;
+                    long totalBytes = 0;
+                    boolean complete = true;
+                    String prefix = shard.group(1);
+                    for (int part = 1; part <= count; part++) {
+                        String partName = prefix + String.format(Locale.ROOT, "-%05d-of-%05d.gguf", part, count);
+                        File partFile = new File(modelDirectory(), partName);
+                        if (!partFile.isFile()) { complete = false; break; }
+                        totalBytes += partFile.length();
+                    }
+                    if (!complete) continue;
+                    JSObject item = new JSObject();
+                    item.put("name", file.getName());
+                    item.put("sizeBytes", totalBytes);
+                    item.put("shards", count);
+                    item.put("loaded", file.getAbsolutePath().equals(loadedModelPath));
+                    models.put(item);
+                    continue;
+                }
                 JSObject item = new JSObject();
                 item.put("name", file.getName());
                 item.put("sizeBytes", file.length());
@@ -258,6 +281,10 @@ public class UltranLocalAiPlugin extends Plugin {
         File partial = null;
         try {
             String name = safeModelName(displayName);
+            Matcher split = GGUF_SHARD.matcher(name);
+            if (split.matches() && Integer.parseInt(split.group(3)) > 1) {
+                throw new IllegalStateException("This is one shard of a split GGUF model. Select all numbered shards together so Ultran can verify and import the complete model.");
+            }
             File destination = new File(modelDirectory(), name);
             if (destination.getAbsolutePath().equals(loadedModelPath)) {
                 call.reject("Unload this model before replacing it.");
@@ -355,6 +382,10 @@ public class UltranLocalAiPlugin extends Plugin {
         final String expectedSha256;
         try {
             name = safeModelName(call.getString("name"));
+            Matcher split = GGUF_SHARD.matcher(name);
+            if (split.matches() && Integer.parseInt(split.group(3)) > 1) {
+                throw new IllegalArgumentException("Download split GGUF models as a complete shard set. Use the multi-select import after obtaining all numbered parts.");
+            }
             source = call.getString("url");
             expectedSha256 = call.getString("sha256", "").trim().toLowerCase(Locale.ROOT);
             if (source == null || source.length() > 4096) throw new IllegalArgumentException("A Hugging Face model URL is required.");
@@ -590,15 +621,40 @@ public class UltranLocalAiPlugin extends Plugin {
         }
         File model = new File(modelDirectory(), name);
         inferenceExecutor.execute(() -> {
-            if (model.getAbsolutePath().equals(loadedModelPath)) {
-                call.reject("Unload this model before deleting it.");
-                return;
+            ArrayList<File> filesToDelete = new ArrayList<>();
+            Matcher split = GGUF_SHARD.matcher(name);
+            if (split.matches()) {
+                int index = Integer.parseInt(split.group(2));
+                int count = Integer.parseInt(split.group(3));
+                if (index != 1) {
+                    call.reject("Select the first shard entry to delete the complete model set.");
+                    return;
+                }
+                String prefix = split.group(1);
+                for (int part = 1; part <= count; part++) {
+                    File shard = new File(modelDirectory(), prefix + String.format(Locale.ROOT, "-%05d-of-%05d.gguf", part, count));
+                    if (!shard.isFile()) {
+                        call.reject("The model shard set is incomplete; missing " + shard.getName() + ".");
+                        return;
+                    }
+                    filesToDelete.add(shard);
+                }
+            } else {
+                filesToDelete.add(model);
             }
-            if (model.exists() && !model.delete()) {
-                call.reject("Could not delete the model file.");
-                return;
+            for (File file : filesToDelete) {
+                if (file.getAbsolutePath().equals(loadedModelPath)) {
+                    call.reject("Unload this model before deleting it.");
+                    return;
+                }
             }
-            call.resolve(new JSObject().put("deleted", true));
+            for (File file : filesToDelete) {
+                if (file.exists() && !file.delete()) {
+                    call.reject("Could not delete the complete model set. Failed at " + file.getName() + ".");
+                    return;
+                }
+            }
+            call.resolve(new JSObject().put("deleted", true).put("files", filesToDelete.size()));
         });
     }
 }

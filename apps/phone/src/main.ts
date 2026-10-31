@@ -1232,12 +1232,14 @@ async function remoteReply(
   };
   const run = async (): Promise<ChatReply> => {
     const agentId = await ensureAgent();
+    const nativePhoneIntent = Capacitor.getPlatform() === "android"
+      && /\\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
     const body = JSON.stringify({
       message: text,
       session_id: convo.sessionId ?? null,
       client_capabilities: Capacitor.getPlatform() === "android" ? ["android_phone_actions"] : [],
-      allow_tools: !nativeToolFollowup,
-      max_tool_calls: nativeToolFollowup ? 0 : 8,
+      allow_tools: !nativeToolFollowup && !nativePhoneIntent,
+      max_tool_calls: nativeToolFollowup || nativePhoneIntent ? 0 : 8,
     });
     const res = await api(`/v1/agents/${agentId}/chat/stream`, { method: "POST", body }, 180_000);
     if (res.status === 404) {

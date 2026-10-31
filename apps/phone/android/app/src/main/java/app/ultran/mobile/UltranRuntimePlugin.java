@@ -46,6 +46,7 @@ public final class UltranRuntimePlugin extends Plugin {
     private static final int MAX_SYMLINK_MANIFEST_BYTES = 2 * 1024 * 1024;
     private final ExecutorService installer = Executors.newSingleThreadExecutor();
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean commandApprovalPending = new AtomicBoolean(false);
     private static final int MAX_COMMAND_OUTPUT_BYTES = 48 * 1024;
     private static final long COMMAND_TIMEOUT_SECONDS = 30;
 
@@ -77,14 +78,35 @@ public final class UltranRuntimePlugin extends Plugin {
             call.reject("Commands must be at most 4,096 characters and cannot contain null bytes.");
             return;
         }
-        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
-            .setTitle("Approve local command")
-            .setMessage("Ultran wants to run this command on your device:\n\n" + command +
-                "\n\nIt runs without root in Ultran's app sandbox. It may change files or access the network. Review it before approving.")
-            .setPositiveButton("Run command", (dialog, which) -> commandExecutor.execute(() -> executeApprovedCommand(call, command)))
-            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("approved", false)))
-            .setOnCancelListener(dialog -> call.resolve(new JSObject().put("approved", false)))
-            .show());
+        if (!commandApprovalPending.compareAndSet(false, true)) {
+            call.reject("Another local command is already awaiting approval or running.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            try {
+                new AlertDialog.Builder(getActivity())
+                    .setTitle("Approve local command")
+                    .setMessage("Ultran wants to run this command on your device:\n\n" + command +
+                        "\n\nIt runs without root in Ultran's app sandbox. It may change files or access the network. Review it before approving.")
+                    .setPositiveButton("Run command", (dialog, which) -> commandExecutor.execute(() -> {
+                        try { executeApprovedCommand(call, command); }
+                        finally { commandApprovalPending.set(false); }
+                    }))
+                    .setNegativeButton("Cancel", (dialog, which) -> {
+                        commandApprovalPending.set(false);
+                        call.resolve(new JSObject().put("approved", false));
+                    })
+                    .setOnCancelListener(dialog -> {
+                        if (commandApprovalPending.compareAndSet(true, false)) {
+                            call.resolve(new JSObject().put("approved", false));
+                        }
+                    })
+                    .show();
+            } catch (Exception error) {
+                commandApprovalPending.set(false);
+                call.reject("Could not request approval for the local command.", error);
+            }
+        });
     }
 
     private void executeApprovedCommand(PluginCall call, String command) {
@@ -103,7 +125,7 @@ public final class UltranRuntimePlugin extends Plugin {
             File bash = new File(prefix, "bin/bash");
             boolean useBash = marker().isFile() && bash.canExecute();
             String shell = useBash ? bash.getAbsolutePath() : "/system/bin/sh";
-            ProcessBuilder builder = new ProcessBuilder(shell, useBash ? "-lc" : "-c", command);
+            ProcessBuilder builder = new ProcessBuilder(shell, "-c", command);
             builder.directory(home);
             builder.redirectErrorStream(true);
             Map<String, String> env = builder.environment();

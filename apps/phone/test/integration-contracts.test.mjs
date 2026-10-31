@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, manifest, orchestrator, policyGate, ledger, runState] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, orchestrator, policyGate, ledger, runState] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
@@ -16,6 +16,7 @@ const [html, main, localAI, runtime, capabilityKernel, persona, companion, voice
   read("src/ultran-persona.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranCompanionPlugin.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranVoiceService.java"),
+  read("android/app/src/main/java/app/ultran/mobile/UltranTaskMonitorWorker.java"),
   read("android/app/src/main/AndroidManifest.xml"),
   read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
   read("../../services/agent-core/src/monetization/policy-gate.ts"),
@@ -160,6 +161,10 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(companion, /startForegroundService/);
   assert.match(voiceService, /TextToSpeech/);
   assert.match(voiceService, /startForeground/);
+  assert.match(taskMonitor, /PeriodicWorkRequest/);
+  assert.match(taskMonitor, /15, TimeUnit\.MINUTES/);
+  assert.match(taskMonitor, /speakUpdate\(title/);
+  assert.match(main, /startTaskMonitor\(\{endpoint: baseUrl\(\), speakUpdates: settings\.voice\}\)/);
   assert.match(manifest, /FOREGROUND_SERVICE_MEDIA_PLAYBACK/);
   assert.match(manifest, /UltranVoiceService/);
   assert.match(main, /processTaskUpdates\(tasks\)/);

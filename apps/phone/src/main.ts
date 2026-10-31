@@ -421,7 +421,15 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelLibraryStatus.textContent = "This file exceeds Ultran's 8 GB download limit.";
     return;
   }
-  const message = `Download ${name} (about ${formatBytes(sizeBytes)}) from Hugging Face into Ultran's private storage? Check the model license before use.`;
+  let existingModel = false;
+  try {
+    const installed = await NativeLocalAI.listModels();
+    existingModel = installed.models.some((model) => model.name.toLowerCase() === name.toLowerCase());
+  } catch {
+    // The native downloader still validates the file; do not block discovery if listing fails.
+  }
+  const replacementWarning = existingModel ? "\n\nA model with this filename already exists. It will be replaced only after the new download passes validation." : "";
+  const message = `Download ${name} (about ${formatBytes(sizeBytes)}) from Hugging Face into Ultran's private storage? Check the model license before use.${replacementWarning}`;
   if (!window.confirm(message)) return;
   modelDownloadInProgress = true;
   modelDownloadProgressEl.hidden = false;

@@ -1,5 +1,6 @@
 package app.ultran.mobile;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -19,6 +20,7 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilterInputStream;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -41,6 +44,9 @@ public final class UltranRuntimePlugin extends Plugin {
     private static final int MAX_ENTRIES = 100000;
     private static final int MAX_SYMLINK_MANIFEST_BYTES = 2 * 1024 * 1024;
     private final ExecutorService installer = Executors.newSingleThreadExecutor();
+    private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
+    private static final int MAX_COMMAND_OUTPUT_BYTES = 48 * 1024;
+    private static final long COMMAND_TIMEOUT_SECONDS = 30;
 
     private File runtimeRoot() {
         return new File("/data/data/" + getContext().getPackageName() + "/files/ultran-runtime");
@@ -57,6 +63,113 @@ public final class UltranRuntimePlugin extends Plugin {
         result.put("prefix", prefix().getAbsolutePath());
         result.put("architecture", android.os.Build.SUPPORTED_ABIS.length == 0 ? "unknown" : android.os.Build.SUPPORTED_ABIS[0]);
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void runCommand(PluginCall call) {
+        String command = call.getString("command");
+        if (command == null || command.trim().isEmpty()) {
+            call.reject("Enter a command to run.");
+            return;
+        }
+        if (command.length() > 4096 || command.indexOf('\0') >= 0) {
+            call.reject("Commands must be at most 4,096 characters and cannot contain null bytes.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Approve local command")
+            .setMessage("Ultran wants to run this command on your device:\n\n" + command +
+                "\n\nIt runs without root in Ultran's app sandbox. It may change files or access the network. Review it before approving.")
+            .setPositiveButton("Run command", (dialog, which) -> commandExecutor.execute(() -> executeApprovedCommand(call, command)))
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("approved", false)))
+            .setOnCancelListener(dialog -> call.resolve(new JSObject().put("approved", false)))
+            .show());
+    }
+
+    private void executeApprovedCommand(PluginCall call, String command) {
+        Process process = null;
+        Thread reader = null;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        AtomicBoolean truncated = new AtomicBoolean(false);
+        try {
+            File runtime = runtimeRoot();
+            File prefix = prefix();
+            File home = new File(runtime, "home");
+            File temp = new File(runtime, "tmp");
+            if ((!home.exists() && !home.mkdirs()) || (!temp.exists() && !temp.mkdirs())) {
+                throw new IllegalStateException("Could not prepare the private command workspace.");
+            }
+            File bash = new File(prefix, "bin/bash");
+            boolean useBash = marker().isFile() && bash.canExecute();
+            String shell = useBash ? bash.getAbsolutePath() : "/system/bin/sh";
+            ProcessBuilder builder = new ProcessBuilder(shell, useBash ? "-lc" : "-c", command);
+            builder.directory(home);
+            builder.redirectErrorStream(true);
+            Map<String, String> env = builder.environment();
+            env.put("HOME", home.getAbsolutePath());
+            env.put("TERMUX__HOME", home.getAbsolutePath());
+            env.put("TERMUX_ANDROID_HOME", home.getAbsolutePath());
+            env.put("PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX_PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX__PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
+            env.put("TERMUX_APP__PACKAGE_NAME", getContext().getPackageName());
+            env.put("TMPDIR", temp.getAbsolutePath());
+            env.put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
+            String prefixLibraryPath = new File(prefix, "lib").getAbsolutePath();
+            String oldLibraryPath = env.get("LD_LIBRARY_PATH");
+            env.put("LD_LIBRARY_PATH", oldLibraryPath == null || oldLibraryPath.isEmpty()
+                ? prefixLibraryPath : prefixLibraryPath + ":" + oldLibraryPath);
+            env.put("SHELL", shell);
+            env.put("TERM", "xterm-256color");
+            env.put("LANG", "C.UTF-8");
+            process = builder.start();
+            final Process running = process;
+            reader = new Thread(() -> {
+                byte[] buffer = new byte[4096];
+                try (InputStream input = running.getInputStream()) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        synchronized (captured) {
+                            int remaining = MAX_COMMAND_OUTPUT_BYTES - captured.size();
+                            if (remaining > 0) captured.write(buffer, 0, Math.min(remaining, read));
+                            if (read > remaining) truncated.set(true);
+                        }
+                    }
+                } catch (IOException ignored) { }
+            }, "ultran-command-output");
+            reader.start();
+            boolean finished = waitForProcess(process, COMMAND_TIMEOUT_SECONDS * 1000L);
+            if (!finished) {
+                stopProcess(process);
+                waitForProcess(process, 2000L);
+            }
+            reader.join(2000);
+            String output;
+            synchronized (captured) { output = captured.toString(StandardCharsets.UTF_8.name()); }
+            if (truncated.get()) output += "\n[Output truncated at 48 KiB.]";
+            if (!finished) output += "\n[Command timed out after 30 seconds and was terminated.]";
+            JSObject result = new JSObject();
+            result.put("approved", true);
+            result.put("exitCode", finished ? process.exitValue() : -1);
+            result.put("timedOut", !finished);
+            result.put("output", output);
+            result.put("runtimeInstalled", marker().isFile());
+            call.resolve(result);
+        } catch (Exception error) {
+            JSObject result = new JSObject();
+            result.put("approved", true);
+            result.put("exitCode", -1);
+            result.put("timedOut", false);
+            result.put("error", error.getMessage() == null ? "Command execution failed." : error.getMessage());
+            call.resolve(result);
+        } finally {
+            if (process != null && isProcessRunning(process)) stopProcess(process);
+            if (process != null) {
+                try { process.getInputStream().close(); } catch (IOException ignored) { }
+            }
+            if (reader != null) reader.interrupt();
+        }
     }
 
     @PluginMethod
@@ -223,6 +336,29 @@ public final class UltranRuntimePlugin extends Plugin {
             if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)) throw new IllegalArgumentException("Bootstrap contains a path traversal entry.");
         }
         return normalized;
+    }
+
+    private boolean waitForProcess(Process process, long timeoutMillis) throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
+        while (System.nanoTime() < deadline) {
+            if (!isProcessRunning(process)) return true;
+            Thread.sleep(100L);
+        }
+        return !isProcessRunning(process);
+    }
+
+    private boolean isProcessRunning(Process process) {
+        try {
+            process.exitValue();
+            return false;
+        } catch (IllegalThreadStateException stillRunning) {
+            return true;
+        }
+    }
+
+    private void stopProcess(Process process) {
+        if (android.os.Build.VERSION.SDK_INT >= 26) process.destroyForcibly();
+        else process.destroy();
     }
 
     private void verifyBootstrapArchitecture(File staging) throws Exception {

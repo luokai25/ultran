@@ -26,3 +26,8 @@ This is intentionally a separate, manual build step because rebuilding Termux pa
 The installer disables the upstream Termux APT sources because those repositories publish packages compiled for Termux's own private prefix. Until an Ultran-specific package repository is built, the bootstrap can run the tools included in the archive (currently `git` and `python` by default), but `apt install` of additional upstream packages is intentionally not enabled.
 
 A manual GitHub Actions workflow, `Build Ultran Termux Bootstrap`, runs this builder on a GitHub-hosted runner with Docker and publishes the two architecture archives plus SHA-256 checksums as a 30-day artifact. Download and unzip that workflow artifact, then select the matching `bootstrap-aarch64.zip` or `bootstrap-x86_64.zip` from Ultran Settings. The bootstrap archive is not yet embedded in the APK, keeping normal Android release builds small.
+
+
+## Local agent command tool
+
+The on-device llama.cpp chat path and configured local Ollama-compatible model path can request one `terminal.run` command per user turn using the internal `ULTRAN_TOOL_CALL:` JSON protocol. Ultran opens a native Android approval dialog showing the exact command before execution. Cancel means no command is started. Approved commands execute without root, with the working directory in Ultran's private `files/ultran-runtime/home`, a 30-second timeout, merged stdout/stderr, and a 48 KiB output cap. The model is told to treat terminal output as untrusted data. This tool is local to the Android client; it is not exposed to remote backend agents because the backend cannot directly access the phone's private runtime.

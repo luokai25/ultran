@@ -78,15 +78,21 @@ public final class UltranRuntimePlugin extends Plugin {
         File python = new File(prefix(), "bin/python");
         File python3 = new File(prefix(), "bin/python3");
         File apt = new File(prefix(), "bin/apt");
+        File proot = new File(prefix(), "bin/proot");
+        File wget = new File(prefix(), "bin/wget");
+        File ssh = new File(prefix(), "bin/ssh");
         boolean installed = marker().isFile();
         boolean shellReady = installed && bash.isFile() && bash.canExecute();
         JSObject result = new JSObject();
         result.put("installed", installed);
         result.put("runtimeReady", shellReady);
-        result.put("shell", shellReady ? bash.getAbsolutePath() : "/system/bin/sh");
+        result.put("shell", shellReady ? bash.getAbsolutePath() : "");
         result.put("gitAvailable", installed && git.isFile() && git.canExecute());
         result.put("pythonAvailable", installed &&
             ((python.isFile() && python.canExecute()) || (python3.isFile() && python3.canExecute())));
+        result.put("prootAvailable", installed && proot.isFile() && proot.canExecute());
+        result.put("wgetAvailable", installed && wget.isFile() && wget.canExecute());
+        result.put("sshAvailable", installed && ssh.isFile() && ssh.canExecute());
         result.put("aptAvailable", installed && apt.isFile() && apt.canExecute());
         result.put("packageManagerEnabled", false);
         result.put("packageManagerNote", "APT repositories are disabled until Ultran publishes packages built for its private prefix.");
@@ -104,6 +110,11 @@ public final class UltranRuntimePlugin extends Plugin {
         }
         if (command.length() > 4096 || command.indexOf('\0') >= 0) {
             call.reject("Commands must be at most 4,096 characters and cannot contain null bytes.");
+            return;
+        }
+        File bash = new File(prefix(), "bin/bash");
+        if (!marker().isFile() || !bash.isFile() || !bash.canExecute()) {
+            call.reject("The verified headless Termux runtime is not installed. Install it from Settings before running local commands.");
             return;
         }
         if (!commandApprovalPending.compareAndSet(false, true)) {
@@ -193,6 +204,12 @@ public final class UltranRuntimePlugin extends Plugin {
                 Data progress = info.getProgress();
                 String phase = progress.getString("phase");
                 if (phase != null) result.put("phase", phase);
+                String progressOutput = progress.getString("output");
+                if (progressOutput != null) result.put("progressOutput", progressOutput);
+                if (progress.hasKeyWithValueOfType("elapsedMs", Long.class)) {
+                    result.put("elapsedMs", progress.getLong("elapsedMs", 0L));
+                }
+                result.put("progressTruncated", progress.getBoolean("truncated", false));
                 call.resolve(result);
             } catch (Exception error) {
                 call.reject("Could not read background job status.", error);
@@ -218,6 +235,14 @@ public final class UltranRuntimePlugin extends Plugin {
                     if (outputText != null) item.put("output", outputText);
                     String error = output.getString(UltranCommandWorker.KEY_ERROR);
                     if (error != null) item.put("error", error);
+                    Data progress = info.getProgress();
+                    String phase = progress.getString("phase");
+                    if (phase != null) item.put("phase", phase);
+                    String progressOutput = progress.getString("output");
+                    if (progressOutput != null) item.put("progressOutput", progressOutput);
+                    if (progress.hasKeyWithValueOfType("elapsedMs", Long.class)) {
+                        item.put("elapsedMs", progress.getLong("elapsedMs", 0L));
+                    }
                     if (output.hasKeyWithValueOfType(UltranCommandWorker.KEY_EXIT_CODE, Integer.class)) {
                         item.put("exitCode", output.getInt(UltranCommandWorker.KEY_EXIT_CODE, -1));
                     }

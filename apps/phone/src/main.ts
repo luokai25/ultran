@@ -57,7 +57,7 @@ const NativeRuntime = registerPlugin<{
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   downloadBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   addListener(eventName: "runtimeDownloadProgress", listener: (event: { downloadedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
-  runCommand(options: { command: string }): Promise<{ approved: boolean; exitCode?: number; timedOut?: boolean; output?: string; error?: string; runtimeInstalled?: boolean }>;
+  runCommand(options: { command: string }): Promise<{ approved: boolean; exitCode?: number; timedOut?: boolean; output?: string; error?: string; runtimeInstalled?: boolean; runtimeMode?: "termux" | "android-shell" }>;
 }>("UltranRuntime");
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
@@ -1421,7 +1421,7 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
     if (!result.approved) return "The user cancelled the command. It was not executed. Do not claim that it ran.";
     if (result.error) return "Command execution failed: " + result.error;
     const status = result.timedOut ? "timed out" : "exit code " + (result.exitCode ?? -1);
-    const runtime = result.runtimeInstalled ? "Termux runtime installed" : "Android system shell fallback (Termux runtime not installed)";
+    const runtime = result.runtimeMode === "termux" ? "Ultran Termux runtime (Bash)" : "Android system shell fallback (Termux runtime unavailable)";
     return "Local command result (" + status + "; " + runtime + "):\\n" + ((result.output ?? "").slice(0, 48 * 1024) || "[no output]");
   } catch (error) { return "Terminal tool failed: " + (error instanceof Error ? error.message : "unknown error"); }
 }

@@ -53,7 +53,7 @@ const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
 const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
-  getStatus(): Promise<{ installed: boolean; prefix: string; architecture: string }>;
+  getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   downloadBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   addListener(eventName: "runtimeDownloadProgress", listener: (event: { downloadedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
@@ -2378,9 +2378,14 @@ const refreshRuntimeStatus = async () => {
   }
   try {
     const status = await NativeRuntime.getStatus();
-    builtInTerminalStatus.textContent = status.installed
-      ? `Termux runtime installed at ${status.prefix} (${status.architecture}).`
-      : `Terminal ready; Termux packages not installed yet (${status.architecture}). Download and verify the official Ultran-compatible Termux runtime, or choose a ZIP you built yourself.`;
+    if (!status.installed) {
+      builtInTerminalStatus.textContent = `Terminal ready; Termux runtime not installed (${status.architecture}). Download and verify the Ultran-compatible runtime to enable the full local environment.`;
+    } else if (!status.runtimeReady) {
+      builtInTerminalStatus.textContent = `Runtime files detected at ${status.prefix}, but the bundled Bash shell is missing or not executable. Reinstall the verified runtime before relying on Termux commands.`;
+    } else {
+      const tools = [status.gitAvailable ? "Git" : null, status.pythonAvailable ? "Python" : null].filter(Boolean).join(" · ");
+      builtInTerminalStatus.textContent = `Termux runtime ready · ${status.architecture} · Bash${tools ? " · " + tools : ""} · ${status.prefix}`;
+    }
   } catch {
     builtInTerminalStatus.textContent = "Terminal is available; runtime status could not be read.";
   }

@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Executes an explicitly approved local command as durable Android-scheduled work.
@@ -43,7 +44,6 @@ public final class UltranCommandWorker extends Worker {
             return Result.failure(new Data.Builder().putString(KEY_ERROR, "Invalid or oversized command.").build());
         }
 
-        setProgressAsync(new Data.Builder().putString("phase", "running").build());
         Process process = null;
         Thread reader = null;
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -137,6 +137,12 @@ public final class UltranCommandWorker extends Worker {
 
             process = builder.start();
             final Process running = process;
+            final long startedAt = SystemClock.elapsedRealtime();
+            final AtomicLong lastProgressUpdate = new AtomicLong(0L);
+            setProgressAsync(new Data.Builder()
+                .putString("phase", "running")
+                .putLong("elapsedMs", 0L)
+                .build());
             reader = new Thread(() -> {
                 byte[] buffer = new byte[2048];
                 try (InputStream input = running.getInputStream()) {
@@ -146,6 +152,18 @@ public final class UltranCommandWorker extends Worker {
                             int remaining = MAX_OUTPUT_BYTES - output.size();
                             if (remaining > 0) output.write(buffer, 0, Math.min(remaining, count));
                             if (count > remaining) truncated.set(true);
+                            long now = SystemClock.elapsedRealtime();
+                            long previous = lastProgressUpdate.get();
+                            if (now - previous >= 1000L && lastProgressUpdate.compareAndSet(previous, now)) {
+                                String snapshot = output.toString(java.nio.charset.StandardCharsets.UTF_8);
+                                if (truncated.get()) snapshot += "\n[Output truncated at 6 KiB.]";
+                                setProgressAsync(new Data.Builder()
+                                    .putString("phase", "running")
+                                    .putString("output", snapshot)
+                                    .putLong("elapsedMs", now - startedAt)
+                                    .putBoolean("truncated", truncated.get())
+                                    .build());
+                            }
                         }
                     }
                 } catch (Exception ignored) { }
@@ -181,7 +199,12 @@ public final class UltranCommandWorker extends Worker {
                 .putBoolean("termuxRuntime", termuxReady)
                 .build();
             postNotification("Ultran task completed", "Background command finished with exit code " + exitCode + ".", false);
-            setProgressAsync(new Data.Builder().putString("phase", "completed").build());
+            setProgressAsync(new Data.Builder()
+                .putString("phase", "completed")
+                .putString("output", text)
+                .putLong("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
+                .putBoolean("truncated", truncated.get())
+                .build());
             return Result.success(result);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

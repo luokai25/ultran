@@ -489,6 +489,7 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
   modelDownloadProgressEl.value = 0;
   modelLibraryStatus.textContent = "Preparing secure download…";
   const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
+  const previousDisabledStates = buttons.map((button) => button.disabled);
   buttons.forEach((button) => { button.disabled = true; });
   try {
     const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
@@ -506,7 +507,7 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelDownloadProgressEl.hidden = true;
     modelDownloadProgressEl.value = 0;
     modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button) => { button.disabled = false; });
+    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index]; });
   }
 }
 
@@ -538,6 +539,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
   modelDownloadProgressEl.value = 0;
   modelLibraryStatus.textContent = "Preparing " + shardCount + "-part model download…";
   const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
+  const previousDisabledStates = buttons.map((button) => button.disabled);
   buttons.forEach((button) => { button.disabled = true; });
   try {
     const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
@@ -564,7 +566,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
     modelDownloadProgressEl.hidden = true;
     modelDownloadProgressEl.value = 0;
     modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button) => { button.disabled = false; });
+    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index]; });
   }
 }
 

@@ -155,7 +155,7 @@ public final class UltranCommandWorker extends Worker {
                             long now = SystemClock.elapsedRealtime();
                             long previous = lastProgressUpdate.get();
                             if (now - previous >= 1000L && lastProgressUpdate.compareAndSet(previous, now)) {
-                                String snapshot = output.toString(java.nio.charset.StandardCharsets.UTF_8);
+                                String snapshot = new String(output.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
                                 if (truncated.get()) snapshot += "\n[Output truncated at 6 KiB.]";
                                 setProgressAsync(new Data.Builder()
                                     .putString("phase", "running")

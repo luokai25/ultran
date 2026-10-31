@@ -212,6 +212,7 @@ function renderDeviceProfile(profile: { deviceModel: string; totalRamBytes: numb
 async function refreshNativeModels(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") {
     nativeModelStatus.textContent = "Native GGUF inference is available in the Android app.";
+    deviceProfileEl.textContent = "Device-aware model recommendations are available in the Android app build.";
     nativeModelLoadButton.disabled = true;
     nativeModelUnloadButton.disabled = true;
     nativeModelDeleteButton.disabled = true;

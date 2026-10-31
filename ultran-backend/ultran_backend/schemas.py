@@ -78,6 +78,26 @@ class AgentTaskCreate(_Strict):
     session_id: str | None = Field(default=None, max_length=64)
 
 
+class AgentTaskBatchItem(_Strict):
+    agent_id: str = Field(min_length=4, max_length=64)
+    message: str = Field(min_length=1, max_length=16000)
+    allow_tools: bool = True
+    max_tool_calls: int = Field(default=4, ge=0, le=16)
+    session_id: str | None = Field(default=None, max_length=64)
+
+
+class AgentTaskBatchCreate(_Strict):
+    tasks: list[AgentTaskBatchItem] = Field(min_length=2, max_length=5)
+
+    @field_validator("tasks")
+    @classmethod
+    def _unique_agents(cls, value: list[AgentTaskBatchItem]) -> list[AgentTaskBatchItem]:
+        ids = [item.agent_id for item in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("an agent can only appear once in a team run")
+        return value
+
+
 class AgentTaskOut(BaseModel):
     id: str
     agent_id: str

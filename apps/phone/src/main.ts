@@ -33,7 +33,7 @@ type Conversation = {
   messages: Message[];
 };
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
-type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; termuxBridgeEndpoint: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
+type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
 type NativeModel = { name: string; sizeBytes: number; loaded: boolean; shards?: number };
 type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[] };
 type HubFile = { rfilename: string; size?: number; lfs?: { oid?: string; size?: number } };
@@ -144,16 +144,6 @@ const modelDownloadProgressEl = req<HTMLProgressElement>("#model-download-progre
 let modelDownloadInProgress = false;
 let hubSearchSequence = 0;
 const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
-const termuxBridgeEndpointEl = req<HTMLInputElement>("#termux-bridge-endpoint");
-const termuxBridgeTokenEl = req<HTMLInputElement>("#termux-bridge-token");
-const termuxBridgeStatusEl = req<HTMLElement>("#termux-bridge-status");
-const termuxBridgeTestButton = req<HTMLButtonElement>("#termux-bridge-test");
-const termuxBridgeDeviceButton = req<HTMLButtonElement>("#termux-bridge-device");
-const termuxFilePathEl = req<HTMLInputElement>("#termux-file-path");
-const termuxFileContentEl = req<HTMLTextAreaElement>("#termux-file-content");
-const termuxFilesListButton = req<HTMLButtonElement>("#termux-files-list");
-const termuxFileReadButton = req<HTMLButtonElement>("#termux-file-read");
-const termuxFileWriteButton = req<HTMLButtonElement>("#termux-file-write");
 const localModelEl = req<HTMLInputElement>("#local-model");
 const ollamaModelsRefreshButton = req<HTMLButtonElement>("#ollama-models-refresh");
 const ollamaModelPullButton = req<HTMLButtonElement>("#ollama-model-pull");
@@ -197,7 +187,7 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", termuxBridgeEndpoint: "http://127.0.0.1:8765", voice: false, theme: "palace", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
+const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", voice: false, theme: "palace", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 if (!(settings.theme in THEMES)) settings.theme = "palace";
 
@@ -2247,77 +2237,6 @@ async function testLocalModel(): Promise<void> {
   }
 }
 
-async function termuxBridgeRequest(route: string, init: RequestInit = {}): Promise<any> {
-  const base = termuxBridgeEndpointEl.value.trim().replace(/\/+$/, "");
-  const token = termuxBridgeTokenEl.value.trim();
-  if (!/^http:\/\/127\.0\.0\.1(?::\d+)?$/i.test(base)) throw new Error("For safety, the bridge must use http://127.0.0.1 and a port.");
-  if (!token) throw new Error("Paste the pairing token printed by Termux.");
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 5000);
-  try {
-    const response = await fetch(base + route, { ...init, signal: controller.signal, headers: { "content-type": "application/json", "x-ultran-token": token, ...(init.headers ?? {}) } });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Bridge returned HTTP " + response.status);
-    return data;
-  } finally { window.clearTimeout(timer); }
-}
-
-async function testTermuxBridge(): Promise<void> {
-  termuxBridgeStatusEl.textContent = "Connecting to the local Termux bridge…";
-  termuxBridgeDeviceButton.disabled = true;
-  try {
-    const health = await termuxBridgeRequest("/health");
-    termuxBridgeStatusEl.textContent = "Connected · " + health.name + " · " + health.capabilities.join(", ");
-    termuxBridgeDeviceButton.disabled = false;
-    termuxFilesListButton.disabled = false;
-    termuxFileReadButton.disabled = false;
-    termuxFileWriteButton.disabled = false;
-  } catch (error) {
-    termuxBridgeStatusEl.textContent = "Not connected: " + (error instanceof Error ? error.message : "unknown error");
-    termuxBridgeDeviceButton.disabled = true;
-    termuxFilesListButton.disabled = true;
-    termuxFileReadButton.disabled = true;
-    termuxFileWriteButton.disabled = true;
-  }
-}
-
-async function listTermuxFiles(): Promise<void> {
-  try {
-    const result = await termuxBridgeRequest("/v1/files/list", { method: "POST", body: JSON.stringify({ path: termuxFilePathEl.value.trim() || "." }) });
-    const listing = result.files.map((file: { name: string; type: string; sizeBytes: number }) => `${file.type === "directory" ? "[DIR] " : ""}${file.name}${file.type === "file" ? " · " + formatBytes(file.sizeBytes) : ""}`).join("\n");
-    termuxFileContentEl.value = listing || "(empty folder)";
-    termuxBridgeStatusEl.textContent = `Listed ${result.files.length} item(s) in ${result.path}. Folder is limited to ~/storage/shared/Ultran.`;
-  } catch (error) { termuxBridgeStatusEl.textContent = "File listing failed: " + (error instanceof Error ? error.message : "unknown error"); }
-}
-
-async function readTermuxFile(): Promise<void> {
-  try {
-    const result = await termuxBridgeRequest("/v1/files/read", { method: "POST", body: JSON.stringify({ path: termuxFilePathEl.value.trim() }) });
-    termuxFileContentEl.value = result.content;
-    termuxBridgeStatusEl.textContent = `Read ${result.path} · ${formatBytes(result.sizeBytes)}. No data leaves this phone through the bridge.`;
-  } catch (error) { termuxBridgeStatusEl.textContent = "File read failed: " + (error instanceof Error ? error.message : "unknown error"); }
-}
-
-async function writeTermuxFile(): Promise<void> {
-  const path = termuxFilePathEl.value.trim();
-  const content = termuxFileContentEl.value;
-  if (!path || path === ".") { termuxBridgeStatusEl.textContent = "Enter a file path before writing."; return; }
-  if (!window.confirm(`Approve writing ${content.length} characters to ${path} inside the dedicated Ultran shared folder? This will replace that file if it exists.`)) return;
-  try {
-    const result = await termuxBridgeRequest("/v1/files/write", { method: "POST", headers: { "x-ultran-approval": "approved" }, body: JSON.stringify({ path, content }) });
-    termuxBridgeStatusEl.textContent = `Wrote ${result.path} · ${formatBytes(result.sizeBytes)} after your confirmation.`;
-  } catch (error) { termuxBridgeStatusEl.textContent = "File write failed: " + (error instanceof Error ? error.message : "unknown error"); }
-}
-
-async function readTermuxDeviceInfo(): Promise<void> {
-  try {
-    const device = await termuxBridgeRequest("/v1/device");
-    termuxBridgeStatusEl.textContent = "Termux on " + device.platform + " · " + device.arch + " · uptime " + Math.floor(device.uptimeSeconds / 3600) + "h · free memory " + formatBytes(device.freeMemoryBytes);
-  } catch (error) {
-    termuxBridgeStatusEl.textContent = "Device info failed: " + (error instanceof Error ? error.message : "unknown error");
-  }
-}
-
 async function refreshAndroidAccessStatus(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") {
     androidAccessStatus.textContent = "These controls are available in the Android release.";
@@ -2337,7 +2256,6 @@ async function refreshAndroidAccessStatus(): Promise<void> {
 function openSheet(): void {
   closeDrawer();
   endpointEl.value = settings.endpoint;
-  termuxBridgeEndpointEl.value = settings.termuxBridgeEndpoint;
   localModelEndpointEl.value = settings.localModelEndpoint;
   localModelEl.value = settings.localModel;
   setNote("Optional backend for hosted agents and remote connectors. Native GGUF inference runs directly on this Android device.");
@@ -2350,7 +2268,6 @@ function closeSheet(): void {
   const next = endpointEl.value.trim().replace(/\/+$/, "");
   settings.localModelEndpoint = normalizeModelEndpoint(localModelEndpointEl.value);
   settings.localModel = localModelEl.value.trim() || "llama3.2:3b";
-  settings.termuxBridgeEndpoint = termuxBridgeEndpointEl.value.trim().replace(/\/+$/, "") || "http://127.0.0.1:8765";
   if (next !== settings.endpoint) {
     settings.endpoint = next;
     store.agentId = undefined; // a different server has different agents
@@ -2428,11 +2345,6 @@ req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
-termuxBridgeTestButton.addEventListener("click", () => void testTermuxBridge());
-termuxBridgeDeviceButton.addEventListener("click", () => void readTermuxDeviceInfo());
-termuxFilesListButton.addEventListener("click", () => void listTermuxFiles());
-termuxFileReadButton.addEventListener("click", () => void readTermuxFile());
-termuxFileWriteButton.addEventListener("click", () => void writeTermuxFile());
 req<HTMLButtonElement>("#settings-btn").addEventListener("click", openSheet);
 androidBatteryAccessButton.addEventListener("click", () => {
   if (Capacitor.getPlatform() !== "android") return;

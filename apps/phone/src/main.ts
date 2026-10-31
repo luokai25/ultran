@@ -33,7 +33,7 @@ type Conversation = {
   messages: Message[];
 };
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
-type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; termuxBridgeEndpoint: string; voice: boolean; theme: ThemeId };
+type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; termuxBridgeEndpoint: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
 type NativeModel = { name: string; sizeBytes: number; loaded: boolean };
 type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[] };
 type HubFile = { rfilename: string; size?: number; lfs?: { oid?: string; size?: number } };
@@ -51,6 +51,7 @@ type NativeLocalAIPlugin = {
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
+const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
@@ -99,6 +100,8 @@ const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
 const voiceBtn = req<HTMLButtonElement>("#voice-btn");
 const micBtn = req<HTMLButtonElement>("#mic-btn");
+const proactiveBtn = req<HTMLButtonElement>("#proactive-btn");
+const smsBtn = req<HTMLButtonElement>("#sms-btn");
 const voiceStatusEl = req<HTMLElement>("#voice-status");
 const backgroundBtn = req<HTMLButtonElement>("#background-btn");
 const workspacePanel = req<HTMLElement>("#workspace-panel");
@@ -106,6 +109,8 @@ const workspaceTasks = req<HTMLElement>("#workspace-tasks");
 const workspaceArtifacts = req<HTMLElement>("#workspace-artifacts");
 const workspaceStats = req<HTMLElement>("#workspace-stats");
 let workspacePoll: number | undefined;
+let proactivePoll: number | undefined;
+const taskStatusSnapshot = new Map<string, string>();
 const workspaceTeamBuilder = req<HTMLElement>("#workspace-team-builder");
 const workspaceTeamAgents = req<HTMLElement>("#workspace-team-agents");
 const workspaceTeamObjective = req<HTMLTextAreaElement>("#workspace-team-objective");
@@ -704,6 +709,7 @@ async function refreshWorkspace(): Promise<void> {
   const [tr, ar] = await Promise.all([api("/v1/tasks?limit=100"), api("/v1/artifacts?limit=100")]);
   if (!tr.ok || !ar.ok) throw new Error(`Workspace unavailable (${tr.status}/${ar.status})`);
   const tasks = await tr.json() as WorkspaceTask[];
+  await processTaskUpdates(tasks);
   const payload = await ar.json() as { artifacts?: ArtifactCard[] };
   const artifacts = payload.artifacts ?? [];
   const counts = [["Active", tasks.filter(t => ["queued","running","retrying"].includes(t.status)).length], ["Completed", tasks.filter(t => t.status === "succeeded").length], ["Attention", tasks.filter(t => ["failed","interrupted"].includes(t.status)).length], ["Files", artifacts.length]];
@@ -734,6 +740,84 @@ async function refreshWorkspace(): Promise<void> {
     const download = workspaceNode("button", "", "Download"); download.addEventListener("click", () => void Browser.open({url:`${baseUrl()}${file.download_url}`})); card.append(preview, download); workspaceArtifacts.append(card);
   }
 }
+
+async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
+  if (!settings.proactiveUpdates) {
+    for (const task of tasks) taskStatusSnapshot.set(task.id, task.status);
+    return;
+  }
+  for (const task of tasks) {
+    const previous = taskStatusSnapshot.get(task.id);
+    taskStatusSnapshot.set(task.id, task.status);
+    if (!previous || previous === task.status) continue;
+    const finished = task.status === "succeeded";
+    const failed = ["failed", "interrupted"].includes(task.status);
+    if (!finished && !failed) continue;
+    const title = finished ? "Task completed" : "Task needs attention";
+    const detail = task.message.slice(0, 110) + (finished ? " completed successfully." : " · " + task.status + (task.error ? ": " + task.error.slice(0, 160) : "."));
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        await NativeCompanion.notify({title, body: detail});
+        if (settings.voice) await NativeCompanion.speakInBackground({text: title + ". " + detail});
+      } catch (error) {
+        console.warn("Ultran proactive update could not be delivered", error);
+      }
+    } else if (settings.voice && document.visibilityState === "visible") {
+      speak(title + ". " + detail);
+    }
+  }
+}
+
+async function enableProactiveUpdates(): Promise<void> {
+  if (!settings.proactiveUpdates) {
+    if (Capacitor.getPlatform() === "android") {
+      const permission = await NativeCompanion.requestNotificationPermission();
+      if (!permission.granted) {
+        voiceStatus("Allow Ultran notifications in Android settings, then enable Updates again.");
+        return;
+      }
+    } else if ("Notification" in window && Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { voiceStatus("Notification permission was not granted."); return; }
+    }
+    settings.proactiveUpdates = true;
+  } else {
+    settings.proactiveUpdates = false;
+    if (proactivePoll) clearInterval(proactivePoll);
+    proactivePoll = undefined;
+  }
+  proactiveBtn.setAttribute("aria-pressed", String(Boolean(settings.proactiveUpdates)));
+  proactiveBtn.dataset.active = String(Boolean(settings.proactiveUpdates));
+  saveSettings();
+  if (settings.proactiveUpdates) {
+    taskStatusSnapshot.clear();
+    if (baseUrl()) {
+      try { const response = await api("/v1/tasks?limit=100"); if (response.ok) for (const task of await response.json() as WorkspaceTask[]) taskStatusSnapshot.set(task.id, task.status); } catch { /* next poll will initialize */ }
+    }
+    if (proactivePoll) clearInterval(proactivePoll);
+    proactivePoll = window.setInterval(() => {
+      if (settings.proactiveUpdates && baseUrl()) void refreshWorkspace().catch(() => undefined);
+    }, 30000);
+    voiceStatus("Proactive updates enabled. Ultran will announce task completions and failures while the app is active.");
+  } else {
+    voiceStatus("Proactive task updates paused.");
+  }
+}
+
+async function prepareSms(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") { voiceStatus("SMS handoff is available in the Android app."); return; }
+  const number = window.prompt("Phone number, including country code:");
+  if (!number?.trim()) return;
+  const body = window.prompt("Message to prepare:");
+  if (!body?.trim()) return;
+  try {
+    await NativeCompanion.composeSms({number:number.trim(), body:body.trim()});
+    voiceStatus("Messaging app opened. Review the recipient and press Send there when ready.");
+  } catch (error) {
+    voiceStatus(error instanceof Error ? error.message : "Could not open the messaging app.", true);
+  }
+}
+
 function updateSynthesisControls(): void {
   const selected = workspaceTasks.querySelectorAll<HTMLInputElement>(".workspace-synthesis-select:checked").length;
   req<HTMLElement>("#workspace-selected-count").textContent = selected + " completed results selected";
@@ -1568,7 +1652,10 @@ async function submit(raw: string): Promise<void> {
     autosize();
     if (nearBottom()) scrollToEnd();
   });
-  if (settings.voice) speak(result.content);
+  if (settings.voice) {
+    if (Capacitor.getPlatform() === "android" && document.visibilityState !== "visible") void NativeCompanion.speakInBackground({text: plainSpeech(result.content).slice(0, 1800)}).catch(() => undefined);
+    else speak(result.content);
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -2052,6 +2139,11 @@ composer.addEventListener("submit", (event) => {
 });
 
 voiceBtn.setAttribute("aria-pressed", String(settings.voice));
+if (settings.proactiveUpdates) {
+  proactiveBtn.setAttribute("aria-pressed", "true");
+  proactiveBtn.dataset.active = "true";
+  proactivePoll = window.setInterval(() => { if (settings.proactiveUpdates && baseUrl()) void refreshWorkspace().catch(() => undefined); }, 30000);
+}
 voiceBtn.addEventListener("click", () => {
   settings.voice = !settings.voice;
   voiceBtn.setAttribute("aria-pressed", String(settings.voice));
@@ -2059,6 +2151,10 @@ voiceBtn.addEventListener("click", () => {
   saveSettings();
 });
 micBtn.addEventListener("click", startListening);
+proactiveBtn.setAttribute("aria-pressed", String(Boolean(settings.proactiveUpdates)));
+proactiveBtn.dataset.active = String(Boolean(settings.proactiveUpdates));
+proactiveBtn.addEventListener("click", () => void enableProactiveUpdates().catch(error => voiceStatus(error instanceof Error ? error.message : "Could not enable updates.", true)));
+smsBtn.addEventListener("click", () => void prepareSms());
 
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);

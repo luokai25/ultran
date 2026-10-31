@@ -8,14 +8,14 @@ Upstream: https://github.com/termux/termux-app
 
 ## Package environment integration findings
 
-The companion `termux/termux-packages` repository was inspected at commit `3bdd137564e7f55e1d24f46406cd3e32e76bfabd`. Its bootstrap build scripts parameterize `TERMUX_PREFIX`, but the default is Termux's `/data/data/com.termux/files/usr`; numerous package recipes and generated binaries/configurations assume that prefix. Ultran must build a dedicated bootstrap for its own private app path and audit/rebuild package recipes rather than unpacking the official Termux bootstrap unchanged. The package source repository is tracked separately upstream and is intentionally not copied wholesale into the Android APK repository.
+The companion `termux/termux-packages` repository is pinned at commit `3bdd137564e7f55e1d24f46406cd3e32e76bfabd`. Its bootstrap is built specifically for Ultran's Android package identity (`app.ultran.mobile`) and private rootfs (`files/ultran-runtime`), rather than reusing binaries compiled for `/data/data/com.termux/files/usr`. The upstream source remains separate and is fetched at a pinned commit by CI, not copied wholesale into the APK repository.
 
 
 ## Ultran compatibility patch
 
 `TerminalBitmap.java` uses numeric API level `35` rather than `Build.VERSION_CODES.VANILLA_ICE_CREAM`, preserving the upstream behavior while allowing the current Android build to compile against SDK 34. No runtime behavior changes for supported API levels.
 
-The native runtime manager pre-creates `ultran-runtime/usr`, `home`, and `tmp` under Ultran private app data and exports Termux-compatible `PREFIX`, `TERMUX_PREFIX`, `TERMUX__PREFIX`, `TERMUX__ROOTFS`, `HOME`, `TMPDIR`, `PATH`, and `LD_LIBRARY_PATH` values. This prepares the exact install layout for a future Ultran-specific bootstrap; it does not claim that packages have been installed yet.
+The native runtime manager installs the prefix under Ultran private app data, prepares `home`, `tmp`, and Termux app metadata directories, and exports the upstream Termux path and identity environment for both bootstrap setup and later headless jobs.
 
 ## Building an Ultran-specific Termux bootstrap
 
@@ -34,5 +34,5 @@ The on-device llama.cpp chat path and configured local Ollama-compatible model p
 
 ## Remaining integration gaps
 
-The headless runtime and bounded background job supervisor are implemented, but this is not yet the entire Termux distribution. The bootstrap includes Termux's base environment plus the selected `git`, `python`, `proot`, `proot-distro`, `wget`, and `openssh` packages. APT repository sources are deliberately disabled because upstream packages are compiled for Termux's own prefix and must not be installed into Ultran's different private prefix. Building and signing an Ultran-compatible package repository for direct Termux-prefix installs and adding integration tests on real ARM64 devices remain outstanding. In the meantime, `proot-distro` provides a separate Debian or other Linux userland with its own working package repositories. WorkManager jobs run without a terminal UI and survive normal navigation, but Android controls scheduling and can defer or stop work under battery restrictions, force-stop, or OS resource pressure. Each approved command is bounded to four minutes and 6 KiB of captured output; this is not an always-on daemon or a promise that arbitrary long-running processes will stay alive.
+The headless runtime and bounded background job supervisor are implemented, but this is not yet the entire Termux distribution. The bootstrap includes Termux's base environment plus the selected `git`, `python`, `proot`, `proot-distro`, `wget`, and `openssh` packages. APT repository sources are deliberately disabled because upstream packages are compiled for Termux's own prefix and must not be installed into Ultran's different private prefix. Building and signing an Ultran-compatible package repository for direct Termux-prefix installs and adding integration tests on real ARM64 devices remain outstanding. In the meantime, `proot-distro` provides a separate Debian or other Linux userland with its own working package repositories. WorkManager jobs run without a terminal UI and survive normal navigation, but Android controls scheduling and can defer or stop work under battery restrictions, force-stop, or OS resource pressure. Each approved command is bounded to nine minutes and 6 KiB of captured output; this is not an always-on daemon or a promise that arbitrary long-running processes will stay alive.
 

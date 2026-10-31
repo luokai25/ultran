@@ -183,11 +183,11 @@ public class UltranLocalAiPlugin extends Plugin {
                     throw new IllegalStateException("This file does not have a valid GGUF header.");
                 }
             }
-            if (destination.exists() && !destination.delete()) {
-                throw new IllegalStateException("Could not replace the existing model file.");
-            }
+            // The partial file lives beside the destination, so rename is an
+            // atomic same-filesystem replacement on Android. Never delete the
+            // old valid model before the replacement is ready to activate.
             if (!partial.renameTo(destination)) {
-                throw new IllegalStateException("Could not finalize the model file.");
+                throw new IllegalStateException("Could not atomically finalize the model file; the existing model was kept.");
             }
             JSObject response = new JSObject();
             response.put("cancelled", false);
@@ -316,8 +316,9 @@ public class UltranLocalAiPlugin extends Plugin {
                         throw new IllegalStateException("Downloaded file does not have a valid GGUF header.");
                     }
                 }
-                if (destination.exists() && !destination.delete()) throw new IllegalStateException("Could not replace existing model file.");
-                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not finalize downloaded model.");
+                // Keep the previous valid model until the verified partial file
+                // can replace it atomically in the same private directory.
+                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not atomically finalize downloaded model; the existing model was kept.");
                 call.resolve(new JSObject().put("downloaded", true).put("name", name).put("sizeBytes", received));
             } catch (Exception error) {
                 if (partial != null && partial.exists()) partial.delete();

@@ -574,6 +574,8 @@ class AgentService:
                 '{"tool":"whatsapp.compose","number":"+internationalnumber","body":"exact message"}.'
                 "\n- For an explicitly requested SMS, emit exactly ULTRAN_TOOL_CALL:"
                 '{"tool":"sms.compose","number":"+internationalnumber","body":"exact message"}.'
+                "\n- For an explicitly requested Telegram message, emit exactly ULTRAN_TOOL_CALL:"
+                '{"tool":"telegram.compose","body":"exact message"}.'
                 "\n- To open an installed supported app, emit exactly ULTRAN_TOOL_CALL:"
                 '{"tool":"app.open","app":"whatsapp|whatsapp-business|telegram|messages|gmail|phone|calendar"}.'
                 "\n- Never invent a recipient or phone number. Ask the user if it is not known."

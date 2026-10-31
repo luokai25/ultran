@@ -603,7 +603,7 @@ class AgentService:
             ))
 
             reply = self.brain.complete(
-                messages, model=agent.model, temperature=agent.temperature,
+                messages, model=agent.model, temperature=task_temperature,
                 backend_override=backend_override,
             )
         # Complex and high-impact tasks receive an independent quality pass.

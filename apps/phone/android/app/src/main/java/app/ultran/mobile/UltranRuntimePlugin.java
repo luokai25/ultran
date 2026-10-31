@@ -162,7 +162,7 @@ public final class UltranRuntimePlugin extends Plugin {
                 String linkRelativePath = validateRelativePath(link[1]);
                 if (".ultran-bootstrap-installed".equals(linkRelativePath)) throw new IllegalArgumentException("Bootstrap attempts to replace Ultran's runtime marker with a symlink.");
                 if (isAptSourcePath(linkRelativePath)) continue;
-                if (!isAllowedSymlinkTarget(linkTarget, finalPrefix)) {
+                if (!isAllowedSymlinkTarget(linkTarget, linkRelativePath, finalPrefix)) {
                     throw new IllegalArgumentException("Bootstrap contains an unexpected symlink target.");
                 }
                 File linkFile = new File(staging, linkRelativePath);
@@ -250,12 +250,19 @@ public final class UltranRuntimePlugin extends Plugin {
         }
     }
 
-    private boolean isAllowedSymlinkTarget(String target, String finalPrefix) {
-        if (target == null || target.isEmpty() || target.indexOf('\0') >= 0) return false;
+    private boolean isAllowedSymlinkTarget(String target, String linkRelativePath, String finalPrefix) {
+        if (target == null || target.isEmpty() || target.indexOf('\0') >= 0 || target.contains("\\")) return false;
         try {
-            String canonical = new File(target).getCanonicalPath();
+            File link = new File(finalPrefix, linkRelativePath);
+            File targetFile = new File(target);
+            // Termux bootstrap manifests mostly use relative targets such as ../lib/libfoo.so.
+            // Resolve them from the link's parent, not from the process working directory.
+            String canonical = (targetFile.isAbsolute()
+                ? targetFile : new File(link.getParentFile(), target)).getCanonicalPath();
             return canonical.equals(finalPrefix) || canonical.startsWith(finalPrefix + File.separator) ||
-                canonical.startsWith("/system/") || canonical.startsWith("/apex/") || canonical.startsWith("/vendor/");
+                canonical.equals("/system") || canonical.startsWith("/system/") ||
+                canonical.equals("/apex") || canonical.startsWith("/apex/") ||
+                canonical.equals("/vendor") || canonical.startsWith("/vendor/");
         } catch (Exception ignored) { return false; }
     }
 

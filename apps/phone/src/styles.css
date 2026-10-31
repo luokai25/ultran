@@ -1343,6 +1343,40 @@ button {
   color: #191407; background: linear-gradient(135deg,var(--accent-bright),var(--accent));
   font-size: 12px; font-weight: 700;
 }
+.model-quick-search {
+  display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 12px;
+}
+.model-quick-search button {
+  padding: 7px 10px; border: 1px solid var(--hairline); border-radius: 999px;
+  color: var(--muted); background: rgba(255,255,255,.025);
+  font-size: 11px; transition: color .18s ease, border-color .18s ease, transform .18s ease;
+}
+.model-quick-search button:hover, .model-quick-search button:focus-visible {
+  color: var(--accent-bright); border-color: var(--accent); transform: translateY(-1px);
+}
+.model-size-filter {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 8px 0; color: var(--muted); font-size: 11px;
+}
+.model-size-filter select {
+  min-width: 0; max-width: 65%; padding: 8px 10px;
+  border: 1px solid var(--hairline); border-radius: 10px;
+  color: var(--ink); background: var(--graphite); font: inherit;
+}
+.model-device-tip {
+  margin: 8px 0 12px; padding: 9px 10px;
+  border-left: 2px solid var(--accent); border-radius: 0 9px 9px 0;
+  color: var(--muted); background: color-mix(in srgb,var(--accent) 5%,transparent);
+  font-size: 10px; line-height: 1.55;
+}
+.model-download-progress {
+  display: block; width: 100%; height: 6px; margin: 8px 0 12px;
+  overflow: hidden; border: 0; border-radius: 999px;
+  accent-color: var(--accent);
+}
+.model-download-progress[hidden] { display: none; }
+.model-download-progress::-webkit-progress-bar { border-radius: 999px; background: rgba(255,255,255,.08); }
+.model-download-progress::-webkit-progress-value { border-radius: 999px; background: linear-gradient(90deg,var(--accent),var(--accent-bright)); }
 .model-library-status { margin: 8px 0 12px; line-height: 1.5; }
 .model-library-results { display: grid; gap: 9px; }
 .hub-model-card {

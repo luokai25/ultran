@@ -59,3 +59,17 @@ test("new orbital U mark stays aligned across web, Android generator, and adapti
   assert.match(background, /#0B0D0F/);
   assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
 });
+
+
+test("reference-inspired five-tab mobile navigation and feature screens are present", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  for (const id of ["nav-chat", "nav-agents", "nav-worlds", "nav-luonix", "nav-more", "agents-screen", "worlds-screen", "luonix-screen", "more-screen", "vault-screen"]) {
+    assert.ok(html.includes(`id=\"${id}\"`), `missing reference UI section: ${id}`);
+  }
+  assert.match(main, /showFeatureScreen\(\"agents-screen\", navAgentsButton\)/);
+  assert.match(main, /showFeatureScreen\(\"worlds-screen\", navWorldsButton\)/);
+  assert.match(main, /showFeatureScreen\(\"luonix-screen\", navLuonixButton\)/);
+  assert.match(main, /showFeatureScreen\(\"more-screen\", navMoreButton\)/);
+  assert.match(html, /No files are represented as encrypted until encrypted storage is implemented and verified/);
+});

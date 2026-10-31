@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE="${SCRIPT_DIR}/.env"
 DATA_DIR="/srv/ultran/.ultran-data"
-BACKUP_IN_VOLUME="${DATA_DIR}/credentials-backup.sqlite3"
+BACKUP_IN_VOLUME="/tmp/ultran-sqlite-backups"
 
 : "${RESTIC_REPOSITORY:?Set RESTIC_REPOSITORY in /etc/ultran-backup.env}"
 : "${RESTIC_PASSWORD_FILE:?Set RESTIC_PASSWORD_FILE in /etc/ultran-backup.env}"
@@ -17,21 +17,21 @@ API_CONTAINER="$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps
 
 TMP_DIR="$(mktemp -d)"
 cleanup() {
-  docker exec "${API_CONTAINER}" rm -f "${BACKUP_IN_VOLUME}" >/dev/null 2>&1 || true
+  docker exec "${API_CONTAINER}" rm -rf "${BACKUP_IN_VOLUME}" >/dev/null 2>&1 || true
   rm -rf "${TMP_DIR}"
 }
 trap cleanup EXIT
 
-# SQLite's backup API creates a transactionally consistent snapshot even when
-# the live database is in WAL mode.
+# Snapshot every SQLite database through SQLite's backup API. This is
+# transactionally consistent even while the live databases use WAL mode.
 docker exec "${API_CONTAINER}" python -c \
-  'import sqlite3; src=sqlite3.connect("/srv/ultran/.ultran-data/credentials.sqlite3"); dst=sqlite3.connect("/srv/ultran/.ultran-data/credentials-backup.sqlite3"); src.backup(dst); dst.close(); src.close()'
+  'import glob, os, sqlite3; srcdir="/srv/ultran/.ultran-data"; out="/tmp/ultran-sqlite-backups"; os.makedirs(out, exist_ok=True); files=glob.glob(os.path.join(srcdir, "*.sqlite3")); assert files, "no Ultran SQLite databases found"; [(lambda src,dst: (src.backup(dst), dst.close(), src.close()))(sqlite3.connect("file:"+p+"?mode=ro", uri=True), sqlite3.connect(os.path.join(out, os.path.basename(p)))) for p in files]'
 
-docker cp "${API_CONTAINER}:${BACKUP_IN_VOLUME}" "${TMP_DIR}/credentials.sqlite3"
+docker cp "${API_CONTAINER}:${BACKUP_IN_VOLUME}" "${TMP_DIR}/ultran-sqlite-databases"
 git -C "${SCRIPT_DIR}/../.." rev-parse HEAD > "${TMP_DIR}/deployed-commit.txt"
 
 # Restic encrypts and authenticates every file before it reaches remote storage.
-restic backup "${TMP_DIR}/credentials.sqlite3" "${ENV_FILE}" \
+restic backup "${TMP_DIR}/ultran-sqlite-databases" "${ENV_FILE}" \
   "${TMP_DIR}/deployed-commit.txt" --tag ultran --tag production
 
 # Keep a useful recovery window without retaining every daily snapshot forever.

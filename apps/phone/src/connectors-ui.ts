@@ -27,6 +27,7 @@ type Deps = {
   linked: () => boolean;
   api: (path: string, init?: RequestInit, timeoutMs?: number) => Promise<Response>;
   closeDrawer: () => void;
+  openExternal: (url: string) => Promise<void>;
 };
 
 const CATALOG = catalogJson as CatalogEntry[];
@@ -34,7 +35,7 @@ const PAGE = 60;
 
 const AUTH_LABEL: Record<CatalogEntry["auth"], string> = {
   api_key: "API key",
-  oauth2: "Access token",
+  oauth2: "OAuth sign-in",
   none: "No key",
   webhook: "Webhook URL",
 };
@@ -79,6 +80,7 @@ export function initConnectors(deps: Deps): void {
   let tier: "all" | "free" | "paid" = "all";
   let shown = PAGE;
   let enabled = new Set<string>();
+  let oauthConnected = new Set<string>();
   let remoteKnown = false;
   let detailReturnFocus: HTMLElement | null = null;
 
@@ -106,6 +108,7 @@ export function initConnectors(deps: Deps): void {
     const head = el("div", "conn-head");
     head.append(el("span", "conn-name", entry.name));
     if (enabled.has(entry.id)) head.append(el("span", "conn-on", "On"));
+    if (oauthConnected.has(entry.id.replace(/-/g, "_"))) head.append(el("span", "conn-on", "Connected"));
     root.append(head, el("p", "conn-desc", entry.description));
 
     const meta = el("div", "conn-meta");
@@ -210,6 +213,25 @@ export function initConnectors(deps: Deps): void {
     render();
   }
 
+  async function refreshOAuthConnections(): Promise<void> {
+    oauthConnected = new Set();
+    if (!deps.linked()) return;
+    try {
+      const status = await deps.api("/v1/connectors/composio/status", {}, 8_000);
+      if (!status.ok) return;
+      const configured = (await status.json()) as { configured?: boolean };
+      if (!configured.configured) return;
+      const response = await deps.api("/v1/connectors/composio/connections", {}, 12_000);
+      if (!response.ok) return;
+      const body = (await response.json()) as { connections?: Array<{ toolkit?: string; status?: string }> };
+      for (const account of body.connections ?? []) {
+        if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
+      }
+    } catch {
+      // A disconnected Composio service must not break the offline catalogue.
+    }
+  }
+
   /* ---------------- detail sheet ---------------- */
 
   function closeDetail(): void {
@@ -226,6 +248,8 @@ export function initConnectors(deps: Deps): void {
     }
     detailEl.replaceChildren();
     const on = enabled.has(entry.id);
+    const toolkit = entry.id.replace(/-/g, "_");
+    const oauthOn = oauthConnected.has(toolkit);
 
     const title = el("h2", undefined, entry.name);
     title.id = "connector-detail-title";
@@ -252,7 +276,7 @@ export function initConnectors(deps: Deps): void {
     close.addEventListener("click", closeDetail);
 
     let keyInput: HTMLInputElement | null = null;
-    if (entry.auth !== "none") {
+    if (entry.auth !== "none" && entry.auth !== "oauth2") {
       const field = el("label", "field");
       field.append(el("span", undefined, AUTH_LABEL[entry.auth] === "Webhook URL" ? "Webhook URL" : entry.auth === "oauth2" ? "Access token" : "API key"));
       keyInput = el("input");
@@ -271,7 +295,7 @@ export function initConnectors(deps: Deps): void {
       note.textContent = "Link your Ultran backend in Settings to enable this connector.";
     }
 
-    const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : on ? "Update key" : "Connect");
+    const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : entry.auth === "oauth2" ? (oauthOn ? "Reconnect account" : "Connect account") : on ? "Update key" : "Connect");
     act.type = "button";
     act.disabled = !canAct;
     act.addEventListener("click", async () => {
@@ -279,7 +303,16 @@ export function initConnectors(deps: Deps): void {
       note.dataset.tone = "";
       note.textContent = "Working…";
       try {
-        if (entry.auth === "none") {
+        if (entry.auth === "oauth2") {
+          const res = await deps.api(`/v1/connectors/composio/authorize/${encodeURIComponent(toolkit)}`, { method: "POST" }, 15_000);
+          if (!res.ok) throw new Error(`${res.status}`);
+          const body = (await res.json()) as { redirect_url?: string };
+          if (!body.redirect_url || !body.redirect_url.startsWith("https://")) throw new Error("Invalid authorization link");
+          await deps.openExternal(body.redirect_url);
+          note.textContent = "Complete sign-in in your browser, return to Ultran, then refresh the connection status.";
+          act.disabled = false;
+          return;
+        } else if (entry.auth === "none") {
           const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/${on ? "disable" : "enable"}`, { method: "POST" });
           if (!res.ok) throw new Error(`${res.status}`);
         } else {
@@ -309,6 +342,19 @@ export function initConnectors(deps: Deps): void {
     });
 
     buttons.append(close);
+    if (entry.auth === "oauth2") {
+      const refresh = el("button", "ghost", oauthOn ? "Refresh status" : "Check connection");
+      refresh.type = "button";
+      refresh.addEventListener("click", async () => {
+        refresh.disabled = true;
+        await refreshOAuthConnections();
+        const nowConnected = oauthConnected.has(toolkit);
+        note.dataset.tone = nowConnected ? "ok" : "";
+        note.textContent = nowConnected ? "Account connected and ready." : "No active connection found yet. Finish authorization in the browser first.";
+        refresh.disabled = false;
+      });
+      buttons.append(refresh);
+    }
     if (on && entry.auth !== "none") {
       const off = el("button", "ghost danger", "Disable");
       off.type = "button";
@@ -342,6 +388,7 @@ export function initConnectors(deps: Deps): void {
     panel.hidden = false;
     document.body.dataset.panel = "connectors";
     void refreshEnabled();
+    void refreshOAuthConnections().then(render);
   }
 
   function close(): void {

@@ -159,7 +159,10 @@
     <section id="workspace-panel" class="workspace-panel" hidden aria-label="Agent workspace">
       <header class="workspace-head"><button id="workspace-back" class="icon-btn" type="button" aria-label="Back">‹</button><div><h2>Agent Workspace</h2><small>Tasks, execution and generated files</small></div><button id="workspace-refresh" class="ghost" type="button">Refresh</button></header>
       <div class="workspace-stats" id="workspace-stats"></div>
-      <button id="workspace-team-open" class="workspace-team-open" type="button">＋ Launch an agent team</button>
+      <button id="workspace-team-open" class="workspace-team-open" type="button">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Launch an agent team</span>
+      </button>
       <section id="workspace-team-builder" class="workspace-team-builder" hidden aria-label="Launch agent team">
         <h3>Parallel agent run</h3><p>Choose 2–5 agents. Each receives the objective independently and runs in parallel.</p>
         <textarea id="workspace-team-objective" rows="3" maxlength="16000" placeholder="Describe the objective for the team…"></textarea>
@@ -178,7 +181,12 @@
 
     <div id="sheet-wrap" class="sheet-wrap" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
-        <h2 id="sheet-title">Settings</h2>
+        <div class="sheet-head">
+          <h2 id="sheet-title">Settings</h2>
+          <button id="settings-close-btn" class="icon-btn" type="button" aria-label="Close settings">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
 
         <section class="field" aria-labelledby="android-access-heading">
           <span id="android-access-heading">Android background access</span>

@@ -1693,7 +1693,7 @@ async function submit(raw: string): Promise<void> {
   } else if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
       const nativePhoneIntent = Capacitor.getPlatform() === "android"
-        && /\\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
+        && /\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
       // Native actions must stay foreground so the user can approve them in real time.
       result = backgroundMode && !nativePhoneIntent
         ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))

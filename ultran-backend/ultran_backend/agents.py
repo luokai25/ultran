@@ -511,6 +511,7 @@ class AgentService:
         workspace_id: str = "local",
         allow_tools: bool = True,
         max_tool_calls: int = 4,
+        client_capabilities: list[str] | None = None,
         event_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         def emit(event: dict[str, Any]) -> None:
@@ -566,6 +567,20 @@ class AgentService:
             + capability_system_prompt(message, agent.brain)
             + memory_context
         )
+        if "android_phone_actions" in (client_capabilities or []):
+            system_message += (
+                "\\n\\nANDROID PHONE ACTIONS (available only through the native Ultran Android client):"
+                "\\n- For an explicitly requested WhatsApp message, emit exactly ULTRAN_TOOL_CALL:"
+                '{"tool":"whatsapp.compose","number":"+internationalnumber","body":"exact message"}.'
+                "\\n- For an explicitly requested SMS, emit exactly ULTRAN_TOOL_CALL:"
+                '{"tool":"sms.compose","number":"+internationalnumber","body":"exact message"}.'
+                "\\n- To open an installed supported app, emit exactly ULTRAN_TOOL_CALL:"
+                '{"tool":"app.open","app":"whatsapp|whatsapp-business|telegram|messages|gmail|phone|calendar"}.'
+                "\\n- Never invent a recipient or phone number. Ask the user if it is not known."
+                "\\n- Use messaging actions only when the user explicitly asks to send. The Android client displays native approval before acting."
+                "\\n- Never claim delivery; WhatsApp's native action result cannot confirm recipient delivery."
+                "\\n- Emit only one phone tool call per turn and never put explanatory prose before or after the JSON tool payload."
+            )
         if artifact_format:
             system_message += _artifact_authoring_instruction(artifact_format)
         messages = [

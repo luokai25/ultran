@@ -192,7 +192,8 @@ public final class UltranRuntimePlugin extends Plugin {
             result.put("exitCode", finished ? process.exitValue() : -1);
             result.put("timedOut", !finished);
             result.put("output", output);
-            result.put("runtimeInstalled", marker().isFile());
+            result.put("runtimeInstalled", useBash);
+            result.put("runtimeMode", useBash ? "termux" : "android-shell");
             call.resolve(result);
         } catch (Exception error) {
             JSObject result = new JSObject();

@@ -19,7 +19,7 @@ import { markDataUrl, markSvg } from "./mark";
 
 type Role = "user" | "assistant";
 type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string; created_at?: string };
-type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; error?: string; result?: { content?: string }; created_at: string; updated_at: string };
+type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; team_id?: string; error?: string; result?: { content?: string }; created_at: string; updated_at: string };
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type Message = { role: Role; content: string; tools?: ToolCall[] };
@@ -313,7 +313,7 @@ async function refreshWorkspace(): Promise<void> {
     const card = workspaceNode("article", "workspace-task"); const top = workspaceNode("div", "workspace-task-top");
     if (task.status === "succeeded" && task.result?.content) { const select = document.createElement("input"); select.type = "checkbox"; select.className = "workspace-synthesis-select"; select.value = task.id; select.setAttribute("aria-label", "Select result from " + task.message.slice(0,60)); select.addEventListener("change", updateSynthesisControls); top.append(select); }
     top.append(workspaceNode("strong", "", task.message.slice(0, 100)), workspaceNode("span", `workspace-status status-${task.status}`, task.status));
-    card.append(top, workspaceNode("small", "workspace-meta", `Updated ${new Date(task.updated_at).toLocaleString()} · Attempt ${task.attempts}`));
+    card.append(top, workspaceNode("small", "workspace-meta", `${task.team_id ? `Team ${task.team_id.slice(-6)} · ` : ""}Updated ${new Date(task.updated_at).toLocaleString()} · Attempt ${task.attempts}`));
     if (task.error) card.append(workspaceNode("p", "workspace-error", task.error));
     const actions = workspaceNode("div", "workspace-actions");
     const open = workspaceNode("button", "", "Open timeline"); open.addEventListener("click", () => { closeWorkspace(); void openTaskTimeline(task.id, task.message); }); actions.append(open);
@@ -385,7 +385,7 @@ async function submitAgentTeam(): Promise<void> {
     if (!response.ok) throw new Error("Team launch failed (" + response.status + "): " + (await response.text()).slice(0,300));
     const created = await response.json() as WorkspaceTask[];
     workspaceTeamBuilder.hidden = true; workspaceTeamObjective.value = "";
-    workspaceNotice("Launched " + created.length + " agents in parallel. Their results will appear as each run completes.");
+    workspaceNotice("Launched " + created.length + " agents in parallel (team " + (created[0]?.team_id ?? "") + "). Their results will appear as each run completes.");
     await refreshWorkspace();
   } catch (error) { workspaceNotice(error instanceof Error ? error.message : "Could not launch team"); }
   finally { submit.disabled = false; submit.textContent = "Launch team"; }

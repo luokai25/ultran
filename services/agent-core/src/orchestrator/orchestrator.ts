@@ -130,31 +130,71 @@ function parseToolCall(value: string): PlannedToolCall {
   return { toolId: item.toolId.trim(), args: item.args as Record<string, unknown> };
 }
 
+function validateSchemaValue(schema: Record<string, unknown>, value: unknown, path: string, errors: string[]): void {
+  const type = schema.type;
+  const valid = type === undefined
+    || type === 'string' && typeof value === 'string'
+    || type === 'boolean' && typeof value === 'boolean'
+    || type === 'number' && typeof value === 'number' && Number.isFinite(value)
+    || type === 'integer' && typeof value === 'number' && Number.isInteger(value)
+    || type === 'array' && Array.isArray(value)
+    || type === 'object' && !!value && typeof value === 'object' && !Array.isArray(value)
+    || type === 'null' && value === null;
+  if (!valid) {
+    errors.push(`${path} must be ${String(type)}`);
+    return;
+  }
+
+  if (Array.isArray(schema.enum) && !schema.enum.some((entry) => Object.is(entry, value))) {
+    errors.push(`${path} is not an allowed value`);
+  }
+  if ('const' in schema && !Object.is(schema.const, value)) errors.push(`${path} does not match its required constant`);
+
+  if (typeof value === 'string') {
+    if (typeof schema.minLength === 'number' && value.length < schema.minLength) errors.push(`${path} is shorter than minLength`);
+    if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) errors.push(`${path} exceeds maxLength`);
+    if (typeof schema.pattern === 'string') {
+      try {
+        if (!new RegExp(schema.pattern).test(value)) errors.push(`${path} does not match the required pattern`);
+      } catch {
+        errors.push(`${path} uses an invalid schema pattern`);
+      }
+    }
+  }
+  if (typeof value === 'number') {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) errors.push(`${path} is below minimum`);
+    if (typeof schema.maximum === 'number' && value > schema.maximum) errors.push(`${path} exceeds maximum`);
+  }
+  if (Array.isArray(value)) {
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) errors.push(`${path} has too few items`);
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) errors.push(`${path} has too many items`);
+    if (schema.items && typeof schema.items === 'object' && !Array.isArray(schema.items)) {
+      value.forEach((item, index) => validateSchemaValue(schema.items as Record<string, unknown>, item, `${path}[${index}]`, errors));
+    }
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const objectValue = value as Record<string, unknown>;
+    const properties = schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)
+      ? schema.properties as Record<string, unknown>
+      : {};
+    const required = Array.isArray(schema.required) ? schema.required.filter((item): item is string => typeof item === 'string') : [];
+    for (const key of required) if (!(key in objectValue)) errors.push(`${path} is missing required property "${key}"`);
+    for (const [key, fieldValue] of Object.entries(objectValue)) {
+      const definition = properties[key];
+      if (definition && typeof definition === 'object' && !Array.isArray(definition)) {
+        validateSchemaValue(definition as Record<string, unknown>, fieldValue, `${path}.${key}`, errors);
+      } else if (schema.additionalProperties === false) {
+        errors.push(`${path} has unexpected property "${key}"`);
+      } else if (schema.additionalProperties && typeof schema.additionalProperties === 'object' && !Array.isArray(schema.additionalProperties)) {
+        validateSchemaValue(schema.additionalProperties as Record<string, unknown>, fieldValue, `${path}.${key}`, errors);
+      }
+    }
+  }
+}
+
 function validateBasicArgs(schema: Record<string, unknown>, args: Record<string, unknown>): string[] {
   const errors: string[] = [];
-  const required = Array.isArray(schema.required) ? schema.required.filter((x): x is string => typeof x === 'string') : [];
-  const properties = schema.properties && typeof schema.properties === 'object'
-    ? schema.properties as Record<string, unknown>
-    : {};
-  for (const key of required) if (!(key in args)) errors.push(`missing required argument "${key}"`);
-  if (schema.additionalProperties === false) {
-    for (const key of Object.keys(args)) if (!(key in properties)) errors.push(`unexpected argument "${key}"`);
-  }
-  for (const [key, definition] of Object.entries(properties)) {
-    if (!(key in args) || !definition || typeof definition !== 'object') continue;
-    const field = definition as Record<string, unknown>;
-    const value = args[key];
-    const type = field.type;
-    const valid = type === 'string' ? typeof value === 'string'
-      : type === 'boolean' ? typeof value === 'boolean'
-        : type === 'number' ? typeof value === 'number' && Number.isFinite(value)
-          : type === 'integer' ? typeof value === 'number' && Number.isInteger(value)
-            : type === 'array' ? Array.isArray(value)
-              : type === 'object' ? !!value && typeof value === 'object' && !Array.isArray(value)
-                : true;
-    if (!valid) errors.push(`argument "${key}" must be ${String(type)}`);
-    if (Array.isArray(field.enum) && !field.enum.some((entry) => Object.is(entry, value))) errors.push(`argument "${key}" is not an allowed value`);
-  }
+  validateSchemaValue(schema, args, 'args', errors);
   return errors;
 }
 

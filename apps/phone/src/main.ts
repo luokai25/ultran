@@ -1392,13 +1392,13 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
     const parsed = JSON.parse(trimmed.slice(prefix.length)) as Record<string, unknown>;
     if (parsed.tool === "terminal.run" && typeof parsed.command === "string") {
       const command = parsed.command.trim();
-      if (!command || command.length > 4096 || command.includes("\\0")) return null;
+      if (!command || command.length > 4096 || command.includes("\0")) return null;
       return { tool: "terminal.run", command };
     }
     if (parsed.tool === "sms.compose" && typeof parsed.number === "string" && typeof parsed.body === "string") {
       const number = parsed.number.trim();
       const body = parsed.body.trim();
-      if (!number || number.length > 40 || !body || body.length > 4000) return null;
+      if (!/^[+0-9(). -]{3,40}$/.test(number) || !body || body.length > 4000 || body.includes("\0")) return null;
       return { tool: "sms.compose", number, body };
     }
     return null;

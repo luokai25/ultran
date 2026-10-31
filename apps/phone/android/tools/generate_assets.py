@@ -49,6 +49,7 @@ SPLASHES = {
 # Ultran's orbital U mark. Geometry mirrors apps/phone/src/mark.ts.
 # ---------------------------------------------------------------------------
 
+Poly = list[tuple[float, float]]
 VIEWPORT = 108.0
 ORBIT_CENTER = (54.0, 54.0)
 ORBIT_RADIUS = 37.0

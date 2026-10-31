@@ -31,7 +31,7 @@ type Conversation = {
   messages: Message[];
 };
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
-type Settings = { endpoint: string; voice: boolean; theme: ThemeId };
+type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; voice: boolean; theme: ThemeId };
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
 type Theme = { label: string; accent: number; bright: string; fog: number };
@@ -90,6 +90,8 @@ const scrim = req<HTMLElement>("#scrim");
 const historyEl = req<HTMLElement>("#history");
 const sheetWrap = req<HTMLElement>("#sheet-wrap");
 const endpointEl = req<HTMLInputElement>("#endpoint");
+const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
+const localModelEl = req<HTMLInputElement>("#local-model");
 const endpointNote = req<HTMLElement>("#endpoint-note");
 const themesEl = req<HTMLElement>("#themes");
 
@@ -124,7 +126,7 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-const settings: Settings = { endpoint: "", voice: false, theme: "palace", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
+const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", voice: false, theme: "palace", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 if (!(settings.theme in THEMES)) settings.theme = "palace";
 
@@ -824,6 +826,59 @@ async function remoteBackgroundReply(
   return completed.result;
 }
 
+function normalizeModelEndpoint(value: string): string {
+  let endpoint = value.trim();
+  while (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1);
+  return endpoint;
+}
+
+function isPrivateModelEndpoint(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host.endsWith(".local") || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return true;
+    const octets = host.split(".").map(Number);
+    if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+    const first = octets[0] ?? -1;
+    const second = octets[1] ?? -1;
+    return first === 10 || first === 127 || (first === 192 && second === 168) || (first === 172 && second >= 16 && second <= 31);
+  } catch { return false; }
+}
+
+async function localModelReply(convo: Conversation): Promise<ChatReply> {
+  const endpoint = normalizeModelEndpoint(settings.localModelEndpoint);
+  const model = settings.localModel.trim();
+  if (!endpoint || !model) throw new Error("Set a local model endpoint and model name in Settings.");
+  if (!isPrivateModelEndpoint(endpoint)) throw new Error("For privacy, use localhost or a private LAN address for the local model.");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 180_000);
+  try {
+    const messages = convo.messages.slice(-20).map((message) => ({ role: message.role, content: message.content.slice(0, 12_000) }));
+    const response = await fetch(endpoint + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          { role: "system", content: "You are Ultran, a private local-first AI agent assistant. Be accurate. Never claim to have executed an action unless a connected tool actually did it. Ask for approval before any external write action." },
+          ...messages,
+        ],
+        options: { temperature: 0.35, num_ctx: 4096 },
+      }),
+    });
+    if (!response.ok) throw new Error("Local model returned HTTP " + response.status + ". Check that Ollama is running and the model is installed.");
+    const payload = await response.json() as { message?: { content?: string }; error?: string };
+    const content = payload.message?.content?.trim();
+    if (!content) throw new Error(payload.error || "The local model returned an empty response.");
+    return { content, session_id: "" };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function localReply(text: string): ChatReply {
   const low = text.toLowerCase();
   const now = new Date();
@@ -834,12 +889,12 @@ function localReply(text: string): ChatReply {
     content = `Today is **${now.toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}**.`;
   } else if (/\b(offline|can you do|what can you|capabilit|help)\b/.test(low)) {
     content =
-      "Running on-device with no brain linked, I can:\n\n- Keep your conversations on this phone\n- Read the time and date\n- Speak replies aloud\n\nFor real reasoning, link your Ultran backend in **Settings → Brain endpoint**.";
+      "Running on-device with no brain linked, I can:\n\n- Keep your conversations on this phone\n- Read the time and date\n- Speak replies aloud\n\nConnect a local model in **Settings** for language-model reasoning. The optional Ultran backend is only needed for hosted workspaces and remote connectors.";
   } else if (/\b(who|what) are you\b/.test(low)) {
-    content = "I am Ultran, a local-first agent console. This lightweight on-device fallback is not a language model; full reasoning needs a configured model through your linked Ultran backend.";
+    content = "I am Ultran, a local-first agent console. This lightweight on-device fallback is not a language model; configure Ollama in Settings for local language-model reasoning; a hosted Ultran backend is optional.";
   } else {
     content =
-      "No brain is linked, so I can't reason about that yet. Open **Settings** and enter your Ultran backend address, and I will route this to it. Your message is saved on this device.";
+      "No brain is linked, so I can't reason about that yet. Open **Settings** and connect an Ollama-compatible runtime on this device or your trusted LAN. Your message is saved on this device.";
   }
   return { content, session_id: "" };
 }
@@ -912,7 +967,7 @@ async function submit(raw: string): Promise<void> {
   setThinking(true);
 
   let result: ChatReply;
-  if (baseUrl()) {
+  if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
       result = backgroundMode
         ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))
@@ -927,8 +982,17 @@ async function submit(raw: string): Promise<void> {
         session_id: "",
       };
     }
+  } else if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
+    try {
+      result = await localModelReply(convo);
+      setLink("online", "local model");
+    } catch (error) {
+      setLink("error", "model unavailable");
+      const why = error instanceof Error ? error.message : "unknown error";
+      result = { content: "I could not reach your local model (" + why + "). Your conversation remains saved on this device.", session_id: "" };
+    }
   } else {
-    await new Promise((resolve) => window.setTimeout(resolve, 380));
+    await new Promise((resolve) => window.setTimeout(resolve, 180));
     result = localReply(text);
   }
   setThinking(false);
@@ -1175,15 +1239,45 @@ async function testLink(): Promise<void> {
   }
 }
 
+async function testLocalModel(): Promise<void> {
+  const url = normalizeModelEndpoint(localModelEndpointEl.value);
+  const model = localModelEl.value.trim();
+  if (!url || !model) return setNote("Enter a local Ollama address and model name.", "bad");
+  if (!isPrivateModelEndpoint(url)) return setNote("For privacy, use localhost or a private LAN address for the local model.", "bad");
+  setNote("Checking local model…");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch(url + "/api/tags", { signal: controller.signal });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const body = await response.json() as { models?: Array<{ name?: string }> };
+    const names = (body.models ?? []).map((entry) => entry.name).filter((name): name is string => Boolean(name));
+    if (!names.some((name) => name === model || name.startsWith(model + ":") || model.startsWith(name + ":"))) {
+      setNote('Ollama is reachable, but "' + model + '" is not installed. Available: ' + (names.slice(0, 6).join(", ") || "none") + ".", "bad");
+      return;
+    }
+    setNote("Local Ollama is reachable and " + model + " is installed. Inference will run directly through this connection.", "ok");
+  } catch (error) {
+    const why = error instanceof Error ? error.message : "no response";
+    setNote("Could not reach local Ollama (" + why + "). On Android, run Ollama locally or use a trusted LAN host and allow the app origin in OLLAMA_ORIGINS.", "bad");
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function openSheet(): void {
   closeDrawer();
   endpointEl.value = settings.endpoint;
-  setNote("Leave empty to stay fully on-device. Link your Ultran backend to get real replies.");
+  localModelEndpointEl.value = settings.localModelEndpoint;
+  localModelEl.value = settings.localModel;
+  setNote("Optional backend for connectors and hosted agents. Local model inference runs directly from this app when configured.");
   sheetWrap.hidden = false;
 }
 
 function closeSheet(): void {
   const next = endpointEl.value.trim().replace(/\/+$/, "");
+  settings.localModelEndpoint = normalizeModelEndpoint(localModelEndpointEl.value);
+  settings.localModel = localModelEl.value.trim() || "llama3.2:3b";
   if (next !== settings.endpoint) {
     settings.endpoint = next;
     store.agentId = undefined; // a different server has different agents
@@ -1191,7 +1285,7 @@ function closeSheet(): void {
     saveStore();
   }
   saveSettings();
-  setLink(settings.endpoint ? "offline" : "offline", settings.endpoint ? "ready" : "local");
+  setLink("offline", settings.endpoint ? "ready" : settings.localModelEndpoint ? "local model ready" : "local");
   sheetWrap.hidden = true;
 }
 
@@ -1256,6 +1350,7 @@ req<HTMLButtonElement>("#workspace-team-submit").addEventListener("click", () =>
 req<HTMLButtonElement>("#workspace-synthesize").addEventListener("click", () => void synthesizeSelectedRuns().catch(e => workspaceNotice(e instanceof Error ? e.message : "Synthesis failed")));
 req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
+req<HTMLButtonElement>("#test-local-model-btn").addEventListener("click", () => void testLocalModel());
 req<HTMLButtonElement>("#clear-btn").addEventListener("click", () => {
   if (!window.confirm("Delete every conversation on this device?")) return;
   store.conversations = [];

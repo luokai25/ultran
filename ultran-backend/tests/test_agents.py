@@ -442,3 +442,101 @@ def test_agent_final_answer_receives_composio_execution_results():
     assert "Project update" in tool_context
     assert "untrusted tool execution results" in tool_context.lower()
     assert len(svc.session(agent.id, result["session_id"]).messages) == 2
+
+
+# ------------------------------------------------------ durable agent memory
+
+
+def test_agents_and_sessions_survive_service_restart(tmp_path):
+    from ultran_backend.connectors import ConnectorRegistry, CredentialVault
+    from ultran_backend.brain import BrainRuntime, EchoBackend
+    from ultran_backend.sandbox import ToolSandbox
+
+    db_path = tmp_path / "agents.sqlite3"
+    first = service()
+    first._db_path = db_path
+    from cryptography.fernet import Fernet
+    encryption_key = Fernet.generate_key().decode("ascii")
+    first._fernet = Fernet(encryption_key.encode("ascii"))
+    first._init_db()
+    agent = first.create(name="Persistent Prime", tools=["github"], system_prompt="Remember the project.")
+    reply = first.chat(agent.id, "Remember that the release is Friday.", allow_tools=False)
+    first.update(agent.id, enabled=False, temperature=0.2)
+
+    registry = ConnectorRegistry(first.sandbox.registry.list())
+    second = AgentService(
+        BrainRuntime(EchoBackend()), ToolSandbox(registry, CredentialVault()),
+        db_path=db_path,
+        encryption_key=encryption_key,
+    )
+    restored = second.get(agent.id)
+    restored_session = second.get_session(agent.id, reply["session_id"])
+
+    assert restored.name == "Persistent Prime"
+    assert restored.enabled is False
+    assert restored.temperature == 0.2
+    assert restored.total_runs == 1
+    assert restored_session.turns == 1
+    assert [m.role for m in restored_session.messages] == ["user", "assistant"]
+    assert "Friday" in restored_session.messages[0].content
+    with db_path.open("rb") as stored:
+        raw_db = stored.read()
+    assert b"Remember that the release is Friday." not in raw_db
+    assert b"Remember the project." not in raw_db
+
+    from cryptography.fernet import Fernet
+    with pytest.raises(RuntimeError, match="cannot be decrypted"):
+        AgentService(
+            BrainRuntime(EchoBackend()), ToolSandbox(registry, CredentialVault()),
+            db_path=db_path, encryption_key=Fernet.generate_key().decode("ascii"),
+        )
+
+
+def test_persistent_session_clear_and_delete_survive_restart(tmp_path):
+    db_path = tmp_path / "agents.sqlite3"
+    first = service()
+    first._db_path = db_path
+    first._init_db()
+    agent = first.create(name="Persistent")
+    reply = first.chat(agent.id, "hello", allow_tools=False)
+    first.clear_session(agent.id, reply["session_id"])
+
+    second = AgentService(
+        BrainRuntime(EchoBackend()), ToolSandbox(first.sandbox.registry, CredentialVault()),
+        db_path=db_path,
+    )
+    assert second.get_session(agent.id, reply["session_id"]).messages == []
+    second.delete_session(agent.id, reply["session_id"])
+    second.delete(agent.id)
+
+    third = AgentService(
+        BrainRuntime(EchoBackend()), ToolSandbox(first.sandbox.registry, CredentialVault()),
+        db_path=db_path,
+    )
+    with pytest.raises(NotFound):
+        third.get(agent.id)
+
+
+def test_container_wires_durable_encrypted_agent_memory(tmp_path):
+    from cryptography.fernet import Fernet
+    from ultran_backend.config import Settings
+    from ultran_backend.container import Container
+
+    settings = Settings(
+        data_dir=tmp_path / "ultran-data",
+        credential_encryption_key=Fernet.generate_key().decode("ascii"),
+    )
+    first = Container.build(settings)
+    agent = first.agents.create(name="Ultran Prime", system_prompt="Keep my project context.")
+    reply = first.agents.chat(agent.id, "The next milestone is offline mode.", allow_tools=False)
+    first.close()
+
+    second = Container.build(settings)
+    try:
+        restored = second.agents.get(agent.id)
+        session = second.agents.get_session(agent.id, reply["session_id"])
+        assert restored.system_prompt == "Keep my project context."
+        assert session.messages[0].content == "The next milestone is offline mode."
+        assert second.agents.get(agent.id).total_runs == 1
+    finally:
+        second.close()

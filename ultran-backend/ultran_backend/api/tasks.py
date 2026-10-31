@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import uuid
 from fastapi import APIRouter, Query, status
 from fastapi.responses import StreamingResponse
 from ..schemas import AgentTaskBatchCreate, AgentTaskCreate, AgentTaskOut
@@ -30,9 +31,10 @@ def submit_team_tasks(payload: AgentTaskBatchCreate, container: ContainerDep, wo
             raise ValidationFailed("team contains a disabled agent", details={"agent_id": agent.id})
         if item.session_id:
             container.agents.get_session(item.agent_id, item.session_id)
+    team_id = "team_" + uuid.uuid4().hex[:12]
     tasks = [container.tasks.submit(
         item.agent_id, workspace, item.message, allow_tools=item.allow_tools,
-        max_tool_calls=item.max_tool_calls, session_id=item.session_id,
+        max_tool_calls=item.max_tool_calls, session_id=item.session_id, team_id=team_id,
     ) for item in payload.tasks]
     return [task.public() for task in tasks]
 
@@ -41,6 +43,11 @@ def submit_team_tasks(payload: AgentTaskBatchCreate, container: ContainerDep, wo
 def list_tasks(container: ContainerDep, workspace: WorkspaceDep,
                limit: int = Query(default=50, ge=0, le=200)):
     return [task.public() for task in container.tasks.list(workspace, limit=limit)]
+
+@router.get("/teams/{team_id}")
+def get_team(team_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    return container.tasks.team(workspace, team_id)
+
 
 @router.get("/{task_id}", response_model=AgentTaskOut)
 def get_task(task_id: str, container: ContainerDep, workspace: WorkspaceDep):

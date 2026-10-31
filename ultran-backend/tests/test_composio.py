@@ -162,3 +162,57 @@ def test_revoke_refuses_an_account_owned_by_another_workspace():
     with pytest.raises(NotFound):
         gateway.revoke("workspace-a", "ca_other")
     assert requested["user_ids"] == [composio_user_id("workspace-a")]
+
+
+def test_composio_tool_discovery_uses_isolated_pool_and_closes_it():
+    gateway = ComposioGateway(api_key="test-key")
+    class Pool:
+        closed = False
+        def list_tools(self):
+            return [SimpleNamespace(as_dict=lambda: {"id": "composio.list_messages"})]
+        def close(self):
+            self.closed = True
+    pool = Pool()
+    gateway._workspace_pool = lambda workspace: pool
+    assert gateway.list_tools("workspace-a") == [{"id": "composio.list_messages"}]
+    assert pool.closed is True
+
+
+def test_composio_unattended_invoke_rejects_mutating_tools_and_closes_pool():
+    gateway = ComposioGateway(api_key="test-key")
+    class Pool:
+        closed = False
+        def find_tool(self, tool_id):
+            assert tool_id == "composio.send_email"
+            return SimpleNamespace(
+                id=tool_id,
+                capabilities=frozenset({"write"}),
+                requires_approval=True,
+            )
+        def close(self):
+            self.closed = True
+    pool = Pool()
+    gateway._workspace_pool = lambda workspace: pool
+    with pytest.raises(ValidationFailed, match="not eligible"):
+        gateway.invoke_read_tool("workspace-a", "send_email", {"to": "x@example.com"})
+    assert pool.closed is True
+
+
+def test_composio_tool_routes_are_workspace_scoped(client, container):
+    class FakeGateway:
+        configured = True
+        def list_tools(self, workspace):
+            return [{"workspace": workspace, "id": "composio.list_messages"}]
+        def invoke_read_tool(self, workspace, tool_name, arguments):
+            return {"workspace": workspace, "tool": tool_name, "arguments": arguments}
+    container.composio = FakeGateway()
+    headers = {"X-Ultran-Workspace": "kai-workspace"}
+    listed = client.get("/v1/connectors/composio/tools", headers=headers)
+    assert listed.json()["tools"][0]["workspace"] == "kai-workspace"
+    invoked = client.post(
+        "/v1/connectors/composio/tools/invoke",
+        headers=headers,
+        json={"tool_name": "list_messages", "arguments": {"query": "inbox"}},
+    )
+    assert invoked.json()["workspace"] == "kai-workspace"
+    assert invoked.json()["arguments"] == {"query": "inbox"}

@@ -224,6 +224,37 @@ public final class UltranCompanionPlugin extends Plugin {
             .show());
     }
 
+
+    @PluginMethod
+    public void composeTelegram(PluginCall call) {
+        String body = call.getString("body", "").trim();
+        if (body.isEmpty() || body.length() > 4000) {
+            call.reject("Provide a Telegram message up to 4,000 characters.");
+            return;
+        }
+        if (getContext().getPackageManager().getLaunchIntentForPackage("org.telegram.messenger") == null) {
+            call.reject("Telegram is not installed.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Review Telegram message")
+            .setMessage("Ultran will open Telegram with this message. Choose the recipient and press Send in Telegram.\n\n" + body)
+            .setPositiveButton("Open Telegram", (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_SEND);
+                intent.setType("text/plain");
+                intent.setPackage("org.telegram.messenger");
+                intent.putExtra(Intent.EXTRA_TEXT, body);
+                try {
+                    getActivity().startActivity(intent);
+                    call.resolve(new JSObject().put("opened", true).put("sent", false));
+                } catch (Exception error) {
+                    call.reject("Could not open Telegram share flow.", error);
+                }
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("sent", false)))
+            .show());
+    }
+
     @PluginMethod
     public void openApp(PluginCall call) {
         String app = call.getString("app", "").trim().toLowerCase(java.util.Locale.ROOT);

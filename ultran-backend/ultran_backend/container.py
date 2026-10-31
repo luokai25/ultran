@@ -70,16 +70,18 @@ class Container:
             mcp_pool.register(spec, replace=True)
         registry.sync_mcp()
 
+        composio = ComposioGateway(
+            api_key=settings.composio_api_key,
+            callback_url=settings.composio_callback_url,
+        )
+
         return cls(
             settings=settings,
             registry=registry,
             vault=vault,
             sandbox=sandbox,
             brain=brain,
-            agents=AgentService(brain, sandbox, vault, composio=ComposioGateway(
-                api_key=settings.composio_api_key,
-                callback_url=settings.composio_callback_url,
-            )),
+            agents=AgentService(brain, sandbox, vault, composio=composio),
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),
@@ -88,10 +90,7 @@ class Container:
             deploys=DeployService(root=settings.data_dir / "deploys"),
             mcp_pool=mcp_pool,
             mcp_gateway=mcp_gateway,
-            composio=ComposioGateway(
-                api_key=settings.composio_api_key,
-                callback_url=settings.composio_callback_url,
-            ),
+            composio=composio,
         )
 
     # ------------------------------------------------------------------ #

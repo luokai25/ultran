@@ -84,6 +84,9 @@ class Settings:
     mcp_approval_ttl_s: int = 300
     mcp_wall_ms: int = 30_000
     mcp_egress_bytes: int = 32 * 1024 * 1024
+    # ---- Composio managed OAuth + hosted MCP gateway ----
+    composio_api_key: str = ""
+    composio_callback_url: str = ""
     debug: bool = False
     # The web workspace is served from a different origin (3000) than the API
     # (8080), so the browser needs an explicit CORS allow-list. Dev gets the
@@ -153,6 +156,8 @@ class Settings:
             mcp_approval_ttl_s=_int(e.get("ULTRAN_MCP_APPROVAL_TTL_S"), 300),
             mcp_wall_ms=_int(e.get("ULTRAN_MCP_WALL_MS"), 30_000),
             mcp_egress_bytes=_int(e.get("ULTRAN_MCP_EGRESS_BYTES"), 32 * 1024 * 1024),
+            composio_api_key=e.get("ULTRAN_COMPOSIO_API_KEY", ""),
+            composio_callback_url=e.get("ULTRAN_COMPOSIO_CALLBACK_URL", ""),
             debug=_flag(e.get("ULTRAN_DEBUG"), False),
             cors_origins=_origins(e.get("ULTRAN_CORS_ORIGINS"), cls().cors_origins),
         )

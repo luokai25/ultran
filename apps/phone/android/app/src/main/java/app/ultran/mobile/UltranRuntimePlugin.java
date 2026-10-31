@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.StatFs;
+import android.os.SystemClock;
+import android.os.Build;
 import android.provider.OpenableColumns;
 import android.system.Os;
 import android.system.OsConstants;
@@ -40,6 +42,8 @@ import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -484,23 +488,144 @@ public final class UltranRuntimePlugin extends Plugin {
                 Os.symlink(linkTarget, linkFile.getAbsolutePath());
             }
 
-            disableIncompatiblePackageSources(staging);
-            try (FileOutputStream markerOutput = new FileOutputStream(new File(staging, ".ultran-bootstrap-installed"))) {
-                markerOutput.write(("termux-packages bootstrap; installed=" + System.currentTimeMillis() + "\n").getBytes(StandardCharsets.UTF_8));
-                markerOutput.getFD().sync();
-            }
             deleteRecursively(backup);
             boolean hadPreviousPrefix = destination.exists() || isSymbolicLink(destination);
             if (hadPreviousPrefix && !destination.renameTo(backup)) throw new IllegalStateException("Could not safely back up the existing runtime.");
             if (!staging.renameTo(destination)) {
                 if (hadPreviousPrefix) backup.renameTo(destination);
-                throw new IllegalStateException("Could not activate the installed runtime.");
+                throw new IllegalStateException("Could not activate the extracted runtime.");
+            }
+
+            // The official Termux installer runs this second stage after extraction.
+            // It configures package post-install scripts; without it, a bootstrap can
+            // look present while essential packages remain only partially configured.
+            runBootstrapSecondStage(destination);
+            disableIncompatiblePackageSources(destination);
+            try (FileOutputStream markerOutput = new FileOutputStream(new File(destination, ".ultran-bootstrap-installed"))) {
+                markerOutput.write(("termux-packages bootstrap; installed=" + System.currentTimeMillis() + "\n").getBytes(StandardCharsets.UTF_8));
+                markerOutput.getFD().sync();
             }
             try { deleteRecursively(backup); } catch (Exception ignored) { }
             call.resolve(new JSObject().put("installed", true).put("prefix", destination.getAbsolutePath()).put("entries", entryCount).put("uncompressedBytes", totalBytes));
         } catch (Exception error) {
+            try {
+                if (destination.exists() || isSymbolicLink(destination)) {
+                    deleteRecursively(destination);
+                }
+                if (backup.exists() || isSymbolicLink(backup)) backup.renameTo(destination);
+            } catch (Exception ignored) { }
             try { deleteRecursively(staging); } catch (Exception ignored) { }
             call.reject(error.getMessage() == null ? "Could not install the Termux bootstrap." : error.getMessage(), error);
+        }
+    }
+
+    private void runBootstrapSecondStage(File prefixDirectory) throws Exception {
+        File script = new File(prefixDirectory,
+            "etc/termux/termux-bootstrap/second-stage/termux-bootstrap-second-stage.sh");
+        File bash = new File(prefixDirectory, "bin/bash");
+        if (!bash.isFile() || !bash.canExecute()) {
+            throw new IllegalStateException("Termux bootstrap is missing its executable Bash shell.");
+        }
+        if (!script.isFile()) {
+            throw new IllegalStateException("Termux bootstrap is missing its official second-stage setup script.");
+        }
+
+        File runtime = prefixDirectory.getParentFile();
+        File home = new File(runtime, "home");
+        File temp = new File(runtime, "tmp");
+        File appData = new File("/data/data/" + getContext().getPackageName());
+        File project = new File(appData, "termux");
+        File apps = new File(project, "app");
+        File appsByIdentifier = new File(apps, "i");
+        File appsByUid = new File(apps, "u");
+        File cache = new File(appData, "cache");
+
+        ProcessBuilder builder = new ProcessBuilder(bash.getAbsolutePath(), script.getAbsolutePath());
+        builder.directory(home);
+        builder.redirectErrorStream(true);
+        Map<String, String> env = builder.environment();
+        env.put("HOME", home.getAbsolutePath());
+        env.put("TERMUX__HOME", home.getAbsolutePath());
+        env.put("TERMUX_ANDROID_HOME", home.getAbsolutePath());
+        env.put("PREFIX", prefixDirectory.getAbsolutePath());
+        env.put("TERMUX_PREFIX", prefixDirectory.getAbsolutePath());
+        env.put("TERMUX__PREFIX", prefixDirectory.getAbsolutePath());
+        env.put("TERMUX__PREFIX_CLASSICAL", prefixDirectory.getAbsolutePath());
+        env.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
+        env.put("TERMUX__ROOTFS_SUBDIR", "files/ultran-runtime");
+        env.put("TERMUX__UID", Integer.toString(android.os.Process.myUid()));
+        env.put("TERMUX__USER_ID", Integer.toString(android.os.Process.myUid()));
+        env.put("TERMUX_APP__PACKAGE_NAME", getContext().getPackageName());
+        env.put("TERMUX_APP__DATA_DIR", appData.getAbsolutePath());
+        env.put("TERMUX__PROJECT_DIR", project.getAbsolutePath());
+        env.put("TERMUX__CORE_DIR", new File(project, "core").getAbsolutePath());
+        env.put("TERMUX__APPS_DIR", apps.getAbsolutePath());
+        env.put("TERMUX__APPS_DIR_BY_IDENTIFIER", appsByIdentifier.getAbsolutePath());
+        env.put("TERMUX__APPS_DIR_BY_UID", appsByUid.getAbsolutePath());
+        env.put("TERMUX__CACHE_DIR", cache.getAbsolutePath());
+        env.put("TERMUX__LEGACY_PROJECT_USER_CONFIG_DIR", new File(home, ".termux").getAbsolutePath());
+        env.put("TERMUX__INTERNAL_NAME", "termux");
+        env.put("TERMUX__LNAME", "termux");
+        env.put("TERMUX__UNAME", "TERMUX");
+        env.put("TERMUX__NAME", "Termux");
+        env.put("TERMUX_APP__NAME", "Termux");
+        env.put("TERMUX_APP__LNAME", "termux");
+        env.put("TERMUX_APP__APP_IDENTIFIER", "termux");
+        env.put("TERMUX_APP__APP_DIR", new File(appsByIdentifier, "termux").getAbsolutePath());
+        env.put("TMPDIR", temp.getAbsolutePath());
+        env.put("PATH", new File(prefixDirectory, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
+        env.put("LD_LIBRARY_PATH", new File(prefixDirectory, "lib").getAbsolutePath());
+        env.put("SHELL", bash.getAbsolutePath());
+        env.put("TERM", "dumb");
+        env.put("LANG", "C.UTF-8");
+
+        Process process = builder.start();
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            byte[] buffer = new byte[4096];
+            try (InputStream input = process.getInputStream()) {
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    synchronized (captured) {
+                        int remaining = 64 * 1024 - captured.size();
+                        if (remaining > 0) captured.write(buffer, 0, Math.min(remaining, count));
+                    }
+                }
+            } catch (Exception ignored) { }
+        }, "ultran-termux-bootstrap-output");
+        reader.start();
+        long deadline = SystemClock.elapsedRealtime() + TimeUnit.MINUTES.toMillis(3);
+        try {
+            while (true) {
+                try {
+                    process.exitValue();
+                    break;
+                } catch (IllegalThreadStateException running) {
+                    if (SystemClock.elapsedRealtime() >= deadline) {
+                        process.destroy();
+                        if (Build.VERSION.SDK_INT >= 26) process.destroyForcibly();
+                        throw new IllegalStateException("Termux second-stage package setup exceeded the three-minute safety limit.");
+                    }
+                    Thread.sleep(150);
+                }
+            }
+            reader.join(2000);
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                String details;
+                synchronized (captured) { details = captured.toString("UTF-8"); }
+                if (details.length() > 6000) details = details.substring(details.length() - 6000);
+                throw new IllegalStateException("Termux second-stage package setup failed with exit code " + exitCode +
+                    (details.isEmpty() ? "." : ":\n" + details));
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            process.destroy();
+            if (Build.VERSION.SDK_INT >= 26) process.destroyForcibly();
+            throw new IllegalStateException("Termux second-stage setup was interrupted.", interrupted);
+        } finally {
+            if (reader.isAlive()) reader.interrupt();
+            try { process.getInputStream().close(); } catch (Exception ignored) { }
         }
     }
 

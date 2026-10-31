@@ -190,7 +190,7 @@ class ChatReply(BaseModel):
 
 class ArtifactCreate(_Strict):
     title: str = Field(min_length=1, max_length=160)
-    format: Literal["html", "md", "txt", "json", "csv", "svg", "pdf", "pptx", "docx", "xlsx"]
+    format: Literal["html", "md", "txt", "json", "csv", "svg", "pdf", "pptx", "docx", "xlsx", "zip", "py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "c", "h", "cpp", "hpp", "sh", "bash", "sql", "xml", "yaml", "yml", "toml", "ini", "css", "scss", "vue", "svelte", "mdx", "rst", "log", "env", "gitignore"]
     content: str = Field(min_length=1, max_length=2_000_000)
 
 

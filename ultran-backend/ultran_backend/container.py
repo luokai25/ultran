@@ -60,7 +60,10 @@ class Container:
         mcp_gateway = ToolGateway(
             mcp_pool,
             grants=GrantStore(default_ttl_s=settings.mcp_grant_ttl_s),
-            approvals=ApprovalGate(ttl_s=settings.mcp_approval_ttl_s),
+            approvals=ApprovalGate(
+                ttl_s=settings.mcp_approval_ttl_s,
+                db_path=str(settings.data_dir / "approvals.sqlite3"),
+            ),
             wall_ms=settings.mcp_wall_ms,
             egress_bytes=settings.mcp_egress_bytes,
             require_grants=settings.mcp_require_grants,

@@ -359,3 +359,66 @@ def test_composio_pending_approval_wrong_key_fails_closed(tmp_path):
     other_key = Fernet.generate_key().decode("ascii")
     with pytest.raises(RuntimeError, match="Cannot decrypt pending Composio approvals"):
         ComposioGateway(api_key="test-key", db_path=path, encryption_key=other_key)
+
+
+def test_approval_rejects_tool_permission_changes_before_execution(monkeypatch):
+    from ultran_backend.composio import ComposioGateway
+
+    spec = SimpleNamespace(
+        name="send_email",
+        title="Send email",
+        description="Send an email",
+        input_schema={
+            "type": "object",
+            "properties": {"to": {"type": "string"}},
+            "required": ["to"],
+        },
+        capabilities=frozenset({"write"}),
+        requires_approval=True,
+        id="composio.send_email",
+    )
+
+    class Pool:
+        def register(self, spec_config, *, connect=False):
+            self.spec_config = spec_config
+
+        def list_tools(self):
+            return [spec]
+
+        def find_tool(self, tool_id):
+            assert tool_id == "composio.send_email"
+            return spec
+
+        def close(self):
+            pass
+
+    pool = Pool()
+    gateway = ComposioGateway(api_key="test-key")
+    gateway.create_session = lambda workspace: {
+        "mcp": {"url": "https://mcp.example", "headers": {}}
+    }
+    monkeypatch.setattr("ultran_backend.mcp.McpClientPool", lambda: pool)
+    monkeypatch.setattr(
+        "ultran_backend.mcp.ServerSpec",
+        lambda **kwargs: SimpleNamespace(**kwargs),
+    )
+    gateway._invoke_with_pool = lambda *args, **kwargs: pytest.fail(
+        "permission-changed tool must never execute"
+    )
+
+    result = gateway.plan_and_execute(
+        "workspace-a",
+        "agent-a",
+        "Send an email",
+        lambda prompt, message: {
+            "calls": [{"tool": "send_email", "arguments": {"to": "kai@example.com"}}]
+        },
+    )
+    approval_id = result[0]["approval_id"]
+    assert result[0]["approval_required"] is True
+
+    # Simulate provider metadata changing after the approval card was created.
+    spec.capabilities = frozenset({"delete"})
+    with pytest.raises(ValidationFailed, match="permissions changed"):
+        gateway.decide_approval("workspace-a", approval_id, approved=True)
+

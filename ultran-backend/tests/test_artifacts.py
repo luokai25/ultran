@@ -150,3 +150,51 @@ def test_chat_stream_emits_progress_and_final_result(client):
     assert '"type": "completed"' in body
     assert '"type": "final"' in body
     assert '"content":' in body
+
+
+def test_zip_creation_and_safe_inspection(tmp_path: Path):
+    import json
+    service = ArtifactService(tmp_path)
+    archive = service.create("ws", "Source bundle", "zip", json.dumps({
+        "src/main.py": "print('hello')",
+        "README.md": "# Demo",
+    }))
+    path = Path(service.get("ws", archive["id"])["path"])
+    assert zipfile.is_zipfile(path)
+    inspected = service.inspect_zip("ws", archive["id"])
+    assert inspected["count"] == 2
+    assert {item["path"] for item in inspected["entries"]} == {"src/main.py", "README.md"}
+    assert next(item for item in inspected["entries"] if item["path"] == "src/main.py")["content"] == "print('hello')"
+
+
+def test_zip_creation_rejects_path_traversal(tmp_path: Path):
+    import json
+    service = ArtifactService(tmp_path)
+    try:
+        service.create("ws", "Unsafe bundle", "zip", json.dumps({"../escape.txt": "no"}))
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 422
+    else:
+        raise AssertionError("ZIP path traversal must be rejected")
+
+
+def test_source_code_artifacts_preserve_exact_text(tmp_path: Path):
+    service = ArtifactService(tmp_path)
+    source = "from pathlib import Path\n\nprint('Ultran')\n"
+    artifact = service.create("ws", "Example", "py", source)
+    saved = Path(service.get("ws", artifact["id"])["path"]).read_text("utf-8")
+    assert saved == source
+
+
+def test_zip_extract_creates_workspace_artifacts(tmp_path: Path):
+    import json
+    service = ArtifactService(tmp_path)
+    archive = service.create("ws", "Bundle", "zip", json.dumps({
+        "src/app.py": "print('hi')",
+        "notes.txt": "hello",
+    }))
+    result = service.extract_zip("ws", archive["id"])
+    assert result["count"] == 2
+    contents = [Path(service.get("ws", item["id"])["path"]).read_text("utf-8") for item in result["extracted"]]
+    assert "print('hi')" in contents
+    assert "hello" in contents

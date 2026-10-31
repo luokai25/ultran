@@ -14,8 +14,22 @@ NATIVE_TOOLS = [
      "capabilities": ["file.write"], "requires_approval": False}
     for fmt, label in (("pdf", "PDF"), ("pptx", "PowerPoint"), ("docx", "Word"),
                        ("xlsx", "Excel"), ("html", "HTML"), ("md", "Markdown"),
-                       ("txt", "Text"), ("csv", "CSV"), ("json", "JSON"), ("svg", "SVG"))
+                       ("txt", "Text"), ("csv", "CSV"), ("json", "JSON"), ("svg", "SVG"),
+                       ("zip", "ZIP archive"), ("py", "Python"), ("js", "JavaScript"),
+                       ("ts", "TypeScript"), ("tsx", "TSX"), ("jsx", "JSX"), ("java", "Java"),
+                       ("kt", "Kotlin"), ("go", "Go"), ("rs", "Rust"), ("c", "C"),
+                       ("cpp", "C++"), ("sh", "Shell script"), ("sql", "SQL"),
+                       ("xml", "XML"), ("yaml", "YAML"), ("toml", "TOML"), ("css", "CSS"),
+                       ("vue", "Vue"), ("svelte", "Svelte"), ("env", "ENV"), ("ini", "INI"))
 ]
+NATIVE_TOOLS.extend([
+    {"id": "archives.extract_zip", "name": "Extract ZIP archive",
+     "description": "Extract safe UTF-8 text entries into workspace artifacts. Binary entries are reported as skipped.",
+     "source": "native", "category": "archive", "capabilities": ["file.write"], "requires_approval": True},
+    {"id": "archives.inspect_zip", "name": "Inspect ZIP archive",
+     "description": "Safely inspect archive entries, sizes and UTF-8 text contents without extracting to disk.",
+     "source": "native", "category": "archive", "capabilities": ["file.read"], "requires_approval": False},
+])
 
 
 @router.get("/catalog")

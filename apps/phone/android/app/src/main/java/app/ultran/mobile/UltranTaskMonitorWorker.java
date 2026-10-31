@@ -5,6 +5,8 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -26,6 +28,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** OS-scheduled, network-constrained task status watcher. Android chooses exact run times. */
 public final class UltranTaskMonitorWorker extends Worker {
@@ -37,8 +41,8 @@ public final class UltranTaskMonitorWorker extends Worker {
         super(context, params);
     }
 
-    public static void schedule(Context context, String endpoint) {
-        Data input = new Data.Builder().putString("endpoint", endpoint).build();
+    public static void schedule(Context context, String endpoint, boolean speakUpdates) {
+        Data input = new Data.Builder().putString("endpoint", endpoint).putBoolean("speakUpdates", speakUpdates).build();
         Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(UltranTaskMonitorWorker.class, 15, TimeUnit.MINUTES)
             .setInputData(input)
@@ -94,6 +98,7 @@ public final class UltranTaskMonitorWorker extends Worker {
                     if (objective.length() > 100) objective = objective.substring(0, 97) + "...";
                     String detail = objective + (done ? " completed successfully." : failed ? " · " + state : active ? " · " + state : "");
                     postNotification(title, detail, id.hashCode());
+                    if (getInputData().getBoolean("speakUpdates", false) && (done || failed)) speakUpdate(title + ". " + detail);
                 }
                 prefs.edit().putString("statuses", current.toString()).apply();
             }
@@ -102,6 +107,38 @@ public final class UltranTaskMonitorWorker extends Worker {
             return Result.retry();
         } finally {
             if (connection != null) connection.disconnect();
+        }
+    }
+
+
+    private void speakUpdate(String text) {
+        CountDownLatch initialized = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(1);
+        final TextToSpeech[] engine = new TextToSpeech[1];
+        try {
+            engine[0] = new TextToSpeech(getApplicationContext(), status -> {
+                if (status == TextToSpeech.SUCCESS) {
+                    engine[0].setLanguage(java.util.Locale.getDefault());
+                    engine[0].setSpeechRate(0.94f);
+                    engine[0].setPitch(0.82f);
+                    engine[0].setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override public void onStart(String id) { }
+                        @Override public void onDone(String id) { finished.countDown(); }
+                        @Override public void onError(String id) { finished.countDown(); }
+                    });
+                }
+                initialized.countDown();
+            });
+            if (initialized.await(8, TimeUnit.SECONDS) && engine[0] != null) {
+                engine[0].speak(text, TextToSpeech.QUEUE_FLUSH, null, "ultran-worker-update");
+                finished.await(25, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ignored) {
+            // Notification delivery remains the reliable fallback.
+        } finally {
+            if (engine[0] != null) engine[0].shutdown();
         }
     }
 

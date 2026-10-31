@@ -35,3 +35,15 @@ def download_artifact(artifact_id: str, container: ContainerDep, workspace: Work
     item = container.artifacts.get(workspace, artifact_id)
     return FileResponse(item["path"], media_type=item["mime_type"], filename=item["filename"],
                         content_disposition_type="attachment", headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'"})
+
+
+@router.get("/{artifact_id}/inspect")
+def inspect_archive(artifact_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Safely inspect ZIP entries without extracting them to disk."""
+    return container.artifacts.inspect_zip(workspace, artifact_id)
+
+
+@router.post("/{artifact_id}/extract")
+def extract_archive(artifact_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Extract safe UTF-8 text entries into separate workspace-scoped artifacts."""
+    return container.artifacts.extract_zip(workspace, artifact_id)

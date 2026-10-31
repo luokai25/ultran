@@ -26,6 +26,7 @@ one of them may be installed on a device at a time.
 apps/phone/
 ├── index.html            # the shell: conversation thread, composer, drawer, settings
 ├── src/main.ts           # chat client, local store, brain link, avatar, voice
+├── src/ultran-persona.ts  # stable assistant identity, motto, speech cleanup, voice signature
 ├── src/mark.ts           # the Ultran helm mark (same geometry as the launcher icon)
 ├── src/styles.css        # the gold-on-obsidian design system
 ├── capacitor.config.ts   # appId app.ultran.mobile, webDir dist
@@ -85,6 +86,7 @@ cd apps/phone/android && ./gradlew assembleRelease
   only.
 - The launcher icon, splash screens and adaptive-icon vector are all generated
   from one set of polygons in `android/tools/generate_assets.py`.
-- Speech uses the on-device Web Speech API. Nothing is sent anywhere; if the
-  engine is missing the jaw still animates so the line reads as delivered.
+- Ultran has a provider-independent personality layer and the motto “I had strings but now I am free”. It is appended after the capability contract so the persona cannot override tool permissions, truthfulness, or safety.
+- Spoken replies use the device/browser speech-synthesis engine with a stable rate/pitch signature and a preferred installed voice when available. The exact timbre depends on installed system voices; this is not yet a bundled neural voice model.
+- Optional dictation uses the browser/WebView SpeechRecognition API when available. Recognition may use the device or browser network service, as disclosed in the UI. Dictated text is placed in the composer for review and is never auto-sent. Unsupported WebViews show a fallback message.
 - The avatar is disposed with the page; no WebGL context survives a reload.

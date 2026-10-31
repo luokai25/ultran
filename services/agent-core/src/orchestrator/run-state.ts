@@ -34,6 +34,9 @@ export type RunEvent =
   | { type: 'meter.emitted'; runId: string; meter: string; amount: number; at: number }
   | { type: 'policy.decided'; runId: string; decision: PolicyDecision; at: number }
   | { type: 'step.completed'; runId: string; stepId: string; at: number }
+  | { type: 'step.failed'; runId: string; stepId: string; reason: string; at: number }
+  | { type: 'approval.required'; runId: string; stepId: string; toolId: string; capability: string; at: number }
+  | { type: 'run.result'; runId: string; result: string; at: number }
   | { type: 'run.completed'; runId: string; status: RunStatus; at: number };
 
 export interface PlanStep {
@@ -51,6 +54,8 @@ export interface RunState {
   status: RunStatus;
   startedAt: number;
   events: RunEvent[];
+  /** Final user-facing synthesis from the active brain, if available. */
+  result?: string;
 }
 
 /**

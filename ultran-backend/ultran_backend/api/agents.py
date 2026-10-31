@@ -6,6 +6,8 @@ from fastapi import APIRouter, status
 
 from ..schemas import (
     AgentCreate,
+    AgentMemoryCreate,
+    AgentMemoryOut,
     AgentOut,
     AgentUpdate,
     ChatReply,
@@ -52,6 +54,33 @@ def update_agent(agent_id: str, payload: AgentUpdate, container: ContainerDep):
 def delete_agent(agent_id: str, container: ContainerDep):
     container.agents.delete(agent_id)
     return None
+
+
+@router.get("/{agent_id}/memories", response_model=list[AgentMemoryOut])
+def list_memories(agent_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    return [m.public() for m in container.agents.list_memories(agent_id, workspace)]
+
+
+@router.post("/{agent_id}/memories", response_model=AgentMemoryOut, status_code=status.HTTP_201_CREATED)
+def add_memory(
+    agent_id: str, payload: AgentMemoryCreate, container: ContainerDep, workspace: WorkspaceDep,
+):
+    return container.agents.add_memory(
+        agent_id, workspace, payload.content, category=payload.category,
+    ).public()
+
+
+@router.delete("/{agent_id}/memories/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_memory(
+    agent_id: str, memory_id: str, container: ContainerDep, workspace: WorkspaceDep,
+):
+    container.agents.delete_memory(agent_id, workspace, memory_id)
+    return None
+
+
+@router.delete("/{agent_id}/memories", status_code=status.HTTP_200_OK)
+def clear_memories(agent_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    return {"deleted": container.agents.clear_memories(agent_id, workspace)}
 
 
 @router.post("/{agent_id}/chat", response_model=ChatReply)

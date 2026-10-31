@@ -183,6 +183,22 @@
               <input id="model-search" type="search" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search Llama, Qwen, Gemma, Phi…" aria-label="Search Hugging Face models" />
               <button class="solid" type="submit">Explore</button>
             </form>
+            <div class="model-quick-search" role="group" aria-label="Popular model families">
+              <button class="ghost" type="button" data-model-query="Qwen GGUF">Qwen</button>
+              <button class="ghost" type="button" data-model-query="Llama GGUF">Llama</button>
+              <button class="ghost" type="button" data-model-query="Gemma GGUF">Gemma</button>
+              <button class="ghost" type="button" data-model-query="Phi GGUF">Phi</button>
+              <button class="ghost" type="button" data-model-query="SmolLM GGUF">Tiny models</button>
+            </div>
+            <label class="model-size-filter" for="model-size-filter">
+              <span>Show model files</span>
+              <select id="model-size-filter">
+                <option value="all">All sizes (up to 8 GB)</option>
+                <option value="2gb">Phone-friendly (≤ 2 GB)</option>
+                <option value="1gb">Lightweight (≤ 1 GB)</option>
+              </select>
+            </label>
+            <p class="model-device-tip">For phones, start with a 1B–3B Q4 model. File size is only a rough guide: RAM, context length, and thermal throttling matter too.</p>
             <p id="model-library-status" class="native-model-status" role="status">Search the Hugging Face catalog. Downloaded weights stay in Ultran's private app storage.</p>
             <div id="model-library-results" class="model-library-results"></div>
             <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the on-device llama.cpp runtime.</small>

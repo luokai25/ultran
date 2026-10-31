@@ -236,7 +236,15 @@ export class Orchestrator {
 
     while (pending.size > 0 && state.status === 'running') {
       const step = [...pending.values()].find((item) => item.dependsOn.every((id) => completed.has(id)));
-      if (!step) throw new Error('plan dependencies cannot make progress');
+      if (!step) {
+        const reason = 'Step skipped because one or more dependencies did not complete successfully.';
+        for (const blocked of pending.values()) {
+          this.append(state, { type: 'step.failed', runId: state.runId, stepId: blocked.id, reason, at: Date.now() });
+          outcomes.push({ stepId: blocked.id, description: blocked.description, ok: false, result: reason });
+        }
+        pending.clear();
+        break;
+      }
       pending.delete(step.id);
       this.append(state, { type: 'step.started', runId: state.runId, stepId: step.id, at: Date.now() });
 
@@ -364,7 +372,7 @@ export class Orchestrator {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const raw = await this.infer(
-        prompt + (attempt ? '\\n\\nThe previous selection was invalid: ' + String(lastError) + '. Return a corrected toolId and args JSON object only.' : ''),
+        prompt + (attempt ? '\n\nThe previous selection was invalid: ' + String(lastError) + '. Return a corrected toolId and args JSON object only.' : ''),
         systemPolicy(state.goal, 'act'),
         degraded ? 512 : 1000,
         0.1,

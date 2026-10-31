@@ -115,8 +115,8 @@ cd apps/phone/android && ./gradlew assembleRelease
 
 ### Approved WhatsApp actions
 
-Ultran can prepare and send a WhatsApp message from the Android app after two explicit approvals: the agent's tool approval in Ultran, followed by the Android confirmation showing the exact international number and message. For the final Send tap, Android's optional Ultran Accessibility Service must be enabled by the device owner in system settings.
+Ultran prepares WhatsApp messages through an explicit handoff. The agent's tool request is reviewed in Ultran, then Android opens WhatsApp with the chosen recipient and message prepared. The user must review the recipient and content and press Send inside WhatsApp. Ultran does not inspect another app's screen or automate taps.
 
-The accessibility action is intentionally narrow: it only responds inside the WhatsApp package, checks that the editable message composer contains the exact approved text, looks for WhatsApp's send control (with an Arabic-label fallback), consumes the one-use approval before tapping, and expires after 60 seconds. It does not read conversations, select contacts, or send arbitrary content. If the composer or send control cannot be verified, it does nothing. Ultran cannot verify WhatsApp delivery/read receipts, so a successful tap is not reported as confirmed delivery.
+SMS uses the Android messaging composer, where the user also presses Send. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultran's cache. Notifications are optional and requested only for task updates.
 
-SMS remains a separate handoff to the device messaging app, where the user presses Send. App opening is restricted to an allow-list. Accessibility access is optional and can be revoked at any time in Android settings.
+These choices reduce sensitive access and improve Play policy compatibility, but they do not guarantee Play approval. The Play listing, privacy policy, Data safety answers, foreground-service declarations, and review materials must still accurately describe the app's behavior.

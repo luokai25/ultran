@@ -246,7 +246,8 @@ content ever leaves the device for metering.
 - [x] Monorepo skeleton and workspace tooling
 - [x] Architecture specification
 - [ ] Brain runtime: llama.cpp backend + model cache verification
-- [x] Connector SDK: manifest schema, validator, first three connectors (github, slack, files)
+- [x] Connector SDK: manifest schema, validator, registry, and ten provider manifests (GitHub, Slack, files, Notion, Discord, Telegram, Google Drive, OpenAI, Anthropic, Ollama)
+- [ ] Complete and verify provider execution adapters and in-app credential authorization
 - [ ] Orchestrator: DAG planner, event log, replay
 - [ ] Sandbox: WASM worker host, grant issuance
 - [ ] Web console: run inspector and connector browser

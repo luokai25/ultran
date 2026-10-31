@@ -752,17 +752,18 @@ async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
     if (!previous || previous === task.status) continue;
     const finished = task.status === "succeeded";
     const failed = ["failed", "interrupted"].includes(task.status);
-    if (!finished && !failed) continue;
-    const title = finished ? "Task completed" : "Task needs attention";
-    const detail = task.message.slice(0, 110) + (finished ? " completed successfully." : " · " + task.status + (task.error ? ": " + task.error.slice(0, 160) : "."));
+    const active = ["running", "retrying"].includes(task.status);
+    if (!finished && !failed && !active) continue;
+    const title = finished ? "Task completed" : failed ? "Task needs attention" : task.status === "retrying" ? "Task retrying" : "Task started";
+    const detail = task.message.slice(0, 110) + (finished ? " completed successfully." : failed ? " · " + task.status + (task.error ? ": " + task.error.slice(0, 160) : ".") : task.status === "retrying" ? " is being retried." : " has started.");
     if (Capacitor.getPlatform() === "android") {
       try {
         await NativeCompanion.notify({title, body: detail});
-        if (settings.voice) await NativeCompanion.speakInBackground({text: title + ". " + detail});
+        if (settings.voice && (finished || failed)) await NativeCompanion.speakInBackground({text: title + ". " + detail});
       } catch (error) {
         console.warn("Ultran proactive update could not be delivered", error);
       }
-    } else if (settings.voice && document.visibilityState === "visible") {
+    } else if (settings.voice && (finished || failed) && document.visibilityState === "visible") {
       speak(title + ". " + detail);
     }
   }

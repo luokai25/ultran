@@ -27,7 +27,7 @@
     "start": "node dist/main.js",
     "lint": "echo lint pending",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm exec tsc -p tsconfig.test.json && node --test dist-test/brain/ollama-backend.test.js",
+    "test": "pnpm exec tsc -p tsconfig.test.json && node --test dist-test/brain/ollama-backend.test.js dist-test/orchestrator/orchestrator.test.js",
     "clean": "rm -rf dist"
   },
   "dependencies": {

@@ -136,25 +136,29 @@ def test_composio_connect_routes_are_workspace_scoped(client, container):
     assert client.post(
         "/v1/connectors/composio/session", headers=headers
     ).json()["workspace"] == "kai-workspace"
-    assert client.delete("/v1/connectors/composio/connections/ca_test").status_code == 204
+    assert client.delete(
+        "/v1/connectors/composio/connections/ca_test", headers=headers
+    ).status_code == 204
 
 
 def test_revoke_refuses_an_account_owned_by_another_workspace():
     from ultran_backend.errors import NotFound
 
+    requested = {}
+
+    def list_accounts(**kwargs):
+        requested.update(kwargs)
+        # The Composio user filter must isolate this workspace. An account
+        # returned for a different user must never be treated as owned here.
+        return SimpleNamespace(items=[])
+
     gateway = ComposioGateway(api_key="test-key")
     gateway._client = SimpleNamespace(
         connected_accounts=SimpleNamespace(
-            list=lambda **kwargs: SimpleNamespace(items=[
-                SimpleNamespace(
-                    id="ca_other",
-                    toolkit=SimpleNamespace(slug="gmail"),
-                    status="ACTIVE",
-                    created_at=None,
-                )
-            ]),
+            list=list_accounts,
             revoke=lambda account_id: pytest.fail("foreign account must not be revoked"),
         )
     )
     with pytest.raises(NotFound):
         gateway.revoke("workspace-a", "ca_other")
+    assert requested["user_ids"] == [composio_user_id("workspace-a")]

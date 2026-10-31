@@ -518,8 +518,8 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
   const parts = [...shardFiles].sort((a, b) => {
     const aName = a.rfilename.split("/").pop() ?? "";
     const bName = b.rfilename.split("/").pop() ?? "";
-    const aIndex = Number(aName.match(/-(\\d{5})-of-\\d{5}\\.gguf$/i)?.[1] ?? 0);
-    const bIndex = Number(bName.match(/-(\\d{5})-of-\\d{5}\\.gguf$/i)?.[1] ?? 0);
+    const aIndex = Number(aName.match(/-(\d{5})-of-\d{5}\.gguf$/i)?.[1] ?? 0);
+    const bIndex = Number(bName.match(/-(\d{5})-of-\d{5}\.gguf$/i)?.[1] ?? 0);
     return aIndex - bIndex;
   });
   if (!shardCount || parts.length !== shardCount || !prefix) {
@@ -544,7 +544,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
     for (let index = 0; index < parts.length; index++) {
       const part = parts[index];
       const name = part.rfilename.split("/").pop() ?? "";
-      if (!/^[A-Za-z0-9._ -]{1,155}\\.gguf$/i.test(name)) throw new Error("Unsupported shard filename: " + name);
+      if (!/^[A-Za-z0-9._ -]{1,155}\.gguf$/i.test(name)) throw new Error("Unsupported shard filename: " + name);
       const rawSha = part.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
       const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
       const encodedPath = part.rfilename.split("/").map(encodeURIComponent).join("/");

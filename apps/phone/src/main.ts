@@ -795,6 +795,9 @@ function requestedArtifactFormat(task: string): string | null {
   for (const extension of ["py","js","ts","tsx","jsx","java","kt","go","rs","cpp","hpp","c","h","sh","bash","sql","xml","yaml","yml","toml","ini","css","scss","vue","svelte","mdx","rst","log","env"]) {
     if (low.includes("." + extension) || low.includes(extension + " file") || low.includes(extension + " script") || low.includes(extension + " source")) return extension;
   }
+  for (const [language, extension] of [["python","py"],["javascript","js"],["typescript","ts"],["kotlin","kt"],["golang","go"],["rust","rs"],["c++","cpp"],["c language","c"],["bash","sh"],["shell script","sh"]]) {
+    if (low.includes(language) && ["code","script","file","source"].some(word => low.includes(word))) return extension;
+  }
   if (low.includes("json")) return "json";
   if (low.includes("csv")) return "csv";
   if (low.includes("html")) return "html";

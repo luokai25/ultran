@@ -1131,7 +1131,6 @@ function renderConversation(): void {
       messagesEl.appendChild(root);
     }
   }
-  promptEl.focus({ preventScroll: true });
   requestAnimationFrame(() => scrollToEnd(false));
   syncRender();
 }
@@ -1978,7 +1977,7 @@ function applyTheme(id: ThemeId): void {
   eyeMaterial.emissive.setHex(theme.accent);
   (jawGlow.material as THREE.MeshBasicMaterial).color.setHex(theme.accent);
   rimLight.color.setHex(theme.accent);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#050505");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#070809");
   for (const button of themesEl.querySelectorAll<HTMLButtonElement>(".theme")) {
     button.setAttribute("aria-pressed", String(button.dataset.theme === id));
   }

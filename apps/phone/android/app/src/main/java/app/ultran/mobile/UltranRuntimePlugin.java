@@ -11,6 +11,12 @@ import android.system.OsConstants;
 import android.system.ErrnoException;
 
 import androidx.activity.result.ActivityResult;
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkInfo;
+import androidx.work.WorkManager;
+
+import java.util.UUID;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -103,10 +109,10 @@ public final class UltranRuntimePlugin extends Plugin {
                     .setTitle("Approve local command")
                     .setMessage("Ultran wants to run this command on your device:\n\n" + command +
                         "\n\nIt runs without root in Ultran's app sandbox. It may change files or access the network. Review it before approving.")
-                    .setPositiveButton("Run command", (dialog, which) -> commandExecutor.execute(() -> {
-                        try { executeApprovedCommand(call, command); }
+                    .setPositiveButton("Run in background", (dialog, which) -> {
+                        try { enqueueApprovedCommand(call, command); }
                         finally { commandApprovalPending.set(false); }
-                    }))
+                    })
                     .setNegativeButton("Cancel", (dialog, which) -> {
                         commandApprovalPending.set(false);
                         call.resolve(new JSObject().put("approved", false));
@@ -122,6 +128,77 @@ public final class UltranRuntimePlugin extends Plugin {
                 call.reject("Could not request approval for the local command.", error);
             }
         });
+    }
+
+    private void enqueueApprovedCommand(PluginCall call, String command) {
+        try {
+            Data input = new Data.Builder().putString(UltranCommandWorker.KEY_COMMAND, command).build();
+            OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(UltranCommandWorker.class)
+                .setInputData(input)
+                .addTag("ultran-local-runtime-job")
+                .build();
+            WorkManager.getInstance(getContext()).enqueue(request);
+            JSObject result = new JSObject();
+            result.put("approved", true);
+            result.put("queued", true);
+            result.put("jobId", request.getId().toString());
+            result.put("status", "enqueued");
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not queue the approved background command.", error);
+        }
+    }
+
+    @PluginMethod
+    public void getCommandStatus(PluginCall call) {
+        String rawId = call.getString("jobId");
+        final UUID id;
+        try {
+            id = UUID.fromString(rawId == null ? "" : rawId);
+        } catch (IllegalArgumentException invalid) {
+            call.reject("A valid background job ID is required.");
+            return;
+        }
+        WorkManager.getInstance(getContext()).getWorkInfoById(id).addListener(() -> {
+            try {
+                WorkInfo info = WorkManager.getInstance(getContext()).getWorkInfoById(id).get();
+                if (info == null) {
+                    call.resolve(new JSObject().put("found", false));
+                    return;
+                }
+                JSObject result = new JSObject();
+                result.put("found", true);
+                result.put("jobId", id.toString());
+                result.put("status", info.getState().name().toLowerCase(java.util.Locale.ROOT));
+                Data output = info.getOutputData();
+                String text = output.getString(UltranCommandWorker.KEY_OUTPUT);
+                if (text != null) result.put("output", text);
+                if (output.hasKeyWithValueOfType(UltranCommandWorker.KEY_EXIT_CODE, Integer.class)) {
+                    result.put("exitCode", output.getInt(UltranCommandWorker.KEY_EXIT_CODE, -1));
+                }
+                result.put("timedOut", output.getBoolean(UltranCommandWorker.KEY_TIMED_OUT, false));
+                String error = output.getString(UltranCommandWorker.KEY_ERROR);
+                if (error != null) result.put("error", error);
+                Data progress = info.getProgress();
+                String phase = progress.getString("phase");
+                if (phase != null) result.put("phase", phase);
+                call.resolve(result);
+            } catch (Exception error) {
+                call.reject("Could not read background job status.", error);
+            }
+        }, commandExecutor);
+    }
+
+    @PluginMethod
+    public void cancelCommand(PluginCall call) {
+        String rawId = call.getString("jobId");
+        try {
+            UUID id = UUID.fromString(rawId == null ? "" : rawId);
+            WorkManager.getInstance(getContext()).cancelWorkById(id);
+            call.resolve(new JSObject().put("jobId", id.toString()).put("status", "cancellation_requested"));
+        } catch (IllegalArgumentException invalid) {
+            call.reject("A valid background job ID is required.");
+        }
     }
 
     private void executeApprovedCommand(PluginCall call, String command) {

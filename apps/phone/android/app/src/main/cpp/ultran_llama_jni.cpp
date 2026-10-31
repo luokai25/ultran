@@ -165,7 +165,6 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
 
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0;
-    model_params.use_mmap = true;
     g_model = llama_model_load_from_file(path.c_str(), model_params);
     if (!g_model) return env->NewStringUTF("Could not load this GGUF model. Check its integrity and available RAM.");
 
@@ -251,7 +250,7 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
         if (piece_size > 0) output.append(piece, static_cast<size_t>(piece_size));
 
         llama_token next = token;
-        batch = llama_batch_get_one(&next, 1);
+        llama_batch batch = llama_batch_get_one(&next, 1);
         if (llama_decode(g_context, batch) != 0) break;
     }
     llama_sampler_free(sampler);

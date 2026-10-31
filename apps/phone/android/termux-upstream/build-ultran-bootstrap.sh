@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a Termux bootstrap for Ultran's Android package identity and private
-# runtime prefix. This deliberately uses upstream Termux build scripts rather
-# than repackaging binaries compiled for com.termux.
+# Build the headless Termux execution runtime for Ultran's Android package
+# identity and private prefix. No terminal UI or separate Termux APK is used.
+# This deliberately uses upstream Termux build scripts rather than repackaging
+# binaries compiled for com.termux.
 
 readonly TERMUX_PACKAGES_COMMIT="3bdd137564e7f55e1d24f46406cd3e32e76bfabd"
 readonly ULTRAN_PACKAGE_NAME="app.ultran.mobile"

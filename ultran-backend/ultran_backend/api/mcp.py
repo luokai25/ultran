@@ -174,6 +174,14 @@ def list_approvals(container: ContainerDep, workspace: WorkspaceDep):
     return {"approvals": [a.as_dict() for a in container.mcp_gateway.approvals.pending(workspace)]}
 
 
+@router.get("/approvals/history")
+def approval_history(
+    container: ContainerDep, workspace: WorkspaceDep,
+    limit: int = Query(default=100, ge=0, le=500),
+):
+    return {"approvals": [a.as_dict() for a in container.mcp_gateway.approvals.history(workspace, limit=limit)]}
+
+
 @router.post("/approvals/{approval_id}")
 def decide_approval(approval_id: str, payload: ApprovalDecision, container: ContainerDep):
     approval = container.mcp_gateway.approvals.decide(

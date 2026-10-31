@@ -3,6 +3,7 @@ package app.ultran.mobile;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.StatFs;
 import android.provider.OpenableColumns;
 import android.system.Os;
 import android.system.OsConstants;
@@ -91,6 +92,10 @@ public final class UltranRuntimePlugin extends Plugin {
             if (!root.exists() && !root.mkdirs() && !root.isDirectory()) {
                 throw new IllegalStateException("Could not create Ultran's private runtime directory.");
             }
+            long availableAtStart = new StatFs(root.getAbsolutePath()).getAvailableBytes();
+            if (archiveSize > 0 && archiveSize > availableAtStart) {
+                throw new IllegalStateException("Not enough free device storage for this bootstrap archive.");
+            }
             deleteRecursively(staging);
             if (!staging.mkdirs() && !staging.isDirectory()) {
                 throw new IllegalStateException("Could not create the runtime staging directory.");
@@ -138,11 +143,10 @@ public final class UltranRuntimePlugin extends Plugin {
                     if (parent != null && !parent.mkdirs() && !parent.isDirectory()) throw new IllegalStateException("Could not create runtime directory.");
                     try (FileOutputStream output = new FileOutputStream(target)) {
                         int read;
-                        long fileBytes = 0;
                         while ((read = zip.read(buffer)) != -1) {
-                            fileBytes += read;
                             totalBytes += read;
                             if (totalBytes > MAX_UNCOMPRESSED_BYTES) throw new IllegalArgumentException("Bootstrap expands beyond the 2 GB safety limit.");
+                            if (totalBytes > availableAtStart) throw new IllegalStateException("Not enough free device storage to extract the bootstrap safely.");
                             output.write(buffer, 0, read);
                         }
                         output.getFD().sync();

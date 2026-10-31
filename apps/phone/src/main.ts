@@ -43,7 +43,8 @@ type NativeLocalAIPlugin = {
   listModels(): Promise<{ models: NativeModel[] }>;
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
   loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
-  generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string }>;
+  generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
+  runBenchmark(): Promise<{ model: string; output: string; contextTokens: number; largeModelMode: boolean; promptTokens: number; generatedTokens: number; promptMs: number; generationMs: number; tokensPerSecond: number; processPssKb: number; processPrivateDirtyKb: number }>;
   unloadModel(): Promise<{ loaded: boolean }>;
   deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
   downloadModel(options: { name: string; url: string; sha256?: string }): Promise<{ downloaded: boolean; name: string; sizeBytes: number }>;
@@ -132,6 +133,7 @@ const deviceProfileEl = req<HTMLElement>("#device-profile");
 const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
 const nativeModelUnloadButton = req<HTMLButtonElement>("#native-model-unload-btn");
 const nativeModelDeleteButton = req<HTMLButtonElement>("#native-model-delete-btn");
+const nativeModelBenchmarkButton = req<HTMLButtonElement>("#native-model-benchmark-btn");
 const modelSearchForm = req<HTMLFormElement>("#model-search-form");
 const modelSearchInput = req<HTMLInputElement>("#model-search");
 const modelLibraryStatus = req<HTMLElement>("#model-library-status");
@@ -234,6 +236,7 @@ async function refreshNativeModels(): Promise<void> {
     nativeModelLoadButton.disabled = true;
     nativeModelUnloadButton.disabled = true;
     nativeModelDeleteButton.disabled = true;
+    nativeModelBenchmarkButton.disabled = true;
     return;
   }
   try {
@@ -280,6 +283,7 @@ async function refreshNativeModels(): Promise<void> {
     nativeModelLoadButton.disabled = !nativeModelSelect.value;
     nativeModelUnloadButton.disabled = !status.loaded;
     nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === status.loadedModel;
+    nativeModelBenchmarkButton.disabled = !status.loaded;
   } catch (error) {
     nativeModelLoaded = false;
     nativeLoadedModelName = "";
@@ -287,6 +291,7 @@ async function refreshNativeModels(): Promise<void> {
     nativeModelLoadButton.disabled = true;
     nativeModelUnloadButton.disabled = true;
     nativeModelDeleteButton.disabled = true;
+    nativeModelBenchmarkButton.disabled = true;
   }
 }
 
@@ -539,6 +544,23 @@ async function loadNativeModel(): Promise<void> {
     nativeModelLoaded = false;
     nativeModelStatus.textContent = "Could not load model: " + (error instanceof Error ? error.message : "unknown error");
     await refreshNativeModels();
+  }
+}
+
+async function runNativeModelBenchmark(): Promise<void> {
+  nativeModelBenchmarkButton.disabled = true;
+  nativeModelStatus.textContent = "Running a short on-device inference benchmark. This uses the loaded model and may warm the CPU…";
+  try {
+    const result = await NativeLocalAI.runBenchmark();
+    const speed = Number.isFinite(result.tokensPerSecond) ? result.tokensPerSecond.toFixed(2) : "0.00";
+    const pss = formatBytes(Math.max(0, result.processPssKb) * 1024);
+    const mode = result.largeModelMode ? "aggressive paging" : "automatic paging";
+    nativeModelStatus.textContent = "Benchmark complete · " + result.model + " · " + speed + " generated tokens/sec · " + result.generatedTokens + " tokens · prompt " + Math.round(result.promptMs) + " ms · process PSS " + pss + " · " + mode + ".";
+    deviceProfileEl.textContent = "Measured on this device in the current session. Results vary with temperature, background apps, storage cache, and model quantization.";
+  } catch (error) {
+    nativeModelStatus.textContent = "Benchmark failed: " + (error instanceof Error ? error.message : "unknown error");
+  } finally {
+    nativeModelBenchmarkButton.disabled = !nativeModelLoaded;
   }
 }
 
@@ -2370,6 +2392,7 @@ modelSizeFilterEl.addEventListener("change", () => {
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
 nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());
+nativeModelBenchmarkButton.addEventListener("click", () => void runNativeModelBenchmark());
 nativeModelSelect.addEventListener("change", () => {
   nativeModelLoadButton.disabled = !nativeModelSelect.value;
   nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;

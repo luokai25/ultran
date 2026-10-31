@@ -141,6 +141,18 @@ set `ULTRAN_HOST=0.0.0.0` and connect using the computer's LAN IP, but only on
 a trusted network and with firewall access limited to your devices. Do not
 expose this development backend directly to the public internet.
 
+### Connect Google and other services through Composio
+
+Composio OAuth is brokered by the backend. Set `ULTRAN_COMPOSIO_API_KEY` in
+`infra/hetzner/.env` on the private API host (see the deployment guide), then
+restart the API. The Android app reads only the backend's redacted configured
+status and starts OAuth authorization; it must never contain the Composio
+project key. Connected accounts are scoped to the Ultran workspace, and
+write-capable actions remain approval-gated. For a single-owner installation,
+keep the backend endpoint private to your own deployment and use a unique owner
+workspace; do not disable approval checks or embed service credentials in the
+APK.
+
 The separate TypeScript `@ultran/agent-core` now has an experimental Ollama
 adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
 That runtime is not yet wired into the phone chat or a complete tool-execution

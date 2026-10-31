@@ -1,6 +1,7 @@
 package app.ultran.mobile;
 
 import androidx.core.app.NotificationCompat;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;

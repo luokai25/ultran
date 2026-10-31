@@ -12,6 +12,8 @@ export interface MeterReading {
   meter: string;
   amount: number;
   at: number;
+  /** Stable action identity prevents duplicate metering when a run is replayed. */
+  idempotencyKey?: string;
 }
 
 export interface UsageTotals {
@@ -26,7 +28,7 @@ export class UsageLedger {
 
   /** Record a reading. Duplicate (runId, meter, at) tuples are ignored. */
   record(reading: MeterReading): boolean {
-    const key = `${reading.runId}::${reading.meter}::${reading.at}`;
+    const key = reading.idempotencyKey ?? `${reading.runId}::${reading.meter}::${reading.at}`;
     if (this.seen.has(key)) return false;
     this.seen.add(key);
     this.entries.push(reading);

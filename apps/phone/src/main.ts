@@ -51,7 +51,7 @@ type NativeLocalAIPlugin = {
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
-const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;openedSettings?:boolean;approved?:boolean;sent?:string|boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; composeTelegram(options:{body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
+const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;openedSettings?:boolean;approved?:boolean;sent?:string|boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; composeTelegram(options:{body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}>; requestBackgroundExemption():Promise<{supported:boolean;granted:boolean;settingsOpened?:boolean}>; openAppBatterySettings():Promise<{opened:boolean}>; getBackgroundAccessStatus():Promise<{notifications:boolean;batteryExempt:boolean;accessibility:boolean;manufacturer:string;model:string;sdk:number}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
@@ -122,6 +122,9 @@ const drawer = req<HTMLElement>("#drawer");
 const scrim = req<HTMLElement>("#scrim");
 const historyEl = req<HTMLElement>("#history");
 const sheetWrap = req<HTMLElement>("#sheet-wrap");
+const androidAccessStatus = req<HTMLElement>("#android-access-status");
+const androidBatteryAccessButton = req<HTMLButtonElement>("#android-battery-access");
+const androidAppSettingsButton = req<HTMLButtonElement>("#android-app-settings");
 const endpointEl = req<HTMLInputElement>("#endpoint");
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeModelStatus = req<HTMLElement>("#native-model-status");
@@ -2171,6 +2174,24 @@ async function readTermuxDeviceInfo(): Promise<void> {
   }
 }
 
+async function refreshAndroidAccessStatus(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") {
+    androidAccessStatus.textContent = "These controls are available in the Android release.";
+    return;
+  }
+  try {
+    const status = await NativeCompanion.getBackgroundAccessStatus();
+    const items = [
+      "Notifications: " + (status.notifications ? "allowed" : "not allowed"),
+      "Battery unrestricted: " + (status.batteryExempt ? "yes" : "not yet"),
+      "WhatsApp accessibility: " + (status.accessibility ? "enabled" : "optional / disabled"),
+    ];
+    androidAccessStatus.textContent = status.manufacturer + " " + status.model + " · " + items.join(" · ");
+  } catch (error) {
+    androidAccessStatus.textContent = "Could not read Android access status: " + (error instanceof Error ? error.message : "unknown error");
+  }
+}
+
 function openSheet(): void {
   closeDrawer();
   endpointEl.value = settings.endpoint;
@@ -2271,6 +2292,23 @@ termuxFilesListButton.addEventListener("click", () => void listTermuxFiles());
 termuxFileReadButton.addEventListener("click", () => void readTermuxFile());
 termuxFileWriteButton.addEventListener("click", () => void writeTermuxFile());
 req<HTMLButtonElement>("#settings-btn").addEventListener("click", openSheet);
+androidBatteryAccessButton.addEventListener("click", () => {
+  if (Capacitor.getPlatform() !== "android") return;
+  void NativeCompanion.requestBackgroundExemption()
+    .then(result => {
+      androidAccessStatus.textContent = result.granted
+        ? "Battery optimization exemption is already allowed. Check Xiaomi Autostart and No restrictions in App settings if background work is still stopped."
+        : "Android battery settings opened. Choose Allow / Unrestricted if Android offers it, then return to Ultran.";
+    })
+    .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open battery access settings."; });
+});
+androidAppSettingsButton.addEventListener("click", () => {
+  if (Capacitor.getPlatform() !== "android") return;
+  void NativeCompanion.openAppBatterySettings()
+    .then(() => { androidAccessStatus.textContent = "In Android settings, allow notifications, set battery usage to Unrestricted / No restrictions, and enable Autostart if your device offers it."; })
+    .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open app settings."; });
+});
+
 req<HTMLButtonElement>("#workspace-btn").addEventListener("click", openWorkspace);
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", closeWorkspace);
 req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));

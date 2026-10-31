@@ -197,7 +197,7 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(messagingService, /clearApproval\(prefs\)/);
   assert.match(messagingService, /"إرسال"/);
   assert.match(accessibilityConfig, /canRetrieveWindowContent="true"/);
-  assert.match(accessibilityConfig, /packageNames="com\\.whatsapp"/);
+  assert.match(accessibilityConfig, /packageNames="com\.whatsapp"/);
   assert.match(main, /parsed\.tool === "sms\.compose"/);
   assert.match(main, /runApprovedLocalTool/);
   assert.match(main, /message has NOT been sent/);
@@ -221,6 +221,6 @@ test("WhatsApp sending requires one-shot approval and exact composer match", () 
   assert.match(messagingService, /clearApproval\(prefs\)/);
   assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);
   assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
-  assert.match(main, /NativeCompanion\\.openWhatsAppMessage/);
+  assert.match(main, /NativeCompanion\.openWhatsAppMessage/);
   assert.match(main, /delivery status is not confirmed/i);
 });

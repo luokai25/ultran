@@ -1,6 +1,11 @@
 name: Build Ultran Termux Bootstrap
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/termux-bootstrap.yml'
+      - 'apps/phone/android/termux-upstream/build-ultran-bootstrap.sh'
   workflow_dispatch:
     inputs:
       packages:
@@ -10,7 +15,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ultran-termux-bootstrap-${{ github.ref }}
@@ -38,7 +43,7 @@ jobs:
         working-directory: ${{ runner.temp }}/ultran-termux-bootstrap
         run: sha256sum bootstrap-aarch64.zip bootstrap-x86_64.zip > SHA256SUMS
 
-      - name: Upload bootstrap archives
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ultran-termux-bootstrap-${{ github.run_id }}
@@ -46,3 +51,23 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+      - name: Publish runtime archives for direct download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTPUT_DIR: ${{ runner.temp }}/ultran-termux-bootstrap
+        run: |
+          set -euo pipefail
+          tag='ultran-termux-runtime-v1'
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title 'Ultran Termux Runtime' \
+              --notes 'Ultran-specific runtime archives built from pinned official termux/termux-packages source for package app.ultran.mobile and Ultran private storage. Default packages: git and python. SHA256SUMS is included. APT sources are disabled until Ultran has its own compatible package repository.' \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
+          gh release upload "$tag" \
+            "$OUTPUT_DIR/bootstrap-aarch64.zip" \
+            "$OUTPUT_DIR/bootstrap-x86_64.zip" \
+            "$OUTPUT_DIR/SHA256SUMS" \
+            --clobber

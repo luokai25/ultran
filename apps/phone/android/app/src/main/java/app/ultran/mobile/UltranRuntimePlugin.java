@@ -64,8 +64,19 @@ public final class UltranRuntimePlugin extends Plugin {
 
     @PluginMethod
     public void getStatus(PluginCall call) {
+        File bash = new File(prefix(), "bin/bash");
+        File git = new File(prefix(), "bin/git");
+        File python = new File(prefix(), "bin/python");
+        File python3 = new File(prefix(), "bin/python3");
+        boolean installed = marker().isFile();
+        boolean shellReady = installed && bash.isFile() && bash.canExecute();
         JSObject result = new JSObject();
-        result.put("installed", marker().isFile());
+        result.put("installed", installed);
+        result.put("runtimeReady", shellReady);
+        result.put("shell", shellReady ? bash.getAbsolutePath() : "/system/bin/sh");
+        result.put("gitAvailable", installed && git.isFile() && git.canExecute());
+        result.put("pythonAvailable", installed &&
+            ((python.isFile() && python.canExecute()) || (python3.isFile() && python3.canExecute())));
         result.put("prefix", prefix().getAbsolutePath());
         result.put("architecture", android.os.Build.SUPPORTED_ABIS.length == 0 ? "unknown" : android.os.Build.SUPPORTED_ABIS[0]);
         call.resolve(result);

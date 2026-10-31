@@ -647,7 +647,7 @@ class AgentService:
                 emit({"type": "quality_review", "ok": False, "detail": str(exc)[:240]})
 
         # Explicit file requests produce a real workspace-scoped artifact.
-        if allow_tools and len(tool_calls) < max_tool_calls and artifact_format and self.artifact_service is not None:
+        if artifact_format and self.artifact_service is not None:
             title = _artifact_title(message)
             try:
                 emit({"type": "tool_started", "tool": "artifacts", "action": f"create_{artifact_format}", "label": f"Creating {artifact_format.upper()}"})

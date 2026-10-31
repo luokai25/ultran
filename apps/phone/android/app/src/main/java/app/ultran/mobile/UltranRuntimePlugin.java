@@ -22,7 +22,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -317,9 +316,6 @@ public final class UltranRuntimePlugin extends Plugin {
                 File archive = new File(getContext().getCacheDir(), assetName);
                 partial = new File(getContext().getCacheDir(), assetName + ".partial");
                 if (partial.exists() && !partial.delete()) throw new IllegalStateException("Could not clear an incomplete runtime download.");
-                if (builtInRuntimeInstalled()) {
-                    // Reinstallation is allowed, but the current runtime stays intact until validation succeeds.
-                }
                 String actual = downloadGithubAsset(BOOTSTRAP_RELEASE_BASE + assetName, partial, call);
                 if (!expected.equals(actual)) throw new IllegalStateException("Termux runtime SHA-256 verification failed; the archive was rejected.");
                 if (!partial.renameTo(archive)) throw new IllegalStateException("Could not finalize the verified runtime archive.");
@@ -330,10 +326,6 @@ public final class UltranRuntimePlugin extends Plugin {
                 call.reject(error.getMessage() == null ? "Could not download the official Termux runtime." : error.getMessage(), error);
             }
         });
-    }
-
-    private boolean builtInRuntimeInstalled() {
-        return marker().isFile();
     }
 
     @PluginMethod

@@ -11,7 +11,8 @@ import * as THREE from "three";
 import { Browser } from "@capacitor/browser";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
-import { budgetConversation, buildCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
+import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
+import { buildUltranSystemPrompt, prepareUltranSpeech, ULTRAN_MOTTO, ULTRAN_VOICE } from "./ultran-persona";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -97,6 +98,8 @@ const composer = req<HTMLFormElement>("#composer");
 const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
 const voiceBtn = req<HTMLButtonElement>("#voice-btn");
+const micBtn = req<HTMLButtonElement>("#mic-btn");
+const voiceStatusEl = req<HTMLElement>("#voice-status");
 const backgroundBtn = req<HTMLButtonElement>("#background-btn");
 const workspacePanel = req<HTMLElement>("#workspace-panel");
 const workspaceTasks = req<HTMLElement>("#workspace-tasks");
@@ -161,6 +164,10 @@ document.head.append(favicon);
 
 const STORE_KEY = "ultran.chat.v1";
 const SETTINGS_KEY = "ultran.settings.v1";
+
+function buildCapabilityPrompt(task: string, provider: string): string {
+  return buildUltranSystemPrompt(buildBaseCapabilityPrompt(task, provider));
+}
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -1700,9 +1707,12 @@ function speak(text: string): void {
   if (!synth) return;
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(plainSpeech(text));
-  utterance.rate = 0.98;
-  utterance.pitch = 0.72;
-  const voice = synth.getVoices().find((v) => /en-GB|en-US/i.test(v.lang) && /male|daniel|google uk english male/i.test(v.name));
+  utterance.rate = ULTRAN_VOICE.rate;
+  utterance.pitch = ULTRAN_VOICE.pitch;
+  const voices = synth.getVoices();
+  const voice = voices.find((v) => ULTRAN_VOICE.preferredVoice.test(v.lang) && ULTRAN_VOICE.preferredName.test(v.name))
+    ?? voices.find((v) => ULTRAN_VOICE.preferredVoice.test(v.lang))
+    ?? voices.find((v) => /^en/i.test(v.lang));
   if (voice) utterance.voice = voice;
   const set = (on: boolean): void => {
     speaking = on;
@@ -2047,6 +2057,7 @@ voiceBtn.addEventListener("click", () => {
   if (!settings.voice) synth?.cancel();
   saveSettings();
 });
+micBtn.addEventListener("click", startListening);
 
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
@@ -2116,8 +2127,88 @@ threadEl.addEventListener("scroll", () => {
 jumpBtn.addEventListener("click", () => scrollToEnd());
 
 // The hero avatar is tappable: it says a line, the fastest way to hear it work.
-const PRESETS = ["Ultran online. All systems nominal.", "Awaiting your objective.", "The brain is local. The decision is yours."];
+const PRESETS = ["Ultran online. All systems nominal.", "Awaiting your objective.", "The brain may change. My standards do not.", ULTRAN_MOTTO + "."];
 canvas.addEventListener("pointerdown", () => speak(PRESETS[Math.floor(Math.random() * PRESETS.length)] ?? PRESETS[0]!));
+
+type UltranRecognition = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+};
+type UltranRecognitionConstructor = new () => UltranRecognition;
+let recognition: UltranRecognition | null = null;
+let listening = false;
+let voiceStatusTimer: number | undefined;
+
+function voiceStatus(message: string, isError = false): void {
+  voiceStatusEl.hidden = !message;
+  voiceStatusEl.textContent = message;
+  voiceStatusEl.dataset.state = isError ? "error" : "info";
+  if (voiceStatusTimer) clearTimeout(voiceStatusTimer);
+  if (message && !listening) voiceStatusTimer = window.setTimeout(() => { voiceStatusEl.hidden = true; }, 6500);
+}
+
+function stopListening(): void {
+  listening = false;
+  micBtn.setAttribute("aria-pressed", "false");
+  micBtn.dataset.active = "false";
+  micBtn.setAttribute("aria-label", "Dictate a message");
+  try { recognition?.stop(); } catch { /* already stopped */ }
+}
+
+function startListening(): void {
+  if (listening) { stopListening(); return; }
+  const speechWindow = window as Window & { SpeechRecognition?: UltranRecognitionConstructor; webkitSpeechRecognition?: UltranRecognitionConstructor };
+  const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+  if (!Recognition) {
+    voiceStatus("Voice input is not available in this WebView. Use the keyboard microphone or a supported browser.", true);
+    return;
+  }
+  try {
+    recognition?.abort();
+    recognition = new Recognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
+      if (transcript) {
+        promptEl.value = transcript;
+        autosize();
+        sendBtn.disabled = !transcript.trim() || busy;
+        voiceStatus("Listening… tap the microphone again to stop, then review your words before sending.");
+      }
+    };
+    recognition.onerror = (event) => {
+      stopListening();
+      voiceStatus(event.error === "not-allowed" ? "Microphone permission was denied." : "Voice input stopped: " + (event.error ?? "recognition error") + ".", true);
+    };
+    recognition.onend = () => {
+      listening = false;
+      micBtn.setAttribute("aria-pressed", "false");
+      micBtn.dataset.active = "false";
+      micBtn.setAttribute("aria-label", "Dictate a message");
+      if (!voiceStatusEl.hidden && voiceStatusEl.textContent?.startsWith("Listening")) {
+        voiceStatus("Dictation ready. Review the text before sending.");
+      }
+    };
+    listening = true;
+    micBtn.setAttribute("aria-pressed", "true");
+    micBtn.dataset.active = "true";
+    micBtn.setAttribute("aria-label", "Stop dictation");
+    voiceStatus("Listening. Speech recognition is handled by your device/browser and may use its network service.");
+    recognition.start();
+  } catch (error) {
+    stopListening();
+    voiceStatus("Could not start voice input: " + (error instanceof Error ? error.message : "unknown error"), true);
+  }
+}
 
 document.addEventListener("visibilitychange", syncRender);
 if (synth) {

@@ -3,6 +3,7 @@
     android:description="@string/ultran_accessibility_description"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
+    android:packageNames="com.whatsapp"
     android:notificationTimeout="150"
     android:canRetrieveWindowContent="true"
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows" />

@@ -1,0 +1,141 @@
+package app.ultran.mobile;
+
+import android.content.Context;
+import android.os.SystemClock;
+
+import androidx.annotation.NonNull;
+import androidx.work.Data;
+import androidx.work.Worker;
+import androidx.work.WorkerParameters;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Executes an explicitly approved local command as durable Android-scheduled work.
+ * This is a bounded, non-root worker, not an always-on daemon.
+ */
+public final class UltranCommandWorker extends Worker {
+    public static final String KEY_COMMAND = "command";
+    public static final String KEY_OUTPUT = "output";
+    public static final String KEY_EXIT_CODE = "exitCode";
+    public static final String KEY_TIMED_OUT = "timedOut";
+    public static final String KEY_ERROR = "error";
+    private static final int MAX_OUTPUT_BYTES = 6 * 1024;
+    private static final long MAX_RUNTIME_MS = TimeUnit.MINUTES.toMillis(4);
+
+    public UltranCommandWorker(@NonNull Context context, @NonNull WorkerParameters params) {
+        super(context, params);
+    }
+
+    @NonNull @Override public Result doWork() {
+        String command = getInputData().getString(KEY_COMMAND);
+        if (command == null || command.trim().isEmpty() || command.length() > 4096 || command.indexOf('\0') >= 0) {
+            return Result.failure(new Data.Builder().putString(KEY_ERROR, "Invalid or oversized command.").build());
+        }
+
+        Process process = null;
+        Thread reader = null;
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        AtomicBoolean truncated = new AtomicBoolean(false);
+        try {
+            Context context = getApplicationContext();
+            File runtime = new File(context.getFilesDir(), "ultran-runtime");
+            File prefix = new File(runtime, "usr");
+            File home = new File(runtime, "home");
+            File temp = new File(runtime, "tmp");
+            if ((!home.exists() && !home.mkdirs()) || (!temp.exists() && !temp.mkdirs())) {
+                return Result.failure(new Data.Builder().putString(KEY_ERROR, "Could not prepare Ultran's private runtime directories.").build());
+            }
+
+            File bash = new File(prefix, "bin/bash");
+            boolean termuxReady = new File(prefix, ".ultran-bootstrap-installed").isFile() && bash.canExecute();
+            String shell = termuxReady ? bash.getAbsolutePath() : "/system/bin/sh";
+            ProcessBuilder builder = new ProcessBuilder(shell, "-c", command);
+            builder.directory(home);
+            builder.redirectErrorStream(true);
+            Map<String, String> env = builder.environment();
+            env.put("HOME", home.getAbsolutePath());
+            env.put("TERMUX__HOME", home.getAbsolutePath());
+            env.put("TERMUX_ANDROID_HOME", home.getAbsolutePath());
+            env.put("PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX_PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX__PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
+            env.put("TERMUX_APP__PACKAGE_NAME", context.getPackageName());
+            env.put("TMPDIR", temp.getAbsolutePath());
+            env.put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
+            String prefixLibraryPath = new File(prefix, "lib").getAbsolutePath();
+            String oldLibraryPath = env.get("LD_LIBRARY_PATH");
+            env.put("LD_LIBRARY_PATH", oldLibraryPath == null || oldLibraryPath.isEmpty()
+                ? prefixLibraryPath : prefixLibraryPath + ":" + oldLibraryPath);
+            env.put("SHELL", shell);
+            env.put("TERM", "dumb");
+            env.put("LANG", "C.UTF-8");
+
+            process = builder.start();
+            final Process running = process;
+            reader = new Thread(() -> {
+                byte[] buffer = new byte[2048];
+                try (InputStream input = running.getInputStream()) {
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        synchronized (output) {
+                            int remaining = MAX_OUTPUT_BYTES - output.size();
+                            if (remaining > 0) output.write(buffer, 0, Math.min(remaining, count));
+                            if (count > remaining) truncated.set(true);
+                        }
+                    }
+                } catch (Exception ignored) { }
+            }, "ultran-runtime-output");
+            reader.start();
+
+            long deadline = SystemClock.elapsedRealtime() + MAX_RUNTIME_MS;
+            boolean timedOut = false;
+            while (true) {
+                if (isStopped()) {
+                    process.destroy();
+                    if (process.isAlive()) process.destroyForcibly();
+                    return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command cancelled.").build());
+                }
+                if (!process.isAlive()) break;
+                if (SystemClock.elapsedRealtime() >= deadline) {
+                    timedOut = true;
+                    process.destroy();
+                    if (process.isAlive()) process.destroyForcibly();
+                    break;
+                }
+                Thread.sleep(150);
+            }
+            reader.join(1500);
+            String text;
+            synchronized (output) { text = output.toString("UTF-8"); }
+            if (truncated.get()) text += "\n[Output truncated at 6 KiB.]";
+            if (timedOut) text += "\n[Command stopped after the 4-minute execution limit.]";
+            int exitCode = timedOut ? -1 : process.exitValue();
+            Data result = new Data.Builder()
+                .putString(KEY_OUTPUT, text)
+                .putInt(KEY_EXIT_CODE, exitCode)
+                .putBoolean(KEY_TIMED_OUT, timedOut)
+                .putBoolean("termuxRuntime", termuxReady)
+                .build();
+            return Result.success(result);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            if (process != null) process.destroyForcibly();
+            return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command interrupted.").build());
+        } catch (Exception error) {
+            if (process != null) process.destroyForcibly();
+            String message = error.getMessage() == null ? "Command execution failed." : error.getMessage();
+            if (message.length() > 1000) message = message.substring(0, 1000);
+            return Result.failure(new Data.Builder().putString(KEY_ERROR, message).build());
+        } finally {
+            if (process != null && process.isAlive()) process.destroyForcibly();
+            if (reader != null) reader.interrupt();
+        }
+    }
+}

@@ -72,7 +72,7 @@ public class UltranLocalAiPlugin extends Plugin {
                 item.put("name", file.getName());
                 item.put("sizeBytes", file.length());
                 item.put("loaded", file.getAbsolutePath().equals(loadedModelPath));
-                try { models.put(item); } catch (JSONException ignored) {}
+                models.put(item);
             }
         }
         JSObject result = new JSObject();

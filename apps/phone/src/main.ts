@@ -70,6 +70,7 @@ const composer = req<HTMLFormElement>("#composer");
 const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
 const voiceBtn = req<HTMLButtonElement>("#voice-btn");
+const backgroundBtn = req<HTMLButtonElement>("#background-btn");
 const linkPill = req<HTMLElement>("#link-pill");
 const jumpBtn = req<HTMLButtonElement>("#jump-btn");
 const menuBtn = req<HTMLButtonElement>("#menu-btn");
@@ -645,6 +646,58 @@ async function remoteReply(
 }
 
 /** The on-device responder: honest about being small, useful for the basics. */
+async function remoteBackgroundReply(
+  convo: Conversation,
+  text: string,
+  onEvent: (event: Record<string, unknown>) => void,
+): Promise<ChatReply> {
+  const agentId = await ensureAgent();
+  const response = await api("/v1/tasks", {
+    method: "POST",
+    body: JSON.stringify({ agent_id: agentId, message: text, session_id: convo.sessionId ?? null,
+      allow_tools: true, max_tool_calls: 8 }),
+  });
+  if (!response.ok) throw new Error(`could not queue background task (${response.status})`);
+  const task = await response.json() as { id: string };
+  const streamResponse = await fetch(`${baseUrl()}/v1/tasks/${task.id}/events`, {
+    headers: { Accept: "text/event-stream" },
+  });
+  if (!streamResponse.ok || !streamResponse.body) throw new Error(`background event stream returned ${streamResponse.status}`);
+  const reader = streamResponse.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let terminal = "";
+  const consume = (block: string): void => {
+    const lines = block.split(/\r?\n/);
+    const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+    const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
+    if (!data) return;
+    const event = JSON.parse(data) as Record<string, unknown>;
+    if (eventName === "terminal") { terminal = String(event.status ?? ""); return; }
+    onEvent(event);
+  };
+  while (!terminal) {
+    const chunk = await reader.read();
+    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    let boundary = buffer.search(/\r?\n\r?\n/);
+    while (boundary >= 0) {
+      const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
+      consume(buffer.slice(0, boundary));
+      buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+      boundary = buffer.search(/\r?\n\r?\n/);
+    }
+    if (chunk.done) break;
+  }
+  reader.cancel().catch(() => undefined);
+  const statusResponse = await api(`/v1/tasks/${task.id}`);
+  if (!statusResponse.ok) throw new Error("could not retrieve background task result");
+  const completed = await statusResponse.json() as { status: string; result?: ChatReply; error?: string };
+  if (completed.status !== "succeeded" || !completed.result) {
+    throw new Error(completed.error || `background task ${completed.status || terminal}`);
+  }
+  return completed.result;
+}
+
 function localReply(text: string): ChatReply {
   const low = text.toLowerCase();
   const now = new Date();
@@ -670,6 +723,7 @@ function localReply(text: string): ChatReply {
  * ------------------------------------------------------------------ */
 
 let busy = false;
+let backgroundMode = false;
 
 function autosize(): void {
   promptEl.style.height = "auto";
@@ -734,7 +788,9 @@ async function submit(raw: string): Promise<void> {
   let result: ChatReply;
   if (baseUrl()) {
     try {
-      result = await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event));
+      result = backgroundMode
+        ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))
+        : await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event));
       if (result.session_id) convo.sessionId = result.session_id;
       setLink("online");
     } catch (error) {
@@ -1039,6 +1095,13 @@ promptEl.addEventListener("keydown", (event) => {
     void submit(promptEl.value);
   }
 });
+backgroundBtn.addEventListener("click", () => {
+  backgroundMode = !backgroundMode;
+  backgroundBtn.setAttribute("aria-pressed", String(backgroundMode));
+  backgroundBtn.dataset.active = String(backgroundMode);
+  backgroundBtn.setAttribute("aria-label", backgroundMode ? "Run as a background task" : "Run in foreground");
+});
+
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
   void submit(promptEl.value);

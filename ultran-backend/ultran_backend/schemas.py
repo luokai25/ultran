@@ -75,6 +75,7 @@ class AgentTaskCreate(_Strict):
     message: str = Field(min_length=1, max_length=16000)
     allow_tools: bool = True
     max_tool_calls: int = Field(default=4, ge=0, le=16)
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 class AgentTaskOut(BaseModel):
@@ -84,6 +85,7 @@ class AgentTaskOut(BaseModel):
     message: str
     allow_tools: bool
     max_tool_calls: int
+    session_id: str | None = None
     status: str
     attempts: int
     result: dict[str, Any] | None = None

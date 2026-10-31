@@ -17,6 +17,7 @@ class AgentTask:
     message: str
     allow_tools: bool
     max_tool_calls: int
+    session_id: str | None = None
     status: str = "queued"
     attempts: int = 0
     result: dict[str, Any] | None = None
@@ -27,7 +28,7 @@ class AgentTask:
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "agent_id": self.agent_id, "workspace_id": self.workspace_id,
                 "message": self.message, "allow_tools": self.allow_tools,
-                "max_tool_calls": self.max_tool_calls, "status": self.status,
+                "max_tool_calls": self.max_tool_calls, "session_id": self.session_id, "status": self.status,
                 "attempts": self.attempts, "result": self.result, "error": self.error,
                 "created_at": self.created_at, "updated_at": self.updated_at}
 
@@ -74,19 +75,31 @@ class AgentTaskService:
                 message TEXT NOT NULL, allow_tools INTEGER NOT NULL, max_tool_calls INTEGER NOT NULL,
                 status TEXT NOT NULL, attempts INTEGER NOT NULL, result TEXT, error TEXT NOT NULL,
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
+            columns = {row[1] for row in db.execute("PRAGMA table_info(agent_tasks)")}
+            if "session_id" not in columns:
+                db.execute("ALTER TABLE agent_tasks ADD COLUMN session_id TEXT")
             db.execute("CREATE INDEX IF NOT EXISTS idx_agent_tasks_workspace ON agent_tasks(workspace_id, created_at DESC)")
+            db.execute("""CREATE TABLE IF NOT EXISTS agent_task_events (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
+                event_json TEXT NOT NULL, created_at TEXT NOT NULL,
+                FOREIGN KEY(task_id) REFERENCES agent_tasks(id) ON DELETE CASCADE)""")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_agent_task_events_task ON agent_task_events(task_id, seq)")
         try: self._path.chmod(0o600)
         except OSError: pass
 
     def _persist(self, task: AgentTask):
         with self._connect() as db:
-            db.execute("""INSERT INTO agent_tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            db.execute("""INSERT INTO agent_tasks
+                (id, agent_id, workspace_id, message, allow_tools, max_tool_calls, status, attempts,
+                 result, error, created_at, updated_at, session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET status=excluded.status, attempts=excluded.attempts,
-                result=excluded.result, error=excluded.error, updated_at=excluded.updated_at""",
+                result=excluded.result, error=excluded.error, updated_at=excluded.updated_at,
+                session_id=excluded.session_id""",
                 (task.id, task.agent_id, task.workspace_id, self._encode(task.message),
                  int(task.allow_tools), task.max_tool_calls, task.status, task.attempts,
                  self._encode(json.dumps(task.result, ensure_ascii=False)) if task.result is not None else None,
-                 self._encode(task.error), task.created_at.isoformat(), task.updated_at.isoformat()))
+                 self._encode(task.error), task.created_at.isoformat(), task.updated_at.isoformat(), task.session_id))
 
     def _load(self):
         with self._connect() as db:
@@ -95,23 +108,25 @@ class AgentTaskService:
             status = row["status"]
             if status in {"running", "retrying"}: status = "interrupted"
             task = AgentTask(row["id"], row["agent_id"], row["workspace_id"], self._decode(row["message"]),
-                bool(row["allow_tools"]), row["max_tool_calls"], status, row["attempts"],
+                bool(row["allow_tools"]), row["max_tool_calls"], row["session_id"], status, row["attempts"],
                 json.loads(self._decode(row["result"])) if row["result"] else None,
                 self._decode(row["error"]), datetime.fromisoformat(row["created_at"]), utcnow())
             self._tasks[task.id] = task
             if task.status == "interrupted": self._persist(task)
 
     def submit(self, agent_id: str, workspace_id: str, message: str, *,
-               allow_tools: bool = True, max_tool_calls: int = 4) -> AgentTask:
+               allow_tools: bool = True, max_tool_calls: int = 4,
+               session_id: str | None = None) -> AgentTask:
         if not message.strip() or len(message) > 16000:
             raise ValidationFailed("task message must contain 1 to 16000 characters")
         if not 0 <= max_tool_calls <= 16:
             raise ValidationFailed("max_tool_calls must be between 0 and 16")
         task = AgentTask("task_" + uuid.uuid4().hex[:16], agent_id, workspace_id,
-                         message.strip(), bool(allow_tools), max_tool_calls)
+                         message.strip(), bool(allow_tools), max_tool_calls, session_id)
         with self._lock:
             self._tasks[task.id] = task
             self._persist(task)
+            self._record_event(task.id, {"type": "task_queued", "status": "queued"})
         self._schedule(task.id)
         return task
 
@@ -134,13 +149,16 @@ class AgentTaskService:
                     return
                 task.status, task.attempts, task.updated_at = "running", task.attempts + 1, utcnow()
                 self._persist(task)
+                self._record_event(task.id, {"type": "task_started", "attempt": task.attempts})
             try:
-                result = self._execute(task.agent_id, task.message, session_id=None,
+                result = self._execute(task.agent_id, task.message, session_id=task.session_id,
                     workspace_id=task.workspace_id, allow_tools=task.allow_tools,
-                    max_tool_calls=task.max_tool_calls)
+                    max_tool_calls=task.max_tool_calls,
+                    event_callback=lambda event: self._record_event(task_id, event))
                 with self._lock:
                     task.result, task.status, task.error, task.updated_at = result, "succeeded", "", utcnow()
                     self._persist(task)
+                    self._record_event(task.id, {"type": "task_succeeded", "status": "succeeded"})
             except Exception as exc:
                 with self._lock:
                     # Do not blindly replay a failed agent run: it may have completed
@@ -148,10 +166,33 @@ class AgentTaskService:
                     # human action and each write tool still passes its approval gate.
                     task.error, task.status, task.updated_at = str(exc)[:2000], "failed", utcnow()
                     self._persist(task)
+                    self._record_event(task.id, {"type": "task_failed", "status": "failed", "message": task.error[:500]})
         finally:
             with self._lock:
                 self._futures.pop(task_id, None)
 
+
+    def _record_event(self, task_id: str, event: dict[str, Any]) -> None:
+        """Persist a bounded, encrypted execution timeline for reconnectable clients."""
+        safe = dict(event)
+        for key in ("detail", "label", "message"):
+            if isinstance(safe.get(key), str):
+                safe[key] = safe[key][:2000]
+        encoded = self._encode(json.dumps(safe, ensure_ascii=False, default=str)[:16000])
+        with self._connect() as db:
+            db.execute("INSERT INTO agent_task_events(task_id, event_json, created_at) VALUES (?, ?, ?)",
+                       (task_id, encoded, utcnow().isoformat()))
+            db.execute("""DELETE FROM agent_task_events WHERE task_id=? AND seq NOT IN
+                        (SELECT seq FROM agent_task_events WHERE task_id=? ORDER BY seq DESC LIMIT 500)""",
+                       (task_id, task_id))
+
+    def events(self, workspace_id: str, task_id: str, *, after: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+        self.get(workspace_id, task_id)
+        with self._connect() as db:
+            rows = db.execute("SELECT seq, event_json, created_at FROM agent_task_events WHERE task_id=? AND seq>? ORDER BY seq LIMIT ?",
+                              (task_id, max(0, after), max(1, min(limit, 200)))).fetchall()
+        return [{"id": row["seq"], "created_at": row["created_at"],
+                 **json.loads(self._decode(row["event_json"]))} for row in rows]
 
     def get(self, workspace_id: str, task_id: str) -> AgentTask:
         with self._lock:
@@ -184,6 +225,7 @@ class AgentTaskService:
                 raise ValidationFailed("task has reached the five-attempt safety limit")
             task.status, task.error, task.updated_at = "queued", "", utcnow()
             self._persist(task)
+            self._record_event(task_id, {"type": "task_requeued", "attempt": task.attempts + 1})
         self._schedule(task_id)
         return task
 

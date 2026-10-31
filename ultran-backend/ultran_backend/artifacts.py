@@ -6,6 +6,7 @@ import hashlib
 import html
 import io
 import json
+import os
 import re
 import uuid
 import zipfile
@@ -423,7 +424,11 @@ def _xlsx_bytes(content: str) -> bytes:
 class ArtifactService:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root).resolve()
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self.root.chmod(0o700)
+        except OSError:
+            pass
         self._items: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
         for meta_path in self.root.glob("*/.*.meta.json"):
@@ -446,7 +451,11 @@ class ArtifactService:
         artifact_id = f"art_{uuid.uuid4().hex[:16]}"
         workspace_key = hashlib.sha256(workspace_id.encode()).hexdigest()[:24]
         directory = (self.root / workspace_key).resolve()
-        directory.mkdir(parents=True, exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            directory.chmod(0o700)
+        except OSError:
+            pass
         filename = f"{_safe_name(title)}-{artifact_id[-6:]}.{fmt}"
         path = (directory / filename).resolve()
         if path.parent != directory:
@@ -477,7 +486,10 @@ class ArtifactService:
             payload = _library_xlsx_bytes(content) or _xlsx_bytes(content)
         else:
             payload = content.encode("utf-8")
-        path.write_bytes(payload)
+        temporary_path = directory / f".{artifact_id}.tmp"
+        temporary_path.write_bytes(payload)
+        temporary_path.chmod(0o600)
+        os.replace(temporary_path, path)
         preview_path = ""
         if fmt == "pptx":
             preview_path = str(directory / f".{artifact_id}.preview.html")
@@ -487,7 +499,10 @@ class ArtifactService:
                 head, _, body = section.partition("\n")
                 cards.append(f"<section class='slide'><small>SLIDE {index:02d}</small><h2>{html.escape(head or title)}</h2><p>{html.escape(body)}</p></section>")
             preview_doc = "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>" + html.escape(title) + "</title><style>body{margin:0;padding:24px;background:#111;color:#eee;font:15px system-ui}.slide{max-width:900px;min-height:360px;margin:20px auto;padding:42px;background:#191919;border:1px solid #a88a36;border-radius:18px;box-shadow:0 12px 40px #000}.slide small{color:#d4af37;letter-spacing:.15em}.slide h2{font-size:30px}.slide p{white-space:pre-wrap;line-height:1.65}</style>" + "".join(cards)
-            Path(preview_path).write_text(preview_doc, encoding="utf-8")
+            preview_tmp = directory / f".{artifact_id}.preview.tmp"
+            preview_tmp.write_text(preview_doc, encoding="utf-8")
+            preview_tmp.chmod(0o600)
+            os.replace(preview_tmp, preview_path)
         elif fmt in {"docx", "xlsx", "csv", "md", "txt", "json"}:
             preview_path = str(directory / f".{artifact_id}.preview.html")
             if fmt in {"xlsx", "csv"}:
@@ -501,12 +516,18 @@ class ArtifactService:
                 display = json.dumps(json.loads(content), ensure_ascii=False, indent=2) if fmt == "json" else content
                 preview_body = "<pre>" + html.escape(display) + "</pre>"
             preview_doc = _html_bytes(title, "<h1>" + html.escape(title) + "</h1>" + preview_body).decode("utf-8")
-            Path(preview_path).write_text(preview_doc, encoding="utf-8")
+            preview_tmp = directory / f".{artifact_id}.preview.tmp"
+            preview_tmp.write_text(preview_doc, encoding="utf-8")
+            preview_tmp.chmod(0o600)
+            os.replace(preview_tmp, preview_path)
         metadata = {"id": artifact_id, "workspace_id": workspace_id, "title": title, "format": fmt,
                     "mime_type": FORMATS[fmt][0], "size": len(payload), "created_at": datetime.now(timezone.utc).isoformat(),
                     "filename": filename, "path": str(path), "preview_path": preview_path}
         meta_path = directory / f".{artifact_id}.meta.json"
-        meta_path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
+        meta_tmp = directory / f".{artifact_id}.meta.tmp"
+        meta_tmp.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
+        meta_tmp.chmod(0o600)
+        os.replace(meta_tmp, meta_path)
         try:
             meta_path.chmod(0o600)
             path.chmod(0o600)

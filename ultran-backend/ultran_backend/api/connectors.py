@@ -10,6 +10,40 @@ from .deps import ContainerDep, WorkspaceDep
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
 
+
+# --------------------------------------------------------- Composio gateway
+
+
+@router.get("/composio/status")
+def composio_status(container: ContainerDep):
+    """Expose configuration state only; never reveal the Composio API key."""
+    return {"configured": container.composio.configured, "provider": "composio"}
+
+
+@router.post("/composio/session")
+def composio_session(container: ContainerDep, workspace: WorkspaceDep):
+    """Create an MCP session scoped to the current Ultran workspace."""
+    return container.composio.create_session(workspace)
+
+
+@router.post("/composio/authorize/{toolkit}")
+def composio_authorize(toolkit: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Return a hosted OAuth Connect Link for the selected Composio toolkit."""
+    return container.composio.authorize(workspace, toolkit)
+
+
+@router.get("/composio/connections")
+def composio_connections(container: ContainerDep, workspace: WorkspaceDep):
+    """List this workspace's connected accounts with credentials redacted."""
+    return {"connections": container.composio.list_connections(workspace)}
+
+
+@router.delete("/composio/connections/{connected_account_id}", status_code=status.HTTP_204_NO_CONTENT)
+def composio_revoke(connected_account_id: str, container: ContainerDep):
+    """Revoke an account by its Composio ID."""
+    container.composio.revoke(connected_account_id)
+    return None
+
 @router.get("/stats")
 def stats(container: ContainerDep):
     return container.registry.stats()

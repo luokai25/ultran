@@ -201,6 +201,10 @@ def test_composio_unattended_invoke_rejects_mutating_tools_and_closes_pool():
 def test_composio_tool_routes_are_workspace_scoped(client, container):
     class FakeGateway:
         configured = True
+        def pending_approvals(self, workspace):
+            return [{"workspace": workspace, "id": "apr_123"}]
+        def decide_approval(self, workspace, approval_id, *, approved):
+            return {"workspace": workspace, "id": approval_id, "approved": approved}
         def list_tools(self, workspace):
             return [{"workspace": workspace, "id": "composio.list_messages"}]
         def invoke_read_tool(self, workspace, tool_name, arguments):
@@ -216,6 +220,16 @@ def test_composio_tool_routes_are_workspace_scoped(client, container):
     )
     assert invoked.json()["workspace"] == "kai-workspace"
     assert invoked.json()["arguments"] == {"query": "inbox"}
+    pending = client.get("/v1/connectors/composio/approvals", headers=headers)
+    assert pending.json()["approvals"][0]["workspace"] == "kai-workspace"
+    approved = client.post(
+        "/v1/connectors/composio/approvals/apr_123/approve", headers=headers
+    )
+    assert approved.json()["approved"] is True
+    denied = client.post(
+        "/v1/connectors/composio/approvals/apr_123/deny", headers=headers
+    )
+    assert denied.json()["approved"] is False
 
 
 

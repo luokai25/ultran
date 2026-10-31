@@ -532,7 +532,7 @@ async function loadNativeModel(): Promise<void> {
   try {
     const result = await NativeLocalAI.loadModel({ name });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · memory-mapped CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "aggressive low-memory paging" : "automatic lazy paging") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {

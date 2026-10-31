@@ -116,7 +116,7 @@ test("agent-core uses one brain-independent plan-act-reflect loop with bounded m
 test("agent-core usage limits account for projected calls and replay-stable metering", () => {
   assert.match(policyGate, /used \+ amount > limit/);
   assert.match(policyGate, /recordUsage\(/);
-  assert.match(orchestrator, /recordUsage\(state\.runId, 'tool\.calls', 1/);
+  assert.match(orchestrator, /recordUsage\(\s*state\.runId, 'tool\.calls', 1/);
   assert.match(ledger, /idempotencyKey\?: string/);
   assert.match(ledger, /reading\.idempotencyKey \?\?/);
   assert.match(runState, /type: 'approval\.required'/);

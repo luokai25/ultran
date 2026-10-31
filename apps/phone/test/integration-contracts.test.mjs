@@ -215,7 +215,7 @@ test("WhatsApp sending requires one-shot explicit approval and exact editable co
   assert.match(companion, /ACTION_ACCESSIBILITY_SETTINGS/);
   assert.match(companion, /pending_accessibility_action/);
   assert.match(messagingService, /com\.whatsapp/);
-  assert.match(messagingService, /node\.isEditable\(\)/);
+  assert.match(messagingService, /android\.widget\.EditText/);
   assert.match(messagingService, /expected\.contentEquals\(text\)/);
   assert.match(messagingService, /clearApproval\(prefs\)/);
   assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);

@@ -68,7 +68,8 @@ class Agent:
     def system_message(self) -> str:
         base = self.system_prompt or f"You are {self.name} ({self.persona}), a local Ultran agent."
         if self.tools:
-            return f"{base} You may call these tools: {', '.join(self.tools)}."
+            extra = " Composio tools are available through connected OAuth accounts; require human approval for write, delete, execute, or admin actions." if "composio" in self.tools else ""
+            return f"{base} You may call these tools: {', '.join(self.tools)}.{extra}"
         return base
 
     def public(self) -> dict[str, Any]:
@@ -89,10 +90,11 @@ class Agent:
 class AgentService:
     """Owns agents and their sessions. Every mutation is validated first."""
 
-    def __init__(self, brain: BrainRuntime, sandbox: ToolSandbox, vault=None) -> None:
+    def __init__(self, brain: BrainRuntime, sandbox: ToolSandbox, vault=None, composio=None) -> None:
         self.brain = brain
         self.sandbox = sandbox
         self.vault = vault
+        self.composio = composio
         self._agents: dict[str, Agent] = {}
         self._sessions: dict[str, Session] = {}
 
@@ -114,7 +116,8 @@ class AgentService:
             raise ValidationFailed("unsupported agent brain provider", details={"provider": brain})
         tool_list = [t for t in (tools or []) if t.strip()]
         for tool_id in tool_list:
-            # fail fast: an agent may only be given connectors that exist
+            if tool_id == "composio":
+                continue
             self.sandbox.registry.get(tool_id)
         agent = Agent(
             id=f"ag_{uuid.uuid4().hex[:12]}",
@@ -163,6 +166,8 @@ class AgentService:
         if changes.get("tools") is not None:
             new_tools = [t for t in changes["tools"] if t.strip()]
             for tool_id in new_tools:
+                if tool_id == "composio":
+                    continue
                 self.sandbox.registry.get(tool_id)
             agent.tools = new_tools
         return agent
@@ -253,7 +258,8 @@ class AgentService:
         tool_calls: list[dict[str, Any]] = []
         if allow_tools and agent.tools and max_tool_calls > 0:
             tool_calls = self._run_tools(
-                agent, workspace_id, message, limit=max_tool_calls
+                agent, workspace_id, message, limit=max_tool_calls,
+                backend_override=backend_override,
             )
 
         agent.total_runs += 1
@@ -270,7 +276,8 @@ class AgentService:
         }
 
     def _run_tools(
-        self, agent: Agent, workspace_id: str, message: str, *, limit: int
+        self, agent: Agent, workspace_id: str, message: str, *, limit: int,
+        backend_override: Any = None,
     ) -> list[dict[str, Any]]:
         """Deterministically choose up to ``limit`` declared actions to exercise.
 
@@ -313,4 +320,21 @@ class AgentService:
                     "detail": "ok" if out.ok else out.error,
                 }
             )
+        if len(results) < limit and "composio" in agent.tools and self.composio is not None:
+            def plan(prompt: str, user_message: str) -> str:
+                planned = self.brain.complete(
+                    [BrainMessage("system", prompt), BrainMessage("user", user_message)],
+                    model=agent.model, temperature=0.0,
+                    backend_override=backend_override,
+                )
+                return planned.content
+            try:
+                results.extend(self.composio.plan_and_execute(
+                    workspace_id, agent.id, message, plan, limit=limit - len(results)
+                ))
+            except Exception as exc:
+                results.append({
+                    "connector": "composio", "action": "plan",
+                    "ok": False, "detail": str(exc)[:300],
+                })
         return results

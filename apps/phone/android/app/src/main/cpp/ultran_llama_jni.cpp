@@ -1,6 +1,9 @@
 #include <jni.h>
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <cstddef>
 #include <mutex>
 #include <string>
@@ -14,6 +17,10 @@ llama_model *g_model = nullptr;
 llama_context *g_context = nullptr;
 bool g_backend_initialized = false;
 uint32_t g_context_tokens = 2048;
+uint64_t g_last_prompt_tokens = 0;
+uint64_t g_last_generated_tokens = 0;
+double g_last_prompt_ms = 0.0;
+double g_last_generation_ms = 0.0;
 
 void release_model() {
     if (g_context) {
@@ -195,6 +202,11 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_model || !g_context) return env->NewStringUTF("No native model is loaded.");
+    using Clock = std::chrono::steady_clock;
+    g_last_prompt_tokens = 0;
+    g_last_generated_tokens = 0;
+    g_last_prompt_ms = 0.0;
+    g_last_generation_ms = 0.0;
 
     const jsize count = jroles ? env->GetArrayLength(jroles) : 0;
     if (count == 0 || count > 40 || !jcontents || env->GetArrayLength(jcontents) != count) {
@@ -228,7 +240,9 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
                      tokens.end() - static_cast<ptrdiff_t>(suffix_tokens));
     }
 
+    g_last_prompt_tokens = tokens.size();
     llama_memory_clear(llama_get_memory(g_context), true);
+    const auto prompt_start = Clock::now();
     for (size_t offset = 0; offset < tokens.size(); offset += 64) {
         const size_t count = std::min<size_t>(64, tokens.size() - offset);
         llama_batch prompt_batch = llama_batch_get_one(tokens.data() + offset, static_cast<int32_t>(count));
@@ -236,6 +250,9 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
             return env->NewStringUTF("The model failed while processing the prompt. Try a shorter conversation.");
         }
     }
+
+    const auto generation_start = Clock::now();
+    g_last_prompt_ms = std::chrono::duration<double, std::milli>(generation_start - prompt_start).count();
 
     auto sampler_params = llama_sampler_chain_default_params();
     llama_sampler *sampler = llama_sampler_chain_init(sampler_params);
@@ -250,6 +267,7 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
         const llama_token token = llama_sampler_sample(sampler, g_context, -1);
         llama_sampler_accept(sampler, token);
         if (llama_vocab_is_eog(vocab, token)) break;
+        ++g_last_generated_tokens;
 
         char piece[512];
         const int32_t piece_size = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
@@ -260,7 +278,25 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
         if (llama_decode(g_context, batch) != 0) break;
     }
     llama_sampler_free(sampler);
+    const auto inference_end = Clock::now();
+    g_last_generation_ms = std::chrono::duration<double, std::milli>(inference_end - generation_start).count();
     return to_java_string(env, output);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_app_ultran_mobile_NativeLlama_nativeGetLastMetrics(JNIEnv *env, jclass) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    const double tokens_per_second = g_last_generation_ms > 0.0
+        ? static_cast<double>(g_last_generated_tokens) * 1000.0 / g_last_generation_ms
+        : 0.0;
+    std::ostringstream json;
+    json << std::fixed << std::setprecision(2)
+         << "{\"promptTokens\":" << g_last_prompt_tokens
+         << ",\"generatedTokens\":" << g_last_generated_tokens
+         << ",\"promptMs\":" << g_last_prompt_ms
+         << ",\"generationMs\":" << g_last_generation_ms
+         << ",\"tokensPerSecond\":" << tokens_per_second << "}";
+    return env->NewStringUTF(json.str().c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL

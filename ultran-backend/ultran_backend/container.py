@@ -76,6 +76,8 @@ class Container:
         composio = ComposioGateway(
             api_key=settings.composio_api_key,
             callback_url=settings.composio_callback_url,
+            db_path=settings.data_dir / "composio_approvals.sqlite3",
+            encryption_key=settings.credential_encryption_key,
         )
 
         return cls(

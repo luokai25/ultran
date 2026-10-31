@@ -35,3 +35,11 @@ button,input,textarea,select{font:inherit}button{touch-action:manipulation}butto
 .panel{bottom:calc(64px + var(--safe-bottom));}
 .workspace-panel{bottom:calc(64px + var(--safe-bottom));inset:0 0 calc(64px + var(--safe-bottom));}
 @media(max-width:430px){.bottom-nav{min-height:62px;padding-inline:7px}.nav-item{min-height:47px;font-size:8px}.nav-item svg{width:19px;height:19px}}
+/* Keep the send action pinned while capability shortcuts scroll independently. */
+.composer-row{display:flex;align-items:center;gap:6px;min-width:0;overflow:visible}
+.tool-strip{display:flex;align-items:center;flex:1 1 0;gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.tool-strip::-webkit-scrollbar{display:none}
+.tool-strip .tool{flex:0 0 auto}
+#link-pill{flex:0 0 auto;margin-left:0;padding-inline:5px;font-size:7px;letter-spacing:.07em}
+#send-btn{position:relative;z-index:2;flex:0 0 38px;width:38px;margin-left:0}
+@media(max-width:390px){#link-pill{display:none}.composer-row{gap:5px}.tool-strip{gap:5px}}

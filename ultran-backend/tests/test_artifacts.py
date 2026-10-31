@@ -118,14 +118,16 @@ def test_html_preview_strips_active_content(tmp_path: Path):
     assert "<script" not in body and "javascript:" not in body
 
 
-def test_tool_budget_can_disable_artifact_generation(client):
-    created = client.post("/v1/agents", json={"name": "No Tools", "brain": "echo", "tools": []})
+def test_native_file_creation_is_not_blocked_by_connector_tool_budget(client):
+    created = client.post("/v1/agents", json={"name": "No Connectors", "brain": "echo", "tools": []})
     agent_id = created.json()["id"]
     response = client.post(f"/v1/agents/{agent_id}/chat", json={
-        "message": "Create a PDF about oceans", "allow_tools": False, "max_tool_calls": 0
+        "message": "Make a PDF about oceans", "allow_tools": False, "max_tool_calls": 0
     })
     assert response.status_code == 200
-    assert response.json()["tool_calls"] == []
+    artifact_calls = [call for call in response.json()["tool_calls"] if call["connector"] == "artifacts"]
+    assert len(artifact_calls) == 1
+    assert artifact_calls[0]["artifact"]["format"] == "pdf"
 
 
 def test_tool_catalog_has_native_file_generators(client):

@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+import threading
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from .brain import BrainMessage, BrainRuntime, OpenAICompatBackend
@@ -94,13 +98,146 @@ class Agent:
 class AgentService:
     """Owns agents and their sessions. Every mutation is validated first."""
 
-    def __init__(self, brain: BrainRuntime, sandbox: ToolSandbox, vault=None, composio=None) -> None:
+    def __init__(
+        self, brain: BrainRuntime, sandbox: ToolSandbox, vault=None, composio=None,
+        db_path: str | Path | None = None, encryption_key: str = "",
+    ) -> None:
         self.brain = brain
         self.sandbox = sandbox
         self.vault = vault
         self.composio = composio
         self._agents: dict[str, Agent] = {}
         self._sessions: dict[str, Session] = {}
+        self._db_path = Path(db_path) if db_path else None
+        self._fernet = None
+        if encryption_key:
+            from cryptography.fernet import Fernet
+            self._fernet = Fernet(encryption_key.encode("ascii"))
+        self._db_lock = threading.RLock()
+        if self._db_path is not None:
+            self._db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            try:
+                self._db_path.parent.chmod(0o700)
+            except OSError:
+                pass
+            self._init_db()
+            self._load_db()
+
+    def _connect_db(self):
+        if self._db_path is None:
+            raise RuntimeError("agent persistence is not configured")
+        db = sqlite3.connect(self._db_path, timeout=10)
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA busy_timeout=10000")
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA synchronous=FULL")
+        return db
+
+    @contextmanager
+    def _database(self):
+        db = self._connect_db()
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def _init_db(self) -> None:
+        with self._db_lock, self._database() as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS agents (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL, persona TEXT NOT NULL,
+                    brain TEXT NOT NULL, model TEXT NOT NULL, tools_json TEXT NOT NULL,
+                    system_prompt TEXT NOT NULL, temperature REAL NOT NULL,
+                    enabled INTEGER NOT NULL, created_at TEXT NOT NULL,
+                    total_runs INTEGER NOT NULL DEFAULT 0,
+                    total_tokens INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                    created_at TEXT NOT NULL, turns INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_sessions_agent_created
+                    ON sessions(agent_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS session_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                    position INTEGER NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL,
+                    UNIQUE(session_id, position)
+                );
+            """)
+        try:
+            self._db_path.chmod(0o600)
+        except OSError:
+            pass
+
+    def _load_db(self) -> None:
+        with self._db_lock, self._database() as db:
+            for row in db.execute("SELECT * FROM agents ORDER BY created_at"):
+                agent = Agent(
+                    id=row["id"], name=row["name"], persona=row["persona"],
+                    brain=row["brain"], model=row["model"],
+                    tools=json.loads(row["tools_json"]), system_prompt=self._decode(row["system_prompt"]),
+                    temperature=row["temperature"], enabled=bool(row["enabled"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                    total_runs=row["total_runs"], total_tokens=row["total_tokens"],
+                )
+                self._agents[agent.id] = agent
+            for row in db.execute("SELECT * FROM sessions ORDER BY created_at"):
+                session = Session(
+                    id=row["id"], agent_id=row["agent_id"],
+                    created_at=datetime.fromisoformat(row["created_at"]), turns=row["turns"],
+                )
+                for msg in db.execute(
+                    "SELECT role, content FROM session_messages WHERE session_id=? ORDER BY position",
+                    (session.id,),
+                ):
+                    session.messages.append(BrainMessage(role=msg["role"], content=self._decode(msg["content"])))
+                self._sessions[session.id] = session
+
+    def _encode(self, value: str) -> str:
+        if self._fernet is None:
+            return value
+        return self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
+
+    def _decode(self, value: str) -> str:
+        if self._fernet is None:
+            return value
+        try:
+            return self._fernet.decrypt(value.encode("ascii")).decode("utf-8")
+        except Exception as exc:
+            raise RuntimeError("stored agent memory cannot be decrypted; check ULTRAN_CREDENTIAL_ENCRYPTION_KEY") from exc
+
+    def _save_agent(self, agent: Agent) -> None:
+        if self._db_path is None:
+            return
+        with self._db_lock, self._database() as db:
+            db.execute("""INSERT INTO agents VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name=excluded.name, persona=excluded.persona,
+                brain=excluded.brain, model=excluded.model, tools_json=excluded.tools_json,
+                system_prompt=excluded.system_prompt, temperature=excluded.temperature,
+                enabled=excluded.enabled, total_runs=excluded.total_runs,
+                total_tokens=excluded.total_tokens""",
+                (agent.id, agent.name, agent.persona, agent.brain, agent.model,
+                 json.dumps(agent.tools), self._encode(agent.system_prompt), agent.temperature,
+                 int(agent.enabled), agent.created_at.isoformat(), agent.total_runs, agent.total_tokens))
+
+    def _save_session(self, session: Session) -> None:
+        if self._db_path is None:
+            return
+        with self._db_lock, self._database() as db:
+            db.execute("INSERT INTO sessions VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET turns=excluded.turns",
+                       (session.id, session.agent_id, session.created_at.isoformat(), session.turns))
+            db.execute("DELETE FROM session_messages WHERE session_id=?", (session.id,))
+            db.executemany(
+                "INSERT INTO session_messages(session_id, position, role, content) VALUES (?, ?, ?, ?)",
+                [(session.id, index, message.role, self._encode(message.content))
+                 for index, message in enumerate(session.messages)],
+            )
 
     # ------------------------------------------------------------------ #
     def create(
@@ -134,6 +271,7 @@ class AgentService:
             temperature=temperature,
         )
         self._agents[agent.id] = agent
+        self._save_agent(agent)
         return agent
 
     def get(self, agent_id: str) -> Agent:
@@ -174,6 +312,7 @@ class AgentService:
                     continue
                 self.sandbox.registry.get(tool_id)
             agent.tools = new_tools
+        self._save_agent(agent)
         return agent
 
     def delete(self, agent_id: str) -> None:
@@ -181,6 +320,9 @@ class AgentService:
         del self._agents[agent_id]
         for sid in [s.id for s in self._sessions.values() if s.agent_id == agent_id]:
             del self._sessions[sid]
+        if self._db_path is not None:
+            with self._db_lock, self._database() as db:
+                db.execute("DELETE FROM agents WHERE id=?", (agent_id,))
 
     # ------------------------------------------------------------------ #
     def session(self, agent_id: str, session_id: str | None = None) -> Session:
@@ -197,6 +339,7 @@ class AgentService:
             return sess
         sess = Session(id=f"ss_{uuid.uuid4().hex[:12]}", agent_id=agent_id)
         self._sessions[sess.id] = sess
+        self._save_session(sess)
         return sess
 
     def list_sessions(self, agent_id: str) -> list[Session]:
@@ -213,11 +356,15 @@ class AgentService:
         sess = self.session(agent_id, session_id)
         sess.messages = []
         sess.turns = 0
+        self._save_session(sess)
         return sess
 
     def delete_session(self, agent_id: str, session_id: str) -> None:
         sess = self.session(agent_id, session_id)
         del self._sessions[sess.id]
+        if self._db_path is not None:
+            with self._db_lock, self._database() as db:
+                db.execute("DELETE FROM sessions WHERE id=?", (sess.id,))
 
     def chat(
         self,
@@ -240,6 +387,7 @@ class AgentService:
         start_tokens_out = getattr(self.brain, "tokens_out", None)
         session.append("user", message)
         session.turns += 1
+        self._save_session(session)
 
         backend_override = None
         if agent.brain in PROVIDER_CHAT_BASE_URLS:
@@ -288,6 +436,7 @@ class AgentService:
                 backend_override=backend_override,
             )
         session.append("assistant", reply.content)
+        self._save_session(session)
 
         end_tokens_in = getattr(self.brain, "tokens_in", None)
         end_tokens_out = getattr(self.brain, "tokens_out", None)
@@ -303,6 +452,7 @@ class AgentService:
         )
         agent.total_runs += 1
         agent.total_tokens += tokens_in + tokens_out
+        self._save_agent(agent)
 
         return {
             "session_id": session.id,

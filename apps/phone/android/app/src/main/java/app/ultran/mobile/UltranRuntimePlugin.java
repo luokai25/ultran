@@ -496,4 +496,118 @@ public final class UltranRuntimePlugin extends Plugin {
         return normalized;
     }
 
+    private void verifyBootstrapArchitecture(File staging) throws Exception {
+        File bash = new File(staging, "bin/bash");
+        byte[] header = new byte[20];
+        try (InputStream input = new java.io.FileInputStream(bash)) {
+            int offset = 0;
+            while (offset < header.length) {
+                int read = input.read(header, offset, header.length - offset);
+                if (read < 0) throw new IllegalArgumentException("Bootstrap is missing a valid bin/bash ELF executable.");
+                offset += read;
+            }
+        }
+        if ((header[0] & 0xff) != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F' || header[5] != 1) {
+            throw new IllegalArgumentException("Bootstrap bin/bash is not a supported little-endian ELF executable.");
+        }
+        int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+        boolean supported = false;
+        for (String abi : android.os.Build.SUPPORTED_ABIS) {
+            if (("arm64-v8a".equals(abi) && machine == 183) || ("x86_64".equals(abi) && machine == 62)) {
+                supported = true;
+                break;
+            }
+        }
+        if (!supported) {
+            String actual = machine == 183 ? "arm64-v8a" : machine == 62 ? "x86_64" : "ELF machine " + machine;
+            throw new IllegalArgumentException("Bootstrap architecture (" + actual + ") does not match this device (" +
+                (android.os.Build.SUPPORTED_ABIS.length == 0 ? "unknown" : android.os.Build.SUPPORTED_ABIS[0]) + "). Select the matching bootstrap ZIP.");
+        }
+    }
+
+    private boolean isAptSourcePath(String path) {
+        return "etc/apt/sources.list".equals(path) || "etc/apt/sources.list.d".equals(path) ||
+            path.startsWith("etc/apt/sources.list.d/");
+    }
+
+    private void disableIncompatiblePackageSources(File staging) throws Exception {
+        File aptDirectory = new File(staging, "etc/apt");
+        if (!aptDirectory.exists() && !aptDirectory.mkdirs()) throw new IllegalStateException("Could not prepare isolated package configuration.");
+        File sourceList = new File(aptDirectory, "sources.list");
+        if (isSymbolicLink(sourceList)) sourceList.delete();
+        try (FileOutputStream output = new FileOutputStream(sourceList)) {
+            output.write("# Disabled by Ultran: upstream Termux packages target a different private prefix.\n# Configure an Ultran-built package repository before installing additional packages.\n".getBytes(StandardCharsets.UTF_8));
+            output.getFD().sync();
+        }
+        File sourceParts = new File(aptDirectory, "sources.list.d");
+        if (isSymbolicLink(sourceParts)) sourceParts.delete();
+        if (!sourceParts.exists() && !sourceParts.mkdirs()) throw new IllegalStateException("Could not isolate package source configuration.");
+        File[] sourceFiles = sourceParts.listFiles();
+        if (sourceFiles != null) {
+            for (File sourceFile : sourceFiles) {
+                if (sourceFile.isDirectory() && !isSymbolicLink(sourceFile)) deleteRecursively(sourceFile);
+                else if (!sourceFile.delete()) throw new IllegalStateException("Could not disable an incompatible package source.");
+            }
+        }
+    }
+
+    private boolean isAllowedSymlinkTarget(String target, String linkRelativePath, String finalPrefix) {
+        if (target == null || target.isEmpty() || target.indexOf('\0') >= 0 || target.contains("\\")) return false;
+        try {
+            File link = new File(finalPrefix, linkRelativePath);
+            File targetFile = new File(target);
+            // Termux bootstrap manifests mostly use relative targets such as ../lib/libfoo.so.
+            // Resolve them from the link's parent, not from the process working directory.
+            String canonical = (targetFile.isAbsolute()
+                ? targetFile : new File(link.getParentFile(), target)).getCanonicalPath();
+            return canonical.equals(finalPrefix) || canonical.startsWith(finalPrefix + File.separator) ||
+                canonical.equals("/system") || canonical.startsWith("/system/") ||
+                canonical.equals("/apex") || canonical.startsWith("/apex/") ||
+                canonical.equals("/vendor") || canonical.startsWith("/vendor/");
+        } catch (Exception ignored) { return false; }
+    }
+
+    private boolean isExecutablePath(String path) {
+        return path.startsWith("bin/") || path.startsWith("libexec/") ||
+            path.startsWith("lib/apt/apt-helper") || path.startsWith("lib/apt/methods/");
+    }
+
+    private boolean isSymbolicLink(File file) {
+        try {
+            return (Os.lstat(file.getAbsolutePath()).st_mode & OsConstants.S_IFMT) == OsConstants.S_IFLNK;
+        } catch (ErrnoException ignored) {
+            return false;
+        }
+    }
+
+    private static final class BoundedInputStream extends FilterInputStream {
+        private final long limit;
+        private long count;
+        BoundedInputStream(InputStream input, long limit) { super(input); this.limit = limit; }
+        @Override public int read() throws IOException {
+            int value = super.read();
+            if (value != -1 && ++count > limit) throw new IOException("Bootstrap archive exceeds the 512 MB compressed-size limit.");
+            return value;
+        }
+        @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+            int read = super.read(buffer, offset, length);
+            if (read > 0) {
+                count += read;
+                if (count > limit) throw new IOException("Bootstrap archive exceeds the 512 MB compressed-size limit.");
+            }
+            return read;
+        }
+    }
+
+    private void deleteRecursively(File file) throws Exception {
+        boolean symlink = isSymbolicLink(file);
+        if (!file.exists() && !symlink) return;
+        if (symlink || file.isFile()) {
+            if (!file.delete()) throw new IllegalStateException("Could not remove previous runtime file.");
+            return;
+        }
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteRecursively(child);
+        if (!file.delete()) throw new IllegalStateException("Could not remove previous runtime directory.");
+    }
 }

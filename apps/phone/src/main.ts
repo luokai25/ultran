@@ -121,6 +121,7 @@ const modelSearchInput = req<HTMLInputElement>("#model-search");
 const modelLibraryStatus = req<HTMLElement>("#model-library-status");
 const modelLibraryResults = req<HTMLElement>("#model-library-results");
 const modelSizeFilterEl = req<HTMLSelectElement>("#model-size-filter");
+const modelDownloadProgressEl = req<HTMLProgressElement>("#model-download-progress");
 let modelDownloadInProgress = false;
 let hubSearchSequence = 0;
 const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
@@ -204,8 +205,17 @@ async function refreshNativeModels(): Promise<void> {
       await NativeLocalAI.addListener("modelImportProgress", (event) => {
         const total = event.totalBytes > 0 ? " / " + formatBytes(event.totalBytes) : "";
         nativeModelStatus.textContent = (modelDownloadInProgress ? "Downloading " : "Importing ") + event.name + " · " + formatBytes(event.copiedBytes) + total;
-        if (modelDownloadInProgress && event.totalBytes > 0) {
-          modelLibraryStatus.textContent = "Downloading " + event.name + " · " + Math.min(100, Math.round(event.copiedBytes / event.totalBytes * 100)) + "% · " + formatBytes(event.copiedBytes) + " of " + formatBytes(event.totalBytes);
+        if (modelDownloadInProgress) {
+          modelDownloadProgressEl.hidden = false;
+          if (event.totalBytes > 0) {
+            const percent = Math.min(100, Math.round(event.copiedBytes / event.totalBytes * 100));
+            modelDownloadProgressEl.max = 100;
+            modelDownloadProgressEl.value = percent;
+            modelLibraryStatus.textContent = "Downloading " + event.name + " · " + percent + "% · " + formatBytes(event.copiedBytes) + " of " + formatBytes(event.totalBytes);
+          } else {
+            modelDownloadProgressEl.removeAttribute("value");
+            modelLibraryStatus.textContent = "Downloading " + event.name + " · " + formatBytes(event.copiedBytes);
+          }
         }
       });
       nativeProgressListenerReady = true;
@@ -393,6 +403,9 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
   const message = `Download ${name} (about ${formatBytes(sizeBytes)}) from Hugging Face into Ultran's private storage? Check the model license before use.`;
   if (!window.confirm(message)) return;
   modelDownloadInProgress = true;
+  modelDownloadProgressEl.hidden = false;
+  modelDownloadProgressEl.max = 100;
+  modelDownloadProgressEl.value = 0;
   modelLibraryStatus.textContent = "Preparing secure download…";
   const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
   buttons.forEach((button) => { button.disabled = true; });
@@ -409,6 +422,9 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelLibraryStatus.textContent = "Download failed: " + (error instanceof Error ? error.message : "unknown error");
   } finally {
     modelDownloadInProgress = false;
+    modelDownloadProgressEl.hidden = true;
+    modelDownloadProgressEl.value = 0;
+    modelDownloadProgressEl.setAttribute("value", "0");
     buttons.forEach((button) => { button.disabled = false; });
   }
 }
@@ -1955,7 +1971,8 @@ document.querySelectorAll<HTMLButtonElement>("[data-model-query]").forEach((butt
   });
 });
 modelSizeFilterEl.addEventListener("change", () => {
-  modelLibraryStatus.textContent = "Size filter updated. Open a model's file list again to apply it.";
+  modelLibraryResults.querySelectorAll(".hub-file-list").forEach((list) => list.remove());
+  modelLibraryStatus.textContent = "Size filter updated. Choose a model's GGUF files to see matching downloads.";
 });
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());

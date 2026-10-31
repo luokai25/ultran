@@ -153,7 +153,7 @@ Java_app_ultran_mobile_NativeLlama_nativeVersion(JNIEnv *env, jclass) {
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath, jint requested_context) {
+Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath, jint requested_context, jboolean aggressive_lazy_loading) {
     std::lock_guard<std::mutex> lock(g_mutex);
     const std::string path = java_string(env, jpath);
     if (path.empty()) return env->NewStringUTF("Model path is empty.");
@@ -169,7 +169,7 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
     // File-backed weights keep the full checkpoint out of anonymous RAM.
     // Android's page cache can reclaim clean pages between layer reads.
     model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
-    model_params.lazy_mode = LLAMA_LAZY_MODE_AUTO;
+    model_params.lazy_mode = aggressive_lazy_loading ? LLAMA_LAZY_MODE_ON : LLAMA_LAZY_MODE_AUTO;
     g_model = llama_model_load_from_file(path.c_str(), model_params);
     if (!g_model) return env->NewStringUTF("Could not load this GGUF model. Check its integrity and available RAM.");
 

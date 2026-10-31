@@ -96,6 +96,31 @@ public final class UltranCompanionPlugin extends Plugin {
 
 
     @PluginMethod
+    public void composeSms(PluginCall call) {
+        String number = call.getString("number", "").trim();
+        String body = call.getString("body", "").trim();
+        if (number.isEmpty() || number.length() > 40 || body.isEmpty() || body.length() > 4000) {
+            call.reject("Provide a phone number and a message of up to 4,000 characters.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Review text message")
+            .setMessage("Ultran wants to open your messaging app with this message prepared. Nothing will be sent until you press Send there.\\n\\nTo: " + number + "\\n\\n" + body)
+            .setPositiveButton("Open messages", (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(number)));
+                intent.putExtra("sms_body", body);
+                try {
+                    getActivity().startActivity(intent);
+                    call.resolve(new JSObject().put("opened", true).put("sent", false));
+                } catch (Exception error) {
+                    call.reject("No compatible messaging app is available.", error);
+                }
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("sent", false)))
+            .show());
+    }
+
+    @PluginMethod
     public void openWhatsAppMessage(PluginCall call) {
         handoffWhatsAppMessage(call);
     }

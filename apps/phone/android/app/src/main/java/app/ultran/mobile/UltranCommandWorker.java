@@ -61,11 +61,26 @@ public final class UltranCommandWorker extends Worker {
             File appsByIdentifier = new File(apps, "i");
             File appsByUid = new File(apps, "u");
             File cache = new File(appData, "cache");
-            File[] directories = {home, temp, core, appsByIdentifier, appsByUid, cache};
+            File jobs = new File(runtime, "jobs");
+            File[] directories = {home, temp, core, appsByIdentifier, appsByUid, cache, jobs};
             for (File directory : directories) {
                 if (!directory.exists() && !directory.mkdirs()) {
                     return Result.failure(new Data.Builder().putString(KEY_ERROR, "Could not prepare Ultran's private runtime directories.").build());
                 }
+            }
+
+            // WorkManager may reschedule interrupted work after process death. Shell
+            // commands can have side effects, so claim each job ID exactly once and
+            // refuse automatic replay if Android restarts this worker.
+            File startedMarker = new File(jobs, getId().toString() + ".started");
+            if (!startedMarker.createNewFile()) {
+                return Result.failure(new Data.Builder()
+                    .putString(KEY_ERROR, "This job was already started. Automatic replay was blocked to prevent duplicate side effects; submit a new approved job if needed.")
+                    .build());
+            }
+            try (java.io.FileOutputStream markerOutput = new java.io.FileOutputStream(startedMarker)) {
+                markerOutput.write("started".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                markerOutput.getFD().sync();
             }
 
             File bash = new File(prefix, "bin/bash");

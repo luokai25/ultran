@@ -2539,49 +2539,49 @@ declare global {
 window.__ULTRAN__ = { ready: true, theme: () => settings.theme, send: submit };
 
 
-const builtInTerminalStatus = document.getElementById("ultran-terminal-status");
+const runtimeStatus = document.getElementById("ultran-runtime-status");
 const runtimeInstallButton = document.getElementById("ultran-runtime-install");
 const runtimeDownloadButton = document.getElementById("ultran-runtime-download");
 const runtimeDownloadProgress = document.getElementById("ultran-runtime-progress") as HTMLProgressElement | null;
 const refreshRuntimeStatus = async () => {
-  if (!builtInTerminalStatus) return;
+  if (!runtimeStatus) return;
   if (!Capacitor.isNativePlatform()) {
-    builtInTerminalStatus.textContent = "Runtime installation is available in the Android APK, not the web preview.";
+    runtimeStatus.textContent = "Runtime installation is available in the Android APK, not the web preview.";
     return;
   }
   try {
     const status = await NativeRuntime.getStatus();
     if (!status.installed) {
-      builtInTerminalStatus.textContent = `Headless runtime not installed (${status.architecture}). Download and verify the Ultran-compatible runtime to enable the full local environment.`;
+      runtimeStatus.textContent = `Headless runtime not installed (${status.architecture}). Download and verify the Ultran-compatible runtime to enable the full local environment.`;
     } else if (!status.runtimeReady) {
-      builtInTerminalStatus.textContent = `Runtime files detected at ${status.prefix}, but the bundled Bash shell is missing or not executable. Reinstall the verified runtime before relying on Termux commands.`;
+      runtimeStatus.textContent = `Runtime files detected at ${status.prefix}, but the bundled Bash shell is missing or not executable. Reinstall the verified runtime before relying on Termux commands.`;
     } else {
       const tools = [status.gitAvailable ? "Git" : null, status.pythonAvailable ? "Python" : null].filter(Boolean).join(" · ");
-      builtInTerminalStatus.textContent = `Termux runtime ready · ${status.architecture} · Bash${tools ? " · " + tools : ""} · ${status.prefix}`;
+      runtimeStatus.textContent = `Termux runtime ready · ${status.architecture} · Bash${tools ? " · " + tools : ""} · ${status.prefix}`;
     }
   } catch {
-    builtInTerminalStatus.textContent = "Ultran's headless runtime status could not be read.";
+    runtimeStatus.textContent = "Ultran's headless runtime status could not be read.";
   }
 };
 void refreshRuntimeStatus();
 if (Capacitor.isNativePlatform()) {
   void NativeRuntime.addListener("runtimeDownloadProgress", (event) => {
-    if (!runtimeDownloadProgress || !builtInTerminalStatus) return;
+    if (!runtimeDownloadProgress || !runtimeStatus) return;
     runtimeDownloadProgress.hidden = false;
     if (event.totalBytes > 0) {
       const percent = Math.min(100, Math.round(event.downloadedBytes / event.totalBytes * 100));
       runtimeDownloadProgress.max = 100;
       runtimeDownloadProgress.value = percent;
-      builtInTerminalStatus.textContent = `Downloading verified Termux runtime · ${percent}% · ${formatBytes(event.downloadedBytes)} of ${formatBytes(event.totalBytes)}.`;
+      runtimeStatus.textContent = `Downloading verified Termux runtime · ${percent}% · ${formatBytes(event.downloadedBytes)} of ${formatBytes(event.totalBytes)}.`;
     } else {
       runtimeDownloadProgress.removeAttribute("value");
-      builtInTerminalStatus.textContent = `Downloading verified Termux runtime · ${formatBytes(event.downloadedBytes)}.`;
+      runtimeStatus.textContent = `Downloading verified Termux runtime · ${formatBytes(event.downloadedBytes)}.`;
     }
   }).catch(() => undefined);
 }
 runtimeDownloadButton?.addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) {
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Direct runtime installation is available in the Android APK, not the web preview.";
+    if (runtimeStatus) runtimeStatus.textContent = "Direct runtime installation is available in the Android APK, not the web preview.";
     return;
   }
   runtimeDownloadButton.setAttribute("disabled", "true");
@@ -2597,15 +2597,15 @@ runtimeDownloadButton?.addEventListener("click", async () => {
     // Continue; the native installer will validate device architecture and the archive.
   }
   if (runtimeDownloadProgress) { runtimeDownloadProgress.hidden = false; runtimeDownloadProgress.max = 100; runtimeDownloadProgress.value = 0; }
-  if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Fetching the official runtime checksum manifest…";
+  if (runtimeStatus) runtimeStatus.textContent = "Fetching the official runtime checksum manifest…";
   try {
     const result = await NativeRuntime.downloadBootstrap();
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = `Termux runtime installed and verified (${result.entries ?? 0} entries).`;
+    if (runtimeStatus) runtimeStatus.textContent = `Termux runtime installed and verified (${result.entries ?? 0} entries).`;
     await refreshRuntimeStatus();
   } catch (error) {
     const why = error instanceof Error ? error.message : "Runtime download or installation failed.";
-    if (builtInTerminalStatus) {
-      builtInTerminalStatus.textContent = /HTTP 404/.test(why)
+    if (runtimeStatus) {
+      runtimeStatus.textContent = /HTTP 404/.test(why)
         ? "No published runtime archive is available yet. Use Choose runtime ZIP or run the Build Ultran Termux Bootstrap workflow."
         : why;
     }
@@ -2617,22 +2617,22 @@ runtimeDownloadButton?.addEventListener("click", async () => {
 });
 runtimeInstallButton?.addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) {
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Install the bootstrap from the Android APK. The web preview cannot access app-private runtime storage.";
+    if (runtimeStatus) runtimeStatus.textContent = "Install the bootstrap from the Android APK. The web preview cannot access app-private runtime storage.";
     return;
   }
   runtimeInstallButton.setAttribute("disabled", "true");
   runtimeDownloadButton?.setAttribute("disabled", "true");
-  if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Choose the Ultran bootstrap ZIP built from the official Termux package source…";
+  if (runtimeStatus) runtimeStatus.textContent = "Choose the Ultran bootstrap ZIP built from the official Termux package source…";
   try {
     const result = await NativeRuntime.pickBootstrap();
     if (result.cancelled) {
       await refreshRuntimeStatus();
       return;
     }
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = `Termux runtime installed (${result.entries ?? 0} entries).`;
+    if (runtimeStatus) runtimeStatus.textContent = `Termux runtime installed (${result.entries ?? 0} entries).`;
     await refreshRuntimeStatus();
   } catch (error) {
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = error instanceof Error ? error.message : "Runtime installation failed.";
+    if (runtimeStatus) runtimeStatus.textContent = error instanceof Error ? error.message : "Runtime installation failed.";
   } finally {
     runtimeInstallButton.removeAttribute("disabled");
     runtimeDownloadButton?.removeAttribute("disabled");

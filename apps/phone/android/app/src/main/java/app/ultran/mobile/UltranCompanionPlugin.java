@@ -187,7 +187,7 @@ public final class UltranCompanionPlugin extends Plugin {
         if (!serviceEnabled) {
             getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
                 .setTitle("Enable approved phone actions")
-                .setMessage("Android must enable Ultran's Accessibility Service before it can tap Send. The service only sends the exact WhatsApp message you approve here, once, within 60 seconds. You can turn it off any time in Android Accessibility settings.")
+                .setMessage("Android must enable Ultran's Accessibility Service before it can tap Send. It only sends the exact WhatsApp message you approve here, once, within 60 seconds. You can disable it any time in Android Accessibility settings.")
                 .setPositiveButton("Open Accessibility settings", (dialog, which) -> {
                     getActivity().startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
                     call.resolve(new JSObject().put("openedSettings", true).put("sent", false));

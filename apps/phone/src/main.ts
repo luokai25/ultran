@@ -310,6 +310,7 @@ async function searchHubModels(query: string): Promise<void> {
   const clean = query.trim().slice(0, 120);
   const sequence = ++hubSearchSequence;
   modelLibraryStatus.textContent = "Searching Hugging Face model catalog…";
+  modelLibraryResults.setAttribute("aria-busy", "true");
   modelLibraryResults.replaceChildren();
   const params = new URLSearchParams({
     filter: "gguf",
@@ -337,6 +338,8 @@ async function searchHubModels(query: string): Promise<void> {
   } catch (error) {
     if (sequence !== hubSearchSequence) return;
     modelLibraryStatus.textContent = "Model catalog unavailable: " + (error instanceof Error ? error.message : "network error");
+  } finally {
+    if (sequence === hubSearchSequence) modelLibraryResults.setAttribute("aria-busy", "false");
   }
 }
 

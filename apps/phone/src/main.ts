@@ -120,7 +120,9 @@ const modelSearchForm = req<HTMLFormElement>("#model-search-form");
 const modelSearchInput = req<HTMLInputElement>("#model-search");
 const modelLibraryStatus = req<HTMLElement>("#model-library-status");
 const modelLibraryResults = req<HTMLElement>("#model-library-results");
+const modelSizeFilterEl = req<HTMLSelectElement>("#model-size-filter");
 let modelDownloadInProgress = false;
+let hubSearchSequence = 0;
 const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
 const termuxBridgeEndpointEl = req<HTMLInputElement>("#termux-bridge-endpoint");
 const termuxBridgeTokenEl = req<HTMLInputElement>("#termux-bridge-token");
@@ -254,7 +256,9 @@ function modelCardNode(model: HubModel): HTMLElement {
   title.textContent = safeHubText(model.id, "Unknown model");
   const badge = document.createElement("span");
   badge.className = "hub-model-tag";
-  badge.textContent = (model.tags ?? []).some((tag) => tag.toLowerCase().includes("license:apache-2.0")) ? "Apache 2.0" : "Community";
+  const licenseTag = (model.tags ?? []).find((tag) => tag.toLowerCase().startsWith("license:"));
+  const license = licenseTag?.slice("license:".length).replace(/[-_]/g, " ");
+  badge.textContent = license ? license.slice(0, 24) : "Check license";
   top.append(title, badge);
   const meta = document.createElement("p");
   meta.className = "hub-model-meta";
@@ -273,6 +277,7 @@ function modelCardNode(model: HubModel): HTMLElement {
 
 async function searchHubModels(query: string): Promise<void> {
   const clean = query.trim().slice(0, 120);
+  const sequence = ++hubSearchSequence;
   modelLibraryStatus.textContent = "Searching Hugging Face model catalog…";
   modelLibraryResults.replaceChildren();
   const params = new URLSearchParams({
@@ -289,6 +294,7 @@ async function searchHubModels(query: string): Promise<void> {
     });
     if (!response.ok) throw new Error("Hugging Face returned HTTP " + response.status);
     const payload = await response.json() as HubModel[];
+    if (sequence !== hubSearchSequence) return;
     if (!Array.isArray(payload)) throw new Error("Unexpected model catalog response");
     const models = payload.filter((model) => typeof model.id === "string" && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(model.id));
     if (!models.length) {
@@ -298,6 +304,7 @@ async function searchHubModels(query: string): Promise<void> {
     modelLibraryStatus.textContent = `Showing up to ${models.length} GGUF repositories from the live catalog. Search to discover more models across Hugging Face.`;
     modelLibraryResults.replaceChildren(...models.map(modelCardNode));
   } catch (error) {
+    if (sequence !== hubSearchSequence) return;
     modelLibraryStatus.textContent = "Model catalog unavailable: " + (error instanceof Error ? error.message : "network error");
   }
 }
@@ -327,7 +334,13 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
         const size = file.lfs?.size ?? file.size ?? 0;
         return size > 0 && size <= 8 * 1024 * 1024 * 1024;
       }).sort((a, b) => (a.lfs?.size ?? a.size ?? Number.MAX_SAFE_INTEGER) - (b.lfs?.size ?? b.size ?? Number.MAX_SAFE_INTEGER));
-      for (const file of eligible.slice(0, 12)) {
+      const maxBytes = modelSizeFilterEl.value === "1gb"
+        ? 1024 * 1024 * 1024
+        : modelSizeFilterEl.value === "2gb"
+          ? 2 * 1024 * 1024 * 1024
+          : 8 * 1024 * 1024 * 1024;
+      const filtered = eligible.filter((file) => (file.lfs?.size ?? file.size ?? 0) <= maxBytes);
+      for (const file of filtered.slice(0, 30)) {
         const size = file.lfs?.size ?? file.size ?? 0;
         const row = document.createElement("div");
         row.className = "hub-file-row";
@@ -347,10 +360,11 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
         list.append(row);
       }
       if (!eligible.length) list.textContent = "No files with a known size under Ultran's 8 GB limit were found.";
-      if (files.length > 12) {
+      else if (!filtered.length) list.textContent = "No files match this size filter. Choose All sizes to see larger quantizations.";
+      if (filtered.length > 30) {
         const note = document.createElement("small");
         note.className = "model-library-note";
-        note.textContent = `Showing the 12 smallest eligible files out of ${files.length} GGUF files.`;
+        note.textContent = `Showing the 30 smallest matching files out of ${filtered.length}. Choose a size filter to narrow the list.`;
         list.append(note);
       }
     }
@@ -1932,6 +1946,16 @@ req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () =>
 modelSearchForm.addEventListener("submit", (event) => {
   event.preventDefault();
   void searchHubModels(modelSearchInput.value);
+});
+document.querySelectorAll<HTMLButtonElement>("[data-model-query]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const query = button.dataset.modelQuery ?? "";
+    modelSearchInput.value = query;
+    void searchHubModels(query);
+  });
+});
+modelSizeFilterEl.addEventListener("change", () => {
+  modelLibraryStatus.textContent = "Size filter updated. Open a model's file list again to apply it.";
 });
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());

@@ -70,6 +70,28 @@ class AgentOut(BaseModel):
     total_tokens: int = 0
 
 
+class AgentTaskCreate(_Strict):
+    agent_id: str = Field(min_length=4, max_length=64)
+    message: str = Field(min_length=1, max_length=16000)
+    allow_tools: bool = True
+    max_tool_calls: int = Field(default=4, ge=0, le=16)
+
+
+class AgentTaskOut(BaseModel):
+    id: str
+    agent_id: str
+    workspace_id: str
+    message: str
+    allow_tools: bool
+    max_tool_calls: int
+    status: str
+    attempts: int
+    result: dict[str, Any] | None = None
+    error: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
 class AgentMemoryCreate(_Strict):
     content: str = Field(min_length=1, max_length=5000)
     category: str = Field(default="general", min_length=1, max_length=48)

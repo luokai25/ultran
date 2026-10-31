@@ -399,6 +399,20 @@ class ApprovalGate:
         rows.sort(key=lambda a: a.created_at, reverse=True)
         return rows
 
+    def history(self, workspace_id: str | None = None, *, limit: int = 100) -> list[Approval]:
+        """Return recent approval decisions, including expired requests."""
+        with self._lock:
+            for approval in self._approvals.values():
+                if approval.state == "pending" and approval.is_expired():
+                    approval.state = "expired"
+                    self._save(approval)
+            rows = [
+                approval for approval in self._approvals.values()
+                if workspace_id is None or approval.workspace_id == workspace_id
+            ]
+        rows.sort(key=lambda approval: approval.created_at, reverse=True)
+        return rows[:max(0, min(int(limit), 500))]
+
     def require(self, approval: Approval | str | None, *, workspace_id: str, tool_id: str) -> Approval:
         if approval is None:
             raise ApprovalPending(

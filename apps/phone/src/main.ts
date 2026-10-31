@@ -384,13 +384,13 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
     } else {
       const eligible = files.filter((file) => {
         const size = file.lfs?.size ?? file.size ?? 0;
-        return size > 0 && size <= 8 * 1024 * 1024 * 1024;
+        return size > 0 && size <= 256 * 1024 * 1024 * 1024;
       }).sort((a, b) => (a.lfs?.size ?? a.size ?? Number.MAX_SAFE_INTEGER) - (b.lfs?.size ?? b.size ?? Number.MAX_SAFE_INTEGER));
       const maxBytes = modelSizeFilterEl.value === "1gb"
         ? 1024 * 1024 * 1024
         : modelSizeFilterEl.value === "2gb"
           ? 2 * 1024 * 1024 * 1024
-          : 8 * 1024 * 1024 * 1024;
+          : 256 * 1024 * 1024 * 1024;
       const filtered = eligible.filter((file) => (file.lfs?.size ?? file.size ?? 0) <= maxBytes);
       for (const file of filtered.slice(0, 30)) {
         const size = file.lfs?.size ?? file.size ?? 0;
@@ -411,7 +411,7 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
         row.append(info, download);
         list.append(row);
       }
-      if (!eligible.length) list.textContent = "No files with a known size under Ultran's 8 GB limit were found.";
+      if (!eligible.length) list.textContent = "No files with a known size under Ultran's 256 GB safety limit were found.";
       else if (!filtered.length) list.textContent = "No files match this size filter. Choose All sizes to see larger quantizations.";
       if (filtered.length > 30) {
         const note = document.createElement("small");

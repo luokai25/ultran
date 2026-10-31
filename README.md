@@ -157,6 +157,8 @@ APK.
 
 Agents, settings, usage totals, sessions, and bounded chat transcripts are stored
 in SQLite under `ULTRAN_DATA_DIR/agents.sqlite3` and restored on backend restart.
+MCP human approvals are persisted separately in `ULTRAN_DATA_DIR/approvals.sqlite3`. Pending requests survive a backend restart, decisions and expiry are retained for audit, and the approval gate continues to reject expired, mismatched, or already-decided requests. The database is created with restrictive file permissions; keep `ULTRAN_DATA_DIR` on persistent storage and include it in backups.
+
 When `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` is configured, agent system prompts and
 message contents are Fernet-encrypted at rest using that same operator-managed
 key. Production requires this key; back it up securely because losing it makes

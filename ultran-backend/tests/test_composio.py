@@ -278,6 +278,8 @@ def test_agent_planner_pauses_write_tool_for_human_approval(monkeypatch):
     )
     class Pool:
         closed = False
+        def register(self, spec_config, *, connect=False):
+            self.spec_config = spec_config
         def list_tools(self):
             return [spec]
         def close(self):

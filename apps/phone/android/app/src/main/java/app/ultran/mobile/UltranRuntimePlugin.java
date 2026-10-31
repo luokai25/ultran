@@ -558,6 +558,7 @@ public final class UltranRuntimePlugin extends Plugin {
 
         ProcessBuilder builder = new ProcessBuilder(bash.getAbsolutePath(), script.getAbsolutePath());
         builder.directory(home);
+        builder.redirectInput(new File("/dev/null"));
         builder.redirectErrorStream(true);
         Map<String, String> env = builder.environment();
         env.put("HOME", home.getAbsolutePath());
@@ -594,6 +595,7 @@ public final class UltranRuntimePlugin extends Plugin {
         env.put("SHELL", bash.getAbsolutePath());
         env.put("TERM", "dumb");
         env.put("LANG", "C.UTF-8");
+        env.put("DEBIAN_FRONTEND", "noninteractive");
 
         Process process = builder.start();
         ByteArrayOutputStream captured = new ByteArrayOutputStream();

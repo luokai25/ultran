@@ -121,6 +121,12 @@ const linkPill = req<HTMLElement>("#link-pill");
 const jumpBtn = req<HTMLButtonElement>("#jump-btn");
 const menuBtn = req<HTMLButtonElement>("#menu-btn");
 const newBtn = req<HTMLButtonElement>("#new-btn");
+const navChatButton = req<HTMLButtonElement>("#nav-chat");
+const navAgentsButton = req<HTMLButtonElement>("#nav-agents");
+const navConnectorsButton = req<HTMLButtonElement>("#nav-connectors");
+const navSettingsButton = req<HTMLButtonElement>("#nav-settings");
+const connectorsButton = req<HTMLButtonElement>("#connectors-btn");
+const connectorsBackButton = req<HTMLButtonElement>("#connectors-back");
 const drawer = req<HTMLElement>("#drawer");
 const scrim = req<HTMLElement>("#scrim");
 const historyEl = req<HTMLElement>("#history");
@@ -2351,12 +2357,51 @@ proactiveBtn.dataset.active = String(Boolean(settings.proactiveUpdates));
 proactiveBtn.addEventListener("click", () => void enableProactiveUpdates().catch(error => voiceStatus(error instanceof Error ? error.message : "Could not enable updates.", true)));
 smsBtn.addEventListener("click", () => void prepareSms());
 
+function setActiveNavigation(active: HTMLButtonElement): void {
+  document.querySelectorAll<HTMLButtonElement>(".nav-item").forEach((button) => {
+    if (button === active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+}
+
+function closeOtherSurfaces(): void {
+  closeWorkspace();
+  if (!sheetWrap.hidden) closeSheet();
+  connectorsBackButton.click();
+  closeDrawer();
+}
+
+navChatButton.addEventListener("click", () => {
+  closeOtherSurfaces();
+  setActiveNavigation(navChatButton);
+});
+navAgentsButton.addEventListener("click", () => {
+  if (!sheetWrap.hidden) closeSheet();
+  connectorsBackButton.click();
+  setActiveNavigation(navAgentsButton);
+  openWorkspace();
+});
+navConnectorsButton.addEventListener("click", () => {
+  closeWorkspace();
+  if (!sheetWrap.hidden) closeSheet();
+  setActiveNavigation(navConnectorsButton);
+  connectorsButton.click();
+});
+navSettingsButton.addEventListener("click", () => {
+  closeWorkspace();
+  connectorsBackButton.click();
+  setActiveNavigation(navSettingsButton);
+  openSheet();
+});
+connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
+connectorsBackButton.addEventListener("click", () => setActiveNavigation(navChatButton));
+req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => setActiveNavigation(navChatButton));
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
-req<HTMLButtonElement>("#settings-btn").addEventListener("click", openSheet);
+req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { setActiveNavigation(navSettingsButton); openSheet(); });
 androidBatteryAccessButton.addEventListener("click", () => {
   if (Capacitor.getPlatform() !== "android") return;
   void NativeCompanion.requestNotificationPermission()
@@ -2374,7 +2419,7 @@ androidAppSettingsButton.addEventListener("click", () => {
     .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open app settings."; });
 });
 
-req<HTMLButtonElement>("#workspace-btn").addEventListener("click", openWorkspace);
+req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { setActiveNavigation(navAgentsButton); openWorkspace(); });
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", closeWorkspace);
 req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));
 req<HTMLButtonElement>("#workspace-team-open").addEventListener("click", () => void openTeamBuilder().catch(e => workspaceNotice(e instanceof Error ? e.message : "Could not load agents")));

@@ -186,6 +186,9 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /parsed\.tool === "telegram\.compose"/);
   assert.match(main, /NativeCompanion\.composeTelegram/);
   assert.match(companion, /public void composeTelegram/);
+  assert.match(main, /parsed\.tool === "telegram\.compose"/);
+  assert.match(main, /NativeCompanion\.composeTelegram/);
+  assert.match(companion, /public void composeTelegram/);
   assert.match(main, /openWhatsAppMessage/);
   assert.match(main, /parsed\.tool === "app\.open"/);
   assert.match(main, /client_capabilities: Capacitor\.getPlatform\(\) === "android"/);

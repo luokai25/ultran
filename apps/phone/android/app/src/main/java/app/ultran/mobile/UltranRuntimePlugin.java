@@ -15,6 +15,7 @@ import android.system.ErrnoException;
 import androidx.activity.result.ActivityResult;
 import androidx.work.Data;
 import androidx.work.OneTimeWorkRequest;
+import androidx.work.OutOfQuotaPolicy;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
@@ -141,6 +142,7 @@ public final class UltranRuntimePlugin extends Plugin {
             Data input = new Data.Builder().putString(UltranCommandWorker.KEY_COMMAND, command).build();
             OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(UltranCommandWorker.class)
                 .setInputData(input)
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .addTag("ultran-local-runtime-job")
                 .build();
             WorkManager.getInstance(getContext()).enqueue(request);

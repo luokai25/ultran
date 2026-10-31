@@ -30,6 +30,24 @@ FORMATS = {
     "pptx": ("application/vnd.openxmlformats-officedocument.presentationml.presentation", "PowerPoint presentation"),
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Word document"),
     "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Excel workbook"),
+    "zip": ("application/zip", "ZIP archive"),
+    **{ext: (mime, label) for ext, mime, label in [
+        ("py","text/x-python; charset=utf-8","Python source"),("js","text/javascript; charset=utf-8","JavaScript source"),
+        ("ts","text/typescript; charset=utf-8","TypeScript source"),("tsx","text/typescript; charset=utf-8","TypeScript JSX source"),
+        ("jsx","text/javascript; charset=utf-8","JavaScript JSX source"),("java","text/x-java-source; charset=utf-8","Java source"),
+        ("kt","text/x-kotlin; charset=utf-8","Kotlin source"),("go","text/x-go; charset=utf-8","Go source"),
+        ("rs","text/x-rust; charset=utf-8","Rust source"),("c","text/x-c; charset=utf-8","C source"),
+        ("h","text/x-c; charset=utf-8","C header"),("cpp","text/x-c++; charset=utf-8","C++ source"),
+        ("hpp","text/x-c++; charset=utf-8","C++ header"),("sh","text/x-shellscript; charset=utf-8","Shell script"),
+        ("bash","text/x-shellscript; charset=utf-8","Bash script"),("sql","application/sql; charset=utf-8","SQL source"),
+        ("xml","application/xml; charset=utf-8","XML document"),("yaml","application/yaml; charset=utf-8","YAML document"),
+        ("yml","application/yaml; charset=utf-8","YAML document"),("toml","application/toml; charset=utf-8","TOML document"),
+        ("ini","text/plain; charset=utf-8","INI configuration"),("css","text/css; charset=utf-8","CSS stylesheet"),
+        ("scss","text/x-scss; charset=utf-8","SCSS stylesheet"),("vue","text/plain; charset=utf-8","Vue component"),
+        ("svelte","text/plain; charset=utf-8","Svelte component"),("mdx","text/markdown; charset=utf-8","MDX document"),
+        ("rst","text/plain; charset=utf-8","reStructuredText document"),("log","text/plain; charset=utf-8","Log file"),
+        ("env","text/plain; charset=utf-8","Environment configuration"),("gitignore","text/plain; charset=utf-8","Git ignore file")
+    ]}
 }
 
 
@@ -476,6 +494,28 @@ class ArtifactService:
             if "<svg" not in content[:500].lower():
                 raise ValidationFailed("SVG content must contain an svg root element")
             payload = content.encode()
+        elif fmt == "zip":
+            try:
+                entries = json.loads(content)
+            except ValueError as exc:
+                raise ValidationFailed("ZIP content must be a JSON object mapping relative file paths to UTF-8 text") from exc
+            if not isinstance(entries, dict) or not entries or len(entries) > 500:
+                raise ValidationFailed("ZIP archives require 1 to 500 named files")
+            out = io.BytesIO()
+            total = 0
+            with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+                for name, value in entries.items():
+                    normalized = str(name).replace("\\", "/")
+                    parts = normalized.split("/")
+                    if not normalized or normalized.startswith("/") or any(part in ("", ".", "..") for part in parts) or ":" in parts[0]:
+                        raise ValidationFailed("ZIP entry paths must be safe relative paths")
+                    if not isinstance(value, str):
+                        raise ValidationFailed("ZIP entries must contain UTF-8 text")
+                    total += len(value.encode("utf-8"))
+                    if total > 8 * 1024 * 1024:
+                        raise ValidationFailed("ZIP uncompressed content exceeds 8 MiB")
+                    archive.writestr(normalized, value)
+            payload = out.getvalue()
         elif fmt == "pdf":
             payload = _library_pdf_bytes(title, content) or _pdf_bytes(title, content)
         elif fmt == "pptx":
@@ -543,6 +583,53 @@ class ArtifactService:
             "preview_url": f"/v1/artifacts/{item['id']}/preview",
             "download_url": f"/v1/artifacts/{item['id']}/download",
         }
+
+    def inspect_zip(self, workspace_id: str, artifact_id: str, *, max_entries: int = 500, max_uncompressed: int = 8 * 1024 * 1024) -> dict[str, Any]:
+        item = self.get(workspace_id, artifact_id)
+        if item["format"] != "zip":
+            raise ValidationFailed("the selected artifact is not a ZIP archive")
+        entries = []
+        total = 0
+        try:
+            with zipfile.ZipFile(item["path"]) as archive:
+                infos = archive.infolist()
+                if len(infos) > max_entries:
+                    raise ValidationFailed("archive contains too many entries")
+                for info in infos:
+                    name = info.filename.replace("\\", "/")
+                    parts = name.split("/")
+                    if name.startswith("/") or any(part == ".." for part in parts) or ":" in parts[0]:
+                        raise ValidationFailed("archive contains an unsafe path")
+                    total += info.file_size
+                    if total > max_uncompressed:
+                        raise ValidationFailed("archive exceeds the uncompressed size limit")
+                    if info.is_dir():
+                        continue
+                    raw = archive.read(info)
+                    try:
+                        value = raw.decode("utf-8")
+                        encoding = "utf-8"
+                    except UnicodeDecodeError:
+                        value = None
+                        encoding = "binary"
+                    entries.append({"path": name, "size": info.file_size, "encoding": encoding, "content": value})
+        except zipfile.BadZipFile as exc:
+            raise ValidationFailed("the ZIP archive is corrupt") from exc
+        return {"artifact_id": artifact_id, "entries": entries, "count": len(entries), "uncompressed_size": total}
+
+    def extract_zip(self, workspace_id: str, artifact_id: str, *, max_files: int = 100) -> dict[str, Any]:
+        inspected = self.inspect_zip(workspace_id, artifact_id, max_entries=max_files)
+        extracted = []
+        skipped = []
+        for entry in inspected["entries"]:
+            if entry["encoding"] != "utf-8" or entry["content"] is None:
+                skipped.append({"path": entry["path"], "reason": "binary file; extraction is limited to UTF-8 text"})
+                continue
+            suffix = Path(entry["path"]).suffix.lower().lstrip(".")
+            fmt = suffix if suffix in FORMATS and suffix != "zip" else "txt"
+            title = Path(entry["path"]).name[:120] or "Extracted file"
+            extracted.append(self.create(workspace_id, title, fmt, entry["content"]))
+        return {"archive_id": artifact_id, "extracted": extracted, "count": len(extracted), "skipped": skipped}
 
     def get(self, workspace_id: str, artifact_id: str) -> dict[str, Any]:
         with self._lock:

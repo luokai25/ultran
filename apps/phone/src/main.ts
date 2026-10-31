@@ -2169,7 +2169,10 @@ if (settings.proactiveUpdates) {
 voiceBtn.addEventListener("click", () => {
   settings.voice = !settings.voice;
   voiceBtn.setAttribute("aria-pressed", String(settings.voice));
-  if (!settings.voice) synth?.cancel();
+  if (!settings.voice) {
+    synth?.cancel();
+    if (Capacitor.getPlatform() === "android") void NativeCompanion.stopBackgroundSpeech().catch(() => undefined);
+  }
   saveSettings();
   if (settings.proactiveUpdates && Capacitor.getPlatform() === "android" && baseUrl()) void NativeCompanion.startTaskMonitor({endpoint:baseUrl(), speakUpdates:settings.voice}).catch(() => undefined);
 });

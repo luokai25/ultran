@@ -75,6 +75,8 @@ export function initConnectors(deps: Deps): void {
   const statusEl = need<HTMLElement>("#connectors-status");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
+  const approvalPanel = need<HTMLElement>("#composio-approvals");
+  const approvalList = need<HTMLElement>("#composio-approval-list");
 
   let category = "all";
   let tier: "all" | "free" | "paid" = "all";
@@ -229,6 +231,69 @@ export function initConnectors(deps: Deps): void {
       }
     } catch {
       // A disconnected Composio service must not break the offline catalogue.
+    }
+  }
+
+
+  async function refreshApprovals(): Promise<void> {
+    approvalList.replaceChildren();
+    approvalPanel.hidden = true;
+    if (!deps.linked()) return;
+    try {
+      const response = await deps.api("/v1/connectors/composio/approvals", {}, 10_000);
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        approvals?: Array<{
+          id: string;
+          agent_id?: string;
+          tool_name?: string;
+          reason?: string;
+          arguments?: Record<string, unknown>;
+          expires_at?: string;
+          capabilities?: string[];
+        }>;
+      };
+      const approvals = body.approvals ?? [];
+      if (approvals.length === 0) return;
+      approvalPanel.hidden = false;
+      for (const approval of approvals) {
+        const card = el("article", "approval-card");
+        const heading = el("strong", "approval-title", approval.tool_name ?? "Requested action");
+        const meta = el("small", "approval-meta",
+          `Agent ${approval.agent_id ?? "unknown"} · ${(approval.capabilities ?? []).join(", ") || "permission review"}`);
+        const reason = el("p", "approval-reason", approval.reason ?? "This action needs your approval.");
+        const args = el("pre", "approval-args", JSON.stringify(approval.arguments ?? {}, null, 2));
+        card.append(heading, meta, reason, args);
+        const actions = el("div", "approval-actions");
+        const deny = el("button", "ghost danger", "Deny");
+        deny.type = "button";
+        const approve = el("button", "solid", "Approve and run once");
+        approve.type = "button";
+        const decide = async (choice: "approve" | "deny", button: HTMLButtonElement): Promise<void> => {
+          deny.disabled = true;
+          approve.disabled = true;
+          try {
+            const result = await deps.api(
+              `/v1/connectors/composio/approvals/${encodeURIComponent(approval.id)}/${choice}`,
+              { method: "POST" },
+              25_000,
+            );
+            if (!result.ok) throw new Error(String(result.status));
+            await refreshApprovals();
+          } catch {
+            meta.textContent = "Could not process this decision. Refresh and review it again.";
+            deny.disabled = false;
+            approve.disabled = false;
+          }
+        };
+        deny.addEventListener("click", () => void decide("deny", deny));
+        approve.addEventListener("click", () => void decide("approve", approve));
+        actions.append(deny, approve);
+        card.append(actions);
+        approvalList.append(card);
+      }
+    } catch {
+      // Approval UI is optional when Composio is not configured.
     }
   }
 
@@ -389,6 +454,7 @@ export function initConnectors(deps: Deps): void {
     document.body.dataset.panel = "connectors";
     void refreshEnabled();
     void refreshOAuthConnections().then(render);
+    void refreshApprovals();
   }
 
   function close(): void {

@@ -1360,6 +1360,9 @@ async function localModelReply(convo: Conversation, toolFollowup?: TerminalToolF
         const reviewed = await reviewLocalDraft(task, content);
         return { content: reviewed, session_id: "" };
       }
+    } else if (shouldVerifyDraft(task)) {
+      const reviewed = await reviewLocalDraft(task, content);
+      return { content: reviewed, session_id: "" };
     }
     return { content, session_id: "" };
   } finally {
@@ -1474,9 +1477,24 @@ async function submit(raw: string): Promise<void> {
           ],
           maxTokens: Math.min(profile.maxTokens, 384),
         });
-        result = { content: parseTerminalToolRequest(followup.content)
-          ? "The terminal tool allows one command per turn. I received a second tool request and did not execute it. Please split the task into another step."
-          : followup.content, session_id: "" };
+        let finalFollowup = followup.content;
+        if (parseTerminalToolRequest(followup.content)) {
+          finalFollowup = "The terminal tool allows one command per turn. I received a second tool request and did not execute it. Please split the task into another step.";
+        } else if (shouldVerifyDraft(text)) {
+          try {
+            const review = await NativeLocalAI.generate({
+              messages: [
+                { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") },
+                { role: "user" as const, content: buildReviewPrompt(text.slice(0, 900), followup.content.slice(0, 2200)) },
+              ],
+              maxTokens: Math.min(profile.maxTokens, 384),
+            });
+            if (review.content.trim()) finalFollowup = review.content.trim();
+          } catch {
+            // Keep the tool-grounded answer if the review pass is unavailable.
+          }
+        }
+        result = { content: finalFollowup, session_id: "" };
       } else {
         let finalContent = response.content;
         if (shouldVerifyDraft(text)) {

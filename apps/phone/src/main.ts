@@ -42,7 +42,7 @@ type NativeLocalAIPlugin = {
   getDeviceProfile(): Promise<{ deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
-  loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string }>;
+  loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
   generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string }>;
   unloadModel(): Promise<{ loaded: boolean }>;
   deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
@@ -438,8 +438,8 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
   }
   const rawSha = file.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
   const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
-  if (sizeBytes > 8 * 1024 * 1024 * 1024) {
-    modelLibraryStatus.textContent = "This file exceeds Ultran's 8 GB download limit.";
+  if (sizeBytes > 256 * 1024 * 1024 * 1024) {
+    modelLibraryStatus.textContent = "This file exceeds Ultran's 256 GB safety limit.";
     return;
   }
   let existingModel = false;
@@ -501,11 +501,11 @@ async function loadNativeModel(): Promise<void> {
   nativeModelLoadButton.disabled = true;
   nativeModelDeleteButton.disabled = true;
   nativeModelUnloadButton.disabled = true;
-  nativeModelStatus.textContent = "Loading model into native memory. Large GGUF files can take a while…";
+  nativeModelStatus.textContent = "Opening model with memory-mapped weights. Large GGUF files may take time to map and can generate slowly…";
   try {
     const result = await NativeLocalAI.loadModel({ name });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · memory-mapped CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {

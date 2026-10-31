@@ -394,6 +394,17 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
       const filtered = eligible.filter((file) => (file.lfs?.size ?? file.size ?? 0) <= maxBytes);
       for (const file of filtered.slice(0, 30)) {
         const size = file.lfs?.size ?? file.size ?? 0;
+        const basename = file.rfilename.split("/").pop() ?? file.rfilename;
+        const shardMatch = basename.match(/^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$/i);
+        if (shardMatch && Number(shardMatch[2]) > 1) continue;
+        const shardCount = shardMatch ? Number(shardMatch[3]) : 1;
+        const shardFiles = shardMatch && shardCount > 1
+          ? files.filter((candidate) => {
+              const candidateName = candidate.rfilename.split("/").pop() ?? candidate.rfilename;
+              const match = candidateName.match(/^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$/i);
+              return !!match && match[1] === shardMatch[1] && Number(match[3]) === shardCount;
+            })
+          : [];
         const row = document.createElement("div");
         row.className = "hub-file-row";
         const info = document.createElement("div");
@@ -401,13 +412,27 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
         const filename = document.createElement("strong");
         filename.textContent = file.rfilename;
         const detailsText = document.createElement("small");
-        detailsText.textContent = formatBytes(size) + (size <= 2 * 1024 * 1024 * 1024 ? " · phone-friendly candidate" : " · large for many phones");
+        if (shardMatch && shardCount > 1) {
+          const setBytes = shardFiles.reduce((sum, part) => sum + (part.lfs?.size ?? part.size ?? 0), 0);
+          detailsText.textContent = formatBytes(setBytes) + " · split model · " + shardFiles.length + "/" + shardCount + " parts";
+        } else {
+          detailsText.textContent = formatBytes(size) + (size <= 2 * 1024 * 1024 * 1024 ? " · phone-friendly candidate" : " · large for many phones");
+        }
         info.append(filename, detailsText);
         const download = document.createElement("button");
         download.type = "button";
         download.className = "solid";
-        download.textContent = "Download";
-        download.addEventListener("click", () => void downloadHubModel(model, file, size, details.sha));
+        if (shardMatch && shardCount > 1) {
+          download.textContent = shardFiles.length === shardCount ? "Open shard set" : "Incomplete set";
+          download.disabled = shardFiles.length !== shardCount;
+          download.addEventListener("click", () => {
+            modelLibraryStatus.textContent = "Download all " + shardCount + " numbered GGUF parts from the repository, then use Import GGUF and select every part together.";
+            void Browser.open({ url: "https://huggingface.co/" + model.id + "/tree/" + (details.sha ?? "main") });
+          });
+        } else {
+          download.textContent = "Download";
+          download.addEventListener("click", () => void downloadHubModel(model, file, size, details.sha));
+        }
         row.append(info, download);
         list.append(row);
       }

@@ -47,6 +47,8 @@ public final class UltranTerminalActivity extends Activity {
 
         Map<String, String> environment = new HashMap<>(System.getenv());
         environment.put("HOME", home.getAbsolutePath());
+        environment.put("TERMUX__HOME", home.getAbsolutePath());
+        environment.put("TERMUX_ANDROID_HOME", home.getAbsolutePath());
         environment.put("TMPDIR", temp.getAbsolutePath());
         environment.put("PREFIX", prefix.getAbsolutePath());
         environment.put("TERMUX_PREFIX", prefix.getAbsolutePath());
@@ -58,7 +60,10 @@ public final class UltranTerminalActivity extends Activity {
         String existingLibraryPath = environment.get("LD_LIBRARY_PATH");
         environment.put("LD_LIBRARY_PATH", existingLibraryPath == null || existingLibraryPath.isEmpty()
             ? prefixLibraryPath : prefixLibraryPath + ":" + existingLibraryPath);
-        environment.put("SHELL", "/system/bin/sh");
+        File bundledBash = new File(prefix, "bin/bash");
+        String shellPath = new File(prefix, ".ultran-bootstrap-installed").isFile() && bundledBash.canExecute()
+            ? bundledBash.getAbsolutePath() : "/system/bin/sh";
+        environment.put("SHELL", shellPath);
         environment.put("TERM", "xterm-256color");
         environment.put("LANG", "C.UTF-8");
         String[] env = new String[environment.size()];
@@ -66,8 +71,8 @@ public final class UltranTerminalActivity extends Activity {
         for (Map.Entry<String, String> entry : environment.entrySet()) {
             env[envIndex++] = entry.getKey() + "=" + entry.getValue();
         }
-        session = new TerminalSession("/system/bin/sh", runtime.getAbsolutePath(),
-            new String[] {"-i"}, env, 2000, new SessionClient());
+        session = new TerminalSession(shellPath, home.getAbsolutePath(),
+            shellPath.endsWith("/bash") ? new String[] {"-l", "-i"} : new String[] {"-i"}, env, 2000, new SessionClient());
         terminalView.attachSession(session);
         terminalView.requestFocus();
     }

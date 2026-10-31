@@ -45,6 +45,7 @@ type NativeLocalAIPlugin = {
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
+const NativeRuntime = registerPlugin<{ getStatus(): Promise<{ installed: boolean; prefix: string; architecture: string }>; pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }> }>("UltranRuntime");
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
 type Theme = { label: string; accent: number; bright: string; fog: number };
@@ -1659,6 +1660,44 @@ window.__ULTRAN__ = { ready: true, theme: () => settings.theme, send: submit };
 
 const builtInTerminalButton = document.getElementById("ultran-terminal-open");
 const builtInTerminalStatus = document.getElementById("ultran-terminal-status");
+const runtimeInstallButton = document.getElementById("ultran-runtime-install");
+const refreshRuntimeStatus = async () => {
+  if (!builtInTerminalStatus) return;
+  if (!Capacitor.isNativePlatform()) {
+    builtInTerminalStatus.textContent = "Runtime installation is available in the Android APK, not the web preview.";
+    return;
+  }
+  try {
+    const status = await NativeRuntime.getStatus();
+    builtInTerminalStatus.textContent = status.installed
+      ? `Termux runtime installed at ${status.prefix} (${status.architecture}).`
+      : `Terminal ready; Termux packages not installed yet (${status.architecture}). Select an Ultran bootstrap ZIP to install them.`;
+  } catch {
+    builtInTerminalStatus.textContent = "Terminal is available; runtime status could not be read.";
+  }
+};
+void refreshRuntimeStatus();
+runtimeInstallButton?.addEventListener("click", async () => {
+  if (!Capacitor.isNativePlatform()) {
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Install the bootstrap from the Android APK. The web preview cannot access app-private runtime storage.";
+    return;
+  }
+  runtimeInstallButton.setAttribute("disabled", "true");
+  if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Choose the Ultran bootstrap ZIP built from the official Termux package source…";
+  try {
+    const result = await NativeRuntime.pickBootstrap();
+    if (result.cancelled) {
+      await refreshRuntimeStatus();
+      return;
+    }
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = `Termux runtime installed (${result.entries ?? 0} entries).`;
+    await refreshRuntimeStatus();
+  } catch (error) {
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = error instanceof Error ? error.message : "Runtime installation failed.";
+  } finally {
+    runtimeInstallButton.removeAttribute("disabled");
+  }
+});
 builtInTerminalButton?.addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) {
     if (builtInTerminalStatus) builtInTerminalStatus.textContent = "The built-in terminal is available in the Android APK, not the web preview.";

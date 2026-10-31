@@ -147,9 +147,9 @@
         </label>
         <section class="field" aria-labelledby="ultran-terminal-heading">
           <span id="ultran-terminal-heading">Ultran built-in terminal</span>
-          <small>Uses the upstream Termux terminal emulator source bundled inside Ultran. The initial shell is Android's built-in shell; Linux package tools are a separate integration step.</small>
-          <button id="ultran-terminal-open" class="ghost" type="button">Open built-in terminal</button>
-          <p id="ultran-terminal-status" class="native-model-status" role="status">Terminal is available in the Android app build.</p>
+          <small>Uses the cloned Termux terminal emulator. Install a bootstrap built from the official Termux package source to enable its bundled shell and tools. Without a bootstrap, Ultran safely falls back to Android's built-in shell.</small>
+          <div class="sheet-actions"><button id="ultran-runtime-install" class="ghost" type="button">Install Termux runtime ZIP</button><button id="ultran-terminal-open" class="ghost" type="button">Open built-in terminal</button></div>
+          <p id="ultran-terminal-status" class="native-model-status" role="status">Checking built-in runtime…</p>
         </section>
         <section class="field" aria-labelledby="termux-bridge-heading">
           <span id="termux-bridge-heading">Termux phone bridge</span>

@@ -56,6 +56,12 @@ public final class UltranCompanionPlugin extends Plugin {
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(new NotificationCompat.Builder(getContext(), CHANNEL)
+                .setSmallIcon(getContext().getApplicationInfo().icon)
+                .setContentTitle("Ultran update")
+                .setContentText("Open Ultran to view details.")
+                .build())
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
         manager.notify((int) (System.currentTimeMillis() & 0x7fffffff), builder.build());
         call.resolve(new JSObject().put("posted", true));

@@ -1,0 +1,48 @@
+name: Build Ultran Termux Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: Comma-separated Termux packages to include in the bootstrap
+        required: true
+        default: git,python
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ultran-termux-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Build prefix-adapted Termux bootstrap archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout Ultran
+        uses: actions/checkout@v4
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Build official Termux bootstrap for Ultran
+        env:
+          ULTRAN_BOOTSTRAP_PACKAGES: ${{ inputs.packages }}
+          ULTRAN_BOOTSTRAP_OUTPUT_DIR: ${{ runner.temp }}/ultran-termux-bootstrap
+        run: ./apps/phone/android/termux-upstream/build-ultran-bootstrap.sh
+
+      - name: Generate checksums
+        working-directory: ${{ runner.temp }}/ultran-termux-bootstrap
+        run: sha256sum bootstrap-aarch64.zip bootstrap-x86_64.zip > SHA256SUMS
+
+      - name: Upload bootstrap archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultran-termux-bootstrap-${{ github.run_id }}
+          path: ${{ runner.temp }}/ultran-termux-bootstrap/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

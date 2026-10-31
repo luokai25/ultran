@@ -364,3 +364,32 @@ def test_agent_rejects_unknown_brain_provider():
     svc = service()
     with pytest.raises(ValidationFailed, match="unsupported agent brain"):
         svc.create(name="Unknown agent", brain="made-up-provider")
+
+
+
+def test_composio_is_a_valid_virtual_agent_tool_and_enters_execution_loop():
+    class FakeComposio:
+        called = False
+        def plan_and_execute(self, workspace, agent_id, message, planner, *, limit):
+            self.called = True
+            prompt = "available tool plan instructions"
+            planner(prompt, message)
+            return [{
+                "connector": "composio", "action": "search_messages",
+                "ok": True, "detail": "Found one message",
+            }]
+
+    from ultran_backend.connectors import ConnectorManifest
+    registry = ConnectorRegistry([
+        ConnectorManifest(id="github", name="Github", category="test",
+                          actions=("commit", "list_repos"))
+    ])
+    vault = CredentialVault()
+    fake = FakeComposio()
+    svc = AgentService(BrainRuntime(EchoBackend()), ToolSandbox(registry, vault), vault,
+                       composio=fake)
+    agent = svc.create(name="Connected agent", tools=["composio"])
+    result = svc.chat(agent.id, "find my latest email", workspace_id="ws")
+    assert fake.called is True
+    assert result["tool_calls"][0]["connector"] == "composio"
+    assert "human approval" in agent.system_message().lower()

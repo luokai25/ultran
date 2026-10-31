@@ -6,6 +6,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(UltranLocalAiPlugin.class);
+        registerPlugin(UltranTerminalPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

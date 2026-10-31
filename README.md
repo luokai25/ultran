@@ -360,3 +360,7 @@ artifact creation, approval waits, errors, and the final result. The phone clien
 uses this stream to show live run activity, then keeps a compact execution
 history with in-app artifact previews and downloads. The regular JSON chat route
 remains available for older clients and integrations.
+
+## Built-in terminal (Termux upstream)
+
+Ultran vendors the official Termux `terminal-emulator` and `terminal-view` Android library modules from upstream commit `8629e632fcb95da272221be327db653fb24befe`. The current integrated shell is Android `/system/bin/sh` in Ultran’s private app sandbox. This does not yet install Termux’s package bootstrap or Linux utilities. See `apps/phone/android/termux-upstream/UPSTREAM.md`.

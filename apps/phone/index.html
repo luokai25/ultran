@@ -145,6 +145,12 @@
           <input id="endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://192.168.1.20:8080" />
           <small id="endpoint-note">Only needed for hosted agents, Composio and remote connector orchestration. Leave empty for local-only use.</small>
         </label>
+        <section class="field" aria-labelledby="ultran-terminal-heading">
+          <span id="ultran-terminal-heading">Ultran built-in terminal</span>
+          <small>Uses the upstream Termux terminal emulator source bundled inside Ultran. The initial shell is Android's built-in shell; Linux package tools are a separate integration step.</small>
+          <button id="ultran-terminal-open" class="ghost" type="button">Open built-in terminal</button>
+          <p id="ultran-terminal-status" class="native-model-status" role="status">Terminal is available in the Android app build.</p>
+        </section>
         <section class="field" aria-labelledby="termux-bridge-heading">
           <span id="termux-bridge-heading">Termux phone bridge</span>
           <small>Optional localhost link to Termux for approved file access. Install the bridge from the bundled termux-bridge folder, run it in Termux, and keep it bound to this phone only.</small>

@@ -44,6 +44,7 @@ type NativeLocalAIPlugin = {
   addListener(eventName: "modelImportProgress", listener: (event: { name: string; copiedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
+const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
 type Theme = { label: string; accent: number; bright: string; fog: number };
@@ -1654,3 +1655,20 @@ declare global {
 }
 
 window.__ULTRAN__ = { ready: true, theme: () => settings.theme, send: submit };
+
+
+const builtInTerminalButton = document.getElementById("ultran-terminal-open");
+const builtInTerminalStatus = document.getElementById("ultran-terminal-status");
+builtInTerminalButton?.addEventListener("click", async () => {
+  if (!Capacitor.isNativePlatform()) {
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = "The built-in terminal is available in the Android APK, not the web preview.";
+    return;
+  }
+  if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Opening terminal…";
+  try {
+    await NativeTerminal.open();
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Terminal opened.";
+  } catch (error) {
+    if (builtInTerminalStatus) builtInTerminalStatus.textContent = error instanceof Error ? error.message : "Could not open terminal.";
+  }
+});

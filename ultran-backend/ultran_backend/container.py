@@ -17,6 +17,7 @@ from .forge import ForgeService
 from .mcp import ApprovalGate, GrantStore, McpClientPool, ServerSpec, ToolGateway
 from .sandbox import ToolSandbox
 from .workspace import AvatarService, VoiceService
+from .tasks import AgentTaskService
 
 
 @dataclass
@@ -27,6 +28,7 @@ class Container:
     sandbox: ToolSandbox
     brain: BrainRuntime
     agents: AgentService
+    tasks: AgentTaskService
     avatar: AvatarService
     voice: VoiceService
     builder: BuilderService
@@ -80,22 +82,35 @@ class Container:
             encryption_key=settings.credential_encryption_key,
         )
 
+        agents = AgentService(
+            brain, sandbox, vault, composio=composio,
+            db_path=settings.data_dir / "agents.sqlite3",
+            encryption_key=settings.credential_encryption_key,
+        )
+        billing = BillingService(default_monthly_tokens=settings.free_plan_monthly_tokens)
+
+        def execute_agent_task(agent_id: str, message: str, **kwargs):
+            result = agents.chat(agent_id, message, **kwargs)
+            billing.meter(kwargs.get("workspace_id", "local"), result["tokens_in"] + result["tokens_out"])
+            return result
+
+        tasks = AgentTaskService(
+            settings.data_dir / "agent_tasks.sqlite3", execute_agent_task,
+            encryption_key=settings.credential_encryption_key,
+        )
         return cls(
             settings=settings,
             registry=registry,
             vault=vault,
             sandbox=sandbox,
             brain=brain,
-            agents=AgentService(
-                brain, sandbox, vault, composio=composio,
-                db_path=settings.data_dir / "agents.sqlite3",
-                encryption_key=settings.credential_encryption_key,
-            ),
+            agents=agents,
+            tasks=tasks,
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),
             forge=ForgeService(),
-            billing=BillingService(default_monthly_tokens=settings.free_plan_monthly_tokens),
+            billing=billing,
             deploys=DeployService(root=settings.data_dir / "deploys"),
             mcp_pool=mcp_pool,
             mcp_gateway=mcp_gateway,
@@ -123,6 +138,7 @@ class Container:
         return status
 
     def close(self) -> None:
+        self.tasks.close()
         self.mcp_pool.close()
 
     # ------------------------------------------------------------------ #

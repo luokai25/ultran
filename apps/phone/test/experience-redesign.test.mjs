@@ -16,7 +16,7 @@ test("new mobile experience stylesheet is loaded after the base and workspace st
   for (const id of ["menu-btn", "new-btn", "thread", "hero", "avatar", "greeting", "suggestions", "messages", "composer", "prompt", "send-btn", "drawer", "history", "workspace-panel", "connectors-panel", "sheet-wrap"]) {
     assert.match(html, new RegExp(`id="${id}"`), `missing live UI node: ${id}`);
   }
-  const ids = [...html.matchAll(/\\bid="([^"]+)"/g)].map((match) => match[1]);
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length, "the rebuilt shell must not introduce duplicate IDs");
 });
 

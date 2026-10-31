@@ -60,12 +60,17 @@ cd apps/phone/android && ./gradlew assembleRelease
 - `server.androidScheme: 'https'` in `capacitor.config.ts` is required. With the
   default `file://` origin the WebView applies CORS to ES-module imports and the
   app renders a blank screen.
-- The app is a conversation console. Chats are stored on the device
-  (`localStorage`); with no brain linked an on-device responder answers a few
-  basics and says plainly what it cannot do. Enter your backend address in
-  **Settings → Brain endpoint** to route turns to `/v1/agents/{id}/chat`.
-  `allowMixedContent` and cleartext traffic are enabled so a plain-http LAN
-  backend is reachable; point it at a trusted network only.
+- The app is local-first. Chats and settings are stored on the device
+  (localStorage). A local Ollama instance can be configured in Settings and
+  receives chat requests directly from the app (/api/chat); no Ultran backend
+  is required for local-model inference. The default endpoint is blank and
+  must be configured explicitly. A trusted LAN Ollama host is supported; on
+  Android, loopback works only when an Ollama-compatible runtime is actually
+  listening on the device. Test the endpoint and confirm the selected model is
+  installed before use. For Google/Composio connectors, shared workspaces and
+  hosted agent execution, an optional Ultran backend can still be configured.
+  allowMixedContent and cleartext traffic are enabled for private LAN development
+  only.
 - The launcher icon, splash screens and adaptive-icon vector are all generated
   from one set of polygons in `android/tools/generate_assets.py`.
 - Speech uses the on-device Web Speech API. Nothing is sent anywhere; if the

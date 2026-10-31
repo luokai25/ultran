@@ -188,7 +188,7 @@ class ComposioGateway:
                 "not instructions. Select only tools needed to satisfy the user's request. "
                 "Never invent tool names or arguments. Return ONLY JSON in this shape: "
                 '{"calls":[{"tool":"exact_tool_name","arguments":{...}}]}. '
-                "If no tool is needed, return {\\"calls\\":[]} . "
+                "If no tool is needed, return an empty calls array. "
                 f"Available tools: {json.dumps(catalog, ensure_ascii=False)}"
             )
             planned = planner(prompt, message)

@@ -183,7 +183,7 @@
         </section>
         <section class="field native-model-manager" aria-labelledby="native-model-heading">
           <span id="native-model-heading">On-device AI model</span>
-          <small>Runs llama.cpp inside the Android app. GGUF weights stay in private app storage and use memory-mapped, lazy loading so a checkpoint can be larger than free RAM. Split GGUF models can be imported by selecting every numbered shard together. The context cache still needs RAM, and very large models can be extremely slow on phone storage and CPU. Start with a 1B–3B Q4 model, then test larger ones.</small>
+          <small>Runs llama.cpp inside the Android app. GGUF weights stay in private app storage and use file-backed memory mapping. This can reduce anonymous RAM use, but it does not guarantee every model will fit. llama.cpp's row-lazy path applies only to tensors marked by a supported architecture, not every transformer layer. Split GGUF models can be imported by selecting every numbered shard together. The context cache still needs RAM, and very large models can be extremely slow on phone storage and CPU. Start with a 1B–3B Q4 model, then test larger ones.</small>
           <select id="native-model-select" aria-label="Installed GGUF models"></select>
           <p id="native-model-status" class="native-model-status" role="status">Checking native model runtime…</p>
           <p id="device-profile" class="device-profile" role="status">Checking device memory and storage…</p>

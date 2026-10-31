@@ -5,4 +5,5 @@
     <string name="package_name">app.ultran.mobile</string>
     <string name="custom_url_scheme">app.ultran.mobile</string>
     <string name="ultran_accessibility_description">Allows Ultran to send a WhatsApp message only after you approve the exact recipient and message in Ultran. The approval is one-use and expires after one minute.</string>
+    <string name="ultran_accessibility_description">Allows Ultran to send a WhatsApp message only after you approve the exact recipient and message. It reads WhatsApp composer text to verify the approved message before tapping Send. Disable this service any time in Android Accessibility settings.</string>
 </resources>

@@ -16,6 +16,7 @@ def test_task_profiles_reserve_review_for_complex_and_high_impact_work():
     critical = profile_task("Review this medication dose and the risks")
     assert critical.tier == "critical"
     assert critical.verify_draft is True
+    assert profile_task("Delete all production data").tier == "critical"
 
 
 def test_capability_contract_does_not_change_with_the_provider():

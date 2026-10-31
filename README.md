@@ -153,6 +153,16 @@ keep the backend endpoint private to your own deployment and use a unique owner
 workspace; do not disable approval checks or embed service credentials in the
 APK.
 
+### Persistent agent memory
+
+Agents, settings, usage totals, sessions, and bounded chat transcripts are stored
+in SQLite under `ULTRAN_DATA_DIR/agents.sqlite3` and restored on backend restart.
+When `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` is configured, agent system prompts and
+message contents are Fernet-encrypted at rest using that same operator-managed
+key. Production requires this key; back it up securely because losing it makes
+stored credentials and encrypted agent memory unrecoverable. Keep the data
+ directory private and include it in your encrypted backup plan.
+
 The separate TypeScript `@ultran/agent-core` now has an experimental Ollama
 adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
 That runtime is not yet wired into the phone chat or a complete tool-execution

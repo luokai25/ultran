@@ -279,6 +279,7 @@ class ComposioGateway:
                             "tool_name": name,
                             "tool_title": spec.title or spec.name,
                             "capabilities": sorted(spec.capabilities),
+                            "requires_approval": bool(spec.requires_approval),
                             "arguments": cleaned,
                         })
                     results.append({
@@ -336,6 +337,7 @@ class ComposioGateway:
                     "tool_name": pending.get("tool_name"),
                     "tool_title": pending.get("tool_title"),
                     "capabilities": pending.get("capabilities", []),
+                    "requires_approval": pending.get("requires_approval", True),
                     "arguments": pending.get("arguments", {}),
                 })
         return rows
@@ -376,6 +378,18 @@ class ComposioGateway:
                 connect=True,
             )
             spec = pool.find_tool(f"composio.{pending['tool_name']}")
+            # Approval binds to the exact risk classification the human saw.
+            # Composio metadata can change between request and approval, so do
+            # not execute if the capability set or approval requirement changed.
+            approved_capabilities = frozenset(pending.get("capabilities", []))
+            approved_requires_approval = bool(pending.get("requires_approval", True))
+            if (
+                spec.capabilities != approved_capabilities
+                or bool(spec.requires_approval) != approved_requires_approval
+            ):
+                raise ValidationFailed(
+                    "Tool permissions changed since approval; request approval again."
+                )
             if spec.capabilities == frozenset({"read"}) and not spec.requires_approval:
                 raise ValidationFailed("Tool risk classification changed; refusing approved execution.")
             from .mcp.schema import validate_arguments

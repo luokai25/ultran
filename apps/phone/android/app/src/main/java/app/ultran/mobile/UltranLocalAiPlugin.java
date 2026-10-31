@@ -489,6 +489,22 @@ public class UltranLocalAiPlugin extends Plugin {
         });
     }
 
+    private long modelSetSize(File model) {
+        Matcher split = GGUF_SHARD.matcher(model.getName());
+        if (!split.matches()) return model.length();
+        int index = Integer.parseInt(split.group(2));
+        int count = Integer.parseInt(split.group(3));
+        if (index != 1) return model.length();
+        long total = 0;
+        String prefix = split.group(1);
+        for (int part = 1; part <= count; part++) {
+            File shard = new File(modelDirectory(), prefix + String.format(Locale.ROOT, "-%05d-of-%05d.gguf", part, count));
+            if (!shard.isFile()) return model.length();
+            total += shard.length();
+        }
+        return total;
+    }
+
     @PluginMethod
     public void loadModel(PluginCall call) {
         final String name;
@@ -525,7 +541,8 @@ public class UltranLocalAiPlugin extends Plugin {
                         ? 512
                         : memory.availMem > 0 && memory.availMem < 2L * 1024L * 1024L * 1024L
                         ? 1024 : 2048;
-                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens);
+                final boolean aggressiveLazyLoading = memory.availMem <= 0 || modelSetSize(model) > memory.availMem;
+                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;
                     loadedContextTokens = 0;
@@ -540,7 +557,7 @@ public class UltranLocalAiPlugin extends Plugin {
                 response.put("contextTokens", contextTokens);
                 response.put("device", "CPU");
                 response.put("memoryMapped", true);
-                response.put("largeModelMode", true);
+                response.put("largeModelMode", aggressiveLazyLoading);
                 call.resolve(response);
             } catch (Throwable error) {
                 loadedModelPath = null;

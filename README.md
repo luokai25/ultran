@@ -121,11 +121,18 @@ inspect repository files, and download GGUF weights directly into private app
 storage. Downloads are restricted to HTTPS Hugging Face URLs, checked against
 the GGUF header, checked against the repository's SHA-256 file digest when
 available, limited to 8 GB, and written through a temporary file before
-activation. Model weights are not bundled in the APK. The initial runtime
-targets arm64-v8a and x86_64, uses a 2,048-token context and up to four CPU
-threads, and is intended to start with 1B–3B Q4 quantized models. Larger models
-can be slow or exceed available RAM. This first native runtime is CPU-only;
-GPU acceleration and streamed native token callbacks remain future optimizations.
+activation. Model weights are not bundled in the APK. The model browser
+includes popular family shortcuts, a file-size filter, live download progress,
+license tags from repository metadata, and device-aware guidance based on
+reported RAM, free storage, CPU cores, and ABI. The size filter is a rough
+starting point, not a guarantee that a model will fit: runtime memory use also
+depends on context length, model architecture, and other apps. Review the
+upstream model card and license before downloading or using any weights. The
+initial runtime targets arm64-v8a and x86_64, uses a 2,048-token context and up
+to four CPU threads, and is intended to start with 1B–3B Q4 quantized models.
+Larger models can be slow or exceed available RAM. This first native runtime is
+CPU-only; GPU acceleration and streamed native token callbacks remain future
+optimizations.
 
 A local Ollama-compatible runtime is also supported as an optional bridge.
 Configure its localhost or private-LAN address in Settings → Local model

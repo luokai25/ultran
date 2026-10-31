@@ -1699,9 +1699,7 @@ function setThinking(next: boolean): void {
 
 const synth = window.speechSynthesis as SpeechSynthesis | undefined;
 
-function plainSpeech(text: string): string {
-  return text.replace(/```[\s\S]*?```/g, " code block. ").replace(/[`*#>_-]+/g, " ").replace(/\s+/g, " ").trim();
-}
+function plainSpeech(text: string): string { return prepareUltranSpeech(text); }
 
 function speak(text: string): void {
   if (!synth) return;

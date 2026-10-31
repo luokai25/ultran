@@ -395,13 +395,13 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
       for (const file of filtered.slice(0, 30)) {
         const size = file.lfs?.size ?? file.size ?? 0;
         const basename = file.rfilename.split("/").pop() ?? file.rfilename;
-        const shardMatch = basename.match(/^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$/i);
+        const shardMatch = basename.match(/^(.*)-(\d{5})-of-(\d{5})\.gguf$/i);
         if (shardMatch && Number(shardMatch[2]) > 1) continue;
         const shardCount = shardMatch ? Number(shardMatch[3]) : 1;
         const shardFiles = shardMatch && shardCount > 1
           ? files.filter((candidate) => {
               const candidateName = candidate.rfilename.split("/").pop() ?? candidate.rfilename;
-              const match = candidateName.match(/^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$/i);
+              const match = candidateName.match(/^(.*)-(\d{5})-of-(\d{5})\.gguf$/i);
               return !!match && match[1] === shardMatch[1] && Number(match[3]) === shardCount;
             })
           : [];

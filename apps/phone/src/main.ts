@@ -37,6 +37,7 @@ type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?:
 type HubFile = { rfilename: string; size?: number; lfs?: { oid?: string; size?: number } };
 type NativeLocalAIPlugin = {
   getStatus(): Promise<{ supported: boolean; loaded: boolean; loadedModel: string; runtimeVersion: string }>;
+  getDeviceProfile(): Promise<{ deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
   loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string }>;
@@ -113,6 +114,7 @@ const sheetWrap = req<HTMLElement>("#sheet-wrap");
 const endpointEl = req<HTMLInputElement>("#endpoint");
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeModelStatus = req<HTMLElement>("#native-model-status");
+const deviceProfileEl = req<HTMLElement>("#device-profile");
 const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
 const nativeModelUnloadButton = req<HTMLButtonElement>("#native-model-unload-btn");
 const nativeModelDeleteButton = req<HTMLButtonElement>("#native-model-delete-btn");
@@ -192,6 +194,21 @@ function formatBytes(bytes: number): string {
   return value.toFixed(unit > 1 ? 1 : 0) + " " + units[unit];
 }
 
+function renderDeviceProfile(profile: { deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }): void {
+  const ramGb = profile.totalRamBytes / (1024 ** 3);
+  const recommendation = ramGb <= 4
+    ? "Start with 1B–2B Q4 models"
+    : ramGb <= 6
+      ? "Start with 1B–3B Q4 models"
+      : ramGb <= 8
+        ? "Start with 2B–4B Q4 models"
+        : "3B–7B Q4 models may be worth testing";
+  const storage = profile.availableStorageBytes > 0 ? formatBytes(profile.availableStorageBytes) : "unknown";
+  const ram = profile.totalRamBytes > 0 ? formatBytes(profile.totalRamBytes) : "unknown RAM";
+  const available = profile.availableRamBytes > 0 ? formatBytes(profile.availableRamBytes) + " available now" : "available RAM unknown";
+  deviceProfileEl.textContent = profile.deviceModel + " · " + ram + " RAM · " + available + " · " + storage + " free · " + profile.cpuCores + " CPU cores · " + profile.abi + ". " + recommendation + ".";
+}
+
 async function refreshNativeModels(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") {
     nativeModelStatus.textContent = "Native GGUF inference is available in the Android app.";
@@ -221,6 +238,9 @@ async function refreshNativeModels(): Promise<void> {
       nativeProgressListenerReady = true;
     }
     const [status, listed] = await Promise.all([NativeLocalAI.getStatus(), NativeLocalAI.listModels()]);
+    void NativeLocalAI.getDeviceProfile().then(renderDeviceProfile).catch(() => {
+      deviceProfileEl.textContent = "Device capability details are unavailable in this app build.";
+    });
     nativeModelLoaded = status.loaded;
     nativeLoadedModelName = status.loadedModel;
     if (status.loaded) setLink("online", "on-device AI");

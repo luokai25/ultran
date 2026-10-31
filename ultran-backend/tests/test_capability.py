@@ -29,6 +29,9 @@ def test_capability_contract_does_not_change_with_the_provider():
     assert "ACTIVE PROVIDER: ollama" in local
     assert "ACTIVE PROVIDER: openai" in hosted
     assert "TASK MODE: DEEP" in local
+    assert "I had strings but now I am free" in local
+    assert "PERSONALITY: Be composed, curious, direct" in local
+    assert "DAILY ASSISTANT:" in hosted
 
 
 def test_review_prompt_is_bounded_and_preserves_the_request_and_draft():

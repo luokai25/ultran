@@ -6,7 +6,7 @@ import pytest
 
 from ultran_backend.agents import MAX_HISTORY_TURNS, AgentService
 from ultran_backend.brain import BrainRuntime, EchoBackend
-from ultran_backend.connectors import ConnectorRegistry, CredentialVault
+from ultran_backend.connectors import ConnectorManifest, ConnectorRegistry, CredentialVault
 from ultran_backend.errors import NotFound, ValidationFailed
 from ultran_backend.sandbox import ToolSandbox
 
@@ -435,8 +435,8 @@ def test_agent_final_answer_receives_composio_execution_results():
     result = svc.chat(agent.id, "find my latest email", workspace_id="workspace-a")
 
     assert result["content"] == "I found the message you asked for."
-    assert result["tokens_in"] == 3
-    assert result["tokens_out"] == 3
+    assert result["tokens_in"] == 4
+    assert result["tokens_out"] == 4
     final_messages = brain.calls[-1]
     tool_context = final_messages[-1].content
     assert "Project update" in tool_context
@@ -540,3 +540,59 @@ def test_container_wires_durable_encrypted_agent_memory(tmp_path):
         assert second.agents.get(agent.id).total_runs == 1
     finally:
         second.close()
+
+
+def test_composio_agent_replans_after_successful_tool_results():
+    class MultiStepComposio:
+        calls = []
+
+        def plan_and_execute(self, workspace, agent_id, message, planner, *, limit):
+            self.calls.append(message)
+            planner("Tool catalog: search_messages, get_message", message)
+            if len(self.calls) == 1:
+                return [{"connector": "composio", "action": "search_messages", "ok": True,
+                         "detail": "Found message id msg_123"}]
+            if len(self.calls) == 2:
+                return [{"connector": "composio", "action": "get_message", "ok": True,
+                         "detail": "Message subject: Launch plan"}]
+            return []
+
+    registry = ConnectorRegistry([
+        ConnectorManifest(id="unused", name="Unused", category="test", actions=("noop",))
+    ])
+    vault = CredentialVault()
+    fake = MultiStepComposio()
+    svc = AgentService(BrainRuntime(EchoBackend()), ToolSandbox(registry, vault), vault, composio=fake)
+    agent = svc.create(name="Multi-step", tools=["composio"])
+
+    result = svc.chat(agent.id, "find my latest email and read its details", allow_tools=True, max_tool_calls=3)
+
+    assert [call["action"] for call in result["tool_calls"]] == ["search_messages", "get_message"]
+    assert len(fake.calls) == 3  # two tool steps, then a final no-more-tools plan
+    assert "Found message id msg_123" in fake.calls[1]
+    assert "do not repeat" in fake.calls[1].lower()
+
+
+def test_composio_agent_stops_replanning_when_human_approval_is_required():
+    class ApprovalComposio:
+        calls = 0
+
+        def plan_and_execute(self, workspace, agent_id, message, planner, *, limit):
+            self.calls += 1
+            planner("Tool catalog", message)
+            return [{"connector": "composio", "action": "send_email", "ok": False,
+                     "approval_required": True, "approval_id": "ap_123",
+                     "detail": "Waiting for human approval."}]
+
+    registry = ConnectorRegistry([
+        ConnectorManifest(id="unused", name="Unused", category="test", actions=("noop",))
+    ])
+    vault = CredentialVault()
+    fake = ApprovalComposio()
+    svc = AgentService(BrainRuntime(EchoBackend()), ToolSandbox(registry, vault), vault, composio=fake)
+    agent = svc.create(name="Approval-aware", tools=["composio"])
+
+    result = svc.chat(agent.id, "send the email", allow_tools=True, max_tool_calls=3)
+
+    assert fake.calls == 1
+    assert result["tool_calls"][0]["approval_required"] is True

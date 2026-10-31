@@ -141,9 +141,18 @@
         <h2 id="sheet-title">Settings</h2>
 
         <label class="field">
-          <span>Brain endpoint</span>
+          <span>Optional Ultran backend</span>
           <input id="endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://192.168.1.20:8080" />
-          <small id="endpoint-note">Leave empty to stay fully on-device. Link your Ultran backend to get real replies.</small>
+          <small id="endpoint-note">Only needed for hosted agents, Composio and remote connector orchestration. Leave empty for local-only use.</small>
+        </label>
+        <label class="field">
+          <span>Local model endpoint (Ollama)</span>
+          <input id="local-model-endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:11434" />
+          <small>Inference is sent directly from Ultran to this Ollama instance, not through an Ultran server. On Android, Ollama must be running locally or on a trusted LAN host.</small>
+        </label>
+        <label class="field">
+          <span>Local model name</span>
+          <input id="local-model" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="llama3.2:3b" />
         </label>
 
         <div class="field">
@@ -152,7 +161,8 @@
         </div>
 
         <div class="sheet-actions">
-          <button id="test-btn" class="ghost" type="button">Test link</button>
+          <button id="test-btn" class="ghost" type="button">Test backend</button>
+          <button id="test-local-model-btn" class="ghost" type="button">Test local model</button>
           <button id="clear-btn" class="ghost danger" type="button">Delete all chats</button>
           <button id="save-btn" class="solid" type="button">Done</button>
         </div>

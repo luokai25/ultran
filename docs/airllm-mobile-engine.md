@@ -35,12 +35,20 @@ AirLLM depends on Python, PyTorch, Transformers, Accelerate, SafeTensors and opt
 ## Mobile implementation already present
 
 - Native loader selects `LLAMA_LOAD_MODE_MMAP`.
-- Native loader selects `LLAMA_LAZY_MODE_AUTO`, which uses on-demand reads for tensor classes marked by the architecture when they exceed llama.cpp's documented threshold.
+- Native loader uses `LLAMA_LAZY_MODE_AUTO` for checkpoints that fit within 70% of currently available RAM. If the complete model set exceeds that threshold, it selects `LLAMA_LAZY_MODE_ON` so llama.cpp uses its aggressive on-demand tensor-row path for eligible tensor types. This is still llama.cpp's graph executor and not AirLLM's explicit per-layer module eviction.
 - Android no longer rejects a model merely because its file is larger than 70% of free RAM. The previous guard incorrectly assumed the full mapped checkpoint must be resident.
 - The context cache is selected from current available memory: 512 tokens below 1 GiB free, 1,024 below 2 GiB, otherwise 2,048.
 - Prompt batches are limited to 64 tokens to reduce transient allocations.
+- Native inference records prompt token count, prompt evaluation time, generated token count, generation time, and generated tokens/second. The Android plugin also samples process PSS and private dirty memory after a run.
+- Settings include an explicit short benchmark action. It runs only when a model is already loaded, so it does not silently download or load a large checkpoint.
 - Import and direct Hugging Face download have a 256 GB safety ceiling and still check actual free storage while writing a temporary file. Split GGUF imports are multi-selected, filename/count checked, staged, and committed as one set; the model list exposes only the first shard as the logical model. llama.cpp's pinned loader automatically discovers the remaining standard `-00001-of-000NN.gguf` files. This ceiling is not a promise that Android hardware can run a model of that size.
 - Existing GGUF validation, SHA-256 validation when supplied, atomic finalization, serialized load/inference/delete operations, and local-only model storage remain in place.
+
+## Runtime measurements and validation
+
+The benchmark is intentionally a small warm-run probe, not a standardized cross-device leaderboard. It reports generated tokens per second separately from prompt evaluation time and includes process PSS/private dirty memory as a snapshot after generation. Results are affected by thermal state, Android page cache, other foreground/background apps, storage speed, and the exact GGUF quantization. A single run cannot establish sustained performance or prove that a larger checkpoint will fit.
+
+The next genuine AirLLM-inspired stage is module-aware scheduling. It must be designed against llama.cpp's graph/tensor lifetime APIs and GGUF tensor metadata, not implemented by manually moving arbitrary tensors while the graph executor still references them. Any layer residency experiment needs correctness tests against the unmodified llama.cpp output, memory high-water measurements, and tests across dense and MoE architectures before it can become the default path.
 
 ## What Ultran's split import does and does not mean
 

@@ -22,8 +22,8 @@ test("new mobile experience stylesheet is loaded after the base and workspace st
 
 test("redesigned UI preserves mobile layout, focus visibility, and reduced-motion support", async () => {
   const css = await read("src/experience.css");
-  assert.match(css, /@media\\(max-width:430px\\)/);
-  assert.match(css, /@media\\(min-width:700px\\)/);
+  assert.ok(css.includes("@media(max-width:430px)"));
+  assert.ok(css.includes("@media(min-width:700px)"));
   assert.match(css, /prefers-reduced-motion:reduce/);
   assert.match(css, /:focus-visible/);
   for (const selector of [".hero-intro", ".quick-start", ".suggestions", ".composer", ".drawer", ".sheet", ".workspace-panel"]) {
@@ -45,5 +45,5 @@ test("new monogram is shared by the web mark, Android generator, and adaptive la
   assert.match(vector, /M54,14 L83,29 L83,70 L54,94/);
   assert.match(vector, /M39,38 L48,38 L48,58/);
   assert.match(background, /#0B0D0F/);
-  assert.match(generator, /OBSIDIAN = \\(11, 13, 15\\)/);
+  assert.ok(generator.includes("OBSIDIAN = (11, 13, 15)"));
 });

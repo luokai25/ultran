@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import threading
+from pathlib import Path
 from typing import Any
 
 from .errors import DependencyUnavailable, NotFound, ValidationFailed
@@ -27,13 +29,60 @@ def composio_user_id(workspace_id: str) -> str:
 class ComposioGateway:
     """Small adapter around the official Composio Python SDK."""
 
-    def __init__(self, api_key: str = "", callback_url: str = "") -> None:
+    def __init__(
+        self, api_key: str = "", callback_url: str = "", *,
+        db_path: str | Path | None = None, encryption_key: str = "",
+    ) -> None:
         self._api_key = api_key.strip()
         self._callback_url = callback_url.strip()
         self._client: Any | None = None
-        self._approval_gate = ApprovalGate(ttl_s=300)
+        self._db_path = str(db_path) if db_path and encryption_key else None
+        self._fernet = None
+        if self._db_path:
+            from cryptography.fernet import Fernet
+            self._fernet = Fernet(encryption_key.encode("ascii"))
+            path = Path(self._db_path)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            with sqlite3.connect(self._db_path) as db:
+                db.execute("PRAGMA journal_mode=WAL")
+                db.execute("CREATE TABLE IF NOT EXISTS pending_calls (approval_id TEXT PRIMARY KEY, payload BLOB NOT NULL)")
+            try:
+                path.chmod(0o600)
+            except OSError:
+                pass
+        self._approval_gate = ApprovalGate(ttl_s=300, db_path=self._db_path)
         self._pending_calls: dict[str, dict[str, Any]] = {}
         self._approval_lock = threading.RLock()
+        self._restore_pending_calls()
+
+    def _save_pending_call(self, approval_id: str, payload: dict[str, Any]) -> None:
+        self._pending_calls[approval_id] = payload
+        if self._db_path and self._fernet:
+            encrypted = self._fernet.encrypt(json.dumps(payload, separators=(",", ":")).encode())
+            with sqlite3.connect(self._db_path, timeout=10) as db:
+                db.execute("INSERT OR REPLACE INTO pending_calls VALUES (?, ?)", (approval_id, encrypted))
+
+    def _remove_pending_call(self, approval_id: str) -> None:
+        self._pending_calls.pop(approval_id, None)
+        if self._db_path:
+            with sqlite3.connect(self._db_path, timeout=10) as db:
+                db.execute("DELETE FROM pending_calls WHERE approval_id=?", (approval_id,))
+
+    def _restore_pending_calls(self) -> None:
+        if not self._db_path or not self._fernet:
+            return
+        with sqlite3.connect(self._db_path, timeout=10) as db:
+            rows = db.execute("SELECT approval_id, payload FROM pending_calls").fetchall()
+        for approval_id, payload in rows:
+            try:
+                decoded = json.loads(self._fernet.decrypt(payload).decode())
+            except Exception as exc:
+                raise RuntimeError("Cannot decrypt pending Composio approvals; verify ULTRAN_CREDENTIAL_ENCRYPTION_KEY.") from exc
+            approval = self._approval_gate.get(approval_id)
+            if approval.state == "pending" and not approval.is_expired():
+                self._pending_calls[approval_id] = decoded
+            else:
+                self._remove_pending_call(approval_id)
 
     @property
     def configured(self) -> bool:
@@ -224,14 +273,14 @@ class ComposioGateway:
                         reason=f"{spec.title or spec.name} requested by agent {agent_id}",
                     )
                     with self._approval_lock:
-                        self._pending_calls[approval.id] = {
+                        self._save_pending_call(approval.id, {
                             "workspace_id": workspace_id,
                             "agent_id": agent_id,
                             "tool_name": name,
                             "tool_title": spec.title or spec.name,
                             "capabilities": sorted(spec.capabilities),
                             "arguments": cleaned,
-                        }
+                        })
                     results.append({
                         "connector": "composio", "action": name, "call_id": call_id, "ok": False,
                         "approval_required": True, "approval_id": approval.id,
@@ -302,16 +351,16 @@ class ComposioGateway:
                 approval_id, approved=approved, decided_by="workspace-user"
             )
             if not approved:
-                self._pending_calls.pop(approval_id, None)
+                self._remove_pending_call(approval_id)
                 return {"approval": approval.as_dict(), "executed": False}
             arguments = dict(pending["arguments"])
             expected_hash = __import__("hashlib").sha256(
                 __import__("json").dumps(arguments, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest()
             if expected_hash != approval.arguments_hash:
-                self._pending_calls.pop(approval_id, None)
+                self._remove_pending_call(approval_id)
                 raise ValidationFailed("Approved arguments changed; refusing execution.")
-            self._pending_calls.pop(approval_id, None)
+            self._remove_pending_call(approval_id)
 
         session = self.create_session(workspace_id)
         from .mcp import McpClientPool, ServerSpec

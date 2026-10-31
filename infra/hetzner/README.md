@@ -165,14 +165,17 @@ Verify `https://YOUR_DOMAIN/v1/health` returns HTTP 200 and confirm that
 
 ## Backups and recovery
 
-The named `ultran-data` volume contains the SQLite credential vault and the
-persistent agent/session database (`agents.sqlite3`). Back up
-the database consistently, encrypt backups before they leave the server, and
-store at least one copy outside the VPS. A backup on the same server is not a
-disaster-recovery plan.
+The named `ultran-data` volume contains the SQLite credential vault, persistent
+agent/session and long-term memory database (`agents.sqlite3`), MCP approval
+history (`approvals.sqlite3`), encrypted Composio pending calls
+(`composio_approvals.sqlite3`), and background task queue (`agent_tasks.sqlite3`).
+The backup script snapshots every `*.sqlite3` database through SQLite's backup
+API, so WAL-mode databases are captured consistently. Encrypt backups before
+they leave the server, and store at least one copy outside the VPS. A backup on
+the same server is not a disaster-recovery plan.
 
 Back up these items together:
-- Both SQLite databases from the `ultran-data` volume.
+- All SQLite databases from the `ultran-data` volume.
 - The Fernet encryption key from the secret store.
 - The deployment `.env` file, excluding any unrelated temporary secrets.
 - The exact Git commit deployed.

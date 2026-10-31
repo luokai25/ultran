@@ -19,6 +19,7 @@ import androidx.work.WorkManager;
 import java.util.UUID;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -182,6 +183,36 @@ public final class UltranRuntimePlugin extends Plugin {
                 call.resolve(result);
             } catch (Exception error) {
                 call.reject("Could not read background job status.", error);
+            }
+        }, commandExecutor);
+    }
+
+    @PluginMethod
+    public void listCommandJobs(PluginCall call) {
+        WorkManager.getInstance(getContext()).getWorkInfosByTag("ultran-local-runtime-job").addListener(() -> {
+            try {
+                List<WorkInfo> infos = WorkManager.getInstance(getContext())
+                    .getWorkInfosByTag("ultran-local-runtime-job").get();
+                JSArray jobs = new JSArray();
+                int count = 0;
+                for (WorkInfo info : infos) {
+                    if (count++ >= 20) break;
+                    JSObject item = new JSObject();
+                    item.put("jobId", info.getId().toString());
+                    item.put("status", info.getState().name().toLowerCase(java.util.Locale.ROOT));
+                    Data output = info.getOutputData();
+                    String outputText = output.getString(UltranCommandWorker.KEY_OUTPUT);
+                    if (outputText != null) item.put("output", outputText);
+                    String error = output.getString(UltranCommandWorker.KEY_ERROR);
+                    if (error != null) item.put("error", error);
+                    if (output.hasKeyWithValueOfType(UltranCommandWorker.KEY_EXIT_CODE, Integer.class)) {
+                        item.put("exitCode", output.getInt(UltranCommandWorker.KEY_EXIT_CODE, -1));
+                    }
+                    jobs.put(item);
+                }
+                call.resolve(new JSObject().put("jobs", jobs));
+            } catch (Exception error) {
+                call.reject("Could not list background runtime jobs.", error);
             }
         }, commandExecutor);
     }

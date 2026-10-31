@@ -386,10 +386,6 @@ public class UltranLocalAiPlugin extends Plugin {
         final String expectedSha256;
         try {
             name = safeModelName(call.getString("name"));
-            Matcher split = GGUF_SHARD.matcher(name);
-            if (split.matches() && Integer.parseInt(split.group(3)) > 1) {
-                throw new IllegalArgumentException("Download split GGUF models as a complete shard set. Use the multi-select import after obtaining all numbered parts.");
-            }
             source = call.getString("url");
             expectedSha256 = call.getString("sha256", "").trim().toLowerCase(Locale.ROOT);
             if (source == null || source.length() > 4096) throw new IllegalArgumentException("A Hugging Face model URL is required.");

@@ -32,12 +32,14 @@ test("redesigned UI preserves mobile layout, focus visibility, and reduced-motio
 });
 
 test("fixed navigation cannot sit above the drawer, connector panel, or settings sheet", async () => {
-  const [base, workspace, experience] = await Promise.all([read("src/styles.css"), read("src/workspace.css"), read("src/experience.css")]);
+  const [base, experience, workspace] = await Promise.all([
+    read("src/styles.css"), read("src/experience.css"), read("src/workspace.css"),
+  ]);
   assert.match(experience, /\.bottom-nav\{position:fixed;z-index:15;/);
   assert.match(base, /\.scrim\s*\{[\s\S]*?z-index:\s*20/);
   assert.match(base, /\.drawer\s*\{[\s\S]*?z-index:\s*30/);
-  assert.match(base, /\.sheet-wrap\s*\{[\s\S]*?z-index:\s*40/);
-  assert.match(workspace, /\.workspace-panel\{[^}]*z-index:\s*60/);
+  assert.match(experience, /\.sheet-wrap\{z-index:40;/);
+  assert.match(workspace, /\.workspace-panel\{position:fixed;z-index:60;/);
 });
 
 test("new orbital U mark stays aligned across web, Android generator, and adaptive icon", async () => {

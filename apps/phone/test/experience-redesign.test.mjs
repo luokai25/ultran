@@ -73,3 +73,18 @@ test("reference-inspired five-tab mobile navigation and feature screens are pres
   assert.match(main, /showFeatureScreen\(\"more-screen\", navMoreButton\)/);
   assert.match(html, /No files are represented as encrypted until encrypted storage is implemented and verified/);
 });
+
+
+test("local file requests have a real PDF fallback and artifact card actions", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const kernel = await readFile(new URL("../src/capability-kernel.ts", import.meta.url), "utf8");
+  assert.match(main, /function localPdfBlob\(/);
+  assert.match(main, /async function attachRequestedArtifact\(/);
+  assert.match(main, /URL\.createObjectURL\(blob\)/);
+  assert.match(main, /downloadArtifact\(call\.artifact/);
+  assert.match(main, /attachRequestedArtifact\(text, finalContent, reply\.body\)/);
+  assert.match(main, /attachRequestedArtifact\(task, content, progressBody\)/);
+  assert.match(kernel, /pdf\|docx\|pptx/);
+  assert.match(kernel, /invisible internal quality-control pass/);
+  assert.doesNotMatch(kernel, /You are Ultran.s independent quality reviewer/);
+});

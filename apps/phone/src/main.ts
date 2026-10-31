@@ -1631,7 +1631,7 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
     if (!queued.approved) return "The user cancelled the command. It was not executed. Do not claim that it ran.";
     if (!queued.jobId) return "Ultran could not create a background job. No command result is available.";
     const jobId = queued.jobId;
-    const deadline = Date.now() + 4 * 60 * 1000 + 15000;
+    const deadline = Date.now() + 9 * 60 * 1000 + 15000;
     while (Date.now() < deadline) {
       const job = await NativeRuntime.getCommandStatus({ jobId });
       if (!job.found) return "Background job " + jobId + " is no longer available.";

@@ -114,10 +114,15 @@ class ComposioGateway:
         except Exception as exc:  # noqa: BLE001
             raise DependencyUnavailable("Composio connections could not be listed.") from exc
 
-    def revoke(self, connected_account_id: str) -> None:
+    def revoke(self, workspace_id: str, connected_account_id: str) -> None:
         account_id = (connected_account_id or "").strip()
         if not account_id.startswith("ca_") or len(account_id) > 128:
             raise ValidationFailed("Invalid connected account ID.")
+        # Never let a caller revoke another workspace's account by guessing its ID.
+        owned_ids = {row.get("id") for row in self.list_connections(workspace_id)}
+        if account_id not in owned_ids:
+            from .errors import NotFound
+            raise NotFound("connected account was not found in this workspace")
         client = self._sdk()
         try:
             client.connected_accounts.revoke(account_id)

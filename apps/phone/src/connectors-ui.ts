@@ -269,7 +269,7 @@ export function initConnectors(deps: Deps): void {
         deny.type = "button";
         const approve = el("button", "solid", "Approve and run once");
         approve.type = "button";
-        const decide = async (choice: "approve" | "deny", button: HTMLButtonElement): Promise<void> => {
+        const decide = async (choice: "approve" | "deny"): Promise<void> => {
           deny.disabled = true;
           approve.disabled = true;
           try {
@@ -286,8 +286,8 @@ export function initConnectors(deps: Deps): void {
             approve.disabled = false;
           }
         };
-        deny.addEventListener("click", () => void decide("deny", deny));
-        approve.addEventListener("click", () => void decide("approve", approve));
+        deny.addEventListener("click", () => void decide("deny"));
+        approve.addEventListener("click", () => void decide("approve"));
         actions.append(deny, approve);
         card.append(actions);
         approvalList.append(card);

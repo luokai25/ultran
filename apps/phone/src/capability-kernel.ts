@@ -19,11 +19,13 @@ export type CapabilityProfile = {
 
 const CRITICAL_PATTERN = /\b(medical|diagnos|symptom|medication|dose|legal|lawsuit|contract|tax|investment|investing|financial|emergency|security incident|personal data|credential|production deploy|delete|wipe|purge|erase|drop table|data loss)\b/i;
 const DEEP_PATTERN = /\b(build|implement|debug|refactor|architecture|design|compare|evaluate|research|investigate|audit|analy[sz]e|plan|roadmap|strategy|multi.?step|step.?by.?step|agent|workflow|connector|integration|code|program|script|test|deploy|migration|optimi[sz]e)\b/i;
+const ARABIC_CRITICAL_PATTERN = /(?:طبي|دواء|جرعة|قانوني|مالي|استثمار|احذف|حذف|امسح|تدمير|بيانات شخصية|قاعدة البيانات)/i;
+const ARABIC_DEEP_PATTERN = /(?:ابن|بناء|برمج|كود|تصميم|تحليل|اختبر|اختبار|بحث|خطة|تكامل|تصحيح|نشر|مراجعة|تحسين|وكيل|سير العمل)/i;
 
 export function profileTask(task: string): CapabilityProfile {
   const text = task.trim();
-  const critical = CRITICAL_PATTERN.test(text);
-  const deep = DEEP_PATTERN.test(text) || text.length > 700 || (text.match(/\n/g)?.length ?? 0) >= 5;
+  const critical = CRITICAL_PATTERN.test(text) || ARABIC_CRITICAL_PATTERN.test(text);
+  const deep = DEEP_PATTERN.test(text) || ARABIC_DEEP_PATTERN.test(text) || text.length > 700 || (text.match(/\n/g)?.length ?? 0) >= 5;
   if (critical) {
     return { tier: "critical", maxTokens: 768, contextMessages: 20, contextChars: 12000, contextTokens: 4096, temperature: 0.15, verifyDraft: true };
   }

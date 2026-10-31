@@ -65,6 +65,7 @@ public final class UltranTaskMonitorWorker extends Worker {
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(15000);
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("X-Ultran-Workspace", "local");
             int status = connection.getResponseCode();
             if (status == 408 || status == 429 || status >= 500) return Result.retry();
             if (status != 200) return Result.retry();
@@ -97,7 +98,7 @@ public final class UltranTaskMonitorWorker extends Worker {
                     String detail = objective + (done ? " completed successfully." : failed ? " · " + state : active ? " · " + state : "");
                     postNotification(title, detail, id.hashCode());
                     if (!spokenUpdate && getInputData().getBoolean("speakUpdates", false) && (done || failed)) {
-                        speakUpdate(title + ". " + detail);
+                        speakUpdate(title + ". Check your notification for task details.");
                         spokenUpdate = true;
                     }
                 }
@@ -157,6 +158,12 @@ public final class UltranTaskMonitorWorker extends Worker {
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(new NotificationCompat.Builder(context, CHANNEL)
+                .setSmallIcon(context.getApplicationInfo().icon)
+                .setContentTitle("Ultran task update")
+                .setContentText("Open Ultran to view details.")
+                .build())
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
         manager.notify(id, notification.build());
     }

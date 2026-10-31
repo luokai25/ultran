@@ -1258,7 +1258,7 @@ async function reviewLocalDraft(task: string, draft: string): Promise<string> {
         stream: false,
         messages: [
           { role: "system", content: buildCapabilityPrompt(task, "Ollama-compatible local model") },
-          { role: "user", content: buildReviewPrompt(task.slice(0, 6000), draft.slice(0, profile.contextTokens * 2)) },
+          { role: "user", content: buildReviewPrompt(task.slice(0, 2000), draft.slice(0, profile.contextTokens)) },
         ],
         options: { temperature: 0.1, num_ctx: profile.contextTokens, num_predict: profile.maxTokens },
       }),
@@ -1275,7 +1275,7 @@ async function reviewLocalDraft(task: string, draft: string): Promise<string> {
 
 function boundToolResult(value: string, maxChars: number): string {
   if (value.length <= maxChars) return value;
-  const marker = "\\n[… tool output truncated …]\\n";
+  const marker = "\n[… tool output truncated …]\n";
   const available = Math.max(0, maxChars - marker.length);
   const head = Math.ceil(available * 0.7);
   const tail = Math.max(0, available - head);
@@ -1472,7 +1472,7 @@ async function submit(raw: string): Promise<void> {
             { role: "assistant" as const, content: response.content },
             { role: "user" as const, content: `Terminal tool result:\n${boundToolResult(toolResult, 2400)}` },
           ],
-          maxTokens: profile.maxTokens,
+          maxTokens: Math.min(profile.maxTokens, 384),
         });
         result = { content: parseTerminalToolRequest(followup.content)
           ? "The terminal tool allows one command per turn. I received a second tool request and did not execute it. Please split the task into another step."

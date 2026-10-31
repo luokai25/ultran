@@ -106,6 +106,7 @@ class AgentTaskOut(BaseModel):
     allow_tools: bool
     max_tool_calls: int
     session_id: str | None = None
+    team_id: str | None = None
     status: str
     attempts: int
     result: dict[str, Any] | None = None

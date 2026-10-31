@@ -37,7 +37,9 @@ function makeBrain() {
       } else if (system.includes('MODE: ACT')) {
         content = JSON.stringify({ toolId: 'demo.echo', args: { text: 'hello' } });
       } else if (prompt.includes('Actual outcomes:')) {
-        content = 'The demo tool completed successfully and returned hello.';
+        content = prompt.includes('No human-approval resolver is configured')
+          ? 'The task was not executed because approval was unavailable.'
+          : 'The demo tool completed successfully and returned hello.';
       } else {
         content = 'The task is complete.';
       }
@@ -125,7 +127,7 @@ test('orchestrator plans, selects, approves, executes, meters, and reflects thro
   assert.match(state.result ?? '', /completed successfully/);
   assert.equal(invocations, 1);
   assert.equal(ledger.totals().totals['tool.calls'], 1);
-  assert.ok(state.events.some((event) => event.type === 'approval.required') === false);
+  assert.ok(state.events.some((event) => event.type === 'approval.required'));
   assert.ok(state.events.some((event) => event.type === 'tool.result' && event.ok));
 });
 

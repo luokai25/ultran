@@ -97,7 +97,8 @@ test("conversation context is budgeted and task complexity adjusts inference", (
   assert.match(capabilityKernel, /tier: "deep"/);
   assert.match(capabilityKernel, /ARABIC_CRITICAL_PATTERN/);
   assert.match(capabilityKernel, /ARABIC_DEEP_PATTERN/);
-  assert.match(main, /budgetConversation\(convo\.messages, profile\.contextMessages, 3800, 1800\)/);
+  assert.match(main, /budgetConversation\(convo\.messages, profile\.contextMessages, historyBudget, profile\.contextChars\)/);
+  assert.match(main, /budgetConversation\(convo\.messages, profile\.contextMessages, 2600, 1200\)/);
   assert.match(main, /profile\.contextTokens \* 2/);
   assert.match(main, /function boundToolResult/);
   assert.match(main, /maxTokens: Math\.min\(profile\.maxTokens, 384\)/);

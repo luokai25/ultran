@@ -224,4 +224,6 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(experience, /\.bottom-nav/);
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
+  const conversationRenderer = main.slice(main.indexOf("function renderConversation"), main.indexOf("function renderHistory"));
+  assert.doesNotMatch(conversationRenderer, /promptEl\.focus\(/, "the initial phone screen must not force-open the keyboard");
 });

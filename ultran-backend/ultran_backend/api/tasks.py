@@ -4,7 +4,7 @@ import asyncio
 import json
 from fastapi import APIRouter, Query, status
 from fastapi.responses import StreamingResponse
-from ..schemas import AgentTaskCreate, AgentTaskOut
+from ..schemas import AgentTaskBatchCreate, AgentTaskCreate, AgentTaskOut
 from .deps import ContainerDep, WorkspaceDep
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -17,6 +17,25 @@ def submit_task(payload: AgentTaskCreate, container: ContainerDep, workspace: Wo
     return container.tasks.submit(payload.agent_id, workspace, payload.message,
         allow_tools=payload.allow_tools, max_tool_calls=payload.max_tool_calls,
         session_id=payload.session_id).public()
+
+@router.post("/batch", response_model=list[AgentTaskOut], status_code=status.HTTP_202_ACCEPTED)
+def submit_team_tasks(payload: AgentTaskBatchCreate, container: ContainerDep, workspace: WorkspaceDep):
+    """Dispatch one bounded parallel team run across distinct workspace agents."""
+    # Validate the complete roster before creating any work, avoiding partial
+    # dispatch caused by an invalid agent or session in the middle of the batch.
+    agents = [container.agents.get(item.agent_id) for item in payload.tasks]
+    for agent, item in zip(agents, payload.tasks):
+        if not agent.enabled:
+            from ..errors import ValidationFailed
+            raise ValidationFailed("team contains a disabled agent", details={"agent_id": agent.id})
+        if item.session_id:
+            container.agents.get_session(item.agent_id, item.session_id)
+    tasks = [container.tasks.submit(
+        item.agent_id, workspace, item.message, allow_tools=item.allow_tools,
+        max_tool_calls=item.max_tool_calls, session_id=item.session_id,
+    ) for item in payload.tasks]
+    return [task.public() for task in tasks]
+
 
 @router.get("", response_model=list[AgentTaskOut])
 def list_tasks(container: ContainerDep, workspace: WorkspaceDep,

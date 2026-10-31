@@ -7,11 +7,12 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranRuntimePlugin.java"),
+  read("src/capability-kernel.ts"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {
@@ -57,4 +58,26 @@ test("Termux runtime download verifies the published checksum before installatio
   assert.match(runtime, /Termux runtime SHA-256 verification failed/);
   assert.match(runtime, /host\.endsWith\("\.githubusercontent\.com"\)/);
   assert.match(runtime, /notifyListeners\("runtimeDownloadProgress", progress\)/);
+});
+
+test("brain-independent capability policy is applied to native and Ollama brains", () => {
+  assert.match(main, /from "\.\/capability-kernel"/);
+  assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp"\)/);
+  assert.match(main, /buildCapabilityPrompt\(task, "Ollama-compatible local model"\)/);
+  assert.match(main, /shouldVerifyDraft\(text\)/);
+  assert.match(main, /shouldVerifyDraft\(task\)/);
+  assert.match(main, /reviewLocalDraft\(task, content\)/);
+  assert.match(capabilityKernel, /export function profileTask/);
+  assert.match(capabilityKernel, /export function buildCapabilityPrompt/);
+  assert.match(capabilityKernel, /export function buildReviewPrompt/);
+  assert.match(capabilityKernel, /verifyDraft: true/);
+  assert.match(capabilityKernel, /Never pretend to browse, read files, run commands, test code, or change external systems/);
+});
+
+test("complex local answers receive an independent review without discarding the first draft on failure", () => {
+  assert.match(main, /const review = await NativeLocalAI\.generate/);
+  assert.match(main, /if \(review\.content\.trim\(\)\) finalContent = review\.content\.trim\(\)/);
+  assert.match(main, /catch \{\s*\/\/ Review is a quality enhancement; never discard a usable first answer\./);
+  assert.match(main, /if \(!response\.ok\) return draft/);
+  assert.match(main, /return payload\.message\?\.content\?\.trim\(\) \|\| draft/);
 });

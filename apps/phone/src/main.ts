@@ -18,7 +18,8 @@ import { markDataUrl, markSvg } from "./mark";
  * ------------------------------------------------------------------ */
 
 type Role = "user" | "assistant";
-type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string };
+type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string; created_at?: string };
+type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; error?: string; created_at: string; updated_at: string };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type Message = { role: Role; content: string; tools?: ToolCall[] };
 type Conversation = {
@@ -71,6 +72,11 @@ const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
 const voiceBtn = req<HTMLButtonElement>("#voice-btn");
 const backgroundBtn = req<HTMLButtonElement>("#background-btn");
+const workspacePanel = req<HTMLElement>("#workspace-panel");
+const workspaceTasks = req<HTMLElement>("#workspace-tasks");
+const workspaceArtifacts = req<HTMLElement>("#workspace-artifacts");
+const workspaceStats = req<HTMLElement>("#workspace-stats");
+let workspacePoll: number | undefined;
 const linkPill = req<HTMLElement>("#link-pill");
 const jumpBtn = req<HTMLButtonElement>("#jump-btn");
 const menuBtn = req<HTMLButtonElement>("#menu-btn");
@@ -279,6 +285,60 @@ function showArtifactPreview(url: string, title: string): void {
   overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
   close.focus();
+}
+
+function workspaceNode(tag: string, className: string, text = ""): HTMLElement {
+  const node = document.createElement(tag); node.className = className; node.textContent = text; return node;
+}
+function workspaceNotice(message: string): void { workspaceTasks.prepend(workspaceNode("p", "workspace-empty", message)); }
+
+async function refreshWorkspace(): Promise<void> {
+  if (!baseUrl()) { workspaceTasks.replaceChildren(workspaceNode("p", "workspace-empty", "Connect a backend in Settings to view runs.")); return; }
+  const [tr, ar] = await Promise.all([api("/v1/tasks?limit=100"), api("/v1/artifacts?limit=100")]);
+  if (!tr.ok || !ar.ok) throw new Error(`Workspace unavailable (${tr.status}/${ar.status})`);
+  const tasks = await tr.json() as WorkspaceTask[];
+  const payload = await ar.json() as { artifacts?: ArtifactCard[] };
+  const artifacts = payload.artifacts ?? [];
+  const counts = [["Active", tasks.filter(t => ["queued","running","retrying"].includes(t.status)).length], ["Completed", tasks.filter(t => t.status === "succeeded").length], ["Attention", tasks.filter(t => ["failed","interrupted"].includes(t.status)).length], ["Files", artifacts.length]];
+  workspaceStats.replaceChildren(...counts.map(([name, value]) => { const el = workspaceNode("div", "workspace-stat"); el.append(workspaceNode("strong", "", String(value)), workspaceNode("small", "", String(name))); return el; }));
+  req<HTMLElement>("#workspace-task-count").textContent = `${tasks.length} runs`;
+  req<HTMLElement>("#workspace-artifact-count").textContent = `${artifacts.length} files`;
+  workspaceTasks.replaceChildren();
+  if (!tasks.length) workspaceTasks.append(workspaceNode("p", "workspace-empty", "No background runs yet. Enable Background in the composer to start one."));
+  for (const task of tasks) {
+    const card = workspaceNode("article", "workspace-task"); const top = workspaceNode("div", "workspace-task-top");
+    top.append(workspaceNode("strong", "", task.message.slice(0, 100)), workspaceNode("span", `workspace-status status-${task.status}`, task.status));
+    card.append(top, workspaceNode("small", "workspace-meta", `Updated ${new Date(task.updated_at).toLocaleString()} · Attempt ${task.attempts}`));
+    if (task.error) card.append(workspaceNode("p", "workspace-error", task.error));
+    const actions = workspaceNode("div", "workspace-actions");
+    const open = workspaceNode("button", "", "Open timeline"); open.addEventListener("click", () => { closeWorkspace(); void openTaskTimeline(task.id, task.message); }); actions.append(open);
+    if (task.status === "queued") { const b = workspaceNode("button", "", "Cancel") as HTMLButtonElement; b.addEventListener("click", async () => { b.disabled = true; const res = await api(`/v1/tasks/${task.id}/cancel`, {method:"POST"}); if (!res.ok) workspaceNotice(`Cancel failed (${res.status})`); await refreshWorkspace(); }); actions.append(b); }
+    if (["failed","interrupted"].includes(task.status)) { const b = workspaceNode("button", "", "Retry") as HTMLButtonElement; b.addEventListener("click", async () => { b.disabled = true; const res = await api(`/v1/tasks/${task.id}/retry`, {method:"POST"}); if (!res.ok) workspaceNotice(`Retry failed (${res.status})`); await refreshWorkspace(); }); actions.append(b); }
+    card.append(actions); workspaceTasks.append(card);
+  }
+  workspaceArtifacts.replaceChildren();
+  if (!artifacts.length) workspaceArtifacts.append(workspaceNode("p", "workspace-empty", "Generated files will appear here."));
+  for (const file of artifacts) {
+    const card = workspaceNode("article", "workspace-file"); card.append(workspaceNode("span", "workspace-file-icon", file.format.toUpperCase()));
+    const copy = workspaceNode("div", "workspace-file-copy"); copy.append(workspaceNode("strong", "", file.title), workspaceNode("small", "", `${(file.size/1024).toFixed(1)} KB`)); card.append(copy);
+    const preview = workspaceNode("button", "", "Preview"); preview.addEventListener("click", () => showArtifactPreview(file.preview_url, file.title));
+    const download = workspaceNode("button", "", "Download"); download.addEventListener("click", () => void Browser.open({url:`${baseUrl()}${file.download_url}`})); card.append(preview, download); workspaceArtifacts.append(card);
+  }
+}
+function openWorkspace(): void { closeDrawer(); workspacePanel.hidden = false; void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Workspace unavailable")); if (workspacePoll) clearInterval(workspacePoll); workspacePoll = window.setInterval(() => { if (!workspacePanel.hidden) void refreshWorkspace().catch(() => undefined); }, 6000); }
+function closeWorkspace(): void { workspacePanel.hidden = true; if (workspacePoll) clearInterval(workspacePoll); workspacePoll = undefined; }
+
+async function openTaskTimeline(taskId: string, prompt: string): Promise<void> {
+  const node = messageNode({role:"assistant", content:`Background task: ${prompt}`}); messagesEl.append(node.root);
+  renderLiveEvent(node.body, {type:"thinking", label:"Reconnecting to saved execution timeline"});
+  try {
+    const response = await api(`/v1/tasks/${taskId}/events?stream=false`); if (!response.ok) throw new Error(`Timeline unavailable (${response.status})`);
+    const payload = await response.json() as { events: Array<Record<string, unknown>> };
+    for (const event of payload.events) if (event.type) renderLiveEvent(node.body,event);
+    const result = await api(`/v1/tasks/${taskId}`);
+    if (result.ok) { const task = await result.json() as {result?:{content?:string;tool_calls?:ToolCall[]};status:string;error?:string}; if (task.result?.content) renderMarkdown(task.result.content,node.body); if (task.result?.tool_calls) finishAssistantNode(node.root,{role:"assistant",content:task.result.content??"",tools:task.result.tool_calls}); if (task.error) renderMarkdown(`Task ${task.status}: ${task.error}`,node.body); }
+  } catch (error) { renderMarkdown(error instanceof Error ? error.message : "Could not load task history",node.body); }
+  scrollToEnd();
 }
 
 function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): void {
@@ -1121,6 +1181,9 @@ scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
 req<HTMLButtonElement>("#settings-btn").addEventListener("click", openSheet);
+req<HTMLButtonElement>("#workspace-btn").addEventListener("click", openWorkspace);
+req<HTMLButtonElement>("#workspace-back").addEventListener("click", closeWorkspace);
+req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));
 req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
 req<HTMLButtonElement>("#clear-btn").addEventListener("click", () => {

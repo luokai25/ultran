@@ -110,8 +110,7 @@ public final class UltranCommandWorker extends Worker {
                 if (!isRunning(process)) break;
                 if (SystemClock.elapsedRealtime() >= deadline) {
                     timedOut = true;
-                    process.destroy();
-                    if (process.isAlive()) process.destroyForcibly();
+                    stopProcess(process);
                     break;
                 }
                 Thread.sleep(150);
@@ -136,7 +135,7 @@ public final class UltranCommandWorker extends Worker {
             if (process != null) stopProcess(process);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command interrupted.").build());
         } catch (Exception error) {
-            if (process != null) process.destroyForcibly();
+            if (process != null) stopProcess(process);
             String message = error.getMessage() == null ? "Command execution failed." : error.getMessage();
             if (message.length() > 1000) message = message.substring(0, 1000);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, message).build());

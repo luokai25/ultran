@@ -2132,7 +2132,12 @@ runtimeDownloadButton?.addEventListener("click", async () => {
     if (builtInTerminalStatus) builtInTerminalStatus.textContent = `Termux runtime installed and verified (${result.entries ?? 0} entries).`;
     await refreshRuntimeStatus();
   } catch (error) {
-    if (builtInTerminalStatus) builtInTerminalStatus.textContent = error instanceof Error ? error.message : "Runtime download or installation failed.";
+    const why = error instanceof Error ? error.message : "Runtime download or installation failed.";
+    if (builtInTerminalStatus) {
+      builtInTerminalStatus.textContent = /HTTP 404/.test(why)
+        ? "No published runtime archive is available yet. Use Choose runtime ZIP or run the Build Ultran Termux Bootstrap workflow."
+        : why;
+    }
   } finally {
     runtimeDownloadButton.removeAttribute("disabled");
     runtimeInstallButton?.removeAttribute("disabled");

@@ -58,7 +58,7 @@ const NativeRuntime = registerPlugin<{
   downloadBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   addListener(eventName: "runtimeDownloadProgress", listener: (event: { downloadedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
   runCommand(options: { command: string }): Promise<{ approved: boolean; queued?: boolean; jobId?: string; status?: string }>;
-  getCommandStatus(options: { jobId: string }): Promise<{ found: boolean; jobId?: string; status?: string; output?: string; exitCode?: number; timedOut?: boolean; error?: string }>;
+  getCommandStatus(options: { jobId: string }): Promise<{ found: boolean; jobId?: string; status?: string; output?: string; exitCode?: number; timedOut?: boolean; error?: string; termuxRuntime?: boolean }>;
   cancelCommand(options: { jobId: string }): Promise<{ jobId: string; status: string }>;
   listCommandJobs(): Promise<{ jobs: Array<{ jobId: string; status: string; output?: string; error?: string; exitCode?: number }> }>;
 }>("UltranRuntime");
@@ -1637,7 +1637,8 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
       if (!job.found) return "Background job " + jobId + " is no longer available.";
       if (job.status === "succeeded") {
         const status = job.timedOut ? "timed out" : "exit code " + (job.exitCode ?? -1);
-        return "Local background job result (" + status + "):\n" + ((job.output ?? "").slice(0, 6 * 1024) || "[no output]");
+        const runtimeLabel = job.termuxRuntime === false ? "Termux runtime unavailable" : "Ultran Termux runtime";
+        return "Local background job result (" + status + "; " + runtimeLabel + "):\n" + ((job.output ?? "").slice(0, 6 * 1024) || "[no output]");
       }
       if (job.status === "failed" || job.status === "cancelled") {
         return "Local background job " + job.status + ": " + (job.error ?? job.output ?? "No additional details.");

@@ -596,3 +596,80 @@ def test_composio_agent_stops_replanning_when_human_approval_is_required():
 
     assert fake.calls == 1
     assert result["tool_calls"][0]["approval_required"] is True
+
+
+def test_agent_memory_is_persistent_workspace_scoped_and_deduplicated(tmp_path):
+    from cryptography.fernet import Fernet
+    from ultran_backend.brain import BrainRuntime, EchoBackend
+    from ultran_backend.connectors import CredentialVault
+    from ultran_backend.sandbox import ToolSandbox
+
+    key = Fernet.generate_key().decode("ascii")
+    path = tmp_path / "agents.sqlite3"
+    first = service()
+    first._db_path = path
+    first._fernet = Fernet(key.encode("ascii"))
+    first._init_db()
+    agent = first.create(name="Memory agent")
+    item = first.add_memory(agent.id, "workspace-a", "Release target is Friday", category="project")
+    duplicate = first.add_memory(agent.id, "workspace-a", "Release target is Friday", category="project")
+    first.add_memory(agent.id, "workspace-b", "Different workspace secret")
+    assert duplicate.id == item.id
+
+    second = AgentService(
+        BrainRuntime(EchoBackend()), ToolSandbox(first.sandbox.registry, CredentialVault()),
+        db_path=path, encryption_key=key,
+    )
+    assert [m.content for m in second.list_memories(agent.id, "workspace-a")] == ["Release target is Friday"]
+    assert second.list_memories(agent.id, "workspace-b")[0].content == "Different workspace secret"
+    with path.open("rb") as stored:
+        raw = stored.read()
+    assert b"Release target is Friday" not in raw
+    second.delete_memory(agent.id, "workspace-a", item.id)
+    assert second.list_memories(agent.id, "workspace-a") == []
+    assert second.list_memories(agent.id, "workspace-b")
+
+
+def test_agent_chat_includes_only_current_workspace_memory():
+    from ultran_backend.brain import BrainRuntime, EchoBackend
+    from ultran_backend.connectors import CredentialVault
+    from ultran_backend.sandbox import ToolSandbox
+
+    class CapturingBackend(EchoBackend):
+        def __init__(self):
+            self.seen = []
+
+        def complete(self, messages, *, model, temperature):
+            self.seen.append(messages[0].content)
+            return super().complete(messages, model=model, temperature=temperature)
+
+    backend = CapturingBackend()
+    registry = service().sandbox.registry
+    svc = AgentService(BrainRuntime(backend), ToolSandbox(registry, CredentialVault()))
+    agent = svc.create(name="Memory-aware")
+    svc.add_memory(agent.id, "workspace-a", "Project codename is Orion")
+    svc.add_memory(agent.id, "workspace-b", "Private other workspace detail")
+    svc.chat(agent.id, "What is the project codename?", workspace_id="workspace-a", allow_tools=False)
+    assert "Project codename is Orion" in backend.seen[-1]
+    assert "Private other workspace detail" not in backend.seen[-1]
+
+
+def test_agent_memory_api_is_workspace_scoped_and_deletable(client):
+    created = client.post("/v1/agents", json={"name": "Memory API agent"})
+    assert created.status_code == 201, created.text
+    agent_id = created.json()["id"]
+    first = client.post(
+        f"/v1/agents/{agent_id}/memories", json={"content": "Remember my project is Ultran", "category": "project"},
+        headers={"X-Ultran-Workspace": "workspace-a"},
+    )
+    assert first.status_code == 201, first.text
+    memory_id = first.json()["id"]
+    assert client.get(
+        f"/v1/agents/{agent_id}/memories", headers={"X-Ultran-Workspace": "workspace-b"}
+    ).json() == []
+    assert client.delete(
+        f"/v1/agents/{agent_id}/memories/{memory_id}", headers={"X-Ultran-Workspace": "workspace-b"}
+    ).status_code == 404
+    assert client.delete(
+        f"/v1/agents/{agent_id}/memories/{memory_id}", headers={"X-Ultran-Workspace": "workspace-a"}
+    ).status_code == 204

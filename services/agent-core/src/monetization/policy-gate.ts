@@ -44,7 +44,10 @@ export class PolicyGate {
    *   degrade - within 10% of the limit; prefer cheaper options
    *   deny    - at or past the limit
    */
-  async check(_runId: string, meter: string, _amount: number): Promise<PolicyDecision> {
+  async check(_runId: string, meter: string, amount: number): Promise<PolicyDecision> {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error('meter amount must be a finite non-negative number');
+    }
     if (this.entitlement.expiresAt < Date.now()) {
       // An expired cached entitlement is not a reason to destroy the run.
       // Fall back to a degraded allowance rather than denying outright.
@@ -55,8 +58,17 @@ export class PolicyGate {
     if (limit === undefined) return 'allow';
 
     const used = this.ledger.totals().totals[meter] ?? 0;
-    if (used >= limit) return 'deny';
-    if (used >= limit * 0.9) return 'degrade';
+    if (used + amount > limit) return 'deny';
+    if (used + amount >= limit * 0.9) return 'degrade';
     return 'allow';
+  }
+
+  /** Record a completed or attempted action using a replay-stable idempotency key. */
+  recordUsage(runId: string, meter: string, amount: number, idempotencyKey: string): boolean {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error('meter amount must be a finite non-negative number');
+    }
+    if (!idempotencyKey.trim()) throw new Error('meter idempotency key must not be empty');
+    return this.ledger.record({ runId, meter, amount, at: Date.now(), idempotencyKey });
   }
 }

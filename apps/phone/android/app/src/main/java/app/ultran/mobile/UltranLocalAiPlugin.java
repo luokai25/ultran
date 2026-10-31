@@ -150,7 +150,7 @@ public class UltranLocalAiPlugin extends Plugin {
     private void handleModelPicked(PluginCall call, ActivityResult result) {
         if (call == null) return;
         if (result == null || result.getResultCode() != android.app.Activity.RESULT_OK ||
-                result.getData() == null || result.getData().getData() == null) {
+                result.getData() == null) {
             call.resolve(new JSObject().put("cancelled", true));
             return;
         }

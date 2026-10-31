@@ -440,5 +440,5 @@ def test_agent_final_answer_receives_composio_execution_results():
     final_messages = brain.calls[-1]
     tool_context = final_messages[-1].content
     assert "Project update" in tool_context
-    assert "untrusted data" in tool_context
+    assert "untrusted tool execution results" in tool_context.lower()
     assert len(svc.session(agent.id, result["session_id"]).messages) == 2

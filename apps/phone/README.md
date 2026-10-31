@@ -61,18 +61,27 @@ cd apps/phone/android && ./gradlew assembleRelease
 - `server.androidScheme: 'https'` in `capacitor.config.ts` is required. With the
   default `file://` origin the WebView applies CORS to ES-module imports and the
   app renders a blank screen.
-- The Android build is configured to bundle the CPU inference runtime from
-  llama.cpp at a pinned upstream commit. Import a single-file GGUF model through
-  Settings; Ultran copies it into private app storage. Models are not bundled in the APK
-  and are never downloaded automatically. The initial runtime targets
-  arm64-v8a and x86_64, uses a 2,048-token context and up to four CPU
-  threads, and requires the model plus context memory to fit on the device.
-  Start with a 1B–3B Q4 quantized model; larger models can be slow or fail to
-  load on phones. This first native runtime is CPU-only; GPU acceleration and
-  streamed token callbacks are later optimizations. The native source is
-  fetched at build time from ggml-org/llama.cpp tag b12020
-  (commit 0ec4027a2a0183de87c007069adddc06e665f7de). Its MIT license is
-  included under android/app/src/main/assets/licenses.
+- The Android build bundles the CPU inference runtime from llama.cpp at a
+  pinned upstream commit. GGUF weights are kept outside the APK in private
+  app storage. The native loader uses llama.cpp's file-backed `MMAP` load mode
+  and automatic lazy tensor mode, allowing the OS to page model weights from
+  storage instead of requiring the entire checkpoint to be resident in
+  anonymous RAM. The context cache remains resident and is reduced adaptively
+  (512, 1,024, or 2,048 tokens) according to available memory; prompt batches
+  are capped at 64 to reduce transient memory. This is a mobile adaptation of
+  the low-residency ideas studied in AirLLM, not a bundled copy of its
+  Python/PyTorch/CUDA implementation. See
+  [the mobile low-memory inference design](../../docs/airllm-mobile-engine.md)
+  for the reverse-engineering notes, trade-offs, and next implementation
+  stages. The importer and downloader accept models up to 256 GB only when
+  enough device storage is available; this is a safety ceiling, not a claim
+  that a phone can use every model of that size. CPU-only inference can be
+  extremely slow and may still fail when an individual tensor, KV cache, or
+  memory pressure exceeds device limits. Start with 1B–3B Q4 models and
+  benchmark larger models gradually. The native source is fetched at build
+  time from ggml-org/llama.cpp tag b12020 (commit
+  0ec4027a2a0183de87c007069adddc06e665f7de). Its MIT license is included
+  under android/app/src/main/assets/licenses.
 - The app is local-first. Chats and settings are stored on the device
   (localStorage). A local Ollama instance can also be configured in Settings and
   receives chat requests directly from the app (/api/chat); no Ultran backend

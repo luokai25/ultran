@@ -259,7 +259,7 @@ content ever leaves the device for metering.
 
 **Pre-alpha.** The repository contains working components and tests, including
 a Python control plane, provider credential vault and verification, agent
-runtime integrations, and an initial Hetzner deployment baseline. The full
+runtime integrations, and an initial Render deployment blueprint. The full
 product is not production-ready: hosted infrastructure has not been provisioned,
 and end-to-end operational verification, broader runtime integration, and
 production hardening remain in progress. Expect breaking changes until

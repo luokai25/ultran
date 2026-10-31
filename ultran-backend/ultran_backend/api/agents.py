@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 from fastapi import APIRouter, status
+from fastapi.responses import StreamingResponse
 
 from ..schemas import (
     AgentCreate,
@@ -101,6 +105,56 @@ def chat(
     # meter the turn against the workspace plan before returning
     container.billing.meter(workspace, result["tokens_in"] + result["tokens_out"])
     return result
+
+
+@router.post("/{agent_id}/chat/stream")
+async def chat_stream(
+    agent_id: str, payload: ChatTurn, container: ContainerDep, workspace: WorkspaceDep,
+):
+    """Stream agent planning, tool activity, artifact creation and final output as SSE."""
+    loop = asyncio.get_running_loop()
+    events: asyncio.Queue = asyncio.Queue()
+
+    def publish(event) -> None:
+        loop.call_soon_threadsafe(events.put_nowait, event)
+
+    def execute() -> None:
+        try:
+            result = container.agents.chat(
+                agent_id, payload.message, session_id=payload.session_id,
+                workspace_id=workspace, allow_tools=payload.allow_tools,
+                max_tool_calls=payload.max_tool_calls, event_callback=publish,
+            )
+            container.billing.meter(workspace, result["tokens_in"] + result["tokens_out"])
+            publish({"type": "final", "result": result})
+        except Exception as exc:
+            from ..errors import UltranError
+            if isinstance(exc, UltranError):
+                error = exc.to_payload()
+            else:
+                error = {"code": "agent_error", "message": str(exc)[:500], "details": {}}
+            publish({"type": "error", "error": error})
+        finally:
+            publish(None)
+
+    worker = asyncio.create_task(asyncio.to_thread(execute))
+
+    async def stream():
+        while True:
+            try:
+                event = await asyncio.wait_for(events.get(), timeout=15)
+            except asyncio.TimeoutError:
+                yield ": keep-alive\n\n"
+                continue
+            if event is None:
+                break
+            yield "data: " + json.dumps(event, ensure_ascii=False, default=str) + "\n\n"
+        await worker
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/{agent_id}/sessions", response_model=list[SessionSummary])

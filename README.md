@@ -330,3 +330,37 @@ for attribution.
 ---
 
 <sub>Ultran — think local, act deliberately.</sub>
+
+
+### Dynamic tools and file artifacts
+
+Ultran exposes a unified, searchable tool catalog at `GET /v1/tools/catalog`.
+It combines native file-generation tools, workspace connector manifests, and
+tools discovered from enabled MCP servers. Use `query`, `source`, `limit` (up
+to 500 per page), and `offset` instead of injecting the full catalog into an
+agent prompt. MCP discovery is paginated at `GET /v1/mcp/tools` (up to 5,000
+entries per page). Agents receive only a small task-relevant subset.
+
+Native artifact generation supports PDF, PowerPoint (`pptx`), Word (`docx`),
+Excel (`xlsx`), HTML, Markdown, text, CSV, JSON, and SVG. The Office/PDF
+formats use maintained document libraries, with dependency-light fallbacks.
+Create artifacts via `POST /v1/artifacts`; list them via `GET /v1/artifacts`;
+preview and download URLs are returned per artifact. Files and metadata are
+workspace-scoped and stored below `ULTRAN_DATA_DIR/artifacts`. HTML content is
+sanitized before preview, and preview responses use a restrictive sandbox CSP.
+Agent chat recognizes explicit file-generation requests and creates the
+requested artifact from the generated answer. The phone client presents
+preview and download actions alongside tool activity.
+
+MCP-backed agents can use dynamically discovered, explicitly read-only tools
+from MCP servers enabled in their workspace. Each unattended call receives a
+short-lived, single-use, read-scoped grant and passes schema, egress, timeout,
+and audit enforcement. Write, delete, execute, and admin tools remain behind
+the human grant and approval flow.
+
+Agent chat also has a streaming endpoint at `POST /v1/agents/{agent_id}/chat/stream`.
+It emits server-sent events for planning, tool discovery, tool starts/completions,
+artifact creation, approval waits, errors, and the final result. The phone client
+uses this stream to show live run activity, then keeps a compact execution
+history with in-app artifact previews and downloads. The regular JSON chat route
+remains available for older clients and integrations.

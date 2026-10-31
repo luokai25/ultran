@@ -673,3 +673,61 @@ def test_agent_memory_api_is_workspace_scoped_and_deletable(client):
     assert client.delete(
         f"/v1/agents/{agent_id}/memories/{memory_id}", headers={"X-Ultran-Workspace": "workspace-a"}
     ).status_code == 204
+
+
+def test_agent_uses_dynamically_discovered_mcp_read_tool():
+    import sys
+    from pathlib import Path
+    from ultran_backend.brain import BrainReply
+    from ultran_backend.mcp import McpClientPool, ServerSpec, ToolGateway
+
+    fixture = Path(__file__).parent / "fixtures" / "mcp_fixture_server.py"
+    pool = McpClientPool()
+    pool.register(ServerSpec(
+        id="fixture", name="Fixture", command=sys.executable,
+        args=(str(fixture),), trust_level="local", timeout_s=20, connect_timeout_s=20,
+    ))
+    pool.connect("fixture")
+    registry = ConnectorRegistry()
+    gateway = ToolGateway(pool)
+    registry.attach_mcp(pool, gateway)
+    registry.sync_mcp()
+    registry.enable("local", "mcp-fixture")
+
+    class PlannedBrain:
+        default_model = "fixture-model"
+        def __init__(self):
+            self.call_count = 0
+            self.responses = [
+                BrainReply("I will inspect the file.", 1, 1, "fixture-model", "test"),
+                BrainReply('{"calls":[{"tool":"fixture.read_file","arguments":{"path":"/tmp/notes.txt"}}]}', 1, 1, "fixture-model", "test"),
+                BrainReply('{"calls":[]}', 1, 1, "fixture-model", "test"),
+                BrainReply("The file contains the requested information.", 1, 1, "fixture-model", "test"),
+            ]
+        def complete(self, *args, **kwargs):
+            self.call_count += 1
+            if self.call_count == 2:
+                catalog_prompt = args[0][0].content
+                assert "fixture.read_file" in catalog_prompt
+                assert "fixture.write_file" not in catalog_prompt
+                assert "fixture.delete_path" not in catalog_prompt
+            return self.responses.pop(0)
+
+    try:
+        svc = AgentService(PlannedBrain(), ToolSandbox(registry, CredentialVault()))
+        agent = svc.create(name="MCP Agent", tools=["mcp-fixture"])
+        events = []
+        result = svc.chat(agent.id, "Read file /tmp/notes.txt", event_callback=events.append)
+        calls = [call for call in result["tool_calls"] if call.get("connector") == "mcp"]
+        assert len(calls) == 1 and calls[0]["ok"] is True
+        assert "contents of /tmp/notes.txt" in calls[0]["detail"]
+        assert any(event.get("type") == "tool_started" for event in events)
+        assert any(event.get("type") == "tool_completed" for event in events)
+
+        registry.disable("local", "mcp-fixture")
+        disabled_svc = AgentService(BrainRuntime(EchoBackend()), ToolSandbox(registry, CredentialVault()))
+        disabled_agent = disabled_svc.create(name="Disabled MCP Agent", tools=["mcp-fixture"])
+        disabled_result = disabled_svc.chat(disabled_agent.id, "Read file /tmp/notes.txt")
+        assert not any(call.get("connector") == "mcp" for call in disabled_result["tool_calls"])
+    finally:
+        pool.close()

@@ -11,6 +11,7 @@ Two rules the ledger enforces, because both have bitten real products:
 from __future__ import annotations
 
 import uuid
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -82,6 +83,7 @@ class Account:
 class BillingService:
     def __init__(self, *, default_monthly_tokens: int = 100_000) -> None:
         self._accounts: dict[str, Account] = {}
+        self._lock = threading.RLock()
         self.default_monthly_tokens = default_monthly_tokens
         # keep the free plan's allowance in sync with configuration
         PLANS["free"]["monthly_tokens"] = default_monthly_tokens
@@ -91,52 +93,47 @@ class BillingService:
         return [PLANS[k] for k in ("free", "studio", "atelier")]
 
     def account(self, account_id: str) -> Account:
-        if account_id not in self._accounts:
-            self._accounts[account_id] = Account(id=account_id)
-        return self._accounts[account_id]
+        with self._lock:
+            if account_id not in self._accounts:
+                self._accounts[account_id] = Account(id=account_id)
+            return self._accounts[account_id]
 
     def subscribe(self, account_id: str, plan: str) -> Account:
         if plan not in PLANS:
             raise ValidationFailed("unknown plan", details={"plan": plan, "valid": sorted(PLANS)})
-        acct = self.account(account_id)
-        acct.plan = plan
-        return acct
+        with self._lock:
+            acct = self.account(account_id)
+            acct.plan = plan
+            return acct
 
     def allowance(self, account_id: str) -> int:
-        return int(PLANS[self.account(account_id).plan]["monthly_tokens"])
+        with self._lock:
+            return int(PLANS[self.account(account_id).plan]["monthly_tokens"])
 
     def meter(self, account_id: str, tokens: int) -> dict[str, Any]:
-        """Record token usage. Raises before mutating when the allowance is gone."""
+        """Record token usage atomically across API and background workers."""
         if tokens < 0:
             raise ValidationFailed("tokens must be >= 0")
-        acct = self.account(account_id)
-        allowance = self.allowance(account_id)
-        if acct.tokens_used + tokens > allowance:
-            raise QuotaExceeded(
-                "monthly token allowance exhausted",
-                details={
-                    "account_id": account_id,
-                    "used": acct.tokens_used,
-                    "requested": tokens,
-                    "allowance": allowance,
-                },
-            )
-        acct.tokens_used += tokens
-        return self.usage(account_id)
+        with self._lock:
+            acct = self.account(account_id)
+            allowance = self.allowance(account_id)
+            if acct.tokens_used + tokens > allowance:
+                raise QuotaExceeded(
+                    "monthly token allowance exhausted",
+                    details={"account_id": account_id, "used": acct.tokens_used,
+                             "requested": tokens, "allowance": allowance},
+                )
+            acct.tokens_used += tokens
+            return self.usage(account_id)
 
     def usage(self, account_id: str) -> dict[str, Any]:
-        acct = self.account(account_id)
-        allowance = self.allowance(account_id)
-        pct = round((acct.tokens_used / allowance) * 100, 2) if allowance else 0.0
-        return {
-            "account_id": account_id,
-            "plan": acct.plan,
-            "tokens_used": acct.tokens_used,
-            "tokens_allowance": allowance,
-            "percent_used": pct,
-            "remaining": max(0, allowance - acct.tokens_used),
-            "balance_cents": acct.balance_cents,
-        }
+        with self._lock:
+            acct = self.account(account_id)
+            allowance = self.allowance(account_id)
+            pct = round((acct.tokens_used / allowance) * 100, 2) if allowance else 0.0
+            return {"account_id": account_id, "plan": acct.plan, "tokens_used": acct.tokens_used,
+                    "tokens_allowance": allowance, "percent_used": pct,
+                    "remaining": max(0, allowance - acct.tokens_used), "balance_cents": acct.balance_cents}
 
     # ------------------------------------------------------------------ #
     def charge(
@@ -153,46 +150,35 @@ class BillingService:
         if amount_cents == 0:
             raise ValidationFailed("amount_cents must not be zero")
         key = (idempotency_key or "").strip() or f"auto_{uuid.uuid4().hex}"
-        acct = self.account(account_id)
-
-        # idempotent replay: same key => same charge, no double-spend
-        if key in acct._keys:
-            existing_id = acct._keys[key]
-            for c in acct.charges:
-                if c.id == existing_id:
-                    return c.public()
-            raise Conflict("idempotency key points at a missing charge", details={"key": key})
-
-        new_balance = acct.balance_cents + amount_cents
-        charge = Charge(
-            id=f"ch_{uuid.uuid4().hex[:12]}",
-            account_id=account_id,
-            amount_cents=amount_cents,
-            kind=kind,
-            memo=memo,
-            idempotency_key=key,
-            balance_after=new_balance,
-        )
-        acct.charges.append(charge)
-        acct._keys[key] = charge.id
-        acct.balance_cents = new_balance
-        return charge.public()
+        with self._lock:
+            acct = self.account(account_id)
+            if key in acct._keys:
+                existing_id = acct._keys[key]
+                for c in acct.charges:
+                    if c.id == existing_id:
+                        return c.public()
+                raise Conflict("idempotency key points at a missing charge", details={"key": key})
+            new_balance = acct.balance_cents + amount_cents
+            charge = Charge(id=f"ch_{uuid.uuid4().hex[:12]}", account_id=account_id,
+                            amount_cents=amount_cents, kind=kind, memo=memo,
+                            idempotency_key=key, balance_after=new_balance)
+            acct.charges.append(charge)
+            acct._keys[key] = charge.id
+            acct.balance_cents = new_balance
+            return charge.public()
 
     def ledger(self, account_id: str) -> list[dict[str, Any]]:
-        return [c.public() for c in self.account(account_id).charges]
+        with self._lock:
+            return [c.public() for c in self.account(account_id).charges]
 
     def revenue_cents(self) -> int:
-        return sum(
-            c.amount_cents
-            for acct in self._accounts.values()
-            for c in acct.charges
-            if c.amount_cents > 0
-        )
+        with self._lock:
+            return sum(c.amount_cents for acct in self._accounts.values()
+                       for c in acct.charges if c.amount_cents > 0)
 
     def summary(self) -> dict[str, Any]:
-        return {
-            "accounts": len(self._accounts),
-            "charges": sum(len(a.charges) for a in self._accounts.values()),
-            "revenue_cents": self.revenue_cents(),
-            "plans": {k: v["price_usd_cents"] for k, v in PLANS.items()},
-        }
+        with self._lock:
+            return {"accounts": len(self._accounts),
+                    "charges": sum(len(a.charges) for a in self._accounts.values()),
+                    "revenue_cents": self.revenue_cents(),
+                    "plans": {k: v["price_usd_cents"] for k, v in PLANS.items()}}

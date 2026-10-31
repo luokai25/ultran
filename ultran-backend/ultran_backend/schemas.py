@@ -141,6 +141,9 @@ class ToolCallRecord(BaseModel):
     ok: bool
     latency_ms: int = 0
     detail: str = ""
+    approval_required: bool = False
+    approval_id: str = ""
+    artifact: dict[str, Any] | None = None
 
 
 class ChatReply(BaseModel):
@@ -151,6 +154,12 @@ class ChatReply(BaseModel):
     tokens_out: int
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
     finish_reason: str = "stop"
+
+
+class ArtifactCreate(_Strict):
+    title: str = Field(min_length=1, max_length=160)
+    format: Literal["html", "md", "txt", "json", "csv", "svg", "pdf", "pptx", "docx", "xlsx"]
+    content: str = Field(min_length=1, max_length=2_000_000)
 
 
 # --------------------------------------------------------------------------- #

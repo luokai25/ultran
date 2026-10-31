@@ -90,18 +90,22 @@ def list_tools(
     ),
     query: str | None = None,
     server_id: str | None = None,
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=50, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0, le=100000),
 ):
     caps = [c.strip() for c in capabilities.split(",") if c.strip()] if capabilities else None
     rows = container.mcp_gateway.list_tools(
         caps,
         query=query,
-        limit=limit,
+        limit=None,
         server_ids=[server_id] if server_id else None,
     )
+    total = len(rows)
+    rows = rows[offset:offset + limit]
     return {
         "tools": [spec.as_dict() for spec in rows],
-        "count": len(rows),
+        "count": len(rows), "total": total, "limit": limit, "offset": offset,
+        "has_more": offset + len(rows) < total,
         "capabilities": caps,
     }
 

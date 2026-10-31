@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import agents, billing, builder, connectors, deploys, forge, mcp, system, workspace, tasks
+from .api import agents, artifacts, billing, builder, connectors, deploys, forge, mcp, system, tools, workspace, tasks
 from .config import Settings
 from .container import Container
 from .errors import UltranError
@@ -25,6 +25,8 @@ ROUTERS = (
     billing.router,
     deploys.router,
     tasks.router,
+    artifacts.router,
+    tools.router,
 )
 
 

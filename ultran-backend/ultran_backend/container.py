@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .agents import AgentService
+from .artifacts import ArtifactService
 from .billing import BillingService
 from .brain import BrainRuntime
 from .builder import BuilderService
@@ -29,6 +30,7 @@ class Container:
     brain: BrainRuntime
     agents: AgentService
     tasks: AgentTaskService
+    artifacts: ArtifactService
     avatar: AvatarService
     voice: VoiceService
     builder: BuilderService
@@ -82,8 +84,9 @@ class Container:
             encryption_key=settings.credential_encryption_key,
         )
 
+        artifacts = ArtifactService(settings.data_dir / "artifacts")
         agents = AgentService(
-            brain, sandbox, vault, composio=composio,
+            brain, sandbox, vault, composio=composio, artifact_service=artifacts,
             db_path=settings.data_dir / "agents.sqlite3",
             encryption_key=settings.credential_encryption_key,
         )
@@ -106,6 +109,7 @@ class Container:
             brain=brain,
             agents=agents,
             tasks=tasks,
+            artifacts=artifacts,
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),

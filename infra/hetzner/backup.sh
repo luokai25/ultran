@@ -6,6 +6,7 @@ COMPOSE_FILE="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE="${SCRIPT_DIR}/.env"
 DATA_DIR="/srv/ultran/.ultran-data"
 BACKUP_IN_VOLUME="/tmp/ultran-sqlite-backups"
+ARTIFACTS_IN_VOLUME="/tmp/ultran-artifact-backups"
 
 : "${RESTIC_REPOSITORY:?Set RESTIC_REPOSITORY in /etc/ultran-backup.env}"
 : "${RESTIC_PASSWORD_FILE:?Set RESTIC_PASSWORD_FILE in /etc/ultran-backup.env}"
@@ -17,7 +18,7 @@ API_CONTAINER="$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps
 
 TMP_DIR="$(mktemp -d)"
 cleanup() {
-  docker exec "${API_CONTAINER}" rm -rf "${BACKUP_IN_VOLUME}" >/dev/null 2>&1 || true
+  docker exec "${API_CONTAINER}" rm -rf "${BACKUP_IN_VOLUME}" "${ARTIFACTS_IN_VOLUME}" >/dev/null 2>&1 || true
   rm -rf "${TMP_DIR}"
 }
 trap cleanup EXIT
@@ -28,10 +29,17 @@ docker exec "${API_CONTAINER}" python -c \
   'import glob, os, sqlite3; srcdir="/srv/ultran/.ultran-data"; out="/tmp/ultran-sqlite-backups"; os.makedirs(out, exist_ok=True); files=glob.glob(os.path.join(srcdir, "*.sqlite3")); assert files, "no Ultran SQLite databases found"; [(lambda src,dst: (src.backup(dst), dst.close(), src.close()))(sqlite3.connect("file:"+p+"?mode=ro", uri=True), sqlite3.connect(os.path.join(out, os.path.basename(p)))) for p in files]'
 
 docker cp "${API_CONTAINER}:${BACKUP_IN_VOLUME}" "${TMP_DIR}/ultran-sqlite-databases"
+# Generated files are durable user data too; include them alongside databases.
+docker exec "${API_CONTAINER}" sh -c 'if [ -d /srv/ultran/.ultran-data/artifacts ]; then cp -a /srv/ultran/.ultran-data/artifacts /tmp/ultran-artifact-backups; fi'
+if docker exec "${API_CONTAINER}" test -d "${ARTIFACTS_IN_VOLUME}"; then
+  docker cp "${API_CONTAINER}:${ARTIFACTS_IN_VOLUME}" "${TMP_DIR}/ultran-artifacts"
+else
+  mkdir -p "${TMP_DIR}/ultran-artifacts"
+fi
 git -C "${SCRIPT_DIR}/../.." rev-parse HEAD > "${TMP_DIR}/deployed-commit.txt"
 
 # Restic encrypts and authenticates every file before it reaches remote storage.
-restic backup "${TMP_DIR}/ultran-sqlite-databases" "${ENV_FILE}" \
+restic backup "${TMP_DIR}/ultran-sqlite-databases" "${TMP_DIR}/ultran-artifacts" "${ENV_FILE}" \
   "${TMP_DIR}/deployed-commit.txt" --tag ultran --tag production
 
 # Keep a useful recovery window without retaining every daily snapshot forever.

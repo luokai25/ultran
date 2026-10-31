@@ -334,6 +334,19 @@ def test_api_registers_a_server_and_exposes_its_tools(client):
     assert "mcp-api-demo" in {c["id"] for c in connectors}
 
 
+def test_api_tool_index_supports_large_catalog_pagination(client):
+    client.post(
+        "/v1/mcp/servers",
+        json={"id": "api-demo", "command": sys.executable, "args": [str(FIXTURE)]},
+    )
+    first = client.get("/v1/mcp/tools", params={"limit": 2, "offset": 0}).json()
+    second = client.get("/v1/mcp/tools", params={"limit": 2, "offset": 2}).json()
+    assert first["total"] >= 5
+    assert first["count"] == 2 and second["count"] == 2
+    assert first["tools"][0]["id"] != second["tools"][0]["id"]
+    assert first["has_more"] is True
+
+
 def test_api_capability_filter_narrows_the_index(client):
     client.post(
         "/v1/mcp/servers",

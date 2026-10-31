@@ -1,12 +1,12 @@
 {
-        "appId": "app.ultran.mobile",
-        "appName": "Ultran",
-        "webDir": "dist",
-        "android": {
-                "backgroundColor": "#050505",
-                "allowMixedContent": false
-        },
-        "server": {
-                "androidScheme": "https"
-        }
+	"appId": "app.ultran.mobile",
+	"appName": "Ultran",
+	"webDir": "dist",
+	"android": {
+		"backgroundColor": "#050505",
+		"allowMixedContent": true
+	},
+	"server": {
+		"androidScheme": "https"
+	}
 }

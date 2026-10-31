@@ -297,3 +297,9 @@ horizontal scaling, move credentials and transactional state to a managed
 database with explicit encryption and migration design. This deployment guide
 does not claim that a VPS has been created or that the service is live; those
 steps require the Hetzner account, server details, and DNS control.
+
+
+Generated user artifacts live under `/srv/ultran/.ultran-data/artifacts` and are
+included in the Restic backup alongside the SQLite snapshots and deployment
+environment. Restore this directory together with the databases to preserve
+artifact download and preview links after recovery.

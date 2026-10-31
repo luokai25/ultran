@@ -18,7 +18,8 @@ import { markDataUrl, markSvg } from "./mark";
  * ------------------------------------------------------------------ */
 
 type Role = "user" | "assistant";
-type ToolCall = { connector: string; action: string; ok: boolean };
+type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string };
+type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type Message = { role: Role; content: string; tools?: ToolCall[] };
 type Conversation = {
   id: string;
@@ -251,18 +252,120 @@ function messageNode(message: Message): { root: HTMLElement; body: HTMLElement }
   return { root, body };
 }
 
+function showArtifactPreview(url: string, title: string): void {
+  document.querySelector(".artifact-preview-overlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "artifact-preview-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", `${title} preview`);
+  const panel = document.createElement("section");
+  panel.className = "artifact-preview-panel";
+  const header = document.createElement("header");
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Close";
+  close.addEventListener("click", () => overlay.remove());
+  header.append(heading, close);
+  const frame = document.createElement("iframe");
+  frame.title = `${title} preview`;
+  frame.setAttribute("sandbox", "allow-same-origin");
+  frame.src = `${baseUrl()}${url}`;
+  panel.append(header, frame);
+  overlay.appendChild(panel);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  close.focus();
+}
+
+function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): void {
+  let panel = body.querySelector<HTMLElement>(".live-run");
+  if (!panel) {
+    body.querySelector(".thinking")?.remove();
+    panel = document.createElement("div");
+    panel.className = "live-run";
+    panel.setAttribute("aria-live", "polite");
+    const heading = document.createElement("div");
+    heading.className = "live-run-heading";
+    heading.textContent = "Working";
+    panel.appendChild(heading);
+    body.appendChild(panel);
+  }
+  const type = String(event.type ?? "event");
+  if (type === "completed" || type === "final") return;
+  const line = document.createElement("div");
+  line.className = "live-run-event";
+  const dot = document.createElement("i");
+  dot.dataset.state = type === "tool_failed" ? "failed" : type === "tool_completed" && event.approval_required ? "active" : type === "tool_completed" || type === "artifact_created" ? "done" : "active";
+  const label = document.createElement("span");
+  const tool = String(event.tool ?? event.source ?? "");
+  const action = String(event.action ?? "");
+  const detail = String(event.label ?? event.detail ?? "");
+  if (type === "thinking") label.textContent = detail || "Planning the task";
+  else if (type === "tool_discovery") label.textContent = detail || `Searching ${tool} tools`;
+  else if (type === "tool_started") label.textContent = detail || `Running ${tool}${action ? ` · ${action}` : ""}`;
+  else if (type === "tool_completed") label.textContent = event.approval_required ? `${tool}${action ? ` · ${action}` : ""} waiting for your approval` : `${tool}${action ? ` · ${action}` : ""} completed`;
+  else if (type === "tool_failed") label.textContent = `${tool}${action ? ` · ${action}` : ""} failed`;
+  else if (type === "artifact_created") {
+    const artifact = event.artifact as ArtifactCard | undefined;
+    label.textContent = artifact ? `Prepared ${artifact.title} (${artifact.format.toUpperCase()})` : "Prepared your file";
+  } else label.textContent = detail || type.replace(/_/g, " ");
+  line.append(dot, label);
+  panel.appendChild(line);
+  threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+}
+
 function finishAssistantNode(root: HTMLElement, message: Message): void {
   if (message.tools?.length) {
     const tools = document.createElement("div");
     tools.className = "tools";
-    for (const call of message.tools) {
-      const chip = document.createElement("span");
-      chip.className = "tool-chip";
-      chip.dataset.ok = String(call.ok);
-      const dot = document.createElement("i");
-      chip.append(dot, document.createTextNode(`${call.connector} · ${call.action}`));
-      tools.appendChild(chip);
-    }
+    const timelineTitle = document.createElement("div");
+    timelineTitle.className = "tool-timeline-title";
+    timelineTitle.textContent = "Tool activity";
+    tools.appendChild(timelineTitle);
+    message.tools.forEach((call, index) => {
+      if (call.artifact) {
+        const card = document.createElement("section");
+        card.className = "artifact-card";
+        const heading = document.createElement("strong");
+        heading.textContent = call.artifact.title;
+        const meta = document.createElement("small");
+        meta.textContent = `${call.artifact.format.toUpperCase()} · ${(call.artifact.size / 1024).toFixed(1)} KB · Ready`;
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.textContent = "Preview";
+        preview.addEventListener("click", () => showArtifactPreview(call.artifact!.preview_url, call.artifact!.title));
+        const download = document.createElement("button");
+        download.type = "button";
+        download.textContent = "Download";
+        download.addEventListener("click", () => void Browser.open({ url: `${baseUrl()}${call.artifact!.download_url}` }));
+        card.append(heading, meta, preview, download);
+        tools.appendChild(card);
+      } else {
+        const step = document.createElement("div");
+        step.className = "tool-step";
+        step.dataset.ok = String(call.ok);
+        step.dataset.approval = String(Boolean(call.approval_required));
+        const number = document.createElement("span");
+        number.className = "tool-step-number";
+        number.textContent = String(index + 1).padStart(2, "0");
+        const copy = document.createElement("div");
+        copy.className = "tool-step-copy";
+        const name = document.createElement("strong");
+        name.textContent = `${call.connector} · ${call.action}`;
+        const detail = document.createElement("small");
+        const summary = (call.detail ?? (call.ok ? "Completed successfully" : "Execution failed")).replace(/\s+/g, " ");
+        detail.textContent = `${summary.slice(0, 180)}${summary.length > 180 ? "…" : ""}${call.latency_ms ? ` · ${call.latency_ms} ms` : ""}`;
+        const status = document.createElement("span");
+        status.className = "tool-step-status";
+        status.textContent = call.approval_required ? "Approval needed" : call.ok ? "Done" : "Failed";
+        copy.append(name, detail);
+        step.append(number, copy, status);
+        tools.appendChild(step);
+      }
+    });
     root.appendChild(tools);
   }
 
@@ -479,22 +582,59 @@ async function ensureAgent(): Promise<string> {
 
 type ChatReply = { content: string; session_id: string; tool_calls?: ToolCall[] };
 
-async function remoteReply(convo: Conversation, text: string): Promise<ChatReply> {
+async function remoteReply(
+  convo: Conversation,
+  text: string,
+  onEvent?: (event: Record<string, unknown>) => void,
+): Promise<ChatReply> {
   const run = async (): Promise<ChatReply> => {
     const agentId = await ensureAgent();
-    const res = await api(`/v1/agents/${agentId}/chat`, {
-      method: "POST",
-      body: JSON.stringify({ message: text, session_id: convo.sessionId ?? null }),
-    });
+    const body = JSON.stringify({ message: text, session_id: convo.sessionId ?? null });
+    const res = await api(`/v1/agents/${agentId}/chat/stream`, { method: "POST", body }, 180_000);
     if (res.status === 404) {
-      // The agent or session was lost on the server (it restarted). Start clean.
-      store.agentId = undefined;
-      for (const conversation of store.conversations) conversation.sessionId = undefined;
-      saveStore();
-      throw new Error("stale");
+      const fallback = await api(`/v1/agents/${agentId}/chat`, { method: "POST", body }, 180_000);
+      if (fallback.status === 404) {
+        store.agentId = undefined;
+        for (const conversation of store.conversations) conversation.sessionId = undefined;
+        saveStore();
+        throw new Error("stale");
+      }
+      if (!fallback.ok) throw new Error(`brain returned ${fallback.status}`);
+      return (await fallback.json()) as ChatReply;
     }
     if (!res.ok) throw new Error(`brain returned ${res.status}`);
-    return (await res.json()) as ChatReply;
+    if (!res.body) return (await res.json()) as ChatReply;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let final: ChatReply | null = null;
+    const consume = (block: string): void => {
+      const data = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
+      if (!data) return;
+      const event = JSON.parse(data) as Record<string, unknown>;
+      onEvent?.(event);
+      if (event.type === "error") {
+        const error = event.error as { code?: string; message?: string } | undefined;
+        if (error?.code === "not_found" || /agent not found|session not found/i.test(error?.message ?? "")) throw new Error("stale");
+        throw new Error(error?.message ?? "agent stream failed");
+      }
+      if (event.type === "final") final = event.result as ChatReply;
+    };
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      let boundary = buffer.search(/\r?\n\r?\n/);
+      while (boundary >= 0) {
+        const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
+        consume(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+        boundary = buffer.search(/\r?\n\r?\n/);
+      }
+      if (chunk.done) break;
+    }
+    if (buffer.trim()) consume(buffer);
+    if (!final) throw new Error("agent stream ended before the final response");
+    return final;
   };
   try {
     return await run();
@@ -594,7 +734,7 @@ async function submit(raw: string): Promise<void> {
   let result: ChatReply;
   if (baseUrl()) {
     try {
-      result = await remoteReply(convo, text);
+      result = await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event));
       if (result.session_id) convo.sessionId = result.session_id;
       setLink("online");
     } catch (error) {
@@ -612,7 +752,7 @@ async function submit(raw: string): Promise<void> {
   setThinking(false);
 
   const message: Message = { role: "assistant", content: result.content };
-  if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok }));
+  if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));
   convo.messages.push(message);
   convo.updatedAt = Date.now();
   saveStore();

@@ -196,3 +196,11 @@ def test_summary_reports_activity():
 
 def test_empty_summary_is_zeroed():
     assert svc().summary()["charges"] == 0
+
+
+def test_concurrent_metering_is_atomic():
+    from concurrent.futures import ThreadPoolExecutor
+    service = svc(default_monthly_tokens=10_000)
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        list(pool.map(lambda _: service.meter("shared", 25), range(120)))
+    assert service.usage("shared")["tokens_used"] == 3_000

@@ -62,30 +62,27 @@ jobs:
         with:
           node-version: 20.11
 
-      # Frozen once the lockfile exists: resolving the tree on every run is what
-      # let a stale registry edge fail two release builds in a row. The fallback
-      # keeps the very first run on a branch without a lockfile working.
+      # Resolve workspace manifest changes and keep the committed lockfile in sync.
+      # This is needed when a dependency is added to an app package.
       - name: Install
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            pnpm install --frozen-lockfile
-          else
-            echo "::warning::no lockfile on this ref - resolving unpinned"
-            pnpm install --no-frozen-lockfile
-          fi
+        run: pnpm install --no-frozen-lockfile
 
       - name: Commit generated pnpm lockfile
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           set -euo pipefail
-          if [ ! -f pnpm-lock.yaml ] || git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1; then
-            echo "No new lockfile to commit"
+          if [ ! -f pnpm-lock.yaml ]; then
+            echo "No lockfile generated"
+            exit 0
+          fi
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "Lockfile already up to date"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
-          git commit -m "chore: generate pnpm lockfile from workspace manifests"
+          git commit -m "chore: sync pnpm lockfile with workspace manifests"
           if ! git push origin HEAD:main; then
             echo "::warning::main advanced during CI; lockfile will be generated on a later run"
           fi

@@ -1,26 +1,26 @@
-# Render Blueprint for Ultran's FastAPI control plane.
-# Deploy from the Render dashboard after configuring the required secret values.
+# Zero-cost Render Blueprint for Ultran's API prototype.
+# Free instances have an ephemeral filesystem: do not store real credentials or rely on local data persisting.
 services:
   - type: web
     name: ultran-api
     runtime: docker
     region: frankfurt
-    plan: starter
+    plan: free
     branch: main
     autoDeploy: true
     dockerContext: ./ultran-backend
     dockerfilePath: ./ultran-backend/Dockerfile
     healthCheckPath: /v1/health
-    disk:
-      name: ultran-api-data
-      mountPath: /srv/ultran/.ultran-data
-      sizeGB: 1
     envVars:
       - key: ULTRAN_ENV
         value: production
       - key: ULTRAN_DEBUG
         value: "false"
+      - key: ULTRAN_BRAIN_BACKEND
+        value: echo
+      - key: ULTRAN_BRAIN_FALLBACKS
+        value: echo
       - key: ULTRAN_DATA_DIR
-        value: /srv/ultran/.ultran-data
+        value: /tmp/ultran-data
       - key: ULTRAN_CREDENTIAL_ENCRYPTION_KEY
         sync: false

@@ -7,8 +7,8 @@ import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.provider.Settings;
+import android.os.Build;
 import android.text.TextUtils;
 
 import androidx.core.app.ActivityCompat;
@@ -99,6 +99,15 @@ public final class UltranCompanionPlugin extends Plugin {
 
     @PluginMethod
     public void openWhatsAppMessage(PluginCall call) {
+        handoffWhatsAppMessage(call);
+    }
+
+    @PluginMethod
+    public void composeWhatsApp(PluginCall call) {
+        handoffWhatsAppMessage(call);
+    }
+
+    private void handoffWhatsAppMessage(PluginCall call) {
         String rawNumber = call.getString("number", "").trim();
         String body = call.getString("body", "").trim();
         String number = rawNumber.replaceAll("[^0-9]", "");
@@ -106,46 +115,29 @@ public final class UltranCompanionPlugin extends Plugin {
             call.reject("Provide an international phone number and a message of up to 4,000 characters.");
             return;
         }
-        String component = getContext().getPackageName() + "/" + UltranMessagingAccessibilityService.class.getName();
-        String enabled = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        boolean serviceEnabled = enabled != null && enabled.contains(component);
-        if (!serviceEnabled) {
-            getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
-                .setTitle("Enable approved phone actions")
-                .setMessage("Android must enable Ultran's Accessibility Service before it can tap Send. It only sends the exact WhatsApp message you approve here, once, within 60 seconds. You can disable it any time in Android Accessibility settings.")
-                .setPositiveButton("Open Accessibility settings", (dialog, which) -> {
-                    getActivity().startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                    call.resolve(new JSObject().put("openedSettings", true).put("sent", false));
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("openedSettings", false).put("sent", false)))
-                .show());
-            return;
-        }
         if (getContext().getPackageManager().getLaunchIntentForPackage("com.whatsapp") == null) {
             call.reject("WhatsApp is not installed. Install it or use the SMS handoff.");
             return;
         }
         getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
-            .setTitle("Approve and send WhatsApp message")
-            .setMessage("Recipient: +" + number + "\n\nMessage:\n" + body + "\n\nAfter approval, Ultran opens WhatsApp and taps Send once only if the editable composer contains this exact text. Approval expires in 60 seconds. WhatsApp delivery cannot be verified by Ultran.")
-            .setPositiveButton("Approve and send", (dialog, which) -> {
+            .setTitle("Review WhatsApp message")
+            .setMessage("Recipient: +" + number + "\\n\\nMessage:\\n" + body +
+                "\\n\\nUltran will open WhatsApp with this message prepared. Nothing is sent automatically. Review the recipient and message in WhatsApp, then press Send yourself.")
+            .setPositiveButton("Open WhatsApp", (dialog, which) -> {
                 try {
-                    String url = "https://wa.me/" + number + "?text=" + Uri.encode(body);
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    Uri target = Uri.parse("https://wa.me/" + number).buildUpon()
+                        .appendQueryParameter("text", body).build();
+                    Intent intent = new Intent(Intent.ACTION_VIEW, target);
                     intent.setPackage("com.whatsapp");
                     getActivity().startActivity(intent);
-                    // Arm only after handing the deep link to WhatsApp, so an already
-                    // open conversation cannot consume a fresh approval before navigation.
-                    getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE)
-                        .edit().putString("approved_text", body)
-                        .putLong("expires_at", System.currentTimeMillis() + 60000L).apply();
-                    call.resolve(new JSObject().put("opened", true).put("approved", true).put("sent", "pending_accessibility_action"));
+                    call.resolve(new JSObject().put("opened", true).put("approved", true)
+                        .put("sent", false).put("requiresUserSend", true));
                 } catch (Exception error) {
-                    getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE).edit().clear().apply();
-                    call.reject("Could not open WhatsApp. The one-use approval was cancelled.", error);
+                    call.reject("Could not open WhatsApp. No message was sent.", error);
                 }
             })
-            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("approved", false).put("sent", false)))
+            .setNegativeButton("Cancel", (dialog, which) ->
+                call.resolve(new JSObject().put("opened", false).put("approved", false).put("sent", false)))
             .show());
     }
 
@@ -305,5 +297,28 @@ public final class UltranCompanionPlugin extends Plugin {
     public void stopBackgroundSpeech(PluginCall call) {
         getContext().stopService(new Intent(getContext(), UltranVoiceService.class));
         call.resolve(new JSObject().put("stopped", true));
+    }
+
+    @PluginMethod
+    public void getBackgroundAccessStatus(PluginCall call) {
+        boolean notifications = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        call.resolve(new JSObject()
+            .put("notifications", notifications)
+            .put("manufacturer", Build.MANUFACTURER)
+            .put("model", Build.MODEL)
+            .put("sdk", Build.VERSION.SDK_INT));
+    }
+
+    @PluginMethod
+    public void openAppBatterySettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getContext().getPackageName()));
+            getActivity().startActivity(intent);
+            call.resolve(new JSObject().put("opened", true));
+        } catch (Exception error) {
+            call.reject("Could not open Ultran app settings.", error);
+        }
     }
 }

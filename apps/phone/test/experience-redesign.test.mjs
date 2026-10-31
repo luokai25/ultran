@@ -82,6 +82,8 @@ test("local file requests have a real PDF fallback and artifact card actions", a
   assert.match(main, /async function attachRequestedArtifact\(/);
   assert.match(main, /URL\.createObjectURL\(blob\)/);
   assert.match(main, /downloadArtifact\(call\.artifact/);
+  assert.match(main, /function artifactPreviewUrl\(/);
+  assert.match(main, /baseUrl\(\)\}\$\{url/);
   assert.match(main, /attachRequestedArtifact\(text, finalContent, reply\.body\)/);
   assert.match(main, /attachRequestedArtifact\(task, content, progressBody\)/);
   assert.match(kernel, /pdf\|docx\|pptx/);

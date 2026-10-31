@@ -79,6 +79,7 @@
       <div class="drawer-label">Recent</div>
       <nav id="history" class="history" aria-label="Recent conversations"></nav>
       <div class="drawer-foot">
+        <button id="workspace-btn" class="drawer-link" type="button"><span aria-hidden="true">▦</span>Agent Workspace</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
           Connectors
@@ -112,6 +113,13 @@
       </div>
       <div id="connectors-list" class="conn-list"></div>
       <button id="connectors-more" class="ghost conn-more" type="button" hidden>Show more</button>
+    </section>
+
+    <section id="workspace-panel" class="workspace-panel" hidden aria-label="Agent workspace">
+      <header class="workspace-head"><button id="workspace-back" class="icon-btn" type="button" aria-label="Back">‹</button><div><h2>Agent Workspace</h2><small>Tasks, execution and generated files</small></div><button id="workspace-refresh" class="ghost" type="button">Refresh</button></header>
+      <div class="workspace-stats" id="workspace-stats"></div>
+      <div class="workspace-section-head"><h3>Background runs</h3><span id="workspace-task-count"></span></div><div id="workspace-tasks" class="workspace-list"><p class="workspace-empty">Loading agent tasks…</p></div>
+      <div class="workspace-section-head"><h3>Generated files</h3><span id="workspace-artifact-count"></span></div><div id="workspace-artifacts" class="workspace-list"><p class="workspace-empty">Loading artifacts…</p></div>
     </section>
 
     <div id="connector-detail-wrap" class="sheet-wrap" hidden>

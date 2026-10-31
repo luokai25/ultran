@@ -731,3 +731,36 @@ def test_agent_uses_dynamically_discovered_mcp_read_tool():
         assert not any(call.get("connector") == "mcp" for call in disabled_result["tool_calls"])
     finally:
         pool.close()
+
+
+def test_complex_provider_task_uses_shared_capability_contract_and_review_pass(monkeypatch):
+    from ultran_backend import agents as agents_module
+    from ultran_backend.brain import BrainReply
+
+    svc = service()
+    svc.vault.put("local", "groq", KEY)
+    agent = svc.create(name="Quality Agent", brain="groq", model="llama-3.3-70b")
+    captured = []
+
+    class FakeProviderBackend:
+        name = "groq"
+
+        def __init__(self, endpoint, timeout_s=30.0, api_key=None):
+            captured.append({"endpoint": endpoint, "api_key": api_key})
+
+        def complete(self, messages, *, model, temperature):
+            captured.append({"messages": messages, "model": model, "temperature": temperature})
+            if sum(1 for item in captured if "messages" in item) == 1:
+                return BrainReply("Draft answer.", 2, 3, model, self.name)
+            return BrainReply("Reviewed final answer.", 3, 4, model, self.name)
+
+    monkeypatch.setattr(agents_module, "OpenAICompatBackend", FakeProviderBackend)
+    result = svc.chat(agent.id, "Audit and debug this integration", workspace_id="local")
+
+    inference_calls = [item for item in captured if "messages" in item]
+    assert result["content"] == "Reviewed final answer."
+    assert len(inference_calls) == 2
+    assert "CAPABILITY CONTRACT" in inference_calls[0]["messages"][0].content
+    assert "TASK MODE: DEEP" in inference_calls[0]["messages"][0].content
+    assert "independent quality reviewer" in inference_calls[1]["messages"][0].content
+    assert inference_calls[1]["temperature"] <= 0.1

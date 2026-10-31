@@ -198,6 +198,16 @@
           <input id="local-model" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="llama3.2:3b" />
         </label>
 
+        <section class="field ollama-library" aria-labelledby="ollama-library-title">
+          <span id="ollama-library-title">Ollama model connection</span>
+          <small>Connect to an Ollama runtime on this device or a trusted private network. Browse installed models or pull a model by name, for example qwen3:4b or llama3.2:3b.</small>
+          <div class="sheet-actions">
+            <button id="ollama-models-refresh" class="ghost" type="button">Find installed models</button>
+            <button id="ollama-model-pull" class="solid" type="button">Download model</button>
+          </div>
+          <select id="ollama-model-list" aria-label="Installed Ollama models" hidden></select>
+          <p id="ollama-library-status" class="native-model-status" role="status">Set the Ollama endpoint above to browse or download models.</p>
+        </section>
         <div class="field">
           <span>Theme</span>
           <div id="themes" class="themes" role="group" aria-label="Theme"></div>

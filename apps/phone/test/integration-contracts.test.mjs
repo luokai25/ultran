@@ -172,6 +172,11 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /NativeCompanion\.speakInBackground/);
   assert.match(main, /proactiveUpdates/);
   assert.match(main, /composeSms/);
+  assert.match(main, /parseLocalToolRequest/);
+  assert.match(main, /parsed\.tool === "sms\.compose"/);
+  assert.match(main, /runApprovedLocalTool/);
+  assert.match(main, /message has NOT been sent/);
+  assert.match(main, /Only one local tool call may run per turn/);
   assert.ok(html.includes('id="proactive-btn"'));
   assert.ok(html.includes('id="sms-btn"'));
 });

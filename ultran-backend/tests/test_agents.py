@@ -764,3 +764,19 @@ def test_complex_provider_task_uses_shared_capability_contract_and_review_pass(m
     assert "TASK MODE: DEEP" in inference_calls[0]["messages"][0].content
     assert "independent quality reviewer" in inference_calls[1]["messages"][0].content
     assert inference_calls[1]["temperature"] <= 0.1
+
+
+def test_history_budget_preserves_recent_turns_under_a_hard_context_limit():
+    from ultran_backend.agents import _budget_history
+    from ultran_backend.brain import BrainMessage
+
+    messages = [
+        BrainMessage("user", "older context"),
+        BrainMessage("assistant", "x" * 500),
+        BrainMessage("user", "latest request"),
+    ]
+    bounded = _budget_history(messages, max_messages=2, max_chars=100)
+    assert len(bounded) <= 2
+    assert sum(len(item.content) for item in bounded) <= 100
+    assert bounded[-1].content == "latest request"
+    assert "earlier context omitted" in bounded[0].content

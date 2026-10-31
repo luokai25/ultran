@@ -1233,7 +1233,7 @@ async function remoteReply(
   const run = async (): Promise<ChatReply> => {
     const agentId = await ensureAgent();
     const nativePhoneIntent = Capacitor.getPlatform() === "android"
-      && /\\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
+      && /\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
     const body = JSON.stringify({
       message: text,
       session_id: convo.sessionId ?? null,

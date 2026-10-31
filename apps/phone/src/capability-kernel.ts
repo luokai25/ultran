@@ -36,6 +36,36 @@ export function profileTask(task: string): CapabilityProfile {
   return { tier: "quick", maxTokens: 320, contextMessages: 12, contextChars: 6000, contextTokens: 2048, temperature: 0.35, verifyDraft: false };
 }
 
+/**
+ * Keep context within a provider budget. Recent turns win; older turns are
+ * dropped before the current request is truncated.
+ */
+export function budgetConversation<T extends { role: string; content: string }>(
+  messages: readonly T[],
+  maxMessages: number,
+  maxTotalChars: number,
+  maxCharsPerMessage: number,
+): T[] {
+  const selected: T[] = [];
+  let used = 0;
+  for (let index = messages.length - 1; index >= 0 && selected.length < maxMessages; index -= 1) {
+    const message = messages[index];
+    if (!message) continue;
+    const remaining = maxTotalChars - used;
+    if (remaining <= 0) break;
+    const limit = Math.min(maxCharsPerMessage, remaining);
+    let content = message.content;
+    if (content.length > limit) {
+      const head = Math.ceil(limit * 0.65);
+      const tail = Math.max(0, limit - head - 24);
+      content = content.slice(0, head) + "\\n[… earlier context omitted …]\\n" + (tail ? content.slice(-tail) : "");
+    }
+    selected.unshift({ ...message, content } as T);
+    used += content.length;
+  }
+  return selected;
+}
+
 export function buildCapabilityPrompt(task: string, provider: string): string {
   const profile = profileTask(task);
   const mode = profile.tier === "critical"

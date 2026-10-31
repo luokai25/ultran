@@ -54,7 +54,10 @@ public final class UltranTerminalActivity extends Activity {
         environment.put("TERMUX_APP__PACKAGE_NAME", getPackageName());
         environment.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
         environment.put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
-        environment.put("LD_LIBRARY_PATH", new File(prefix, "lib").getAbsolutePath());
+        String prefixLibraryPath = new File(prefix, "lib").getAbsolutePath();
+        String existingLibraryPath = environment.get("LD_LIBRARY_PATH");
+        environment.put("LD_LIBRARY_PATH", existingLibraryPath == null || existingLibraryPath.isEmpty()
+            ? prefixLibraryPath : prefixLibraryPath + ":" + existingLibraryPath);
         environment.put("SHELL", "/system/bin/sh");
         environment.put("TERM", "xterm-256color");
         environment.put("LANG", "C.UTF-8");

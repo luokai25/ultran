@@ -90,3 +90,13 @@ cd apps/phone/android && ./gradlew assembleRelease
 - Spoken replies use the device/browser speech-synthesis engine with a stable rate/pitch signature and a preferred installed voice when available. The exact timbre depends on installed system voices; this is not yet a bundled neural voice model.
 - Optional dictation uses the browser/WebView SpeechRecognition API when available. Recognition may use the device or browser network service, as disclosed in the UI. Dictated text is placed in the composer for review and is never auto-sent. Unsupported WebViews show a fallback message.
 - The avatar is disposed with the page; no WebGL context survives a reload.
+
+
+## Proactive companion actions
+
+- The Android companion bridge can post task notifications, open the installed SMS app with a recipient and message prefilled, and speak a short update through a foreground Android text-to-speech service.
+- SMS is deliberately a handoff: Ultran shows a review dialog, opens the messaging app, and the user presses Send. The app does not request the dangerous `SEND_SMS` permission or silently send messages.
+- Enable **Updates** in the composer to watch the configured backend task list while the app's JavaScript runtime is active. Completion and failure transitions create Android notifications; if spoken replies are enabled, the foreground voice service reads the update aloud.
+- Android 13+ notification permission is required. If the first permission request is still pending, tap Updates again after granting it.
+- Current limitation: Android may suspend WebView timers and network work when the app is backgrounded or the device is in deep sleep. The foreground speech service can finish a message already handed to it, but continuous unattended task polling and scheduled wake-ups are not yet implemented. Do not treat this version as an always-on monitor.
+- Proactive updates are opt-in and can be switched off. Keep spoken updates short and avoid enabling them in situations where audio could expose private task details.

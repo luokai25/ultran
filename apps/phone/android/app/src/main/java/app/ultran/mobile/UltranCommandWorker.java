@@ -4,6 +4,11 @@ import android.content.Context;
 import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
 import androidx.work.Data;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
@@ -38,6 +43,7 @@ public final class UltranCommandWorker extends Worker {
             return Result.failure(new Data.Builder().putString(KEY_ERROR, "Invalid or oversized command.").build());
         }
 
+        setProgressAsync(new Data.Builder().putString("phase", "running").build());
         Process process = null;
         Thread reader = null;
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -98,11 +104,10 @@ public final class UltranCommandWorker extends Worker {
             boolean timedOut = false;
             while (true) {
                 if (isStopped()) {
-                    process.destroy();
-                    if (process.isAlive()) process.destroyForcibly();
+                    stopProcess(process);
                     return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command cancelled.").build());
                 }
-                if (!process.isAlive()) break;
+                if (!isRunning(process)) break;
                 if (SystemClock.elapsedRealtime() >= deadline) {
                     timedOut = true;
                     process.destroy();
@@ -123,10 +128,12 @@ public final class UltranCommandWorker extends Worker {
                 .putBoolean(KEY_TIMED_OUT, timedOut)
                 .putBoolean("termuxRuntime", termuxReady)
                 .build();
+            postNotification("Ultran task completed", "Background command finished with exit code " + exitCode + ".");
+            setProgressAsync(new Data.Builder().putString("phase", "completed").build());
             return Result.success(result);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            if (process != null) process.destroyForcibly();
+            if (process != null) stopProcess(process);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command interrupted.").build());
         } catch (Exception error) {
             if (process != null) process.destroyForcibly();
@@ -134,8 +141,38 @@ public final class UltranCommandWorker extends Worker {
             if (message.length() > 1000) message = message.substring(0, 1000);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, message).build());
         } finally {
-            if (process != null && process.isAlive()) process.destroyForcibly();
+            if (process != null && isRunning(process)) stopProcess(process);
             if (reader != null) reader.interrupt();
         }
+    }
+
+    private boolean isRunning(Process process) {
+        try { process.exitValue(); return false; }
+        catch (IllegalThreadStateException running) { return true; }
+    }
+
+    private void stopProcess(Process process) {
+        process.destroy();
+        if (Build.VERSION.SDK_INT >= 26 && isRunning(process)) process.destroyForcibly();
+    }
+
+    private void postNotification(String title, String body) {
+        Context context = getApplicationContext();
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        final String channelId = "ultran_runtime_jobs";
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel = new NotificationChannel(channelId, "Ultran background jobs", NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription("Completion updates for approved local runtime tasks");
+            manager.createNotificationChannel(channel);
+        }
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(context.getApplicationInfo().icon)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
+        manager.notify(getId().hashCode(), notification.build());
     }
 }

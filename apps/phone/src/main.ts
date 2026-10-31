@@ -507,7 +507,7 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelDownloadProgressEl.hidden = true;
     modelDownloadProgressEl.value = 0;
     modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index]; });
+    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index] ?? false; });
   }
 }
 
@@ -545,6 +545,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
     const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
     for (let index = 0; index < parts.length; index++) {
       const part = parts[index];
+      if (!part) throw new Error("A shard disappeared from the verified set.");
       const name = part.rfilename.split("/").pop() ?? "";
       if (!/^[A-Za-z0-9._ -]{1,155}\.gguf$/i.test(name)) throw new Error("Unsupported shard filename: " + name);
       const rawSha = part.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
@@ -555,7 +556,9 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
       await NativeLocalAI.downloadModel({ name, url, ...(sha ? { sha256: sha } : {}) });
     }
     await refreshNativeModels();
-    const firstName = parts[0].rfilename.split("/").pop() ?? "";
+    const firstPart = parts[0];
+    if (!firstPart) throw new Error("The completed shard set has no first part.");
+    const firstName = firstPart.rfilename.split("/").pop() ?? "";
     nativeModelSelect.value = firstName;
     nativeModelStatus.textContent = "Imported complete split model · " + shardCount + " verified shards · " + formatBytes(totalBytes) + ". Load it when ready.";
     modelLibraryStatus.textContent = "All " + shardCount + " GGUF shards downloaded and individually verified. Ultran now lists them as one model.";
@@ -566,7 +569,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
     modelDownloadProgressEl.hidden = true;
     modelDownloadProgressEl.value = 0;
     modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index]; });
+    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index] ?? false; });
   }
 }
 

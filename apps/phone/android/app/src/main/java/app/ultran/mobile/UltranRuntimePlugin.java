@@ -22,11 +22,15 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +45,7 @@ import java.util.zip.ZipInputStream;
 @CapacitorPlugin(name = "UltranRuntime")
 public final class UltranRuntimePlugin extends Plugin {
     private static final long MAX_ARCHIVE_BYTES = 512L * 1024L * 1024L;
+    private static final String BOOTSTRAP_RELEASE_BASE = "https://github.com/luokai25/ultran/releases/download/ultran-termux-runtime-v1/";
     private static final long MAX_UNCOMPRESSED_BYTES = 2L * 1024L * 1024L * 1024L;
     private static final int MAX_ENTRIES = 100000;
     private static final int MAX_SYMLINK_MANIFEST_BYTES = 2 * 1024 * 1024;
@@ -193,6 +198,142 @@ public final class UltranRuntimePlugin extends Plugin {
             }
             if (reader != null) reader.interrupt();
         }
+    }
+
+    private HttpURLConnection openTrustedGithubConnection(String address) throws Exception {
+        URL current = new URL(address);
+        for (int redirects = 0; redirects <= 5; redirects++) {
+            if (!"https".equalsIgnoreCase(current.getProtocol())) {
+                throw new IllegalStateException("Runtime downloads must use HTTPS.");
+            }
+            HttpURLConnection connection = (HttpURLConnection) current.openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(30000);
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestProperty("User-Agent", "Ultran-Android/0.1");
+            connection.setRequestProperty("Accept", "application/octet-stream");
+            int code = connection.getResponseCode();
+            if (code >= 300 && code < 400) {
+                String location = connection.getHeaderField("Location");
+                connection.disconnect();
+                if (location == null || redirects == 5) {
+                    throw new IllegalStateException("Runtime download returned too many or invalid redirects.");
+                }
+                URL next = new URL(current, location);
+                String host = next.getHost().toLowerCase(java.util.Locale.ROOT);
+                boolean trusted = host.equals("github.com") || host.endsWith(".github.com")
+                    || host.equals("githubusercontent.com") || host.endsWith(".githubusercontent.com");
+                if (!"https".equalsIgnoreCase(next.getProtocol()) || !trusted) {
+                    throw new IllegalStateException("Runtime download redirected to an untrusted host.");
+                }
+                current = next;
+                continue;
+            }
+            if (code != HttpURLConnection.HTTP_OK) {
+                connection.disconnect();
+                throw new IllegalStateException("GitHub runtime download failed with HTTP " + code + ".");
+            }
+            return connection;
+        }
+        throw new IllegalStateException("Could not open the runtime download.");
+    }
+
+    private byte[] readGithubAsset(String address, long maxBytes) throws Exception {
+        HttpURLConnection connection = openTrustedGithubConnection(address);
+        try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            long total = 0;
+            while ((read = input.read(buffer)) != -1) {
+                total += read;
+                if (total > maxBytes) throw new IllegalStateException("Runtime checksum manifest is unexpectedly large.");
+                output.write(buffer, 0, read);
+            }
+            return output.toByteArray();
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private String downloadGithubAsset(String address, File destination, PluginCall call) throws Exception {
+        HttpURLConnection connection = openTrustedGithubConnection(address);
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try {
+            long total = connection.getContentLengthLong();
+            if (total > MAX_ARCHIVE_BYTES) throw new IllegalStateException("Termux runtime archive exceeds the 512 MB download limit.");
+            long available = new StatFs(getContext().getCacheDir().getAbsolutePath()).getAvailableBytes();
+            if (total > 0 && total > available) throw new IllegalStateException("Not enough free storage to download the Termux runtime.");
+            long received = 0;
+            try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(destination)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    received += read;
+                    if (received > MAX_ARCHIVE_BYTES || received > available) {
+                        throw new IllegalStateException("Runtime download exceeded the available storage limit.");
+                    }
+                    digest.update(buffer, 0, read);
+                    output.write(buffer, 0, read);
+                    JSObject progress = new JSObject();
+                    progress.put("downloadedBytes", received);
+                    progress.put("totalBytes", total);
+                    notifyListeners("runtimeDownloadProgress", progress);
+                }
+                output.getFD().sync();
+            }
+            if (total > 0 && received != total) throw new IllegalStateException("Termux runtime download was incomplete.");
+            StringBuilder hex = new StringBuilder();
+            for (byte value : digest.digest()) hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+            return hex.toString();
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private String checksumForAsset(byte[] manifest, String assetName) {
+        String text = new String(manifest, StandardCharsets.UTF_8);
+        for (String line : text.split("\\R")) {
+            String[] fields = line.trim().split("\\s+");
+            if (fields.length >= 2 && fields[1].replaceFirst("^\\*", "").equals(assetName)
+                    && fields[0].matches("(?i)[a-f0-9]{64}")) {
+                return fields[0].toLowerCase(java.util.Locale.ROOT);
+            }
+        }
+        throw new IllegalStateException("GitHub's SHA256SUMS does not include " + assetName + ".");
+    }
+
+    @PluginMethod
+    public void downloadBootstrap(PluginCall call) {
+        installer.execute(() -> {
+            File partial = null;
+            try {
+                String abi = android.os.Build.SUPPORTED_ABIS.length == 0 ? "" : android.os.Build.SUPPORTED_ABIS[0];
+                final String assetName;
+                if (abi.equals("arm64-v8a") || abi.equals("aarch64")) assetName = "bootstrap-aarch64.zip";
+                else if (abi.equals("x86_64")) assetName = "bootstrap-x86_64.zip";
+                else throw new IllegalStateException("No published Termux runtime matches this device architecture: " + abi);
+                byte[] manifest = readGithubAsset(BOOTSTRAP_RELEASE_BASE + "SHA256SUMS", 64 * 1024);
+                String expected = checksumForAsset(manifest, assetName);
+                File archive = new File(getContext().getCacheDir(), assetName);
+                partial = new File(getContext().getCacheDir(), assetName + ".partial");
+                if (partial.exists() && !partial.delete()) throw new IllegalStateException("Could not clear an incomplete runtime download.");
+                if (builtInRuntimeInstalled()) {
+                    // Reinstallation is allowed, but the current runtime stays intact until validation succeeds.
+                }
+                String actual = downloadGithubAsset(BOOTSTRAP_RELEASE_BASE + assetName, partial, call);
+                if (!expected.equals(actual)) throw new IllegalStateException("Termux runtime SHA-256 verification failed; the archive was rejected.");
+                if (!partial.renameTo(archive)) throw new IllegalStateException("Could not finalize the verified runtime archive.");
+                partial = null;
+                installBootstrap(call, Uri.fromFile(archive));
+            } catch (Exception error) {
+                if (partial != null && partial.exists()) partial.delete();
+                call.reject(error.getMessage() == null ? "Could not download the official Termux runtime." : error.getMessage(), error);
+            }
+        });
+    }
+
+    private boolean builtInRuntimeInstalled() {
+        return marker().isFile();
     }
 
     @PluginMethod

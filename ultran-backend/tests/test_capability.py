@@ -17,6 +17,8 @@ def test_task_profiles_reserve_review_for_complex_and_high_impact_work():
     assert critical.tier == "critical"
     assert critical.verify_draft is True
     assert profile_task("Delete all production data").tier == "critical"
+    assert profile_task("احذف قاعدة البيانات").tier == "critical"
+    assert profile_task("حلل هذا التكامل واختبر الكود").tier == "deep"
 
 
 def test_capability_contract_does_not_change_with_the_provider():

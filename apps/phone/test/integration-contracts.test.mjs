@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, orchestrator, policyGate, ledger, runState] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, messagingService, accessibilityConfig, orchestrator, policyGate, ledger, runState] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
@@ -18,6 +18,8 @@ const [html, main, localAI, runtime, capabilityKernel, persona, companion, voice
   read("android/app/src/main/java/app/ultran/mobile/UltranVoiceService.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranTaskMonitorWorker.java"),
   read("android/app/src/main/AndroidManifest.xml"),
+  read("android/app/src/main/java/app/ultran/mobile/UltranMessagingAccessibilityService.java"),
+  read("android/app/src/main/res/xml/ultran_accessibility_service.xml"),
   read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
   read("../../services/agent-core/src/monetization/policy-gate.ts"),
   read("../../services/agent-core/src/monetization/ledger.ts"),
@@ -186,4 +188,23 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /Only one local tool call may run per turn/);
   assert.ok(html.includes('id="proactive-btn"'));
   assert.ok(html.includes('id="sms-btn"'));
+});
+
+
+test("WhatsApp sending requires one-shot explicit approval and exact editable composer match", () => {
+  assert.match(manifest, /UltranMessagingAccessibilityService/);
+  assert.match(manifest, /BIND_ACCESSIBILITY_SERVICE/);
+  assert.match(accessibilityConfig, /canRetrieveWindowContent="true"/);
+  assert.match(companion, /Approve and send WhatsApp message/);
+  assert.match(companion, /expires_at/);
+  assert.match(companion, /ACTION_ACCESSIBILITY_SETTINGS/);
+  assert.match(companion, /pending_accessibility_action/);
+  assert.match(messagingService, /com\.whatsapp/);
+  assert.match(messagingService, /node\.isEditable\(\)/);
+  assert.match(messagingService, /expected\.contentEquals\(text\)/);
+  assert.match(messagingService, /clearApproval\(prefs\)/);
+  assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);
+  assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
+  assert.match(main, /NativeCompanion\.composeWhatsApp/);
+  assert.match(main, /WhatsApp delivery status is not available/);
 });

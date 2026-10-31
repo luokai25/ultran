@@ -1,6 +1,6 @@
 package app.ultran.mobile;
 
-import android.app.Notification;
+import androidx.core.app.NotificationCompat;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -40,11 +40,12 @@ public final class UltranVoiceService extends Service {
             return START_NOT_STICKY;
         }
         pendingText = text.trim();
-        Notification notification = new Notification.Builder(this, CHANNEL)
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(getApplicationInfo().icon)
             .setContentTitle("Ultran is speaking")
             .setContentText(pendingText.length() > 90 ? pendingText.substring(0, 87) + "..." : pendingText)
             .setOngoing(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
         startForeground(4107, notification);
         if (initialized) speakNow(pendingText);
@@ -58,7 +59,7 @@ public final class UltranVoiceService extends Service {
         speech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ultran-" + System.currentTimeMillis());
         new android.os.Handler(getMainLooper()).postDelayed(() -> {
             if (speech != null && !speech.isSpeaking()) stopSelf();
-        }, Math.min(60000, Math.max(5000, text.length() * 90L)));
+        }, Math.min(180000, Math.max(5000, text.length() * 100L)));
     }
 
     private void createChannel() {

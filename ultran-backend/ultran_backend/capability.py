@@ -28,7 +28,7 @@ _CRITICAL = re.compile(
 _DEEP = re.compile(
     r"\b(build|implement|debug|refactor|architecture|design|compare|evaluate|research|investigate|"
     r"audit|analy[sz]e|plan|roadmap|strategy|multi.?step|step.?by.?step|agent|workflow|connector|"
-    r"integration|code|program|script|test|deploy|migration|optimi[sz]e|pdf|docx|pptx|xlsx|spreadsheet|presentation|document|file)\b",
+    r"integration|code|program|script|test|deploy|migration|optimi[sz]e|pdf|docx|pptx|xlsx|spreadsheet|presentation|document|file|zip|archive|compress|extract|python|javascript|typescript|java|kotlin|golang|rust|shell|sql)\b",
     re.IGNORECASE,
 )
 _ARABIC_CRITICAL = re.compile(r"(?:طبي|دواء|جرعة|قانوني|مالي|استثمار|احذف|حذف|امسح|تدمير|بيانات شخصية|قاعدة البيانات)", re.IGNORECASE)

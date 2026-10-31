@@ -225,6 +225,7 @@ public class UltranLocalAiPlugin extends Plugin {
             if (totalReported > MAX_MODEL_BYTES || (totalReported > 0 && totalReported > availableAtStart)) {
                 throw new IllegalStateException("The complete model set exceeds Ultran's safety limit or available device storage.");
             }
+            long totalCopied = 0;
             for (SelectedShard shard : shards) {
                 File destination = new File(directory, shard.name);
                 if (destination.exists()) throw new IllegalStateException("A shard named " + shard.name + " already exists. Delete or rename the old set before importing a replacement.");
@@ -240,7 +241,8 @@ public class UltranLocalAiPlugin extends Plugin {
                     int read;
                     while ((read = input.read(buffer)) != -1) {
                         copied += read;
-                        if (copied > MAX_MODEL_BYTES || copied > availableAtStart) throw new IllegalStateException("The model set exceeded available storage while copying.");
+                        totalCopied += read;
+                        if (totalCopied > MAX_MODEL_BYTES || totalCopied > availableAtStart) throw new IllegalStateException("The model set exceeded available storage while copying.");
                         output.write(buffer, 0, read);
                         JSObject progress = new JSObject();
                         progress.put("name", shard.name);

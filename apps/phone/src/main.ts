@@ -33,6 +33,8 @@ type Conversation = {
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
 type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; termuxBridgeEndpoint: string; voice: boolean; theme: ThemeId };
 type NativeModel = { name: string; sizeBytes: number; loaded: boolean };
+type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[] };
+type HubFile = { rfilename: string; size?: number; lfs?: { oid?: string; size?: number } };
 type NativeLocalAIPlugin = {
   getStatus(): Promise<{ supported: boolean; loaded: boolean; loadedModel: string; runtimeVersion: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
@@ -41,6 +43,7 @@ type NativeLocalAIPlugin = {
   generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string }>;
   unloadModel(): Promise<{ loaded: boolean }>;
   deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
+  downloadModel(options: { name: string; url: string; sha256?: string }): Promise<{ downloaded: boolean; name: string; sizeBytes: number }>;
   addListener(eventName: "modelImportProgress", listener: (event: { name: string; copiedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
@@ -113,6 +116,11 @@ const nativeModelStatus = req<HTMLElement>("#native-model-status");
 const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
 const nativeModelUnloadButton = req<HTMLButtonElement>("#native-model-unload-btn");
 const nativeModelDeleteButton = req<HTMLButtonElement>("#native-model-delete-btn");
+const modelSearchForm = req<HTMLFormElement>("#model-search-form");
+const modelSearchInput = req<HTMLInputElement>("#model-search");
+const modelLibraryStatus = req<HTMLElement>("#model-library-status");
+const modelLibraryResults = req<HTMLElement>("#model-library-results");
+let modelDownloadInProgress = false;
 const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
 const termuxBridgeEndpointEl = req<HTMLInputElement>("#termux-bridge-endpoint");
 const termuxBridgeTokenEl = req<HTMLInputElement>("#termux-bridge-token");
@@ -189,7 +197,10 @@ async function refreshNativeModels(): Promise<void> {
     if (!nativeProgressListenerReady) {
       await NativeLocalAI.addListener("modelImportProgress", (event) => {
         const total = event.totalBytes > 0 ? " / " + formatBytes(event.totalBytes) : "";
-        nativeModelStatus.textContent = "Importing " + event.name + " · " + formatBytes(event.copiedBytes) + total;
+        nativeModelStatus.textContent = (modelDownloadInProgress ? "Downloading " : "Importing ") + event.name + " · " + formatBytes(event.copiedBytes) + total;
+        if (modelDownloadInProgress && event.totalBytes > 0) {
+          modelLibraryStatus.textContent = "Downloading " + event.name + " · " + Math.min(100, Math.round(event.copiedBytes / event.totalBytes * 100)) + "% · " + formatBytes(event.copiedBytes) + " of " + formatBytes(event.totalBytes);
+        }
       });
       nativeProgressListenerReady = true;
     }

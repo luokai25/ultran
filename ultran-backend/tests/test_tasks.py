@@ -210,3 +210,35 @@ def test_task_api_accepts_existing_agent_session(client):
     invalid = client.post("/v1/tasks", json={"agent_id": agent["id"], "message": "wrong session",
         "session_id": "ss_not_this_agent"}, headers=headers)
     assert invalid.status_code in {400, 404}
+
+
+def test_batch_dispatches_distinct_agents_in_parallel_and_is_workspace_scoped(client):
+    agents = [client.post("/v1/agents", json={"name": f"Team agent {index}"}).json() for index in range(2)]
+    headers = {"X-Ultran-Workspace": "team-workspace"}
+    response = client.post("/v1/tasks/batch", headers=headers, json={"tasks": [
+        {"agent_id": agents[0]["id"], "message": "Analyze the architecture", "allow_tools": False},
+        {"agent_id": agents[1]["id"], "message": "Review the security risks", "allow_tools": False},
+    ]})
+    assert response.status_code == 202, response.text
+    tasks = response.json()
+    assert len(tasks) == 2
+    assert {task["agent_id"] for task in tasks} == {agent["id"] for agent in agents}
+    assert len({task["id"] for task in tasks}) == 2
+    assert client.get("/v1/tasks", headers={"X-Ultran-Workspace": "other-workspace"}).json() == []
+
+
+def test_batch_validates_roster_before_dispatch(client):
+    agent = client.post("/v1/agents", json={"name": "Batch validation agent"}).json()
+    headers = {"X-Ultran-Workspace": "team-validation"}
+    invalid = client.post("/v1/tasks/batch", headers=headers, json={"tasks": [
+        {"agent_id": agent["id"], "message": "valid"},
+        {"agent_id": "agent-does-not-exist", "message": "invalid"},
+    ]})
+    assert invalid.status_code == 404
+    assert client.get("/v1/tasks", headers=headers).json() == []
+    duplicate = client.post("/v1/tasks/batch", headers=headers, json={"tasks": [
+        {"agent_id": agent["id"], "message": "first"},
+        {"agent_id": agent["id"], "message": "second"},
+    ]})
+    assert duplicate.status_code == 422
+    assert client.get("/v1/tasks", headers=headers).json() == []

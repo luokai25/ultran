@@ -39,9 +39,9 @@ def composio_connections(container: ContainerDep, workspace: WorkspaceDep):
 
 
 @router.delete("/composio/connections/{connected_account_id}", status_code=status.HTTP_204_NO_CONTENT)
-def composio_revoke(connected_account_id: str, container: ContainerDep):
+def composio_revoke(connected_account_id: str, container: ContainerDep, workspace: WorkspaceDep):
     """Revoke an account by its Composio ID."""
-    container.composio.revoke(connected_account_id)
+    container.composio.revoke(workspace, connected_account_id)
     return None
 
 @router.get("/stats")

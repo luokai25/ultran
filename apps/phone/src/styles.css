@@ -1462,3 +1462,12 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .mic-toggle[data-active="true"] { animation: none; }
 }
+
+
+/* Proactive controls use the same calm gold state as the assistant voice. */
+#proactive-btn[aria-pressed="true"] {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+#sms-btn { color: var(--ink-soft); }

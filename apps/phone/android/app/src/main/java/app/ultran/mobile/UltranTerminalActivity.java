@@ -18,6 +18,8 @@ import com.termux.view.TerminalView;
 import com.termux.view.TerminalViewClient;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Native terminal UI powered by the vendored upstream Termux terminal libraries. */
 public final class UltranTerminalActivity extends Activity {
@@ -43,20 +45,24 @@ public final class UltranTerminalActivity extends Activity {
         setContentView(terminalView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        String[] env = new String[] {
-            "HOME=" + home.getAbsolutePath(),
-            "TMPDIR=" + temp.getAbsolutePath(),
-            "PREFIX=" + prefix.getAbsolutePath(),
-            "TERMUX_PREFIX=" + prefix.getAbsolutePath(),
-            "TERMUX__PREFIX=" + prefix.getAbsolutePath(),
-            "TERMUX_APP__PACKAGE_NAME=" + getPackageName(),
-            "TERMUX__ROOTFS=" + runtime.getAbsolutePath(),
-            "PATH=" + new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin",
-            "LD_LIBRARY_PATH=" + new File(prefix, "lib").getAbsolutePath(),
-            "SHELL=/system/bin/sh",
-            "TERM=xterm-256color",
-            "LANG=C.UTF-8"
-        };
+        Map<String, String> environment = new HashMap<>(System.getenv());
+        environment.put("HOME", home.getAbsolutePath());
+        environment.put("TMPDIR", temp.getAbsolutePath());
+        environment.put("PREFIX", prefix.getAbsolutePath());
+        environment.put("TERMUX_PREFIX", prefix.getAbsolutePath());
+        environment.put("TERMUX__PREFIX", prefix.getAbsolutePath());
+        environment.put("TERMUX_APP__PACKAGE_NAME", getPackageName());
+        environment.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
+        environment.put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
+        environment.put("LD_LIBRARY_PATH", new File(prefix, "lib").getAbsolutePath());
+        environment.put("SHELL", "/system/bin/sh");
+        environment.put("TERM", "xterm-256color");
+        environment.put("LANG", "C.UTF-8");
+        String[] env = new String[environment.size()];
+        int envIndex = 0;
+        for (Map.Entry<String, String> entry : environment.entrySet()) {
+            env[envIndex++] = entry.getKey() + "=" + entry.getValue();
+        }
         session = new TerminalSession("/system/bin/sh", runtime.getAbsolutePath(),
             new String[] {"-i"}, env, 2000, new SessionClient());
         terminalView.attachSession(session);

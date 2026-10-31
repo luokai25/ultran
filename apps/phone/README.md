@@ -64,9 +64,10 @@ cd apps/phone/android && ./gradlew assembleRelease
 - The Android build bundles the CPU inference runtime from llama.cpp at a
   pinned upstream commit. GGUF weights are kept outside the APK in private
   app storage. The native loader uses llama.cpp's file-backed `MMAP` load mode
-  and automatic lazy tensor mode, allowing the OS to page model weights from
-  storage instead of requiring the entire checkpoint to be resident in
-  anonymous RAM. The context cache remains resident and is reduced adaptively
+  and lazy tensor mode. Models larger than current free RAM enable llama.cpp's
+  aggressive on-demand tensor-row reads; smaller models use automatic lazy
+  reads. This lets the OS page model weights from storage instead of requiring
+  the entire checkpoint to be resident in anonymous RAM. The context cache remains resident and is reduced adaptively
   (512, 1,024, or 2,048 tokens) according to available memory; prompt batches
   are capped at 64 to reduce transient memory. This is a mobile adaptation of
   the low-residency ideas studied in AirLLM, not a bundled copy of its

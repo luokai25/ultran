@@ -31,7 +31,7 @@ public final class UltranCommandWorker extends Worker {
     public static final String KEY_TIMED_OUT = "timedOut";
     public static final String KEY_ERROR = "error";
     private static final int MAX_OUTPUT_BYTES = 6 * 1024;
-    private static final long MAX_RUNTIME_MS = TimeUnit.MINUTES.toMillis(4);
+    private static final long MAX_RUNTIME_MS = TimeUnit.MINUTES.toMillis(9);
 
     public UltranCommandWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -172,7 +172,7 @@ public final class UltranCommandWorker extends Worker {
             String text;
             synchronized (output) { text = output.toString("UTF-8"); }
             if (truncated.get()) text += "\n[Output truncated at 6 KiB.]";
-            if (timedOut) text += "\n[Command stopped after the 4-minute execution limit.]";
+            if (timedOut) text += "\n[Command stopped after the 9-minute execution limit.]";
             int exitCode = timedOut ? -1 : process.exitValue();
             Data result = new Data.Builder()
                 .putString(KEY_OUTPUT, text)

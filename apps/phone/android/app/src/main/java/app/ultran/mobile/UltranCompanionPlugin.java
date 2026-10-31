@@ -129,14 +129,16 @@ public final class UltranCompanionPlugin extends Plugin {
             .setTitle("Approve and send WhatsApp message")
             .setMessage("Recipient: +" + number + "\n\nMessage:\n" + body + "\n\nAfter approval, Ultran opens WhatsApp and taps Send once only if the editable composer contains this exact text. Approval expires in 60 seconds. WhatsApp delivery cannot be verified by Ultran.")
             .setPositiveButton("Approve and send", (dialog, which) -> {
-                getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE)
-                    .edit().putString("approved_text", body)
-                    .putLong("expires_at", System.currentTimeMillis() + 60000L).apply();
                 try {
                     String url = "https://wa.me/" + number + "?text=" + Uri.encode(body);
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     intent.setPackage("com.whatsapp");
                     getActivity().startActivity(intent);
+                    // Arm only after handing the deep link to WhatsApp, so an already
+                    // open conversation cannot consume a fresh approval before navigation.
+                    getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE)
+                        .edit().putString("approved_text", body)
+                        .putLong("expires_at", System.currentTimeMillis() + 60000L).apply();
                     call.resolve(new JSObject().put("opened", true).put("approved", true).put("sent", "pending_accessibility_action"));
                 } catch (Exception error) {
                     getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE).edit().clear().apply();

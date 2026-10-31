@@ -132,14 +132,16 @@ function parseToolCall(value: string): PlannedToolCall {
 
 function validateSchemaValue(schema: Record<string, unknown>, value: unknown, path: string, errors: string[]): void {
   const type = schema.type;
-  const valid = type === undefined
-    || type === 'string' && typeof value === 'string'
-    || type === 'boolean' && typeof value === 'boolean'
-    || type === 'number' && typeof value === 'number' && Number.isFinite(value)
-    || type === 'integer' && typeof value === 'number' && Number.isInteger(value)
-    || type === 'array' && Array.isArray(value)
-    || type === 'object' && !!value && typeof value === 'object' && !Array.isArray(value)
-    || type === 'null' && value === null;
+  const types = Array.isArray(type) ? type : [type];
+  const valid = type === undefined || types.some((candidate) =>
+    candidate === 'string' && typeof value === 'string'
+    || candidate === 'boolean' && typeof value === 'boolean'
+    || candidate === 'number' && typeof value === 'number' && Number.isFinite(value)
+    || candidate === 'integer' && typeof value === 'number' && Number.isInteger(value)
+    || candidate === 'array' && Array.isArray(value)
+    || candidate === 'object' && !!value && typeof value === 'object' && !Array.isArray(value)
+    || candidate === 'null' && value === null
+  );
   if (!valid) {
     errors.push(`${path} must be ${String(type)}`);
     return;

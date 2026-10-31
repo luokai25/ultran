@@ -22,12 +22,10 @@ try:
 except ImportError:  # pragma: no cover - CI installs Pillow explicitly
     sys.exit("Pillow is required: pip install pillow")
 
-VOID = (5, 5, 5)
+VOID = (7, 8, 9)
 OBSIDIAN = (11, 13, 15)
-CARBON = (19, 19, 23)
-GOLD = (212, 175, 55)
-GOLD_BRIGHT = (245, 215, 110)
-GOLD_DEEP = (138, 109, 31)
+GOLD = (205, 169, 77)
+GOLD_BRIGHT = (240, 213, 138)
 
 RES = "app/src/main/res"
 
@@ -48,45 +46,79 @@ SPLASHES = {
 }
 
 # ---------------------------------------------------------------------------
-# Ultran's new monogram: a precise gold shield with a bright U glyph.
-# Geometry is shared with apps/phone/src/mark.ts.
+# Ultran's orbital U mark. Geometry mirrors apps/phone/src/mark.ts.
 # ---------------------------------------------------------------------------
 
-Poly = list[tuple[float, float]]
 VIEWPORT = 108.0
-
-SHELL: Poly = [(54,14),(83,29),(83,70),(54,94),(25,70),(25,29)]
-INNER: Poly = [(54,24),(73,35),(73,65),(54,81),(35,65),(35,35)]
-MONOGRAM: Poly = [(39,38),(48,38),(48,58),(51,63),(57,63),(60,58),(60,38),(69,38),(69,60),(63,71),(45,71),(39,60)]
-CREST: Poly = [(54,23),(60,31),(54,35),(48,31)]
-
-LAYERS: list[tuple[Poly, tuple[int, int, int]]] = [
-    (SHELL, GOLD),
-    (INNER, OBSIDIAN),
-    (MONOGRAM, GOLD_BRIGHT),
-    (CREST, GOLD_BRIGHT),
-]
+ORBIT_CENTER = (54.0, 54.0)
+ORBIT_RADIUS = 37.0
+ORBIT_STROKE = 5.0
+U_START = (34.0, 34.0)
+U_LEFT_BOTTOM = (34.0, 55.0)
+U_CURVE = ((34.0, 82.0), (74.0, 82.0), (74.0, 55.0))
+U_END = (74.0, 34.0)
+U_STROKE = 9.0
+CREST: Poly = [(54, 23), (60, 30), (54, 37), (48, 30)]
+NODE_CENTER = (81.0, 35.0)
+NODE_RADIUS = 3.0
 
 SS = 4  # supersampling factor for clean launcher artwork
 
-def _hex(rgb: tuple[int, int, int]) -> str:
-    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+def _scaled_point(point: tuple[float, float], scale: float, ox: float, oy: float) -> tuple[float, float]:
+    return ox + point[0] * scale, oy + point[1] * scale
 
 
-def _scaled(poly: Poly, scale: float, ox: float, oy: float) -> list[tuple[float, float]]:
-    return [(ox + x * scale, oy + y * scale) for x, y in poly]
+def _cubic_points(
+    start: tuple[float, float],
+    control1: tuple[float, float],
+    control2: tuple[float, float],
+    end: tuple[float, float],
+    steps: int = 32,
+) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for index in range(steps + 1):
+        t = index / steps
+        inverse = 1 - t
+        x = inverse**3 * start[0] + 3 * inverse**2 * t * control1[0] + 3 * inverse * t**2 * control2[0] + t**3 * end[0]
+        y = inverse**3 * start[1] + 3 * inverse**2 * t * control1[1] + 3 * inverse * t**2 * control2[1] + t**3 * end[1]
+        points.append((x, y))
+    return points
 
 
 def draw_mark(img: Image.Image, size: float, ox: float, oy: float) -> None:
-    """Draw the helm into ``img`` so the 108-unit viewport maps to ``size`` px."""
+    """Draw the orbital U into ``img`` using the same paths as the inline SVG."""
     draw = ImageDraw.Draw(img)
     scale = size / VIEWPORT
-    for poly, colour in LAYERS:
-        draw.polygon(_scaled(poly, scale, ox, oy), fill=colour)
+    cx, cy = _scaled_point(ORBIT_CENTER, scale, ox, oy)
+    radius = ORBIT_RADIUS * scale
+    draw.ellipse(
+        (cx - radius, cy - radius, cx + radius, cy + radius),
+        outline=GOLD,
+        width=max(1, round(ORBIT_STROKE * scale)),
+    )
+
+    curve = _cubic_points(U_LEFT_BOTTOM, *U_CURVE)
+    u_path = [U_START, U_LEFT_BOTTOM, *curve[1:], U_END]
+    stroke = max(1, round(U_STROKE * scale))
+    draw.line(
+        [_scaled_point(point, scale, ox, oy) for point in u_path],
+        fill=GOLD_BRIGHT,
+        width=stroke,
+        joint="curve",
+    )
+    cap_radius = stroke / 2
+    for point in (U_START, U_END):
+        px, py = _scaled_point(point, scale, ox, oy)
+        draw.ellipse((px - cap_radius, py - cap_radius, px + cap_radius, py + cap_radius), fill=GOLD_BRIGHT)
+    draw.polygon([_scaled_point(point, scale, ox, oy) for point in CREST], fill=GOLD_BRIGHT)
+    nx, ny = _scaled_point(NODE_CENTER, scale, ox, oy)
+    node_radius = NODE_RADIUS * scale
+    draw.ellipse((nx - node_radius, ny - node_radius, nx + node_radius, ny + node_radius), fill=GOLD_BRIGHT)
 
 
 def mark(size: int, background: tuple[int, int, int], fill_ratio: float = 1.0) -> Image.Image:
-    """The helm on a dark field. ``fill_ratio`` scales the 108-unit viewport."""
+    """The orbital U on a dark field. ``fill_ratio`` scales the 108-unit viewport."""
     big = size * SS
     img = Image.new("RGB", (big, big), background)
     viewport = big * fill_ratio
@@ -95,25 +127,27 @@ def mark(size: int, background: tuple[int, int, int], fill_ratio: float = 1.0) -
 
 
 def vector_drawable() -> str:
-    """The adaptive-icon foreground, emitted from the same polygons."""
-    paths = []
-    for poly, colour in LAYERS:
-        if colour == OBSIDIAN:
-            # Obsidian is the icon background; as a vector layer it is a cut-out.
-            colour = OBSIDIAN
-        data = "M" + " L".join(f"{x:g},{y:g}" for x, y in poly) + " Z"
-        paths.append(
-            f'    <path android:fillColor="{_hex(colour)}"\n        android:pathData="{data}" />'
-        )
-    body = "\n".join(paths)
-    return (
-        '<?xml version="1.0" encoding="utf-8"?>\n'
-        "<!-- GENERATED by tools/generate_assets.py - edit the polygons there. -->\n"
-        '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
-        '    android:width="108dp"\n    android:height="108dp"\n'
-        '    android:viewportWidth="108"\n    android:viewportHeight="108">\n'
-        f"{body}\n</vector>\n"
-    )
+    """Adaptive-icon foreground matching the inline SVG orbital U paths."""
+    return """<?xml version="1.0" encoding="utf-8"?>
+<!-- GENERATED by tools/generate_assets.py - edit the paths there. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#00000000"
+        android:strokeColor="#CDA94D" android:strokeWidth="5"
+        android:pathData="M54,17 C74.435,17 91,33.565 91,54 C91,74.435 74.435,91 54,91 C33.565,91 17,74.435 17,54 C17,33.565 33.565,17 54,17 Z" />
+    <path android:fillColor="#00000000"
+        android:strokeColor="#F0D58A" android:strokeWidth="9"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M34,34 L34,55 C34,82 74,82 74,55 L74,34" />
+    <path android:fillColor="#F0D58A"
+        android:pathData="M54,23 L60,30 L54,37 L48,30 Z" />
+    <path android:fillColor="#F0D58A"
+        android:pathData="M81,32 C82.657,32 84,33.343 84,35 C84,36.657 82.657,38 81,38 C79.343,38 78,36.657 78,35 C78,33.343 79.343,32 81,32 Z" />
+</vector>
+"""
 
 
 def splash(width: int, height: int) -> Image.Image:
@@ -132,7 +166,7 @@ def splash(width: int, height: int) -> Image.Image:
         )
         draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=shade)
 
-    # Draw the helm directly on the glow (supersampled), not as a pasted tile,
+    # Draw the orbital U directly on the glow (supersampled), not as a pasted tile,
     # so no square edge shows against the gradient.
     side = min(width, height) * 0.46
     big = img.resize((width * 2, height * 2), Image.LANCZOS)

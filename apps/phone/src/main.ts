@@ -51,7 +51,7 @@ type NativeLocalAIPlugin = {
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
-const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
+const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
@@ -792,6 +792,9 @@ async function enableProactiveUpdates(): Promise<void> {
   saveSettings();
   if (settings.proactiveUpdates) {
     taskStatusSnapshot.clear();
+    if (Capacitor.getPlatform() === "android" && baseUrl()) {
+      try { await NativeCompanion.startTaskMonitor({endpoint: baseUrl()}); } catch (error) { console.warn("Background task monitor unavailable", error); }
+    }
     if (baseUrl()) {
       try { const response = await api("/v1/tasks?limit=100"); if (response.ok) for (const task of await response.json() as WorkspaceTask[]) taskStatusSnapshot.set(task.id, task.status); } catch { /* next poll will initialize */ }
     }
@@ -801,6 +804,7 @@ async function enableProactiveUpdates(): Promise<void> {
     }, 30000);
     voiceStatus("Proactive updates enabled. Ultran will announce task completions and failures while the app is active.");
   } else {
+    if (Capacitor.getPlatform() === "android") { try { await NativeCompanion.stopTaskMonitor(); } catch { /* already stopped */ } }
     voiceStatus("Proactive task updates paused.");
   }
 }
@@ -2142,6 +2146,7 @@ composer.addEventListener("submit", (event) => {
 voiceBtn.setAttribute("aria-pressed", String(settings.voice));
 if (settings.proactiveUpdates) {
   proactiveBtn.setAttribute("aria-pressed", "true");
+  if (Capacitor.getPlatform() === "android" && baseUrl()) void NativeCompanion.startTaskMonitor({endpoint:baseUrl()}).catch(() => undefined);
   proactiveBtn.dataset.active = "true";
   proactivePoll = window.setInterval(() => { if (settings.proactiveUpdates && baseUrl()) void refreshWorkspace().catch(() => undefined); }, 30000);
 }

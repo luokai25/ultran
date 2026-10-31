@@ -2113,14 +2113,18 @@ runtimeDownloadButton?.addEventListener("click", async () => {
     if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Direct runtime installation is available in the Android APK, not the web preview.";
     return;
   }
+  runtimeDownloadButton.setAttribute("disabled", "true");
+  runtimeInstallButton?.setAttribute("disabled", "true");
   try {
     const current = await NativeRuntime.getStatus();
-    if (current.installed && !window.confirm("A Termux runtime is already installed. Download and verify a fresh copy before replacing it?")) return;
+    if (current.installed && !window.confirm("A Termux runtime is already installed. Download and verify a fresh copy before replacing it?")) {
+      runtimeDownloadButton.removeAttribute("disabled");
+      runtimeInstallButton?.removeAttribute("disabled");
+      return;
+    }
   } catch {
     // Continue; the native installer will validate device architecture and the archive.
   }
-  runtimeDownloadButton.setAttribute("disabled", "true");
-  runtimeInstallButton?.setAttribute("disabled", "true");
   if (runtimeDownloadProgress) { runtimeDownloadProgress.hidden = false; runtimeDownloadProgress.max = 100; runtimeDownloadProgress.value = 0; }
   if (builtInTerminalStatus) builtInTerminalStatus.textContent = "Fetching the official runtime checksum manifest…";
   try {

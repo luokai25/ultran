@@ -222,7 +222,11 @@ export function initConnectors(deps: Deps): void {
       const status = await deps.api("/v1/connectors/composio/status", {}, 8_000);
       if (!status.ok) return;
       const configured = (await status.json()) as { configured?: boolean };
-      if (!configured.configured) return;
+      if (configured.configured !== true) {
+        statusEl.textContent = "Composio is not configured on the backend. Set ULTRAN_COMPOSIO_API_KEY in the private server .env, then restart the API. Never add this key to the APK.";
+        statusEl.dataset.tone = "warn";
+        return;
+      }
       const response = await deps.api("/v1/connectors/composio/connections", {}, 12_000);
       if (!response.ok) return;
       const body = (await response.json()) as { connections?: Array<{ toolkit?: string; status?: string }> };

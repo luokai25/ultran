@@ -64,13 +64,14 @@ public final class UltranCompanionPlugin extends Plugin {
     @PluginMethod
     public void startTaskMonitor(PluginCall call) {
         String endpoint = call.getString("endpoint", "").trim().replaceAll("/+$", "");
+        boolean speakUpdates = call.getBoolean("speakUpdates", false);
         android.net.Uri uri = android.net.Uri.parse(endpoint);
         if (endpoint.isEmpty() || uri.getHost() == null || !("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))) {
             call.reject("Configure a valid HTTP or HTTPS backend URL first.");
             return;
         }
         try {
-            UltranTaskMonitorWorker.schedule(getContext(), endpoint);
+            UltranTaskMonitorWorker.schedule(getContext(), endpoint, speakUpdates);
             call.resolve(new JSObject().put("scheduled", true).put("minimumIntervalMinutes", 15));
         } catch (Exception error) {
             call.reject("Could not schedule background task monitoring.", error);

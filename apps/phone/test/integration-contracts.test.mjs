@@ -221,6 +221,8 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(main, /navAgentsButton\.addEventListener/);
   assert.match(main, /navConnectorsButton\.addEventListener/);
   assert.match(main, /navSettingsButton\.addEventListener/);
+  assert.match(main, /#settings-close-btn/);
+  assert.match(html, /id="settings-close-btn"/);
   assert.match(experience, /\.bottom-nav/);
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);

@@ -278,7 +278,7 @@ export function initConnectors(deps: Deps): void {
     let keyInput: HTMLInputElement | null = null;
     if (entry.auth !== "none" && entry.auth !== "oauth2") {
       const field = el("label", "field");
-      field.append(el("span", undefined, AUTH_LABEL[entry.auth] === "Webhook URL" ? "Webhook URL" : entry.auth === "oauth2" ? "Access token" : "API key"));
+      field.append(el("span", undefined, entry.auth === "webhook" ? "Webhook URL" : "API key"));
       keyInput = el("input");
       keyInput.type = "password";
       keyInput.autocomplete = "off";
@@ -355,7 +355,7 @@ export function initConnectors(deps: Deps): void {
       });
       buttons.append(refresh);
     }
-    if (on && entry.auth !== "none") {
+    if (on && entry.auth !== "none" && entry.auth !== "oauth2") {
       const off = el("button", "ghost danger", "Disable");
       off.type = "button";
       off.disabled = !canAct;

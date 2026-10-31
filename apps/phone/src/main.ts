@@ -537,7 +537,7 @@ async function loadNativeModel(): Promise<void> {
   try {
     const result = await NativeLocalAI.loadModel({ name });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "aggressive low-memory paging" : "automatic lazy paging") + " · CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {
@@ -554,7 +554,7 @@ async function runNativeModelBenchmark(): Promise<void> {
     const result = await NativeLocalAI.runBenchmark();
     const speed = Number.isFinite(result.tokensPerSecond) ? result.tokensPerSecond.toFixed(2) : "0.00";
     const pss = formatBytes(Math.max(0, result.processPssKb) * 1024);
-    const mode = result.largeModelMode ? "aggressive paging" : "automatic paging";
+    const mode = result.largeModelMode ? "large-model memory policy" : "automatic memory policy";
     nativeModelStatus.textContent = "Benchmark complete · " + result.model + " · " + speed + " generated tokens/sec · " + result.generatedTokens + " tokens · prompt " + Math.round(result.promptMs) + " ms · process PSS " + pss + " · " + mode + ".";
     deviceProfileEl.textContent = "Measured on this device in the current session. Results vary with temperature, background apps, storage cache, and model quantization.";
   } catch (error) {

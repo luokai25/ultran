@@ -94,6 +94,7 @@ public final class UltranCommandWorker extends Worker {
             String shell = bash.getAbsolutePath();
             ProcessBuilder builder = new ProcessBuilder(shell, "--login", "-c", command);
             builder.directory(home);
+            builder.redirectInput(new File("/dev/null"));
             builder.redirectErrorStream(true);
             Map<String, String> env = builder.environment();
             env.put("HOME", home.getAbsolutePath());

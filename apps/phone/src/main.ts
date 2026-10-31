@@ -1837,6 +1837,7 @@ function openSheet(): void {
   setNote("Optional backend for hosted agents and remote connectors. Native GGUF inference runs directly on this Android device.");
   sheetWrap.hidden = false;
   void refreshNativeModels();
+  if (!modelLibraryResults.childElementCount) void searchHubModels("");
 }
 
 function closeSheet(): void {

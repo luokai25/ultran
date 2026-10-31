@@ -259,7 +259,15 @@ export class Orchestrator {
       }
 
       const tools = this.opts.registry.listTools().filter((tool) => step.candidates.includes(tool.id));
-      const call = await this.selectTool(state, step, tools, outcomes, decision === 'degrade');
+      let call: PlannedToolCall;
+      try {
+        call = await this.selectTool(state, step, tools, outcomes, decision === 'degrade');
+      } catch (error) {
+        const reason = 'tool selection failed after bounded retries: ' + (error instanceof Error ? error.message : String(error));
+        outcomes.push({ stepId: step.id, description: step.description, ok: false, result: reason });
+        this.append(state, { type: 'step.failed', runId: state.runId, stepId: step.id, reason, at: Date.now() });
+        continue;
+      }
       const tool = tools.find((item) => item.id === call.toolId);
       if (!tool) {
         const reason = 'brain selected a tool outside the step allow-list';

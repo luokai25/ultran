@@ -38,6 +38,26 @@ python -m pytest -q
 Provider connection tests use mocked HTTP clients. They verify adapter behavior
 without claiming that real provider accounts or API keys have been exercised.
 
+## Brain-independent capability layer
+
+Every agent turn receives the same Ultran capability contract, regardless of
+whether the active brain is Echo, Ollama, an OpenAI-compatible local runtime, or
+a configured hosted provider. The contract keeps tool permissions, truthfulness,
+untrusted-output handling, task decomposition, and delivery standards outside
+the model itself.
+
+Tasks are classified into quick, standard, deep, and critical modes. The runtime
+uses bounded recent history and memory, lowers sampling temperature for complex
+work, and performs an independent review pass for deep or high-impact tasks
+when the first response came from a language model. If review fails, Ultran
+keeps the usable first answer. The deterministic Echo fallback is not run
+through a second review pass because it is not a generative language model.
+
+This does not make every model equally intelligent. It gives each model the
+same execution scaffolding and safety contract, while the selected model still
+sets the ceiling for raw reasoning and knowledge. Real connector access, approval
+checks, and sandbox rules remain enforced by the existing tool runtime.
+
 ## Composio connections (optional)
 
 Ultran can use Composio's hosted OAuth and MCP gateway for cloud services. Composio

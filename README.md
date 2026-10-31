@@ -115,19 +115,25 @@ pnpm format       # prettier
 ### Connect a local model
 
 The Android build is configured to bundle the CPU inference runtime from
-llama.cpp at a pinned upstream commit. In the app, open Settings → On-device AI
-model and import a single-file GGUF model from device storage. Ultran copies it into
-private app storage; model weights are not bundled in the APK and are not
-downloaded automatically. The initial runtime targets arm64-v8a and
-x86_64, uses a 2,048-token context and up to four CPU threads, and is intended
-to start with 1B–3B Q4 quantized models. Larger models can be slow or exceed
-available RAM. This first native runtime is CPU-only; GPU acceleration and
-streamed native token callbacks remain future optimizations.
+llama.cpp at a pinned upstream commit. In Settings → On-device AI model, users
+can import a GGUF file from storage or search the live Hugging Face catalog,
+inspect repository files, and download GGUF weights directly into private app
+storage. Downloads are restricted to HTTPS Hugging Face URLs, checked against
+the GGUF header, checked against the repository's SHA-256 file digest when
+available, limited to 8 GB, and written through a temporary file before
+activation. Model weights are not bundled in the APK. The initial runtime
+targets arm64-v8a and x86_64, uses a 2,048-token context and up to four CPU
+threads, and is intended to start with 1B–3B Q4 quantized models. Larger models
+can be slow or exceed available RAM. This first native runtime is CPU-only;
+GPU acceleration and streamed native token callbacks remain future optimizations.
 
-A local Ollama-compatible runtime is still supported as an optional bridge.
-Configure its localhost or private-LAN address and installed model in Settings
-→ Local model endpoint. Inference goes directly from the app to that runtime,
-not through the Ultran backend.
+A local Ollama-compatible runtime is also supported as an optional bridge.
+Configure its localhost or private-LAN address in Settings → Local model
+endpoint. The app can list installed Ollama models and request a model pull by
+name, then use that model directly through the configured endpoint. Inference
+goes directly from the app to that runtime, not through the Ultran backend.
+The Ollama host must allow the app origin through its CORS configuration, and
+the endpoint should remain on localhost or a trusted private network.
 
 For hosted agents, Composio and shared workspaces, the optional Python control
 plane can still run separately. Set ULTRAN_BRAIN_BACKEND=ollama and

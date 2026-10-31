@@ -94,6 +94,9 @@ test("conversation context is budgeted and task complexity adjusts inference", (
   assert.match(capabilityKernel, /tier: "deep"/);
   assert.match(main, /budgetConversation\(convo\.messages, profile\.contextMessages, 3800, 1800\)/);
   assert.match(main, /profile\.contextTokens \* 2/);
+  assert.match(main, /function boundToolResult/);
+  assert.match(main, /maxTokens: Math\.min\(profile\.maxTokens, 384\)/);
+  assert.match(main, /boundToolResult\(toolResult, 2400\)/);
 });
 
 test("agent-core uses one brain-independent plan-act-reflect loop with bounded model retries", () => {

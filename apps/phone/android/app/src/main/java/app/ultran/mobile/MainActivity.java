@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(UltranLocalAiPlugin.class);
         registerPlugin(UltranTerminalPlugin.class);
         registerPlugin(UltranRuntimePlugin.class);
+        registerPlugin(UltranCompanionPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -145,8 +145,20 @@
           <input id="endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://192.168.1.20:8080" />
           <small id="endpoint-note">Only needed for hosted agents, Composio and remote connector orchestration. Leave empty for local-only use.</small>
         </label>
+        <section class="field native-model-manager" aria-labelledby="native-model-heading">
+          <span id="native-model-heading">On-device AI model</span>
+          <small>Runs llama.cpp inside the Android app. Import a GGUF file once; it is copied into private app storage and works offline. Start with a small 1B–3B Q4 model on phones.</small>
+          <select id="native-model-select" aria-label="Installed GGUF models"></select>
+          <p id="native-model-status" class="native-model-status" role="status">Checking native model runtime…</p>
+          <div class="sheet-actions native-model-actions">
+            <button id="native-model-pick-btn" class="ghost" type="button">Import GGUF</button>
+            <button id="native-model-load-btn" class="ghost" type="button" disabled>Load model</button>
+            <button id="native-model-unload-btn" class="ghost" type="button" disabled>Unload</button>
+            <button id="native-model-delete-btn" class="ghost danger" type="button" disabled>Delete</button>
+          </div>
+        </section>
         <label class="field">
-          <span>Local model endpoint (Ollama)</span>
+          <span>Local model endpoint (Ollama fallback)</span>
           <input id="local-model-endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:11434" />
           <small>Inference is sent directly from Ultran to this Ollama instance, not through an Ultran server. On Android, Ollama must be running locally or on a trusted LAN host.</small>
         </label>

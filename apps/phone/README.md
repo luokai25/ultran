@@ -60,8 +60,20 @@ cd apps/phone/android && ./gradlew assembleRelease
 - `server.androidScheme: 'https'` in `capacitor.config.ts` is required. With the
   default `file://` origin the WebView applies CORS to ES-module imports and the
   app renders a blank screen.
+- The Android build is configured to bundle the CPU inference runtime from
+  llama.cpp at a pinned upstream commit. Import a single-file GGUF model through
+  Settings; Ultran copies it into private app storage. Models are not bundled in the APK
+  and are never downloaded automatically. The initial runtime targets
+  arm64-v8a and x86_64, uses a 2,048-token context and up to four CPU
+  threads, and requires the model plus context memory to fit on the device.
+  Start with a 1B–3B Q4 quantized model; larger models can be slow or fail to
+  load on phones. This first native runtime is CPU-only; GPU acceleration and
+  streamed token callbacks are later optimizations. The native source is
+  fetched at build time from ggml-org/llama.cpp tag b12020
+  (commit 0ec4027a2a0183de87c007069adddc06e665f7de). Its MIT license is
+  included under android/app/src/main/assets/licenses.
 - The app is local-first. Chats and settings are stored on the device
-  (localStorage). A local Ollama instance can be configured in Settings and
+  (localStorage). A local Ollama instance can also be configured in Settings and
   receives chat requests directly from the app (/api/chat); no Ultran backend
   is required for local-model inference. The default endpoint is blank and
   must be configured explicitly. A trusted LAN Ollama host is supported; on

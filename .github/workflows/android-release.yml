@@ -40,7 +40,7 @@ jobs:
   release:
     name: Build signed APK and publish release
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -118,7 +118,7 @@ jobs:
       - name: Install Android platform and build tools
         run: |
           set -euo pipefail
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
           yes | sdkmanager --licenses > /dev/null || true
 
       - name: Sync Capacitor
@@ -187,6 +187,13 @@ jobs:
 
           "$BT/aapt2" dump badging "$APK" | head -20
 
+          # Fail the release if Gradle silently omits the native inference
+          # runtime or one of its shared llama.cpp libraries for either ABI.
+          for ABI in arm64-v8a x86_64; do
+            unzip -l "$APK" | grep -q "lib/$ABI/libultran-llama.so"
+            unzip -l "$APK" | grep -q "lib/$ABI/libllama.so"
+          done
+
           SIZE=$(stat -c%s "$APK")
           echo "APK size: $SIZE bytes"
           if [ "$SIZE" -lt 1000000 ]; then
@@ -211,6 +218,8 @@ jobs:
             -x "android/.gradle/*" \
             -x "android/build/*" \
             -x "android/app/build/*" \
+            -x "android/app/.cxx/*" \
+            -x "android/app/.externalNativeBuild/*" \
             -x "android/local.properties" \
             -x "android/app/src/main/assets/public/*" \
             -x "android/*.keystore" \

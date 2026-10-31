@@ -1,0 +1,14 @@
+package app.ultran.mobile;
+
+final class NativeLlama {
+    static {
+        System.loadLibrary("ultran-llama");
+    }
+
+    private NativeLlama() {}
+
+    static native String nativeVersion();
+    static native String nativeLoadModel(String path);
+    static native String nativeGenerate(String[] roles, String[] contents, int maxTokens);
+    static native void nativeUnloadModel();
+}

@@ -1,15 +1,15 @@
 /**
  * Ultran phone client - a conversation console.
  *
- * Local-first: conversations live on the device and the shell works with no
- * network at all (an on-device responder answers a few things and says plainly
- * what it cannot do). When a brain endpoint is linked in Settings, turns go to
- * the Ultran control plane (`/v1/agents/{id}/chat`) and sessions are kept in
- * step with it. Nothing is sent anywhere until an endpoint is entered.
+ * Local-first: conversations live on the device. Android can run GGUF models
+ * through the bundled llama.cpp native runtime; an optional Ollama endpoint or
+ * Ultran control plane can be configured for local-network or hosted tools.
+ * Nothing is sent anywhere until the user explicitly configures a connection.
  */
 
 import * as THREE from "three";
 import { Browser } from "@capacitor/browser";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
 import { markDataUrl, markSvg } from "./mark";
 
@@ -32,6 +32,18 @@ type Conversation = {
 };
 type ThemeId = "palace" | "forge" | "vault" | "war-room";
 type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; voice: boolean; theme: ThemeId };
+type NativeModel = { name: string; sizeBytes: number; loaded: boolean };
+type NativeLocalAIPlugin = {
+  getStatus(): Promise<{ supported: boolean; loaded: boolean; loadedModel: string; runtimeVersion: string }>;
+  listModels(): Promise<{ models: NativeModel[] }>;
+  pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
+  loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string }>;
+  generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string }>;
+  unloadModel(): Promise<{ loaded: boolean }>;
+  deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
+  addListener(eventName: "modelImportProgress", listener: (event: { name: string; copiedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
+};
+const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
 type Theme = { label: string; accent: number; bright: string; fog: number };
@@ -90,6 +102,11 @@ const scrim = req<HTMLElement>("#scrim");
 const historyEl = req<HTMLElement>("#history");
 const sheetWrap = req<HTMLElement>("#sheet-wrap");
 const endpointEl = req<HTMLInputElement>("#endpoint");
+const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
+const nativeModelStatus = req<HTMLElement>("#native-model-status");
+const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
+const nativeModelUnloadButton = req<HTMLButtonElement>("#native-model-unload-btn");
+const nativeModelDeleteButton = req<HTMLButtonElement>("#native-model-delete-btn");
 const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
 const localModelEl = req<HTMLInputElement>("#local-model");
 const endpointNote = req<HTMLElement>("#endpoint-note");
@@ -131,6 +148,127 @@ const store: Store = { conversations: [], activeId: null, ...readJson<Partial<St
 if (!(settings.theme in THEMES)) settings.theme = "palace";
 
 const saveSettings = (): void => writeJson(SETTINGS_KEY, settings);
+let nativeModelLoaded = false;
+let nativeProgressListenerReady = false;
+let nativeLoadedModelName = "";
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown size";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return value.toFixed(unit > 1 ? 1 : 0) + " " + units[unit];
+}
+
+async function refreshNativeModels(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") {
+    nativeModelStatus.textContent = "Native GGUF inference is available in the Android app.";
+    nativeModelLoadButton.disabled = true;
+    nativeModelUnloadButton.disabled = true;
+    nativeModelDeleteButton.disabled = true;
+    return;
+  }
+  try {
+    if (!nativeProgressListenerReady) {
+      await NativeLocalAI.addListener("modelImportProgress", (event) => {
+        const total = event.totalBytes > 0 ? " / " + formatBytes(event.totalBytes) : "";
+        nativeModelStatus.textContent = "Importing " + event.name + " · " + formatBytes(event.copiedBytes) + total;
+      });
+      nativeProgressListenerReady = true;
+    }
+    const [status, listed] = await Promise.all([NativeLocalAI.getStatus(), NativeLocalAI.listModels()]);
+    nativeModelLoaded = status.loaded;
+    nativeLoadedModelName = status.loadedModel;
+    if (status.loaded) setLink("online", "on-device AI");
+    const selected = nativeModelSelect.value || status.loadedModel;
+    nativeModelSelect.replaceChildren();
+    for (const model of listed.models) {
+      const option = document.createElement("option");
+      option.value = model.name;
+      option.textContent = model.name + " · " + formatBytes(model.sizeBytes);
+      nativeModelSelect.appendChild(option);
+    }
+    if (selected && listed.models.some((model) => model.name === selected)) nativeModelSelect.value = selected;
+    nativeModelStatus.textContent = status.loaded
+      ? "Loaded: " + status.loadedModel + " · llama.cpp " + status.runtimeVersion + " · CPU · 2K context"
+      : listed.models.length
+        ? listed.models.length + " GGUF model(s) stored privately on this device. Load one to enable offline AI."
+        : "No models installed. Import a GGUF model from device storage. Models stay in Ultran's private app storage.";
+    nativeModelLoadButton.disabled = !nativeModelSelect.value;
+    nativeModelUnloadButton.disabled = !status.loaded;
+    nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === status.loadedModel;
+  } catch (error) {
+    nativeModelLoaded = false;
+    nativeLoadedModelName = "";
+    nativeModelStatus.textContent = "Native runtime unavailable: " + (error instanceof Error ? error.message : "unknown error");
+    nativeModelLoadButton.disabled = true;
+    nativeModelUnloadButton.disabled = true;
+    nativeModelDeleteButton.disabled = true;
+  }
+}
+
+async function importNativeModel(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  nativeModelStatus.textContent = "Choose a .gguf model. Ultran will copy it into private app storage.";
+  try {
+    const imported = await NativeLocalAI.pickModel();
+    if (imported.cancelled) return;
+    await refreshNativeModels();
+    if (imported.name) nativeModelSelect.value = imported.name;
+    nativeModelStatus.textContent = "Imported " + (imported.name || "model") + " · " + formatBytes(imported.sizeBytes || 0) + ". Load it when ready.";
+    nativeModelLoadButton.disabled = !nativeModelSelect.value;
+    nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;
+  } catch (error) {
+    nativeModelStatus.textContent = "Model import failed: " + (error instanceof Error ? error.message : "unknown error");
+  }
+}
+
+async function loadNativeModel(): Promise<void> {
+  const name = nativeModelSelect.value;
+  if (!name) return;
+  nativeModelLoadButton.disabled = true;
+  nativeModelDeleteButton.disabled = true;
+  nativeModelUnloadButton.disabled = true;
+  nativeModelStatus.textContent = "Loading model into native memory. Large GGUF files can take a while…";
+  try {
+    const result = await NativeLocalAI.loadModel({ name });
+    nativeModelLoaded = result.loaded;
+    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · CPU inference";
+    setLink("online", "on-device AI");
+    await refreshNativeModels();
+  } catch (error) {
+    nativeModelLoaded = false;
+    nativeModelStatus.textContent = "Could not load model: " + (error instanceof Error ? error.message : "unknown error");
+    await refreshNativeModels();
+  }
+}
+
+async function unloadNativeModel(): Promise<void> {
+  nativeModelStatus.textContent = "Releasing model memory…";
+  try {
+    await NativeLocalAI.unloadModel();
+    nativeModelLoaded = false;
+    setLink("offline", "model unloaded");
+    await refreshNativeModels();
+  } catch (error) {
+    nativeModelStatus.textContent = "Could not unload model: " + (error instanceof Error ? error.message : "unknown error");
+  }
+}
+
+async function deleteNativeModel(): Promise<void> {
+  const name = nativeModelSelect.value;
+  if (!name || Capacitor.getPlatform() !== "android") return;
+  if (!window.confirm("Permanently delete " + name + " from this device?")) return;
+  try {
+    await NativeLocalAI.deleteModel({ name });
+    nativeModelStatus.textContent = "Deleted " + name + ".";
+    await refreshNativeModels();
+  } catch (error) {
+    nativeModelStatus.textContent = "Could not delete model: " + (error instanceof Error ? error.message : "unknown error");
+  }
+}
+
 const saveStore = (): void => writeJson(STORE_KEY, store);
 
 const uid = (): string => `c_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -967,7 +1105,20 @@ async function submit(raw: string): Promise<void> {
   setThinking(true);
 
   let result: ChatReply;
-  if (!settings.localModelEndpoint.trim() && baseUrl()) {
+  if (nativeModelLoaded && Capacitor.getPlatform() === "android") {
+    try {
+      const messages = [
+        { role: "system" as const, content: "You are Ultran, a private on-device AI agent assistant. Be accurate. Do not claim to execute actions unless a connected tool actually performed them. Ask for approval before external write actions." },
+        ...convo.messages.slice(-18).map((message) => ({ role: message.role, content: message.content.slice(0, 10000) })),
+      ];
+      const response = await NativeLocalAI.generate({ messages, maxTokens: 256 });
+      result = { content: response.content, session_id: "" };
+      setLink("online", "on-device AI");
+    } catch (error) {
+      setLink("error", "local inference failed");
+      result = { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
+    }
+  } else if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
       result = backgroundMode
         ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))
@@ -1270,8 +1421,9 @@ function openSheet(): void {
   endpointEl.value = settings.endpoint;
   localModelEndpointEl.value = settings.localModelEndpoint;
   localModelEl.value = settings.localModel;
-  setNote("Optional backend for connectors and hosted agents. Local model inference runs directly from this app when configured.");
+  setNote("Optional backend for hosted agents and remote connectors. Native GGUF inference runs directly on this Android device.");
   sheetWrap.hidden = false;
+  void refreshNativeModels();
 }
 
 function closeSheet(): void {
@@ -1351,6 +1503,15 @@ req<HTMLButtonElement>("#workspace-synthesize").addEventListener("click", () => 
 req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
 req<HTMLButtonElement>("#test-local-model-btn").addEventListener("click", () => void testLocalModel());
+req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () => void importNativeModel());
+nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
+nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
+nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());
+nativeModelSelect.addEventListener("change", () => {
+  nativeModelLoadButton.disabled = !nativeModelSelect.value;
+  nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;
+});
+
 req<HTMLButtonElement>("#clear-btn").addEventListener("click", () => {
   if (!window.confirm("Delete every conversation on this device?")) return;
   store.conversations = [];
@@ -1394,6 +1555,7 @@ buildThemes();
 applyTheme(settings.theme);
 setLink("offline", settings.endpoint ? "ready" : "local");
 renderConversation();
+void refreshNativeModels();
 autosize();
 resize();
 

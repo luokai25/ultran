@@ -114,15 +114,20 @@ pnpm format       # prettier
 
 ### Connect a local model
 
-The Android shell does not bundle model weights yet. It can send inference
-directly to a local Ollama-compatible runtime without routing chat through the
-Ultran backend. Configure the runtime address and installed model in the phone
-app under Settings → Local model endpoint. The app accepts localhost and
-private-LAN endpoints only. On Android, localhost works only after an
-on-device runtime is installed and running; a trusted LAN computer can host the
-model during development. The native in-app llama.cpp runtime and model manager
-are still in progress, so this direct-runtime bridge is not yet a
-self-contained model engine.
+The Android build is configured to bundle the CPU inference runtime from
+llama.cpp at a pinned upstream commit. In the app, open Settings → On-device AI
+model and import a single-file GGUF model from device storage. Ultran copies it into
+private app storage; model weights are not bundled in the APK and are not
+downloaded automatically. The initial runtime targets arm64-v8a and
+x86_64, uses a 2,048-token context and up to four CPU threads, and is intended
+to start with 1B–3B Q4 quantized models. Larger models can be slow or exceed
+available RAM. This first native runtime is CPU-only; GPU acceleration and
+streamed native token callbacks remain future optimizations.
+
+A local Ollama-compatible runtime is still supported as an optional bridge.
+Configure its localhost or private-LAN address and installed model in Settings
+→ Local model endpoint. Inference goes directly from the app to that runtime,
+not through the Ultran backend.
 
 For hosted agents, Composio and shared workspaces, the optional Python control
 plane can still run separately. Set ULTRAN_BRAIN_BACKEND=ollama and

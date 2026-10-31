@@ -81,7 +81,11 @@ class Container:
             vault=vault,
             sandbox=sandbox,
             brain=brain,
-            agents=AgentService(brain, sandbox, vault, composio=composio),
+            agents=AgentService(
+                brain, sandbox, vault, composio=composio,
+                db_path=settings.data_dir / "agents.sqlite3",
+                encryption_key=settings.credential_encryption_key,
+            ),
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),

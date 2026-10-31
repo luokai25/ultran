@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { Browser } from "@capacitor/browser";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
-import { buildCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
+import { budgetConversation, buildCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -1258,7 +1258,7 @@ async function reviewLocalDraft(task: string, draft: string): Promise<string> {
         stream: false,
         messages: [
           { role: "system", content: buildCapabilityPrompt(task, "Ollama-compatible local model") },
-          { role: "user", content: buildReviewPrompt(task, draft) },
+          { role: "user", content: buildReviewPrompt(task.slice(0, 6000), draft.slice(0, profile.contextTokens * 2)) },
         ],
         options: { temperature: 0.1, num_ctx: profile.contextTokens, num_predict: profile.maxTokens },
       }),
@@ -1315,7 +1315,7 @@ async function localModelReply(convo: Conversation, toolFollowup?: TerminalToolF
   try {
     const task = convo.messages[convo.messages.length - 1]?.content ?? "";
     const profile = profileTask(task);
-    const messages = convo.messages.slice(-profile.contextMessages).map((message) => ({ role: message.role, content: message.content.slice(0, profile.contextChars) }));
+    const messages = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
     const response = await fetch(endpoint + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1450,7 +1450,7 @@ async function submit(raw: string): Promise<void> {
       const profile = profileTask(text);
       const messages = [
         { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT },
-        ...convo.messages.slice(-profile.contextMessages).map((message) => ({ role: message.role, content: message.content.slice(0, profile.contextChars) })),
+        ...budgetConversation(convo.messages, profile.contextMessages, 3800, 1800),
       ];
       const response = await NativeLocalAI.generate({ messages, maxTokens: profile.maxTokens });
       const request = parseTerminalToolRequest(response.content);
@@ -1474,7 +1474,7 @@ async function submit(raw: string): Promise<void> {
             const review = await NativeLocalAI.generate({
               messages: [
                 { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") },
-                { role: "user" as const, content: buildReviewPrompt(text, response.content) },
+                { role: "user" as const, content: buildReviewPrompt(text, response.content.slice(0, 4200)) },
               ],
               maxTokens: profile.maxTokens,
             });

@@ -235,6 +235,165 @@ async function refreshNativeModels(): Promise<void> {
   }
 }
 
+const HUB_API = "https://huggingface.co/api";
+
+function safeHubText(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value.slice(0, 240) : fallback;
+}
+
+function modelCardNode(model: HubModel): HTMLElement {
+  const card = document.createElement("article");
+  card.className = "hub-model-card";
+  const top = document.createElement("div");
+  top.className = "hub-model-top";
+  const title = document.createElement("strong");
+  title.textContent = safeHubText(model.id, "Unknown model");
+  const badge = document.createElement("span");
+  badge.className = "hub-model-tag";
+  badge.textContent = (model.tags ?? []).some((tag) => tag.toLowerCase().includes("license:apache-2.0")) ? "Apache 2.0" : "Community";
+  top.append(title, badge);
+  const meta = document.createElement("p");
+  meta.className = "hub-model-meta";
+  meta.textContent = `${(model.downloads ?? 0).toLocaleString()} downloads · ${(model.likes ?? 0).toLocaleString()} likes`;
+  const actions = document.createElement("div");
+  actions.className = "hub-model-actions";
+  const files = document.createElement("button");
+  files.type = "button";
+  files.className = "ghost";
+  files.textContent = "Choose GGUF file";
+  files.addEventListener("click", () => void showHubFiles(model, card));
+  actions.append(files);
+  card.append(top, meta, actions);
+  return card;
+}
+
+async function searchHubModels(query: string): Promise<void> {
+  const clean = query.trim().slice(0, 120);
+  modelLibraryStatus.textContent = "Searching Hugging Face model catalog…";
+  modelLibraryResults.replaceChildren();
+  const params = new URLSearchParams({
+    filter: "gguf",
+    sort: "downloads",
+    direction: "-1",
+    limit: "30",
+  });
+  if (clean) params.set("search", clean);
+  try {
+    const response = await fetch(`${HUB_API}/models?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error("Hugging Face returned HTTP " + response.status);
+    const payload = await response.json() as HubModel[];
+    if (!Array.isArray(payload)) throw new Error("Unexpected model catalog response");
+    const models = payload.filter((model) => typeof model.id === "string" && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(model.id));
+    if (!models.length) {
+      modelLibraryStatus.textContent = "No GGUF repositories found. Try a model family such as Qwen, Llama, Gemma, or Phi.";
+      return;
+    }
+    modelLibraryStatus.textContent = `Showing ${models.length} GGUF repositories. Search to discover more of the catalog.`;
+    modelLibraryResults.replaceChildren(...models.map(modelCardNode));
+  } catch (error) {
+    modelLibraryStatus.textContent = "Model catalog unavailable: " + (error instanceof Error ? error.message : "network error");
+  }
+}
+
+async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
+  const old = card.querySelector(".hub-file-list");
+  if (old) { old.remove(); return; }
+  const status = document.createElement("p");
+  status.className = "hub-model-meta";
+  status.textContent = "Loading repository files…";
+  card.append(status);
+  try {
+    const response = await fetch(`${HUB_API}/models/${encodeURIComponent(model.id)}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error("Could not read model repository (" + response.status + ")");
+    const details = await response.json() as { siblings?: HubFile[]; sha?: string };
+    const files = (details.siblings ?? []).filter((file) => file.rfilename.toLowerCase().endsWith(".gguf"));
+    status.remove();
+    const list = document.createElement("div");
+    list.className = "hub-file-list";
+    if (!files.length) {
+      list.textContent = "This repository has no GGUF files. Ultran's on-device runtime needs GGUF quantized weights.";
+    } else {
+      const eligible = files.filter((file) => {
+        const size = file.lfs?.size ?? file.size ?? 0;
+        return size > 0 && size <= 8 * 1024 * 1024 * 1024;
+      }).sort((a, b) => (a.lfs?.size ?? a.size ?? Number.MAX_SAFE_INTEGER) - (b.lfs?.size ?? b.size ?? Number.MAX_SAFE_INTEGER));
+      for (const file of eligible.slice(0, 12)) {
+        const size = file.lfs?.size ?? file.size ?? 0;
+        const row = document.createElement("div");
+        row.className = "hub-file-row";
+        const info = document.createElement("div");
+        info.className = "hub-file-info";
+        const filename = document.createElement("strong");
+        filename.textContent = file.rfilename;
+        const detailsText = document.createElement("small");
+        detailsText.textContent = formatBytes(size) + (size <= 2 * 1024 * 1024 * 1024 ? " · phone-friendly candidate" : " · large for many phones");
+        info.append(filename, detailsText);
+        const download = document.createElement("button");
+        download.type = "button";
+        download.className = "solid";
+        download.textContent = "Download";
+        download.addEventListener("click", () => void downloadHubModel(model, file, size, details.sha));
+        row.append(info, download);
+        list.append(row);
+      }
+      if (!eligible.length) list.textContent = "No files with a known size under Ultran's 8 GB limit were found.";
+      if (files.length > 12) {
+        const note = document.createElement("small");
+        note.className = "model-library-note";
+        note.textContent = `Showing the 12 smallest eligible files out of ${files.length} GGUF files.`;
+        list.append(note);
+      }
+    }
+    card.append(list);
+  } catch (error) {
+    status.textContent = "Could not load repository files: " + (error instanceof Error ? error.message : "network error");
+  }
+}
+
+async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: number, revision?: string): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") {
+    modelLibraryStatus.textContent = "Direct model downloads require the Android APK. In a web preview, use Import GGUF after downloading a file separately.";
+    return;
+  }
+  const name = file.rfilename.split("/").pop() ?? "";
+  if (!/^[A-Za-z0-9._ -]{1,155}\.gguf$/i.test(name)) {
+    modelLibraryStatus.textContent = "This file has an unsupported filename and cannot be installed.";
+    return;
+  }
+  const sha = file.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
+  if (sizeBytes > 8 * 1024 * 1024 * 1024) {
+    modelLibraryStatus.textContent = "This file exceeds Ultran's 8 GB download limit.";
+    return;
+  }
+  const message = `Download ${name} (about ${formatBytes(sizeBytes)}) from Hugging Face into Ultran's private storage? Check the model license before use.`;
+  if (!window.confirm(message)) return;
+  modelDownloadInProgress = true;
+  modelLibraryStatus.textContent = "Preparing secure download…";
+  const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
+    const encodedPath = file.rfilename.split("/").map(encodeURIComponent).join("/");
+    const url = `https://huggingface.co/${model.id}/resolve/${revisionPath}/${encodedPath}?download=true`;
+    const result = await NativeLocalAI.downloadModel({ name, url, ...(sha ? { sha256: sha } : {}) });
+    await refreshNativeModels();
+    nativeModelSelect.value = result.name;
+    nativeModelStatus.textContent = "Downloaded and verified " + result.name + " · " + formatBytes(result.sizeBytes) + ". Load it to use offline.";
+    modelLibraryStatus.textContent = "Download complete. The model is stored privately on this device and is ready to load.";
+  } catch (error) {
+    modelLibraryStatus.textContent = "Download failed: " + (error instanceof Error ? error.message : "unknown error");
+  } finally {
+    modelDownloadInProgress = false;
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
 async function importNativeModel(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") return;
   nativeModelStatus.textContent = "Choose a .gguf model. Ultran will copy it into private app storage.";
@@ -1672,6 +1831,10 @@ req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
 req<HTMLButtonElement>("#test-local-model-btn").addEventListener("click", () => void testLocalModel());
 req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () => void importNativeModel());
+modelSearchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void searchHubModels(modelSearchInput.value);
+});
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
 nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());

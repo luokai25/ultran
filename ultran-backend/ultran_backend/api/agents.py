@@ -101,6 +101,7 @@ def chat(
         workspace_id=workspace,
         allow_tools=payload.allow_tools,
         max_tool_calls=payload.max_tool_calls,
+        client_capabilities=payload.client_capabilities,
     )
     # meter the turn against the workspace plan before returning
     container.billing.meter(workspace, result["tokens_in"] + result["tokens_out"])
@@ -123,7 +124,7 @@ async def chat_stream(
             result = container.agents.chat(
                 agent_id, payload.message, session_id=payload.session_id,
                 workspace_id=workspace, allow_tools=payload.allow_tools,
-                max_tool_calls=payload.max_tool_calls, event_callback=publish,
+                max_tool_calls=payload.max_tool_calls, client_capabilities=payload.client_capabilities, event_callback=publish,
             )
             container.billing.meter(workspace, result["tokens_in"] + result["tokens_out"])
             publish({"type": "final", "result": result})

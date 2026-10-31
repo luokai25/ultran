@@ -13,6 +13,7 @@ std::mutex g_mutex;
 llama_model *g_model = nullptr;
 llama_context *g_context = nullptr;
 bool g_backend_initialized = false;
+uint32_t g_context_tokens = 2048;
 
 void release_model() {
     if (g_context) {
@@ -152,7 +153,7 @@ Java_app_ultran_mobile_NativeLlama_nativeVersion(JNIEnv *env, jclass) {
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath) {
+Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath, jint requested_context) {
     std::lock_guard<std::mutex> lock(g_mutex);
     const std::string path = java_string(env, jpath);
     if (path.empty()) return env->NewStringUTF("Model path is empty.");
@@ -165,13 +166,18 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
 
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0;
+    // File-backed weights keep the full checkpoint out of anonymous RAM.
+    // Android's page cache can reclaim clean pages between layer reads.
+    model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
+    model_params.lazy_mode = LLAMA_LAZY_MODE_AUTO;
     g_model = llama_model_load_from_file(path.c_str(), model_params);
     if (!g_model) return env->NewStringUTF("Could not load this GGUF model. Check its integrity and available RAM.");
 
     llama_context_params context_params = llama_context_default_params();
-    context_params.n_ctx = 2048;
-    context_params.n_batch = 256;
-    context_params.n_ubatch = 256;
+    g_context_tokens = static_cast<uint32_t>(std::max(512, std::min(2048, static_cast<int>(requested_context))));
+    context_params.n_ctx = g_context_tokens;
+    context_params.n_batch = 64;
+    context_params.n_ubatch = 64;
     const long processors = sysconf(_SC_NPROCESSORS_ONLN);
     const int threads = std::max(1, std::min(4, static_cast<int>(processors) - 1));
     context_params.n_threads = threads;
@@ -179,7 +185,7 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
     g_context = llama_init_from_model(g_model, context_params);
     if (!g_context) {
         release_model();
-        return env->NewStringUTF("The model loaded but its 2048-token context could not fit in memory.");
+        return env->NewStringUTF("The model weights were mapped, but even the reduced context cache could not fit in memory. Close other apps or choose a smaller model.");
     }
     return env->NewStringUTF("");
 }
@@ -211,8 +217,8 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     const std::string prompt = format_chat(roles, contents);
     auto tokens = tokenize(prompt);
     if (tokens.empty()) return env->NewStringUTF("The model could not tokenize this conversation.");
-    const int limit = std::max(16, std::min(512, static_cast<int>(max_tokens)));
-    const size_t prompt_limit = static_cast<size_t>(2048 - limit - 16);
+    const int limit = std::max(16, std::min({512, static_cast<int>(max_tokens), static_cast<int>(g_context_tokens / 2)}));
+    const size_t prompt_limit = static_cast<size_t>(g_context_tokens - static_cast<uint32_t>(limit) - 16);
     if (tokens.size() > prompt_limit) {
         // Preserve the opening system instructions and the newest conversation
         // turns instead of chopping the system prompt off the front.
@@ -223,8 +229,8 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     }
 
     llama_memory_clear(llama_get_memory(g_context), true);
-    for (size_t offset = 0; offset < tokens.size(); offset += 256) {
-        const size_t count = std::min<size_t>(256, tokens.size() - offset);
+    for (size_t offset = 0; offset < tokens.size(); offset += 64) {
+        const size_t count = std::min<size_t>(64, tokens.size() - offset);
         llama_batch prompt_batch = llama_batch_get_one(tokens.data() + offset, static_cast<int32_t>(count));
         if (llama_decode(g_context, prompt_batch) != 0) {
             return env->NewStringUTF("The model failed while processing the prompt. Try a shorter conversation.");

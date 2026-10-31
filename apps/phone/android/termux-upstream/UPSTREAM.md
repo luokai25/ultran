@@ -16,3 +16,9 @@ The companion `termux/termux-packages` repository was inspected at commit `3bdd1
 `TerminalBitmap.java` uses numeric API level `35` rather than `Build.VERSION_CODES.VANILLA_ICE_CREAM`, preserving the upstream behavior while allowing the current Android build to compile against SDK 34. No runtime behavior changes for supported API levels.
 
 The native terminal now pre-creates `ultran-runtime/usr`, `home`, and `tmp` under Ultran private app data and exports Termux-compatible `PREFIX`, `TERMUX_PREFIX`, `TERMUX__PREFIX`, `TERMUX__ROOTFS`, `HOME`, `TMPDIR`, `PATH`, and `LD_LIBRARY_PATH` values. This prepares the exact install layout for a future Ultran-specific bootstrap; it does not claim that packages have been installed yet.
+
+## Building an Ultran-specific Termux bootstrap
+
+`build-ultran-bootstrap.sh` clones the pinned official `termux/termux-packages` source, applies a guarded two-line configuration patch for Android package `app.ultran.mobile` and rootfs `files/ultran-runtime`, then invokes the upstream Docker bootstrap builder for `aarch64` and `x86_64`. It defaults to including `git` and `python`; set `ULTRAN_BOOTSTRAP_PACKAGES` to a comma-separated package list to change that, and `ULTRAN_BOOTSTRAP_OUTPUT_DIR` to change the output directory. Docker is required.
+
+This is intentionally a separate, manual build step because rebuilding Termux packages for a new prefix is expensive and must not silently run on every APK release. The generated archives are not yet included in the APK: a native bootstrap installer and a compatible package repository strategy still need to be implemented and tested before Ultran can claim full Termux tool availability.

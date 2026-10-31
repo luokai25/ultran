@@ -541,7 +541,7 @@ public class UltranLocalAiPlugin extends Plugin {
                         ? 512
                         : memory.availMem > 0 && memory.availMem < 2L * 1024L * 1024L * 1024L
                         ? 1024 : 2048;
-                final boolean aggressiveLazyLoading = memory.availMem <= 0 || modelSetSize(model) > memory.availMem;
+                final boolean aggressiveLazyLoading = memory.availMem <= 0 || modelSetSize(model) > (long) (memory.availMem * 0.70);
                 String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;

@@ -1374,3 +1374,19 @@ button {
   .model-discovery, .hub-model-card { animation: none; transition: none; }
 }
 
+.ollama-library {
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,.025), color-mix(in srgb,var(--accent) 4%,transparent));
+}
+.ollama-library > span { font-size: 14px; font-weight: 650; }
+.ollama-library > small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.55; }
+.ollama-library .sheet-actions { display: flex; flex-wrap: wrap; margin: 10px 0 0; }
+.ollama-library select {
+  width: 100%; margin-top: 10px; padding: 11px;
+  color: var(--ink); background: var(--graphite);
+  border: 1px solid var(--hairline); border-radius: 11px;
+}
+.ollama-library .native-model-status { margin-bottom: 0; }
+

@@ -72,6 +72,7 @@ public final class UltranRuntimePlugin extends Plugin {
         File git = new File(prefix(), "bin/git");
         File python = new File(prefix(), "bin/python");
         File python3 = new File(prefix(), "bin/python3");
+        File apt = new File(prefix(), "bin/apt");
         boolean installed = marker().isFile();
         boolean shellReady = installed && bash.isFile() && bash.canExecute();
         JSObject result = new JSObject();
@@ -81,6 +82,9 @@ public final class UltranRuntimePlugin extends Plugin {
         result.put("gitAvailable", installed && git.isFile() && git.canExecute());
         result.put("pythonAvailable", installed &&
             ((python.isFile() && python.canExecute()) || (python3.isFile() && python3.canExecute())));
+        result.put("aptAvailable", installed && apt.isFile() && apt.canExecute());
+        result.put("packageManagerEnabled", false);
+        result.put("packageManagerNote", "APT repositories are disabled until Ultran publishes packages built for its private prefix.");
         result.put("prefix", prefix().getAbsolutePath());
         result.put("architecture", android.os.Build.SUPPORTED_ABIS.length == 0 ? "unknown" : android.os.Build.SUPPORTED_ABIS[0]);
         call.resolve(result);

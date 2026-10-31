@@ -411,11 +411,64 @@ async function api(path: string, init: RequestInit = {}, timeoutMs = 20_000): Pr
   }
 }
 
+async function connectedAgentTools(): Promise<string[] | null> {
+  try {
+    const status = await api("/v1/connectors/composio/status", {}, 8_000);
+    if (!status.ok) return null;
+    const state = (await status.json()) as { configured?: boolean };
+    if (state.configured === false) return [];
+    if (state.configured !== true) return null;
+    const response = await api("/v1/connectors/composio/connections", {}, 10_000);
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      connections?: Array<{ status?: string }>;
+    };
+    return (body.connections ?? []).some((connection) => connection.status === "ACTIVE")
+      ? ["composio"]
+      : [];
+  } catch {
+    // A temporary status failure must not silently revoke an already-enabled tool.
+    return null;
+  }
+}
+
 async function ensureAgent(): Promise<string> {
-  if (store.agentId) return store.agentId;
+  const desiredTools = await connectedAgentTools();
+  if (store.agentId) {
+    const current = await api(`/v1/agents/${encodeURIComponent(store.agentId)}`, {}, 8_000);
+    if (current.status === 404) {
+      store.agentId = undefined;
+      for (const conversation of store.conversations) conversation.sessionId = undefined;
+      saveStore();
+    } else if (!current.ok) {
+      throw new Error(`agent lookup failed (${current.status})`);
+    } else {
+      const agent = (await current.json()) as { id: string; tools?: string[] };
+      if (desiredTools !== null) {
+        const tools = new Set(agent.tools ?? []);
+        const next = new Set([...tools].filter((tool) => tool !== "composio"));
+        for (const tool of desiredTools) next.add(tool);
+        const nextTools = [...next].sort();
+        const currentTools = [...tools].sort();
+        if (JSON.stringify(nextTools) !== JSON.stringify(currentTools)) {
+          const update = await api(`/v1/agents/${encodeURIComponent(agent.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ tools: nextTools }),
+          });
+          if (!update.ok) throw new Error(`agent tool update failed (${update.status})`);
+        }
+      }
+      return agent.id;
+    }
+  }
+
   const res = await api("/v1/agents", {
     method: "POST",
-    body: JSON.stringify({ name: "Ultran Prime", persona: "ultran" }),
+    body: JSON.stringify({
+      name: "Ultran Prime",
+      persona: "ultran",
+      tools: desiredTools ?? [],
+    }),
   });
   if (!res.ok) throw new Error(`agent create failed (${res.status})`);
   const agent = (await res.json()) as { id: string };
@@ -436,7 +489,8 @@ async function remoteReply(convo: Conversation, text: string): Promise<ChatReply
     if (res.status === 404) {
       // The agent or session was lost on the server (it restarted). Start clean.
       store.agentId = undefined;
-      convo.sessionId = undefined;
+      for (const conversation of store.conversations) conversation.sessionId = undefined;
+      saveStore();
       throw new Error("stale");
     }
     if (!res.ok) throw new Error(`brain returned ${res.status}`);

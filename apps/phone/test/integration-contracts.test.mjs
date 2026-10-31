@@ -140,6 +140,7 @@ test("Ultran identity, motto, voice signature, and voice dictation are wired acr
   assert.match(main, /micBtn\.addEventListener\("click", startListening\)/);
   assert.match(main, /SpeechRecognition \?\? speechWindow\.webkitSpeechRecognition/);
   assert.match(main, /may use its network service/);
+  assert.match(main, /preferredLanguage/);
   assert.match(main, /ULTRAN_MOTTO/);
   assert.ok(html.includes('id="mic-btn"'));
   assert.ok(html.includes('id="voice-status"'));

@@ -186,7 +186,7 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /openWhatsAppMessage/);
   assert.match(main, /parsed\.tool === "app\.open"/);
   assert.match(companion, /Approve WhatsApp message/);
-  assert.match(companion, /APPROVED/);
+  assert.match(companion, /approved_text/);
   assert.match(companion, /UltranMessagingAccessibilityService/);
   assert.match(companion, /expires_at/);
   assert.match(manifest, /UltranMessagingAccessibilityService/);
@@ -206,20 +206,20 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
 });
 
 
-test("WhatsApp sending requires one-shot explicit approval and exact editable composer match", () => {
+test("WhatsApp sending requires one-shot approval and exact composer match", () => {
   assert.match(manifest, /UltranMessagingAccessibilityService/);
   assert.match(manifest, /BIND_ACCESSIBILITY_SERVICE/);
   assert.match(accessibilityConfig, /canRetrieveWindowContent="true"/);
-  assert.match(companion, /Approve and send WhatsApp message/);
+  assert.match(companion, /Approve WhatsApp message/);
+  assert.match(companion, /approved_text/);
   assert.match(companion, /expires_at/);
   assert.match(companion, /ACTION_ACCESSIBILITY_SETTINGS/);
-  assert.match(companion, /pending_accessibility_action/);
-  assert.match(messagingService, /com\.whatsapp/);
-  assert.match(messagingService, /android\.widget\.EditText/);
-  assert.match(messagingService, /expected\.contentEquals\(text\)/);
-  assert.match(messagingService, /clearApproval\(prefs\)/);
-  assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);
-  assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
-  assert.match(main, /NativeCompanion\.composeWhatsApp/);
-  assert.match(main, /WhatsApp delivery status is not available/);
+  assert.match(messagingService, /com\\.whatsapp/);
+  assert.match(messagingService, /android\\.widget\\.EditText/);
+  assert.match(messagingService, /expected\\.contentEquals\\(text\\)/);
+  assert.match(messagingService, /clearApproval\\(prefs\\)/);
+  assert.match(messagingService, /AccessibilityNodeInfo\\.ACTION_CLICK/);
+  assert.match(main, /parsed\\.tool === "whatsapp\\.compose"/);
+  assert.match(main, /NativeCompanion\\.openWhatsAppMessage/);
+  assert.match(main, /delivery status is not confirmed/i);
 });

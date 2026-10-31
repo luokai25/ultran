@@ -149,7 +149,7 @@ lazy tensor loading, so the whole checkpoint does not need to be resident in
 anonymous RAM. Context cache size adapts to available memory and prompt batches
 are reduced. This is the first mobile low-residency stage inspired by the
 public AirLLM architecture study, not yet its explicit per-layer/per-expert
-module eviction pipeline. The size filter is a rough starting point, not a
+module eviction pipeline. Standard Llama transformer matrices are not all marked for row-lazy reads, so this is not yet a universal per-layer memory guarantee. The size filter is a rough starting point, not a
 guarantee that a model will run: the KV cache, active tensors, scratch buffers,
 CPU bandwidth, storage speed, and thermal limits still matter. Review the
 upstream model card and license before downloading or using any weights. The

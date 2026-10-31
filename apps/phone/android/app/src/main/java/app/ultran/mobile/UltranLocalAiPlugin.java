@@ -7,6 +7,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.StatFs;
 import android.os.Build;
+import android.os.Debug;
 import android.provider.OpenableColumns;
 
 import com.getcapacitor.annotation.ActivityCallback;
@@ -571,6 +572,53 @@ public class UltranLocalAiPlugin extends Plugin {
         });
     }
 
+    private void addInferenceMetrics(JSObject result) {
+        try {
+            JSONObject metrics = new JSONObject(NativeLlama.nativeGetLastMetrics());
+            result.put("promptTokens", metrics.optInt("promptTokens"));
+            result.put("generatedTokens", metrics.optInt("generatedTokens"));
+            result.put("promptMs", metrics.optDouble("promptMs"));
+            result.put("generationMs", metrics.optDouble("generationMs"));
+            result.put("tokensPerSecond", metrics.optDouble("tokensPerSecond"));
+            Debug.MemoryInfo processMemory = new Debug.MemoryInfo();
+            Debug.getMemoryInfo(processMemory);
+            result.put("processPssKb", processMemory.getTotalPss());
+            result.put("processPrivateDirtyKb", processMemory.getTotalPrivateDirty());
+        } catch (Exception ignored) {
+            // Metrics are diagnostic only; they must never fail inference.
+        }
+    }
+
+    @PluginMethod
+    public void runBenchmark(PluginCall call) {
+        if (loadedModelPath == null) {
+            call.reject("Load a local GGUF model before running the benchmark.");
+            return;
+        }
+        inferenceExecutor.execute(() -> {
+            try {
+                if (loadedModelPath == null) {
+                    call.reject("The local model was unloaded before the benchmark started.");
+                    return;
+                }
+                String output = NativeLlama.nativeGenerate(
+                        new String[]{"user"},
+                        new String[]{"Reply with one short word: READY."},
+                        48
+                );
+                JSObject result = new JSObject();
+                result.put("model", new File(loadedModelPath).getName());
+                result.put("output", output == null ? "" : output);
+                result.put("contextTokens", loadedContextTokens);
+                result.put("largeModelMode", loadedLargeModelMode);
+                addInferenceMetrics(result);
+                call.resolve(result);
+            } catch (Throwable error) {
+                call.reject(error.getMessage() == null ? "On-device benchmark failed." : error.getMessage());
+            }
+        });
+    }
+
     @PluginMethod
     public void generate(PluginCall call) {
         if (loadedModelPath == null) {
@@ -616,6 +664,9 @@ public class UltranLocalAiPlugin extends Plugin {
                 JSObject response = new JSObject();
                 response.put("content", text == null ? "" : text);
                 response.put("model", new File(loadedModelPath).getName());
+                response.put("largeModelMode", loadedLargeModelMode);
+                response.put("contextTokens", loadedContextTokens);
+                addInferenceMetrics(response);
                 call.resolve(response);
             } catch (Throwable error) {
                 call.reject(error.getMessage() == null ? "Native inference failed." : error.getMessage());

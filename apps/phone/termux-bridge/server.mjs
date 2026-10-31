@@ -15,11 +15,29 @@ const ALLOWED_ORIGINS = new Set(['http://localhost', 'https://localhost', 'capac
 
 await fs.mkdir(ROOT, { recursive: true, mode: 0o700 });
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(JSON.stringify(body)); };
-function safePath(relative) {
+async function safePath(relative) {
   if (typeof relative !== 'string' || !relative || relative.includes('\0') || path.isAbsolute(relative)) throw new Error('Provide a relative path inside the Ultran folder.');
   const target = path.resolve(ROOT, relative);
   if (target !== ROOT && !target.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultran folder.');
-  return target;
+  // Resolve existing symlinks (including a symlink used as the requested folder)
+  // so lexical traversal checks cannot be bypassed to read/write outside the sandbox.
+  let probe = target;
+  while (true) {
+    try {
+      const real = await fs.realpath(probe);
+      if (real !== ROOT && !real.startsWith(ROOT + path.sep)) throw new Error('Symlink escapes the Ultran folder.');
+      if (probe === target) return real;
+      const relativeTail = path.relative(probe, target);
+      const candidate = path.resolve(real, relativeTail);
+      if (candidate !== ROOT && !candidate.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultran folder.');
+      return candidate;
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes('escapes'))) throw error;
+      const parent = path.dirname(probe);
+      if (parent === probe) throw new Error('Could not resolve a safe path inside the Ultran folder.');
+      probe = parent;
+    }
+  }
 }
 async function body(req) {
   let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 16_384) throw new Error('Request too large.'); }
@@ -36,12 +54,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok: true, name: 'Ultran Termux Bridge', version: 1, filesRoot: ROOT, capabilities: ['device-info', 'list-files', 'read-text', 'write-text-approved'] });
     if (req.method === 'GET' && url.pathname === '/v1/device') return json(res, 200, { platform: 'android-termux', arch: process.arch, release: os.release(), hostname: os.hostname(), uptimeSeconds: os.uptime(), freeMemoryBytes: os.freemem(), totalMemoryBytes: os.totalmem(), home: os.homedir() });
     if (req.method === 'POST' && url.pathname === '/v1/files/list') {
-      const input = await body(req); const target = safePath(input.path || '.'); const entries = await fs.readdir(target, { withFileTypes: true });
+      const input = await body(req); const target = await safePath(input.path || '.'); const entries = await fs.readdir(target, { withFileTypes: true });
       const files = await Promise.all(entries.slice(0, 200).map(async entry => { const p = path.join(target, entry.name); let size = 0; try { if (entry.isFile()) size = (await fs.stat(p)).size; } catch {} return { name: entry.name, type: entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : 'other', sizeBytes: size }; }));
       return json(res, 200, { path: path.relative(ROOT, target) || '.', files });
     }
     if (req.method === 'POST' && url.pathname === '/v1/files/read') {
-      const input = await body(req); const target = safePath(input.path); const stat = await fs.stat(target);
+      const input = await body(req); const target = await safePath(input.path); const stat = await fs.stat(target);
       if (!stat.isFile() || stat.size > MAX_READ) return json(res, 413, { error: 'Only regular text files up to 256 KiB can be read.' });
       const content = await fs.readFile(target, 'utf8'); if (content.includes('\ufffd')) return json(res, 415, { error: 'File does not appear to be UTF-8 text.' });
       return json(res, 200, { path: input.path, sizeBytes: stat.size, content });
@@ -50,7 +68,7 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       if (req.headers['x-ultran-approval'] !== 'approved') return json(res, 403, { error: 'Write denied. Ultran must show the exact path and content and obtain explicit user approval first.' });
       if (typeof input.content !== 'string' || Buffer.byteLength(input.content) > MAX_READ) return json(res, 413, { error: 'Text content must be at most 256 KiB.' });
-      const target = safePath(input.path); await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+      const target = await safePath(input.path); await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
       const temp = `${target}.ultran-${crypto.randomBytes(6).toString('hex')}.partial`;
       await fs.writeFile(temp, input.content, { encoding: 'utf8', mode: 0o600, flag: 'wx' }); await fs.rename(temp, target);
       return json(res, 200, { ok: true, path: input.path, sizeBytes: Buffer.byteLength(input.content) });

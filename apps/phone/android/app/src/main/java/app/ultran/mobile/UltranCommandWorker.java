@@ -85,7 +85,13 @@ public final class UltranCommandWorker extends Worker {
 
             File bash = new File(prefix, "bin/bash");
             boolean termuxReady = new File(prefix, ".ultran-bootstrap-installed").isFile() && bash.canExecute();
-            String shell = termuxReady ? bash.getAbsolutePath() : "/system/bin/sh";
+            if (!termuxReady) {
+                return Result.failure(new Data.Builder()
+                    .putString(KEY_ERROR, "The headless Termux runtime is not installed. Install the verified Ultran runtime before running local commands.")
+                    .putBoolean("termuxRuntime", false)
+                    .build());
+            }
+            String shell = bash.getAbsolutePath();
             ProcessBuilder builder = new ProcessBuilder(shell, "-c", command);
             builder.directory(home);
             builder.redirectErrorStream(true);

@@ -11,7 +11,7 @@
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
     "lint": "echo lint pending",
-    "test": "echo no tests yet",
+    "test": "node --test test/*.test.mjs",
     "clean": "rm -rf dist android/app/src/main/assets/public",
     "cap:sync": "cap sync android",
     "android:release": "cd android && ./gradlew assembleRelease --no-daemon --console=plain"

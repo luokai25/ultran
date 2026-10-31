@@ -27,8 +27,13 @@ public final class UltranTerminalActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        File runtime = new File(getFilesDir(), "ultran-runtime");
-        if (!runtime.exists() && !runtime.mkdirs()) {
+        File runtime = new File("/data/data/" + getPackageName() + "/files/ultran-runtime");
+        File prefix = new File(runtime, "usr");
+        File home = new File(runtime, "home");
+        File temp = new File(runtime, "tmp");
+        if ((!prefix.exists() && !prefix.mkdirs()) ||
+            (!home.exists() && !home.mkdirs()) ||
+            (!temp.exists() && !temp.mkdirs())) {
             finish();
             return;
         }
@@ -39,13 +44,19 @@ public final class UltranTerminalActivity extends Activity {
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         String[] env = new String[] {
-            "HOME=" + runtime.getAbsolutePath(),
-            "TMPDIR=" + new File(runtime, "tmp").getAbsolutePath(),
-            "PATH=/system/bin:/system/xbin",
+            "HOME=" + home.getAbsolutePath(),
+            "TMPDIR=" + temp.getAbsolutePath(),
+            "PREFIX=" + prefix.getAbsolutePath(),
+            "TERMUX_PREFIX=" + prefix.getAbsolutePath(),
+            "TERMUX__PREFIX=" + prefix.getAbsolutePath(),
+            "TERMUX_APP__PACKAGE_NAME=" + getPackageName(),
+            "TERMUX__ROOTFS=" + runtime.getAbsolutePath(),
+            "PATH=" + new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin",
+            "LD_LIBRARY_PATH=" + new File(prefix, "lib").getAbsolutePath(),
+            "SHELL=/system/bin/sh",
             "TERM=xterm-256color",
             "LANG=C.UTF-8"
         };
-        new File(runtime, "tmp").mkdirs();
         session = new TerminalSession("/system/bin/sh", runtime.getAbsolutePath(),
             new String[] {"-i"}, env, 2000, new SessionClient());
         terminalView.attachSession(session);

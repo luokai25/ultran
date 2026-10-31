@@ -82,6 +82,7 @@ public final class UltranCommandWorker extends Worker {
                 markerOutput.write("started".getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 markerOutput.getFD().sync();
             }
+            postNotification("Ultran is working", "An approved local task is running in the background.", true);
 
             File bash = new File(prefix, "bin/bash");
             boolean termuxReady = new File(prefix, ".ultran-bootstrap-installed").isFile() && bash.canExecute();
@@ -153,6 +154,7 @@ public final class UltranCommandWorker extends Worker {
             while (true) {
                 if (isStopped()) {
                     stopProcess(process);
+                    postNotification("Ultran task stopped", "The approved background task was cancelled.", false);
                     return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command cancelled.").build());
                 }
                 if (!isRunning(process)) break;
@@ -175,16 +177,18 @@ public final class UltranCommandWorker extends Worker {
                 .putBoolean(KEY_TIMED_OUT, timedOut)
                 .putBoolean("termuxRuntime", termuxReady)
                 .build();
-            postNotification("Ultran task completed", "Background command finished with exit code " + exitCode + ".");
+            postNotification("Ultran task completed", "Background command finished with exit code " + exitCode + ".", false);
             setProgressAsync(new Data.Builder().putString("phase", "completed").build());
             return Result.success(result);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             if (process != null) stopProcess(process);
+            postNotification("Ultran task interrupted", "Android interrupted the approved background task.", false);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command interrupted.").build());
         } catch (Exception error) {
             if (process != null) stopProcess(process);
             String message = error.getMessage() == null ? "Command execution failed." : error.getMessage();
+            postNotification("Ultran task failed", message, false);
             if (message.length() > 1000) message = message.substring(0, 1000);
             return Result.failure(new Data.Builder().putString(KEY_ERROR, message).build());
         } finally {
@@ -203,7 +207,7 @@ public final class UltranCommandWorker extends Worker {
         if (Build.VERSION.SDK_INT >= 26 && isRunning(process)) process.destroyForcibly();
     }
 
-    private void postNotification(String title, String body) {
+    private void postNotification(String title, String body, boolean ongoing) {
         Context context = getApplicationContext();
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
@@ -217,9 +221,16 @@ public final class UltranCommandWorker extends Worker {
             .setSmallIcon(context.getApplicationInfo().icon)
             .setContentTitle(title)
             .setContentText(body)
-            .setAutoCancel(true)
+            .setAutoCancel(!ongoing)
+            .setOngoing(ongoing)
+            .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
-        manager.notify(getId().hashCode(), notification.build());
+        try {
+            manager.notify(getId().hashCode(), notification.build());
+        } catch (SecurityException ignored) {
+            // Notification access is optional; job execution must not fail because
+            // the user has not granted Android notification permission.
+        }
     }
 }

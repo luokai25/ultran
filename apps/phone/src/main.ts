@@ -1578,20 +1578,20 @@ async function submit(raw: string): Promise<void> {
         ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200),
       ];
       const response = await NativeLocalAI.generate({ messages, maxTokens: Math.min(profile.maxTokens, 384) });
-      const request = parseTerminalToolRequest(response.content);
+      const request = parseLocalToolRequest(response.content);
       if (request) {
-        const toolResult = await runApprovedTerminalTool(request.command);
+        const toolResult = await runApprovedLocalTool(request);
         const followup = await NativeLocalAI.generate({
           messages: [
             ...messages,
             { role: "assistant" as const, content: response.content },
-            { role: "user" as const, content: `Terminal tool result:\n${boundToolResult(toolResult, 2400)}` },
+            { role: "user" as const, content: `Local tool result:\n${boundToolResult(toolResult, 2400)}` },
           ],
           maxTokens: Math.min(profile.maxTokens, 384),
         });
         let finalFollowup = followup.content;
-        if (parseTerminalToolRequest(followup.content)) {
-          finalFollowup = "The terminal tool allows one command per turn. I received a second tool request and did not execute it. Please split the task into another step.";
+        if (parseLocalToolRequest(followup.content)) {
+          finalFollowup = "Ultran allows one local tool action per turn. I received a second tool request and did not execute it. Please split the task into another step.";
         } else if (shouldVerifyDraft(text)) {
           try {
             const review = await NativeLocalAI.generate({

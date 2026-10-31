@@ -101,3 +101,12 @@ cd apps/phone/android && ./gradlew assembleRelease
 - Android also schedules a persistent WorkManager task monitor when Updates is enabled. It checks the configured backend at an OS-managed interval of at least 15 minutes, survives app restarts, and posts notifications for task start/retry/completion/failure transitions. Terminal updates can be spoken aloud when the Voice setting is enabled.
 - Android controls the exact WorkManager execution time and may delay checks during Doze, battery saver, or network loss. This is durable periodic monitoring, not real-time surveillance or an always-on microphone. The foreground WebView poll remains faster while the app is active.
 - Proactive updates are opt-in and can be switched off. Keep spoken updates short and avoid enabling them in situations where audio could expose private task details.
+
+
+### Approved WhatsApp actions
+
+Ultran can prepare and send a WhatsApp message from the Android app after two explicit approvals: the agent's tool approval in Ultran, followed by the Android confirmation showing the exact international number and message. For the final Send tap, Android's optional Ultran Accessibility Service must be enabled by the device owner in system settings.
+
+The accessibility action is intentionally narrow: it only responds inside the WhatsApp package, checks that the editable message composer contains the exact approved text, looks for WhatsApp's send control (with an Arabic-label fallback), consumes the one-use approval before tapping, and expires after 60 seconds. It does not read conversations, select contacts, or send arbitrary content. If the composer or send control cannot be verified, it does nothing. Ultran cannot verify WhatsApp delivery/read receipts, so a successful tap is not reported as confirmed delivery.
+
+SMS remains a separate handoff to the device messaging app, where the user presses Send. App opening is restricted to an allow-list. Accessibility access is optional and can be revoked at any time in Android settings.

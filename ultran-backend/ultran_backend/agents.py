@@ -934,21 +934,26 @@ class AgentService:
 
 def _requested_artifact_format(message: str) -> str | None:
     low = message.lower()
-    if not any(word in low for word in ("create", "generate", "make", "export", "save", "build", "produce", "write", "draft", "convert")):
+    words = set(re.findall(r"[a-z0-9_.+-]+", low))
+    if not words.intersection({"create", "generate", "make", "export", "save", "build", "produce", "write", "draft", "package", "zip"}):
         return None
-    formats = (
-        ("pptx", ("powerpoint", "pptx", "presentation", "slides")),
+    formats = [("pptx", ("powerpoint", "pptx", "presentation", "slides")),
         ("docx", ("word document", "word file", "docx")), ("xlsx", ("excel", "xls", "xlsx", "spreadsheet")),
-        ("pdf", ("pdf",)), ("html", ("html", "webpage", "web page", "website")),
-        ("csv", ("csv",)), ("json", ("json",)),
-        ("svg", ("svg",)), ("md", ("markdown file", ".md")),
-        ("txt", ("text file", ".txt")),
-    )
-    return next((fmt for fmt, terms in formats if any(term in low for term in terms)), None)
+        ("pdf", ("pdf",)), ("zip", ("zip", "archive", "compressed folder")),
+        ("html", ("html", "webpage", "web page", "website")), ("csv", ("csv",)),
+        ("json", ("json",)), ("svg", ("svg",)), ("md", ("markdown", ".md")), ("txt", ("text file", ".txt"))]
+    extensions = ("py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "c", "h", "cpp", "hpp", "sh", "bash", "sql", "xml", "yaml", "yml", "toml", "ini", "css", "scss", "vue", "svelte", "mdx", "rst", "log", "env")
+    for extension in extensions:
+        if "." + extension in low or extension + " file" in low or extension + " script" in low or extension + " source" in low:
+            return extension
+    for fmt, terms in formats:
+        if any(term in low for term in terms):
+            return fmt
+    return None
 
 
 def _artifact_title(message: str) -> str:
-    cleaned = re.sub(r"(?i)\b(create|generate|make|export|save|build|a|an|the|as|to|into|file|pdf|pptx|powerpoint|presentation|slides|html|webpage|web page|csv|json|svg|markdown|text|word document|docx|excel|xlsx|spreadsheet)\b", " ", message)
+    cleaned = re.sub(r"(?i)\b(create|generate|make|export|save|build|a|an|the|as|to|into|file|pdf|pptx|powerpoint|presentation|slides|zip|archive|html|webpage|web page|csv|json|svg|markdown|text|word document|docx|excel|xlsx|spreadsheet)\b", " ", message)
     cleaned = " ".join(cleaned.split()).strip(" .,:;-")
     return (cleaned[:72] or "Ultran generated document").title()
 
@@ -965,5 +970,6 @@ def _artifact_authoring_instruction(fmt: str) -> str:
         "svg": "Return a complete standalone SVG document. No scripts, event handlers or external references. No Markdown fences. ",
         "md": "Return a complete, polished Markdown document. No opening chat. ",
         "txt": "Return the finished plain-text document only. No opening chat. ",
+        "zip": "Return only a valid JSON object mapping safe relative file paths to their complete UTF-8 text contents. Do not include binary files, absolute paths, parent-directory segments, Markdown fences or commentary.",
     }
     return "\n\nArtifact authoring mode: " + instructions.get(fmt, "Return finished file content only. ")

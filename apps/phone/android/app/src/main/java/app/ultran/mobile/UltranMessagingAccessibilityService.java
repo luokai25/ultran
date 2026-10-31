@@ -64,14 +64,24 @@ public final class UltranMessagingAccessibilityService extends AccessibilityServ
     }
 
     private AccessibilityNodeInfo findSendButton(AccessibilityNodeInfo root) {
-        List<AccessibilityNodeInfo> matches = root.findAccessibilityNodeInfosByText("Send");
-        if (matches != null) {
+        // WhatsApp's send button resource ID is more reliable than translated labels.
+        List<AccessibilityNodeInfo> byId = root.findAccessibilityNodeInfosByViewId("com.whatsapp:id/send");
+        if (byId != null) {
+            for (AccessibilityNodeInfo node : byId) {
+                if (node.isClickable() && node.isEnabled()) return node;
+                node.recycle();
+            }
+        }
+        // Fallback for WhatsApp versions with changed IDs and Arabic UI.
+        for (String label : new String[]{"Send", "إرسال"}) {
+            List<AccessibilityNodeInfo> matches = root.findAccessibilityNodeInfosByText(label);
+            if (matches == null) continue;
             for (AccessibilityNodeInfo node : matches) {
                 CharSequence description = node.getContentDescription();
-                CharSequence label = node.getText();
-                boolean sendLabel = (description != null && "Send".contentEquals(description))
-                    || (label != null && "Send".contentEquals(label));
-                if (sendLabel && node.isClickable()) return node;
+                CharSequence text = node.getText();
+                boolean exactLabel = (description != null && label.contentEquals(description))
+                    || (text != null && label.contentEquals(text));
+                if (exactLabel && node.isClickable() && node.isEnabled()) return node;
                 node.recycle();
             }
         }

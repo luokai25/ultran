@@ -48,7 +48,7 @@ the model itself.
 
 Tasks are classified into quick, standard, deep, and critical modes. The runtime
 uses bounded recent history and memory, lowers sampling temperature for complex
-work, and performs an independent review pass for deep or high-impact tasks
+work, and performs a separate review pass with the selected provider for deep or high-impact tasks
 when the first response came from a language model. If review fails, Ultran
 keeps the usable first answer. The deterministic Echo fallback is not run
 through a second review pass because it is not a generative language model.

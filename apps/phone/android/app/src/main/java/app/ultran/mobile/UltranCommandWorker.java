@@ -170,7 +170,8 @@ public final class UltranCommandWorker extends Worker {
             }, "ultran-runtime-output");
             reader.start();
 
-            long deadline = SystemClock.elapsedRealtime() + MAX_RUNTIME_MS;
+            long deadline = startedAt + MAX_RUNTIME_MS;
+            long lastProgressNotificationAt = startedAt;
             boolean timedOut = false;
             while (true) {
                 if (isStopped()) {
@@ -179,7 +180,13 @@ public final class UltranCommandWorker extends Worker {
                     return Result.failure(new Data.Builder().putString(KEY_ERROR, "Command cancelled.").build());
                 }
                 if (!isRunning(process)) break;
-                if (SystemClock.elapsedRealtime() >= deadline) {
+                long now = SystemClock.elapsedRealtime();
+                if (now - lastProgressNotificationAt >= TimeUnit.MINUTES.toMillis(1)) {
+                    long elapsedMinutes = Math.max(1L, TimeUnit.MILLISECONDS.toMinutes(now - startedAt));
+                    postNotification("Ultran is still working", "The approved local task has been running for " + elapsedMinutes + " minute(s).", true);
+                    lastProgressNotificationAt = now;
+                }
+                if (now >= deadline) {
                     timedOut = true;
                     stopProcess(process);
                     break;

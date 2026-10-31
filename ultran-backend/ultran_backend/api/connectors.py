@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Query, status
+from pydantic import BaseModel, Field
 
 from ..schemas import ConnectorConnect, ConnectorInvoke, ConnectorOut, CredentialOut
 from .deps import ContainerDep, WorkspaceDep
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
+
+class ComposioToolInvoke(BaseModel):
+    tool_name: str = Field(min_length=1, max_length=160)
+    arguments: dict = Field(default_factory=dict)
+
 
 
 
@@ -31,6 +37,24 @@ def composio_authorize(toolkit: str, container: ContainerDep, workspace: Workspa
     """Return a hosted OAuth Connect Link for the selected Composio toolkit."""
     return container.composio.authorize(workspace, toolkit)
 
+
+
+@router.get("/composio/tools")
+def composio_tools(container: ContainerDep, workspace: WorkspaceDep):
+    """Discover tools available to this workspace without exposing session credentials."""
+    return {"tools": container.composio.list_tools(workspace)}
+
+
+@router.post("/composio/tools/invoke")
+def composio_tool_invoke(
+    payload: ComposioToolInvoke,
+    container: ContainerDep,
+    workspace: WorkspaceDep,
+):
+    """Run an explicitly read-only Composio tool through the MCP policy gateway."""
+    return container.composio.invoke_read_tool(
+        workspace, payload.tool_name, payload.arguments
+    )
 
 @router.get("/composio/connections")
 def composio_connections(container: ContainerDep, workspace: WorkspaceDep):

@@ -50,12 +50,22 @@ public final class UltranCommandWorker extends Worker {
         AtomicBoolean truncated = new AtomicBoolean(false);
         try {
             Context context = getApplicationContext();
-            File runtime = new File(context.getFilesDir(), "ultran-runtime");
+            File appData = new File("/data/data/" + context.getPackageName());
+            File runtime = new File(appData, "files/ultran-runtime");
             File prefix = new File(runtime, "usr");
             File home = new File(runtime, "home");
             File temp = new File(runtime, "tmp");
-            if ((!home.exists() && !home.mkdirs()) || (!temp.exists() && !temp.mkdirs())) {
-                return Result.failure(new Data.Builder().putString(KEY_ERROR, "Could not prepare Ultran's private runtime directories.").build());
+            File project = new File(appData, "termux");
+            File core = new File(project, "core");
+            File apps = new File(project, "app");
+            File appsByIdentifier = new File(apps, "i");
+            File appsByUid = new File(apps, "u");
+            File cache = new File(appData, "cache");
+            File[] directories = {home, temp, core, appsByIdentifier, appsByUid, cache};
+            for (File directory : directories) {
+                if (!directory.exists() && !directory.mkdirs()) {
+                    return Result.failure(new Data.Builder().putString(KEY_ERROR, "Could not prepare Ultran's private runtime directories.").build());
+                }
             }
 
             File bash = new File(prefix, "bin/bash");
@@ -71,8 +81,25 @@ public final class UltranCommandWorker extends Worker {
             env.put("PREFIX", prefix.getAbsolutePath());
             env.put("TERMUX_PREFIX", prefix.getAbsolutePath());
             env.put("TERMUX__PREFIX", prefix.getAbsolutePath());
+            env.put("TERMUX__PREFIX_CLASSICAL", prefix.getAbsolutePath());
             env.put("TERMUX__ROOTFS", runtime.getAbsolutePath());
             env.put("TERMUX_APP__PACKAGE_NAME", context.getPackageName());
+            env.put("TERMUX_APP__DATA_DIR", appData.getAbsolutePath());
+            env.put("TERMUX__PROJECT_DIR", project.getAbsolutePath());
+            env.put("TERMUX__CORE_DIR", core.getAbsolutePath());
+            env.put("TERMUX__APPS_DIR", apps.getAbsolutePath());
+            env.put("TERMUX__APPS_DIR_BY_IDENTIFIER", appsByIdentifier.getAbsolutePath());
+            env.put("TERMUX__APPS_DIR_BY_UID", appsByUid.getAbsolutePath());
+            env.put("TERMUX__CACHE_DIR", cache.getAbsolutePath());
+            env.put("TERMUX__LEGACY_PROJECT_USER_CONFIG_DIR", new File(home, ".termux").getAbsolutePath());
+            env.put("TERMUX__INTERNAL_NAME", "termux");
+            env.put("TERMUX__LNAME", "termux");
+            env.put("TERMUX__UNAME", "TERMUX");
+            env.put("TERMUX__NAME", "Termux");
+            env.put("TERMUX_APP__NAME", "Termux");
+            env.put("TERMUX_APP__LNAME", "termux");
+            env.put("TERMUX_APP__APP_IDENTIFIER", "termux");
+            env.put("TERMUX_APP__APP_DIR", new File(appsByIdentifier, "termux").getAbsolutePath());
             env.put("TMPDIR", temp.getAbsolutePath());
             env.put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin:/system/xbin");
             String prefixLibraryPath = new File(prefix, "lib").getAbsolutePath();

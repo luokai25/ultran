@@ -156,6 +156,7 @@ public final class UltranRuntimePlugin extends Plugin {
             }
 
             if (symlinks.isEmpty()) throw new IllegalArgumentException("This is not a supported Termux bootstrap: SYMLINKS.txt is missing or empty.");
+            verifyBootstrapArchitecture(staging);
             String finalPrefix = destination.getCanonicalPath();
             for (String[] link : symlinks) {
                 String linkTarget = link[0];
@@ -222,6 +223,35 @@ public final class UltranRuntimePlugin extends Plugin {
             if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)) throw new IllegalArgumentException("Bootstrap contains a path traversal entry.");
         }
         return normalized;
+    }
+
+    private void verifyBootstrapArchitecture(File staging) throws Exception {
+        File bash = new File(staging, "bin/bash");
+        byte[] header = new byte[20];
+        try (InputStream input = new java.io.FileInputStream(bash)) {
+            int offset = 0;
+            while (offset < header.length) {
+                int read = input.read(header, offset, header.length - offset);
+                if (read < 0) throw new IllegalArgumentException("Bootstrap is missing a valid bin/bash ELF executable.");
+                offset += read;
+            }
+        }
+        if ((header[0] & 0xff) != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F' || header[5] != 1) {
+            throw new IllegalArgumentException("Bootstrap bin/bash is not a supported little-endian ELF executable.");
+        }
+        int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+        boolean supported = false;
+        for (String abi : android.os.Build.SUPPORTED_ABIS) {
+            if (("arm64-v8a".equals(abi) && machine == 183) || ("x86_64".equals(abi) && machine == 62)) {
+                supported = true;
+                break;
+            }
+        }
+        if (!supported) {
+            String actual = machine == 183 ? "arm64-v8a" : machine == 62 ? "x86_64" : "ELF machine " + machine;
+            throw new IllegalArgumentException("Bootstrap architecture (" + actual + ") does not match this device (" +
+                (android.os.Build.SUPPORTED_ABIS.length == 0 ? "unknown" : android.os.Build.SUPPORTED_ABIS[0]) + "). Select the matching bootstrap ZIP.");
+        }
     }
 
     private boolean isAptSourcePath(String path) {

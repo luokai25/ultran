@@ -416,6 +416,8 @@ def test_api_approval_flow_completes(client):
 
     decided = client.post(f"/v1/mcp/approvals/{approval_id}", json={"approved": True})
     assert decided.json()["state"] == "approved"
+    history = client.get("/v1/mcp/approvals/history").json()["approvals"]
+    assert any(row["id"] == approval_id and row["state"] == "approved" for row in history)
 
     second = client.post(
         "/v1/mcp/invoke",

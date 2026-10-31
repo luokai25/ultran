@@ -40,11 +40,11 @@ test("new orbital U mark stays aligned across web, Android generator, and adapti
   ]);
   assert.match(mark, /<circle cx="54" cy="54" r="37"/);
   assert.match(mark, /M34 34v21c0 27 40 27 40 0V34/);
-  assert.match(generator, /ORBIT_CENTER = \\(54\.0, 54\.0\\)/);
-  assert.match(generator, /ORBIT_RADIUS = 37\.0/);
-  assert.match(generator, /U_CURVE = \\(\\(34\.0, 82\.0\\), \\(74\.0, 82\.0\\), \\(74\.0, 55\.0\\)\\)/);
+  assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
+  assert.ok(generator.includes("ORBIT_RADIUS = 37.0"));
+  assert.ok(generator.includes("U_CURVE = ((34.0, 82.0), (74.0, 82.0), (74.0, 55.0))"));
   assert.match(vector, /android:strokeColor="#CDA94D" android:strokeWidth="5"/);
   assert.match(vector, /android:strokeColor="#F0D58A" android:strokeWidth="9"/);
   assert.match(background, /#0B0D0F/);
-  assert.match(generator, /Poly = list\\[tuple\\[float, float\\]\\]/);
+  assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
 });

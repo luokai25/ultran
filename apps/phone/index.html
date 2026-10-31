@@ -60,6 +60,7 @@
         <form id="composer" class="composer">
           <textarea id="prompt" rows="1" autocomplete="off" autocapitalize="sentences" placeholder="Message Ultran…" aria-label="Message"></textarea>
           <div class="composer-row">
+            <div class="tool-strip" id="tool-strip">
             <button type="button" id="voice-btn" class="tool" aria-pressed="false" aria-label="Speak replies aloud">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l5 4V6L7 10H4z"/><path d="M16 9c1.3 1 1.3 5 0 6M18.5 6.5c3 2.5 3 8.5 0 11"/></svg>
               <span>Voice</span>
@@ -73,6 +74,7 @@
             <button type="button" id="background-btn" class="tool background-toggle" aria-pressed="false" aria-label="Run in background">
               <span>Background</span>
             </button>
+            </div>
             <span id="link-pill" class="link-pill" data-state="offline">local</span>
             <button type="submit" id="send-btn" class="send" aria-label="Send" disabled>
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>

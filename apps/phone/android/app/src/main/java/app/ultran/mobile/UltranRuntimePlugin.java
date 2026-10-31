@@ -321,6 +321,9 @@ public final class UltranRuntimePlugin extends Plugin {
                 if (!partial.renameTo(archive)) throw new IllegalStateException("Could not finalize the verified runtime archive.");
                 partial = null;
                 installBootstrap(call, Uri.fromFile(archive));
+                // The archive is only a staging download; free the space after
+                // the installer has consumed it, whether install succeeded or not.
+                if (archive.exists()) archive.delete();
             } catch (Exception error) {
                 if (partial != null && partial.exists()) partial.delete();
                 call.reject(error.getMessage() == null ? "Could not download the official Termux runtime." : error.getMessage(), error);

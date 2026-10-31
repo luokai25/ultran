@@ -120,6 +120,15 @@ Edit `.env`:
 - Set `ULTRAN_DOMAIN` to a DNS name whose A record points to this server.
 - Set `ACME_EMAIL` to an address for TLS certificate notices.
 - Set `ULTRAN_CORS_ORIGINS` to the exact HTTPS origin(s) of the web app.
+- To enable Composio-managed OAuth connectors, create/copy the project API key
+  from your Composio project settings and set `ULTRAN_COMPOSIO_API_KEY` in this
+  private server-side `.env` file. Keep permissions at `0600`; never commit the
+  populated file, add the key to GitHub source, expose it through a frontend
+  variable, or bundle it into the APK. The Android app checks the backend's
+  redacted `/v1/connectors/composio/status` endpoint and displays whether the
+  server is configured; it never needs the project key itself. Restart the API
+  after changing the environment, then verify the status endpoint reports
+  `configured: true` and complete one OAuth connection from the app.
 - Generate the Fernet key on the server with Python's standard library,
   then put it in `.env`. Do not paste it into chat, commit it, or put it in
   shell history.

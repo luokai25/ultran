@@ -208,7 +208,7 @@ class ComposioGateway:
                 # Validate schemas before an approval prompt is shown.
                 from .mcp.schema import validate_arguments
                 cleaned = validate_arguments(spec.name, spec.input_schema, args)
-                mutating = bool(spec.capabilities & {"write", "delete", "execute", "admin"})
+                mutating = spec.capabilities != frozenset({"read"})
                 if mutating or spec.requires_approval:
                     approval = self._approval_gate.request(
                         workspace_id, spec.id,

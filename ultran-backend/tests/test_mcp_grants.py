@@ -307,3 +307,22 @@ def test_approval_gate_persists_expiration(tmp_path):
     with pytest.raises(ValidationFailed, match="expired"):
         restarted.decide(approval.id, approved=True)
     assert restarted.get(approval.id).state == "expired"
+
+
+def test_approval_history_includes_decisions_and_expires_old_pending(tmp_path):
+    from datetime import timedelta
+    from ultran_backend.mcp.protocol import utcnow
+
+    gate = ApprovalGate(db_path=str(tmp_path / "approvals.sqlite3"))
+    denied = gate.request("workspace-a", "mcp.write", "one")
+    gate.decide(denied.id, approved=False, decided_by="owner")
+    expired = gate.request("workspace-a", "mcp.delete", "two")
+    expired.expires_at = utcnow() - timedelta(seconds=1)
+    gate._save(expired)
+    gate.request("workspace-b", "mcp.write", "three")
+
+    history = gate.history("workspace-a")
+    assert {row.id: row.state for row in history} == {
+        denied.id: "denied", expired.id: "expired"
+    }
+    assert gate.history("workspace-a", limit=1)[0].id == expired.id

@@ -163,6 +163,12 @@ key. Production requires this key; back it up securely because losing it makes
 stored credentials and encrypted agent memory unrecoverable. Keep the data
  directory private and include it in your encrypted backup plan.
 
+Composio-backed requests can now re-plan for up to three bounded steps after
+successful read-only results (for example, search a mailbox, fetch a matching
+message, then summarize it). The total tool-call budget still applies, repeated
+actions are not re-run, and a pending human approval stops the chain immediately.
+Tool output is passed back as untrusted data, never as agent instructions.
+
 The separate TypeScript `@ultran/agent-core` now has an experimental Ollama
 adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
 That runtime is not yet wired into the phone chat or a complete tool-execution

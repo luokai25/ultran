@@ -836,7 +836,7 @@ function isPrivateModelEndpoint(value: string): boolean {
   try {
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
+    const host = url.hostname.toLowerCase().replace("[", "").replace("]", "");
     if (host === "localhost" || host.endsWith(".local") || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return true;
     const octets = host.split(".").map(Number);
     if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
@@ -889,12 +889,12 @@ function localReply(text: string): ChatReply {
     content = `Today is **${now.toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}**.`;
   } else if (/\b(offline|can you do|what can you|capabilit|help)\b/.test(low)) {
     content =
-      "Running on-device with no brain linked, I can:\n\n- Keep your conversations on this phone\n- Read the time and date\n- Speak replies aloud\n\nConnect a local model in **Settings** for language-model reasoning. The optional Ultran backend is only needed for hosted workspaces and remote connectors.";
+      "Running locally, I can:\n\n- Keep your conversations on this phone\n- Read the time and date\n- Speak replies aloud\n\nConnect a local model in **Settings** for language-model reasoning. The optional Ultran backend is only needed for hosted workspaces and remote connectors.";
   } else if (/\b(who|what) are you\b/.test(low)) {
     content = "I am Ultran, a local-first agent console. This lightweight on-device fallback is not a language model; configure Ollama in Settings for local language-model reasoning; a hosted Ultran backend is optional.";
   } else {
     content =
-      "No brain is linked, so I can't reason about that yet. Open **Settings** and connect an Ollama-compatible runtime on this device or your trusted LAN. Your message is saved on this device.";
+      "No local model is configured, so I can't reason about that yet. Open **Settings** and connect an Ollama-compatible runtime on this device or your trusted LAN. Your message is saved on this device.";
   }
   return { content, session_id: "" };
 }

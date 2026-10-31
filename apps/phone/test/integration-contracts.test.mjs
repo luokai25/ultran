@@ -7,12 +7,16 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, orchestrator, policyGate, ledger, runState] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranRuntimePlugin.java"),
   read("src/capability-kernel.ts"),
+  read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
+  read("../../services/agent-core/src/monetization/policy-gate.ts"),
+  read("../../services/agent-core/src/monetization/ledger.ts"),
+  read("../../services/agent-core/src/orchestrator/run-state.ts"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {
@@ -80,4 +84,38 @@ test("complex local answers receive an independent review without discarding the
   assert.match(main, /catch \{\s*\/\/ Review is a quality enhancement; never discard a usable first answer\./);
   assert.match(main, /if \(!response\.ok\) return draft/);
   assert.match(main, /return payload\.message\?\.content\?\.trim\(\) \|\| draft/);
+});
+
+test("conversation context is budgeted and task complexity adjusts inference", () => {
+  assert.match(capabilityKernel, /export function budgetConversation/);
+  assert.match(capabilityKernel, /maxTotalChars/);
+  assert.match(capabilityKernel, /export function profileTask/);
+  assert.match(capabilityKernel, /tier: "critical"/);
+  assert.match(capabilityKernel, /tier: "deep"/);
+  assert.match(main, /budgetConversation\(convo\.messages, profile\.contextMessages, 3800, 1800\)/);
+  assert.match(main, /profile\.contextTokens \* 2/);
+});
+
+test("agent-core uses one brain-independent plan-act-reflect loop with bounded model retries", () => {
+  assert.match(orchestrator, /private async plan\(/);
+  assert.match(orchestrator, /private async selectTool\(/);
+  assert.match(orchestrator, /private async reflect\(/);
+  assert.match(orchestrator, /this\.opts\.brain\.infer\(this\.opts\.planModelId/);
+  assert.match(orchestrator, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
+  assert.match(orchestrator, /validateBasicArgs\(tool\.inputSchema, call\.args\)/);
+  assert.match(orchestrator, /step\.candidates\.includes\(call\.toolId\)/);
+  assert.match(orchestrator, /No human-approval resolver is configured; the tool was not invoked/);
+  assert.match(orchestrator, /this\.opts\.authorizeTool\(/);
+  assert.match(orchestrator, /type: 'run\.result'/);
+  assert.doesNotMatch(orchestrator, /TODO: real constrained-decoding call/);
+});
+
+test("agent-core usage limits account for projected calls and replay-stable metering", () => {
+  assert.match(policyGate, /used \+ amount > limit/);
+  assert.match(policyGate, /recordUsage\(/);
+  assert.match(orchestrator, /recordUsage\(state\.runId, 'tool\.calls', 1/);
+  assert.match(ledger, /idempotencyKey\?: string/);
+  assert.match(ledger, /reading\.idempotencyKey \?\?/);
+  assert.match(runState, /type: 'approval\.required'/);
+  assert.match(runState, /type: 'step\.failed'/);
 });

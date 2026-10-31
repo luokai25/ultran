@@ -9,7 +9,7 @@ from ultran_backend.capability import (
 
 def test_task_profiles_reserve_review_for_complex_and_high_impact_work():
     assert profile_task("What time is it?").tier == "quick"
-    assert profile_task("Explain why this design is better and compare the trade-offs").tier == "standard"
+    assert profile_task("How does this concept work?").tier == "standard"
     deep = profile_task("Audit this integration, debug the code, and create a test plan")
     assert deep.tier == "deep"
     assert deep.verify_draft is True

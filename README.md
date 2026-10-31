@@ -112,34 +112,25 @@ pnpm lint         # lint every workspace
 pnpm format       # prettier
 ```
 
-### Enable real local-model reasoning
+### Connect a local model
 
-The Android shell is a chat client, not a bundled LLM. For actual language-model
-responses, run Ollama and the Python control plane on a trusted computer or
-local server, then enter that server's LAN address in **Settings → Brain
-endpoint** in the phone app.
+The Android shell does not bundle model weights yet. It can send inference
+directly to a local Ollama-compatible runtime without routing chat through the
+Ultran backend. Configure the runtime address and installed model in the phone
+app under Settings → Local model endpoint. The app accepts localhost and
+private-LAN endpoints only. On Android, localhost works only after an
+on-device runtime is installed and running; a trusted LAN computer can host the
+model during development. The native in-app llama.cpp runtime and model manager
+are still in progress, so this direct-runtime bridge is not yet a
+self-contained model engine.
 
-```bash
-# Install Ollama separately, then fetch the model once:
-ollama pull llama3.1:8b
-
-# In the repository root:
-cd ultran-backend
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-
-# Prefer local Ollama; Echo is an explicit degraded/offline fallback.
-ULTRAN_BRAIN_BACKEND=ollama \
-ULTRAN_BRAIN_MODEL=llama3.1:8b \
-ULTRAN_BRAIN_FALLBACKS=echo \
-python -m ultran_backend
-```
-
-The backend listens on `127.0.0.1:8080` by default. To reach it from a phone,
-set `ULTRAN_HOST=0.0.0.0` and connect using the computer's LAN IP, but only on
-a trusted network and with firewall access limited to your devices. Do not
-expose this development backend directly to the public internet.
+For hosted agents, Composio and shared workspaces, the optional Python control
+plane can still run separately. Set ULTRAN_BRAIN_BACKEND=ollama and
+ULTRAN_BRAIN_MODEL=llama3.1:8b before starting the backend. It listens on
+127.0.0.1:8080 by default. To reach it from a phone, set ULTRAN_HOST=0.0.0.0
+and connect using the computer's LAN IP, but only on a trusted network and
+with firewall access limited to your devices. Do not expose this development
+backend directly to the public internet.
 
 ### Connect Google and other services through Composio
 

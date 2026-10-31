@@ -163,6 +163,23 @@ jobs:
           set -euo pipefail
           gradle assembleRelease --no-daemon --console=plain --stacktrace --max-workers=2 2>&1 | tee build.log
 
+      - name: Verify privacy-safe merged Android manifest
+        working-directory: ${{ env.WORKDIR }}/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST=$(find app/build/intermediates -type f -path '*merged_manifest*release*/AndroidManifest.xml' -print -quit)
+          if [ -z "$MANIFEST" ]; then
+            echo "::error::Merged release manifest was not found"
+            exit 1
+          fi
+          echo "Auditing $MANIFEST"
+          if grep -E 'android.permission.(READ_SMS|RECEIVE_SMS|SEND_SMS|WRITE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|PROCESS_OUTGOING_CALLS|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)|BIND_ACCESSIBILITY_SERVICE|AccessibilityService' "$MANIFEST"; then
+            echo "::error::Restricted or broad user-data access found in merged release manifest"
+            exit 1
+          fi
+          echo "::notice::No restricted SMS/call-log, broad storage/media, battery-exemption, or accessibility-service declarations found"
+
       - name: Verify APK
         id: verify
         working-directory: ${{ env.WORKDIR }}/android

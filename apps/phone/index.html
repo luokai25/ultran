@@ -168,6 +168,7 @@
           <small>Runs llama.cpp inside the Android app. Import a GGUF file once; it is copied into private app storage and works offline. Start with a small 1B–3B Q4 model on phones.</small>
           <select id="native-model-select" aria-label="Installed GGUF models"></select>
           <p id="native-model-status" class="native-model-status" role="status">Checking native model runtime…</p>
+          <p id="device-profile" class="device-profile" role="status">Checking device memory and storage…</p>
           <div class="sheet-actions native-model-actions">
             <button id="native-model-pick-btn" class="ghost" type="button">Import GGUF</button>
             <button id="native-model-load-btn" class="ghost" type="button" disabled>Load model</button>

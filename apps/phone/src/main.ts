@@ -1443,7 +1443,7 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
     }
     if (parsed.tool === "telegram.compose" && typeof parsed.body === "string") {
       const body = parsed.body.trim();
-      if (!body || body.length > 4000 || body.includes("\\0")) return null;
+      if (!body || body.length > 4000 || body.includes("\0")) return null;
       return { tool: "telegram.compose", body };
     }
     const allowedApps = ["whatsapp", "whatsapp-business", "telegram", "messages", "gmail", "phone", "calendar"] as const;

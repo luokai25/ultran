@@ -2358,7 +2358,9 @@ smsBtn.addEventListener("click", () => void prepareSms());
 
 function setActiveNavigation(active: HTMLButtonElement): void {
   document.querySelectorAll<HTMLButtonElement>(".nav-item").forEach((button) => {
-    if (button === active) button.setAttribute("aria-current", "page");
+    const selected = button === active;
+    button.classList.toggle("is-active", selected);
+    if (selected) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
 }
@@ -2395,6 +2397,7 @@ navSettingsButton.addEventListener("click", () => {
 connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
 connectorsBackButton.addEventListener("click", () => setActiveNavigation(navChatButton));
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => setActiveNavigation(navChatButton));
+setActiveNavigation(navChatButton);
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);

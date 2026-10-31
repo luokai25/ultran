@@ -18,7 +18,7 @@ export type CapabilityProfile = {
 };
 
 const CRITICAL_PATTERN = /\b(medical|diagnos|symptom|medication|dose|legal|lawsuit|contract|tax|investment|investing|financial|emergency|security incident|personal data|credential|production deploy|delete|wipe|purge|erase|drop table|data loss)\b/i;
-const DEEP_PATTERN = /\b(build|implement|debug|refactor|architecture|design|compare|evaluate|research|investigate|audit|analy[sz]e|plan|roadmap|strategy|multi.?step|step.?by.?step|agent|workflow|connector|integration|code|program|script|test|deploy|migration|optimi[sz]e|pdf|docx|pptx|xlsx|spreadsheet|presentation|document|file)\b/i;
+const DEEP_PATTERN = /\b(build|implement|debug|refactor|architecture|design|compare|evaluate|research|investigate|audit|analy[sz]e|plan|roadmap|strategy|multi.?step|step.?by.?step|agent|workflow|connector|integration|code|program|script|test|deploy|migration|optimi[sz]e|pdf|docx|pptx|xlsx|spreadsheet|presentation|document|file|zip|archive|compress|extract|python|javascript|typescript|java|kotlin|golang|rust|shell|sql)\b/i;
 const ARABIC_CRITICAL_PATTERN = /(?:طبي|دواء|جرعة|قانوني|مالي|استثمار|احذف|حذف|امسح|تدمير|بيانات شخصية|قاعدة البيانات)/i;
 const ARABIC_DEEP_PATTERN = /(?:ابن|بناء|برمج|كود|تصميم|تحليل|اختبر|اختبار|بحث|خطة|تكامل|تصحيح|نشر|مراجعة|تحسين|وكيل|سير العمل)/i;
 

@@ -26,6 +26,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import sqlite3
+import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -284,9 +286,62 @@ class ApprovalGate:
     ``409 approval_pending`` that the orchestrator turns into a paused run.
     """
 
-    def __init__(self, *, ttl_s: int = 300) -> None:
+    def __init__(self, *, ttl_s: int = 300, db_path: str | None = None) -> None:
         self.ttl_s = max(1, int(ttl_s))
         self._approvals: dict[str, Approval] = {}
+        self._lock = threading.RLock()
+        self._db_path = db_path
+        if self._db_path:
+            from pathlib import Path
+            path = Path(self._db_path)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._init_db()
+            try:
+                path.chmod(0o600)
+            except OSError:
+                pass
+
+    def _connect(self):
+        connection = sqlite3.connect(self._db_path, timeout=10)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=10000")
+        return connection
+
+    def _init_db(self) -> None:
+        with self._connect() as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("""CREATE TABLE IF NOT EXISTS approvals (
+                id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, tool_id TEXT NOT NULL,
+                arguments_hash TEXT NOT NULL, reason TEXT NOT NULL, state TEXT NOT NULL,
+                created_at TEXT NOT NULL, expires_at TEXT, decided_by TEXT NOT NULL,
+                decided_at TEXT
+            )""")
+            rows = db.execute("SELECT * FROM approvals").fetchall()
+        for row in rows:
+            approval = Approval(
+                id=row["id"], workspace_id=row["workspace_id"], tool_id=row["tool_id"],
+                arguments_hash=row["arguments_hash"], reason=row["reason"], state=row["state"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
+                decided_by=row["decided_by"],
+                decided_at=datetime.fromisoformat(row["decided_at"]) if row["decided_at"] else None,
+            )
+            self._approvals[approval.id] = approval
+
+    def _save(self, approval: Approval) -> None:
+        if not self._db_path:
+            return
+        with self._connect() as db:
+            db.execute("""INSERT INTO approvals VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET workspace_id=excluded.workspace_id,
+                tool_id=excluded.tool_id, arguments_hash=excluded.arguments_hash,
+                reason=excluded.reason, state=excluded.state, expires_at=excluded.expires_at,
+                decided_by=excluded.decided_by, decided_at=excluded.decided_at""", (
+                approval.id, approval.workspace_id, approval.tool_id, approval.arguments_hash,
+                approval.reason, approval.state, approval.created_at.isoformat(),
+                approval.expires_at.isoformat() if approval.expires_at else None,
+                approval.decided_by, approval.decided_at.isoformat() if approval.decided_at else None,
+            ))
 
     def request(
         self,
@@ -304,40 +359,43 @@ class ApprovalGate:
             reason=reason or "sensitive action requires confirmation",
             expires_at=utcnow() + timedelta(seconds=self.ttl_s),
         )
-        self._approvals[approval.id] = approval
+        with self._lock:
+            self._approvals[approval.id] = approval
+            self._save(approval)
         return approval
 
     def get(self, approval_id: str) -> Approval:
-        try:
-            return self._approvals[approval_id]
-        except KeyError:
-            raise NotFound("approval not found", details={"approval_id": approval_id}) from None
+        with self._lock:
+            try:
+                return self._approvals[approval_id]
+            except KeyError:
+                raise NotFound("approval not found", details={"approval_id": approval_id}) from None
 
     def decide(self, approval_id: str, *, approved: bool, decided_by: str = "user") -> Approval:
-        approval = self.get(approval_id)
-        if approval.state != "pending":
-            raise ValidationFailed(
-                "approval has already been decided",
-                details={"approval_id": approval_id, "state": approval.state},
-            )
-        if approval.is_expired():
-            approval.state = "expired"
-            raise ValidationFailed(
-                "approval has expired", details={"approval_id": approval_id}
-            )
-        approval.state = "approved" if approved else "denied"
-        approval.decided_by = decided_by
-        approval.decided_at = utcnow()
-        return approval
+        with self._lock:
+            approval = self.get(approval_id)
+            if approval.state != "pending":
+                raise ValidationFailed(
+                    "approval has already been decided",
+                    details={"approval_id": approval_id, "state": approval.state},
+                )
+            if approval.is_expired():
+                approval.state = "expired"
+                self._save(approval)
+                raise ValidationFailed("approval has expired", details={"approval_id": approval_id})
+            approval.state = "approved" if approved else "denied"
+            approval.decided_by = decided_by
+            approval.decided_at = utcnow()
+            self._save(approval)
+            return approval
 
     def pending(self, workspace_id: str | None = None) -> list[Approval]:
-        rows = [
-            a
-            for a in self._approvals.values()
-            if a.state == "pending"
-            and not a.is_expired()
-            and (workspace_id is None or a.workspace_id == workspace_id)
-        ]
+        with self._lock:
+            rows = [
+                a for a in self._approvals.values()
+                if a.state == "pending" and not a.is_expired()
+                and (workspace_id is None or a.workspace_id == workspace_id)
+            ]
         rows.sort(key=lambda a: a.created_at, reverse=True)
         return rows
 

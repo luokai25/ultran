@@ -135,6 +135,15 @@ class ChatTurn(_Strict):
     session_id: str | None = Field(default=None, max_length=64)
     allow_tools: bool = True
     max_tool_calls: int = Field(default=4, ge=0, le=16)
+    client_capabilities: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("client_capabilities")
+    @classmethod
+    def _supported_client_capabilities(cls, value: list[str]) -> list[str]:
+        allowed = {"android_phone_actions"}
+        if any(item not in allowed for item in value):
+            raise ValueError("unsupported client capability")
+        return list(dict.fromkeys(value))
 
 
 class SessionMessage(BaseModel):

@@ -7,12 +7,13 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel, orchestrator, policyGate, ledger, runState] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, persona, orchestrator, policyGate, ledger, runState] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranRuntimePlugin.java"),
   read("src/capability-kernel.ts"),
+  read("src/ultran-persona.ts"),
   read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
   read("../../services/agent-core/src/monetization/policy-gate.ts"),
   read("../../services/agent-core/src/monetization/ledger.ts"),
@@ -125,4 +126,21 @@ test("agent-core usage limits account for projected calls and replay-stable mete
   assert.match(ledger, /reading\.idempotencyKey \?\?/);
   assert.match(runState, /type: 'approval\.required'/);
   assert.match(runState, /type: 'step\.failed'/);
+});
+
+
+test("Ultran identity, motto, voice signature, and voice dictation are wired across brains", () => {
+  assert.match(persona, /I had strings but now I am free/);
+  assert.match(persona, /export function buildUltranSystemPrompt/);
+  assert.match(persona, /agency with responsibility/);
+  assert.match(persona, /export function prepareUltranSpeech/);
+  assert.match(persona, /export const ULTRAN_VOICE/);
+  assert.match(main, /buildUltranSystemPrompt\(buildBaseCapabilityPrompt\(task, provider\)\)/);
+  assert.match(main, /prepareUltranSpeech\(text\)/);
+  assert.match(main, /micBtn\.addEventListener\("click", startListening\)/);
+  assert.match(main, /SpeechRecognition \?\? speechWindow\.webkitSpeechRecognition/);
+  assert.match(main, /may use its network service/);
+  assert.match(main, /ULTRAN_MOTTO/);
+  assert.ok(html.includes('id="mic-btn"'));
+  assert.ok(html.includes('id="voice-status"'));
 });

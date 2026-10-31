@@ -164,6 +164,12 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(taskMonitor, /PeriodicWorkRequest/);
   assert.match(taskMonitor, /15, TimeUnit\.MINUTES/);
   assert.match(taskMonitor, /speakUpdate\(title/);
+  assert.match(taskMonitor, /X-Ultran-Workspace/);
+  assert.match(taskMonitor, /VISIBILITY_PRIVATE/);
+  assert.match(taskMonitor, /Open Ultran to view details/);
+  assert.match(taskMonitor, /Check your notification for task details/);
+  assert.match(companion, /VISIBILITY_PRIVATE/);
+  assert.match(companion, /Open Ultran to view details/);
   assert.match(main, /startTaskMonitor\(\{endpoint: baseUrl\(\), speakUpdates: settings\.voice\}\)/);
   assert.match(manifest, /FOREGROUND_SERVICE_MEDIA_PLAYBACK/);
   assert.match(manifest, /UltranVoiceService/);

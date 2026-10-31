@@ -38,9 +38,12 @@ def retry_task(task_id: str, container: ContainerDep, workspace: WorkspaceDep):
 
 @router.get("/{task_id}/events")
 async def stream_task_events(task_id: str, container: ContainerDep, workspace: WorkspaceDep,
-                             after: int = Query(default=0, ge=0)):
-    """Reconnectable SSE feed backed by the durable task event log."""
-    container.tasks.get(workspace, task_id)  # authorize before opening the stream
+                             after: int = Query(default=0, ge=0),
+                             stream: bool = Query(default=True)):
+    """Reconnectable SSE feed or a bounded event snapshot."""
+    container.tasks.get(workspace, task_id)  # authorize before returning any task data
+    if not stream:
+        return {"events": await asyncio.to_thread(container.tasks.events, workspace, task_id, after=after, limit=200)}
 
     async def stream():
         cursor = after

@@ -209,3 +209,19 @@ test("WhatsApp handoff never sends or taps automatically", () => {
   assert.doesNotMatch(manifest, /BIND_ACCESSIBILITY_SERVICE|UltranMessagingAccessibilityService/);
   assert.doesNotMatch(companion, /AccessibilityNodeInfo|Settings\.Secure|ACTION_ACCESSIBILITY_SETTINGS/);
 });
+
+
+test("mobile navigation is fully wired and respects phone accessibility zoom", async () => {
+  const experience = await read("src/experience.css");
+  for (const id of ["nav-chat", "nav-agents", "nav-connectors", "nav-settings"]) {
+    assert.equal((html.match(new RegExp(`id="${id}"`, "g")) ?? []).length, 1);
+    assert.ok(main.includes(`#${id}`));
+  }
+  assert.match(main, /navChatButton\.addEventListener/);
+  assert.match(main, /navAgentsButton\.addEventListener/);
+  assert.match(main, /navConnectorsButton\.addEventListener/);
+  assert.match(main, /navSettingsButton\.addEventListener/);
+  assert.match(experience, /\.bottom-nav/);
+  assert.match(experience, /\.nav-item\[aria-current="page"\]/);
+  assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
+});

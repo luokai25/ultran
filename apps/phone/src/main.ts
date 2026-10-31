@@ -1273,6 +1273,15 @@ async function reviewLocalDraft(task: string, draft: string): Promise<string> {
   }
 }
 
+function boundToolResult(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  const marker = "\\n[… tool output truncated …]\\n";
+  const available = Math.max(0, maxChars - marker.length);
+  const head = Math.ceil(available * 0.7);
+  const tail = Math.max(0, available - head);
+  return value.slice(0, head) + marker + (tail ? value.slice(-tail) : "");
+}
+
 type TerminalToolRequest = { tool: "terminal.run"; command: string };
 type TerminalToolFollowup = { request: string; result: string };
 
@@ -1315,7 +1324,8 @@ async function localModelReply(convo: Conversation, toolFollowup?: TerminalToolF
   try {
     const task = convo.messages[convo.messages.length - 1]?.content ?? "";
     const profile = profileTask(task);
-    const messages = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
+    const historyBudget = toolFollowup ? Math.max(1800, profile.contextTokens * 2 - 3500) : profile.contextTokens * 2;
+    const messages = budgetConversation(convo.messages, profile.contextMessages, historyBudget, profile.contextChars);
     const response = await fetch(endpoint + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1344,7 +1354,7 @@ async function localModelReply(convo: Conversation, toolFollowup?: TerminalToolF
       const request = parseTerminalToolRequest(content);
       if (request) {
         const toolResult = await runApprovedTerminalTool(request.command);
-        return localModelReply(convo, { request: content, result: toolResult });
+        return localModelReply(convo, { request: content, result: boundToolResult(toolResult, 3000) });
       }
       if (shouldVerifyDraft(task)) {
         const reviewed = await reviewLocalDraft(task, content);
@@ -1450,9 +1460,9 @@ async function submit(raw: string): Promise<void> {
       const profile = profileTask(text);
       const messages = [
         { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT },
-        ...budgetConversation(convo.messages, profile.contextMessages, 3800, 1800),
+        ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200),
       ];
-      const response = await NativeLocalAI.generate({ messages, maxTokens: profile.maxTokens });
+      const response = await NativeLocalAI.generate({ messages, maxTokens: Math.min(profile.maxTokens, 384) });
       const request = parseTerminalToolRequest(response.content);
       if (request) {
         const toolResult = await runApprovedTerminalTool(request.command);
@@ -1460,7 +1470,7 @@ async function submit(raw: string): Promise<void> {
           messages: [
             ...messages,
             { role: "assistant" as const, content: response.content },
-            { role: "user" as const, content: `Terminal tool result:\n${toolResult}` },
+            { role: "user" as const, content: `Terminal tool result:\n${boundToolResult(toolResult, 2400)}` },
           ],
           maxTokens: profile.maxTokens,
         });
@@ -1474,9 +1484,9 @@ async function submit(raw: string): Promise<void> {
             const review = await NativeLocalAI.generate({
               messages: [
                 { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") },
-                { role: "user" as const, content: buildReviewPrompt(text, response.content.slice(0, 4200)) },
+                { role: "user" as const, content: buildReviewPrompt(text.slice(0, 900), response.content.slice(0, 2200)) },
               ],
-              maxTokens: profile.maxTokens,
+              maxTokens: Math.min(profile.maxTokens, 384),
             });
             if (review.content.trim()) finalContent = review.content.trim();
           } catch {

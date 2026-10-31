@@ -94,6 +94,13 @@ const server = createServer(async (req, res) => {
       }
       const maxTokens = typeof body.maxTokens === 'number' ? body.maxTokens : 512;
       const temperature = typeof body.temperature === 'number' ? body.temperature : 0.2;
+      const responseSchema = body.responseSchema && typeof body.responseSchema === 'object' && !Array.isArray(body.responseSchema)
+        ? body.responseSchema as Record<string, unknown>
+        : undefined;
+      if (body.responseSchema !== undefined && !responseSchema) {
+        send(400, { error: 'responseSchema must be a JSON schema object' });
+        return;
+      }
       if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 8192) {
         send(400, { error: 'maxTokens must be an integer between 1 and 8192' });
         return;
@@ -108,6 +115,7 @@ const server = createServer(async (req, res) => {
         ...(typeof body.system === 'string' ? { system: body.system } : {}),
         maxTokens,
         temperature,
+        ...(responseSchema ? { responseSchema } : {}),
       })) tokens.push(token.text);
       const output = tokens.join('');
       send(200, {

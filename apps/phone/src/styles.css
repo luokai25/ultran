@@ -1293,3 +1293,84 @@ button {
 .native-model-status { margin: 4px 0; color: var(--muted, #aaa); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .native-model-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .native-model-actions button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ---------- Hugging Face model library ---------- */
+.model-discovery {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--hairline));
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
+    linear-gradient(145deg, color-mix(in srgb, var(--carbon) 94%, var(--accent)), var(--obsidian));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 14px 35px rgba(0,0,0,.18);
+  animation: model-library-enter .38s cubic-bezier(.2,.8,.2,1) both;
+}
+.model-discovery-heading, .hub-model-top, .hub-model-actions, .hub-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.model-discovery-heading > div { display: grid; gap: 4px; }
+.model-discovery-heading strong { font-size: 15px; letter-spacing: -.01em; }
+.model-discovery-heading small, .model-library-note { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.model-library-badge, .hub-model-tag {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 999px;
+  color: var(--accent-bright);
+  font: 9px var(--font-mono);
+  letter-spacing: .08em;
+}
+.model-search { display: flex; gap: 8px; margin: 14px 0 8px; }
+.model-search input {
+  flex: 1; min-width: 0; width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  outline: 0;
+  color: var(--ink);
+  background: rgba(0,0,0,.3);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.model-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.model-search .solid, .hub-file-row .solid {
+  padding: 9px 12px; border: 0; border-radius: 12px;
+  color: #191407; background: linear-gradient(135deg,var(--accent-bright),var(--accent));
+  font-size: 12px; font-weight: 700;
+}
+.model-library-status { margin: 8px 0 12px; line-height: 1.5; }
+.model-library-results { display: grid; gap: 9px; }
+.hub-model-card {
+  min-width: 0; padding: 12px;
+  border: 1px solid var(--hairline); border-radius: 15px;
+  background: rgba(255,255,255,.025);
+  animation: model-card-enter .28s ease both;
+  transition: border-color .2s ease, transform .2s ease, background .2s ease;
+}
+.hub-model-card:focus-within, .hub-model-card:hover {
+  border-color: color-mix(in srgb,var(--accent) 44%,var(--hairline));
+  background: color-mix(in srgb,var(--accent) 4%,var(--carbon));
+}
+.hub-model-top strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+.hub-model-meta { margin: 6px 0 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.hub-model-actions { justify-content: flex-start; }
+.hub-model-actions button, .hub-file-row button { padding: 8px 10px; border-radius: 10px; font-size: 11px; }
+.hub-file-list { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.hub-file-row { align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.045); }
+.hub-file-info { display: grid; min-width: 0; gap: 4px; }
+.hub-file-info strong { overflow-wrap: anywhere; font-size: 11px; line-height: 1.4; }
+.hub-file-info small { color: var(--muted); font-size: 10px; }
+.hub-file-row .solid { flex: 0 0 auto; }
+.model-library-note { display: block; margin-top: 12px; }
+.native-model-manager .model-discovery { width: 100%; }
+@keyframes model-library-enter { from { opacity: 0; transform: translateY(9px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes model-card-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .model-discovery, .hub-model-card { animation: none; transition: none; }
+}
+

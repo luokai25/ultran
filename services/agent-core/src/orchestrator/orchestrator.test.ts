@@ -16,7 +16,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
 }
 
-function makeBrain() {
+function makeBrain(options: { invalidArgs?: boolean } = {}) {
   const backend = new OllamaBackend({
     fetcher: async (input, init) => {
       const url = String(input);
@@ -35,7 +35,10 @@ function makeBrain() {
           description: 'Echo the requested text using the demo tool',
         }] });
       } else if (system.includes('MODE: ACT')) {
-        content = JSON.stringify({ toolId: 'demo.echo', args: { text: 'hello' } });
+        content = JSON.stringify({
+          toolId: 'demo.echo',
+          args: options.invalidArgs ? { text: 'hello', options: { mode: 42 } } : { text: 'hello' },
+        });
       } else if (prompt.includes('Actual outcomes:')) {
         content = prompt.includes('No human-approval resolver is configured')
           ? 'The task was not executed because approval was unavailable.'
@@ -72,7 +75,15 @@ function makeRegistry() {
       capability: 'demo:read',
       inputSchema: {
         type: 'object',
-        properties: { text: { type: 'string' } },
+        properties: {
+          text: { type: 'string' },
+          options: {
+            type: 'object',
+            properties: { mode: { type: 'string', enum: ['fast', 'safe'] } },
+            required: ['mode'],
+            additionalProperties: false,
+          },
+        },
         required: ['text'],
         additionalProperties: false,
       },
@@ -162,4 +173,32 @@ test('policy gate accounts for the next call and stable meter keys prevent dupli
   assert.equal(await gate.check('run', 'tool.calls', 1), 'degrade');
   gate.recordUsage('run', 'tool.calls', 1, 'run:step-2:tool.calls');
   assert.equal(await gate.check('run', 'tool.calls', 1), 'deny');
+});
+
+
+test('nested schema violations stop before the sandbox can cause a side effect', async () => {
+  const { brain } = makeBrain({ invalidArgs: true });
+  await brain.load(modelRef);
+  const registry = makeRegistry();
+  const grants = new InMemoryGrantStore();
+  const sandbox = new ToolSandbox(grants);
+  let invocations = 0;
+  sandbox.register('demo', { exec: async () => { invocations += 1; return { ok: true }; } });
+  const policyGate = new PolicyGate(new UsageLedger(), {
+    plan: 'test', limits: { 'tool.calls': 10 }, features: [], expiresAt: Date.now() + 60_000,
+  });
+  const orchestrator = new Orchestrator({
+    brain, registry, sandbox, policyGate, planModelId: modelRef.id,
+    authorizeTool: async (request) => grants.issue({
+      runId: request.runId,
+      capabilities: [request.capability],
+      expiresAt: Date.now() + 60_000,
+      singleUse: true,
+    }).id,
+  });
+  const runId = await orchestrator.start('Echo hello');
+  const state = await waitForRun(orchestrator, runId);
+  assert.equal(state.status, 'failed');
+  assert.equal(invocations, 0);
+  assert.ok(state.events.some((event) => event.type === 'step.failed' && event.reason.includes('argument "mode" must be string')));
 });

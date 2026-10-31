@@ -51,7 +51,7 @@ type NativeLocalAIPlugin = {
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeTerminal = registerPlugin<{ open(): Promise<void> }>("UltranTerminal");
-const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened:boolean;approved?:boolean;sent?:string|boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
+const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;openedSettings?:boolean;approved?:boolean;sent?:string|boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
@@ -1429,6 +1429,7 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
     if (Capacitor.getPlatform() !== "android") return "WhatsApp tool unavailable: use the Android app.";
     try {
       const result = await NativeCompanion.openWhatsAppMessage({number: request.number, body: request.body});
+      if (result.openedSettings) return "Android Accessibility settings opened. The user must enable Ultran approved phone actions, then retry the WhatsApp request. No message was sent.";
       return result.opened
         ? "WhatsApp opened with the selected number and message prepared after user approval. The exact message was approved in Ultran. The one-shot accessibility service attempts Send only when the WhatsApp editable composer exactly matches the approved text before the 60-second expiry. The send tap is not proof of delivery; report delivery status as unconfirmed."
         : "The user cancelled the WhatsApp handoff. No message was sent.";
@@ -1480,7 +1481,7 @@ async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFoll
           ...messages,
           ...(toolFollowup ? [
             { role: "assistant", content: toolFollowup.request },
-            { role: "user", content: `Terminal tool result:\n${toolFollowup.result}` },
+            { role: "user", content: `Android tool result:\n${toolFollowup.result}` },
           ] : []),
         ],
         options: { temperature: profile.temperature, num_ctx: profile.contextTokens, num_predict: profile.maxTokens },

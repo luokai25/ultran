@@ -788,6 +788,80 @@ function messageNode(message: Message): { root: HTMLElement; body: HTMLElement }
   return { root, body };
 }
 
+function requestedArtifactFormat(task: string): string | null {
+  const low = task.toLowerCase();
+  if (!/\b(create|generate|make|export|save|build|produce|write|draft)\b/.test(low)) return null;
+  if (/\bpdf\b/.test(low)) return "pdf";
+  if (/\b(word document|docx)\b/.test(low)) return "docx";
+  if (/\b(powerpoint|pptx|presentation|slides)\b/.test(low)) return "pptx";
+  if (/\b(excel|xlsx|spreadsheet)\b/.test(low)) return "xlsx";
+  if (/\b(markdown file|\.md)\b/.test(low)) return "md";
+  if (/\b(text file|\.txt)\b/.test(low)) return "txt";
+  return null;
+}
+
+function artifactTitle(task: string): string {
+  const cleaned = task.replace(/\b(create|generate|make|export|save|build|produce|write|draft|a|an|the|as|to|into|file|pdf|docx|pptx|powerpoint|presentation|slides|word document|excel|xlsx|spreadsheet)\b/gi, " ").replace(/\s+/g, " ").trim();
+  return (cleaned.slice(0, 64) || "Ultran document").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function localPdfBlob(title: string, content: string): Blob {
+  const lines: string[] = [title, ""];
+  for (const raw of content.replace(/\r/g, "").split("\n")) {
+    let line = raw.replace(/[^\x20-\x7E]/g, "?");
+    while (line.length > 88) { let cut = line.lastIndexOf(" ", 88); if (cut < 1) cut = 88; lines.push(line.slice(0, cut)); line = line.slice(cut).trimStart(); }
+    lines.push(line);
+  }
+  const pages: string[][] = [];
+  for (let i = 0; i < lines.length; i += 48) pages.push(lines.slice(i, i + 48));
+  const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>", "", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  const pageIds: number[] = [];
+  for (const page of pages.length ? pages : [[]]) {
+    const pageId = objects.length + 1; const contentId = pageId + 1; pageIds.push(pageId);
+    const commands = ["BT", "/F1 10 Tf", "50 790 Td", "14 TL", ...page.map(line => `(${line.replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)")}) Tj T*`), "ET"].join("\n");
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects.push(`<< /Length ${commands.length} >>\nstream\n${commands}\nendstream`);
+  }
+  objects[1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  let pdf = "%PDF-1.4\n%ULTRAN\n"; const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = pdf.length; pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10,"0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+async function attachRequestedArtifact(task: string, content: string, body: HTMLElement): Promise<ToolCall[]> {
+  const format = requestedArtifactFormat(task);
+  if (!format) return [];
+  renderLiveEvent(body, { type: "thinking", stage: "file", label: `Preparing your ${format.toUpperCase()} document` });
+  const title = artifactTitle(task);
+  try {
+    const response = await api("/v1/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, format, content }) });
+    if (response.ok) {
+      const artifact = await response.json() as ArtifactCard;
+      renderLiveEvent(body, { type: "artifact_created", artifact });
+      return [{ connector: "artifacts", action: `create_${format}`, ok: true, detail: `Created ${title}.${format}`, artifact }];
+    }
+  } catch { /* A local PDF fallback keeps offline document creation useful. */ }
+  if (format === "pdf") {
+    const blob = localPdfBlob(title, content);
+    const url = URL.createObjectURL(blob);
+    const artifact: ArtifactCard = { id: `local_${uid()}`, title, format, size: blob.size, preview_url: url, download_url: url };
+    renderLiveEvent(body, { type: "artifact_created", artifact });
+    return [{ connector: "local-files", action: "create_pdf", ok: true, detail: "Created on this device; not uploaded", artifact }];
+  }
+  renderLiveEvent(body, { type: "tool_failed", tool: "artifacts", action: `create_${format}`, detail: "The file service is unavailable" });
+  return [{ connector: "artifacts", action: `create_${format}`, ok: false, detail: "The file service is unavailable; connect Ultran's local control plane and retry." }];
+}
+
+function downloadArtifact(url: string, filename: string): void {
+  if (url.startsWith("blob:")) {
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); return;
+  }
+  void Browser.open({ url: `${baseUrl()}${url}` });
+}
+
 function showArtifactPreview(url: string, title: string): void {
   document.querySelector(".artifact-preview-overlay")?.remove();
   const overlay = document.createElement("div");
@@ -1077,7 +1151,7 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
         const download = document.createElement("button");
         download.type = "button";
         download.textContent = "Download";
-        download.addEventListener("click", () => void Browser.open({ url: `${baseUrl()}${call.artifact!.download_url}` }));
+        download.addEventListener("click", () => downloadArtifact(call.artifact!.download_url, `${call.artifact!.title}.${call.artifact!.format}`));
         card.append(heading, meta, preview, download);
         tools.appendChild(card);
       } else {
@@ -1659,7 +1733,7 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
   } catch (error) { return "Runtime job failed: " + (error instanceof Error ? error.message : "unknown error"); }
 }
 
-async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFollowup): Promise<ChatReply> {
+async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFollowup, progressBody: HTMLElement = messagesEl): Promise<ChatReply> {
   const endpoint = normalizeModelEndpoint(settings.localModelEndpoint);
   const model = settings.localModel.trim();
   if (!endpoint || !model) throw new Error("Set a local model endpoint and model name in Settings.");
@@ -1671,6 +1745,8 @@ async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFoll
     const profile = profileTask(task);
     const historyBudget = toolFollowup ? Math.max(1800, profile.contextTokens * 2 - 3500) : profile.contextTokens * 2;
     const messages = budgetConversation(convo.messages, profile.contextMessages, historyBudget, profile.contextChars);
+    renderLiveEvent(progressBody, { type: "thinking", stage: "planning", label: "Planning the requested work" });
+    renderLiveEvent(progressBody, { type: "thinking", stage: "drafting", label: "Drafting the document with your local model" });
     const response = await fetch(endpoint + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1699,17 +1775,19 @@ async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFoll
       const request = parseLocalToolRequest(content);
       if (request) {
         const toolResult = await runApprovedLocalTool(request);
-        return localModelReply(convo, { request: content, result: boundToolResult(toolResult, 3000) });
+        return localModelReply(convo, { request: content, result: boundToolResult(toolResult, 3000) }, progressBody);
       }
-      if (shouldVerifyDraft(task)) {
-        const reviewed = await reviewLocalDraft(task, content);
-        return { content: reviewed, session_id: "" };
-      }
+      if (shouldVerifyDraft(task)) renderLiveEvent(progressBody, { type: "thinking", stage: "quality", label: "Checking the document for errors and missing sections" });
+      let finalContent = shouldVerifyDraft(task) ? await reviewLocalDraft(task, content) : content;
+      const artifacts = await attachRequestedArtifact(task, finalContent, progressBody);
+      return { content: finalContent, session_id: "", tool_calls: artifacts };
     } else if (shouldVerifyDraft(task)) {
       const reviewed = await reviewLocalDraft(task, content);
-      return { content: reviewed, session_id: "" };
+      const artifacts = await attachRequestedArtifact(task, reviewed, progressBody);
+      return { content: reviewed, session_id: "", tool_calls: artifacts };
     }
-    return { content, session_id: "" };
+    const artifacts = await attachRequestedArtifact(task, content, progressBody);
+    return { content, session_id: "", tool_calls: artifacts };
   } finally {
     window.clearTimeout(timer);
   }
@@ -1810,6 +1888,8 @@ async function submit(raw: string): Promise<void> {
         { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT },
         ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200),
       ];
+      renderLiveEvent(reply.body, { type: "thinking", stage: "planning", label: "Planning your request" });
+      renderLiveEvent(reply.body, { type: "thinking", stage: "drafting", label: requestedArtifactFormat(text) ? "Drafting the requested document" : "Working on your request" });
       const response = await NativeLocalAI.generate({ messages, maxTokens: Math.min(profile.maxTokens, 384) });
       const request = parseLocalToolRequest(response.content);
       if (request) {
@@ -1826,6 +1906,7 @@ async function submit(raw: string): Promise<void> {
         if (parseLocalToolRequest(followup.content)) {
           finalFollowup = "Ultran allows one local tool action per turn. I received a second tool request and did not execute it. Please split the task into another step.";
         } else if (shouldVerifyDraft(text)) {
+          renderLiveEvent(reply.body, { type: "thinking", stage: "quality", label: "Checking the draft for errors and missing sections" });
           try {
             const review = await NativeLocalAI.generate({
               messages: [
@@ -1839,10 +1920,12 @@ async function submit(raw: string): Promise<void> {
             // Keep the tool-grounded answer if the review pass is unavailable.
           }
         }
-        result = { content: finalFollowup, session_id: "" };
+        const artifacts = await attachRequestedArtifact(text, finalFollowup, reply.body);
+        result = { content: finalFollowup, session_id: "", tool_calls: artifacts };
       } else {
         let finalContent = response.content;
         if (shouldVerifyDraft(text)) {
+          renderLiveEvent(reply.body, { type: "thinking", stage: "quality", label: "Checking the draft for errors and missing sections" });
           try {
             const review = await NativeLocalAI.generate({
               messages: [
@@ -1856,7 +1939,8 @@ async function submit(raw: string): Promise<void> {
             // Review is a quality enhancement; never discard a usable first answer.
           }
         }
-        result = { content: finalContent, session_id: "" };
+        const artifacts = await attachRequestedArtifact(text, finalContent, reply.body);
+        result = { content: finalContent, session_id: "", tool_calls: artifacts };
       }
       setLink("online", "on-device AI");
     } catch (error) {
@@ -1883,7 +1967,7 @@ async function submit(raw: string): Promise<void> {
     }
   } else if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
     try {
-      result = await localModelReply(convo);
+      result = await localModelReply(convo, undefined, reply.body);
       setLink("online", "local model");
     } catch (error) {
       setLink("error", "model unavailable");

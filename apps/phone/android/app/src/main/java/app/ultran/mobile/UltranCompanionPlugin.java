@@ -181,28 +181,44 @@ public final class UltranCompanionPlugin extends Plugin {
             call.reject("Provide a WhatsApp number with country code and a message up to 4,000 characters.");
             return;
         }
-        Uri target = Uri.parse("https://wa.me/" + recipient).buildUpon()
-            .appendQueryParameter("text", body).build();
+        String component = getContext().getPackageName() + "/" + UltranMessagingAccessibilityService.class.getName();
+        String enabled = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        boolean serviceEnabled = enabled != null && enabled.contains(component);
+        if (!serviceEnabled) {
+            getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+                .setTitle("Enable approved phone actions")
+                .setMessage("Android must enable Ultran's Accessibility Service before it can tap Send. The service only sends the exact WhatsApp message you approve here, once, within 60 seconds. You can turn it off any time in Android Accessibility settings.")
+                .setPositiveButton("Open Accessibility settings", (dialog, which) -> {
+                    getActivity().startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    call.resolve(new JSObject().put("openedSettings", true).put("sent", false));
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("openedSettings", false).put("sent", false)))
+                .show());
+            return;
+        }
+        if (getContext().getPackageManager().getLaunchIntentForPackage("com.whatsapp") == null) {
+            call.reject("WhatsApp is not installed.");
+            return;
+        }
         getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
-            .setTitle("Review WhatsApp message")
-            .setMessage("Ultran wants to open WhatsApp with this message prepared. Nothing will be sent until you press Send in WhatsApp.\n\nTo: +" + recipient + "\n\n" + body)
-            .setPositiveButton("Open WhatsApp", (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_VIEW, target);
-                intent.setPackage("com.whatsapp");
+            .setTitle("Approve and send WhatsApp message")
+            .setMessage("Recipient: +" + recipient + "\n\nMessage:\n" + body + "\n\nAfter approval, Ultran opens WhatsApp and taps Send once only if the composer contains this exact text. Approval expires in 60 seconds. WhatsApp delivery cannot be verified by Ultran.")
+            .setPositiveButton("Approve and send", (dialog, which) -> {
+                getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE)
+                    .edit().putString("approved_text", body)
+                    .putLong("expires_at", System.currentTimeMillis() + 60000L).apply();
+                Uri target = Uri.parse("https://wa.me/" + recipient).buildUpon().appendQueryParameter("text", body).build();
                 try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, target);
+                    intent.setPackage("com.whatsapp");
                     getActivity().startActivity(intent);
-                    call.resolve(new JSObject().put("opened", true).put("sent", false));
+                    call.resolve(new JSObject().put("opened", true).put("approved", true).put("sent", "pending_accessibility_action"));
                 } catch (Exception error) {
-                    Intent fallback = new Intent(Intent.ACTION_VIEW, target);
-                    try {
-                        getActivity().startActivity(fallback);
-                        call.resolve(new JSObject().put("opened", true).put("sent", false).put("fallback", true));
-                    } catch (Exception fallbackError) {
-                        call.reject("WhatsApp or a compatible link handler is not installed.", fallbackError);
-                    }
+                    getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE).edit().clear().apply();
+                    call.reject("Could not open WhatsApp. The one-use approval was cancelled.", error);
                 }
             })
-            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("sent", false)))
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("approved", false).put("sent", false)))
             .show());
     }
 

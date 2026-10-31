@@ -330,6 +330,12 @@ export class Orchestrator {
       try {
         const plan = parsePlan(candidate);
         const errors = validatePlan(plan);
+        if (plan.length > this.maxSteps) errors.push(`plan exceeds maxSteps (${plan.length} > ${this.maxSteps})`);
+        const allowedIds = new Set(tools.map((tool) => tool.id));
+        for (const step of plan) {
+          if (step.candidates.length === 0) errors.push(`step "${step.id}" has no tool candidates`);
+          for (const id of step.candidates) if (!allowedIds.has(id)) errors.push(`step "${step.id}" references unavailable tool "${id}"`);
+        }
         if (errors.length) throw new Error(errors.join('; '));
         return plan;
       } catch (error) { lastError = error; }
@@ -353,10 +359,24 @@ export class Orchestrator {
       'Completed or attempted step outcomes: ' + JSON.stringify(previous).slice(0, 12000),
       'Allowed tools: ' + JSON.stringify(tools.map((tool) => ({ id: tool.id, capability: tool.capability, description: tool.description, inputSchema: tool.inputSchema }))),
     ].join('\n\n');
-    const raw = await this.infer(prompt, systemPolicy(state.goal, 'act'), degraded ? 512 : 1000, 0.1, TOOL_CALL_SCHEMA);
-    const call = parseToolCall(raw);
-    if (!step.candidates.includes(call.toolId)) throw new Error(`selected tool "${call.toolId}" is not in the step allow-list`);
-    return call;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const raw = await this.infer(
+        prompt + (attempt ? '\\n\\nThe previous selection was invalid: ' + String(lastError) + '. Return a corrected toolId and args JSON object only.' : ''),
+        systemPolicy(state.goal, 'act'),
+        degraded ? 512 : 1000,
+        0.1,
+        TOOL_CALL_SCHEMA,
+      );
+      try {
+        const call = parseToolCall(raw);
+        if (!step.candidates.includes(call.toolId)) throw new Error(`selected tool "${call.toolId}" is not in the step allow-list`);
+        return call;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw new Error('could not produce a valid tool selection: ' + (lastError instanceof Error ? lastError.message : String(lastError)));
   }
 
   private async reflect(goal: string, plan: PlanStep[], outcomes: StepOutcome[], stopReason: string): Promise<string> {

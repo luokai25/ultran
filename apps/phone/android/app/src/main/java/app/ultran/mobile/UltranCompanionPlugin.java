@@ -9,12 +9,10 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.provider.Settings;
 import android.os.Build;
-import android.text.TextUtils;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -105,6 +103,40 @@ public final class UltranCompanionPlugin extends Plugin {
     @PluginMethod
     public void composeWhatsApp(PluginCall call) {
         handoffWhatsAppMessage(call);
+    }
+
+    private void handoffWhatsAppMessage(PluginCall call) {
+        String rawNumber = call.getString("number", "").trim();
+        String body = call.getString("body", "").trim();
+        String number = rawNumber.replaceAll("[^0-9]", "");
+        if (number.length() < 7 || number.length() > 15 || body.isEmpty() || body.length() > 4000) {
+            call.reject("Provide an international phone number and a message of up to 4,000 characters.");
+            return;
+        }
+        if (getContext().getPackageManager().getLaunchIntentForPackage("com.whatsapp") == null) {
+            call.reject("WhatsApp is not installed. Install it or use the SMS handoff.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Review WhatsApp message")
+            .setMessage("Recipient: +" + number + "\\n\\nMessage:\\n" + body +
+                "\\n\\nUltran will open WhatsApp with this message prepared. Nothing is sent automatically. Review the recipient and message in WhatsApp, then press Send yourself.")
+            .setPositiveButton("Open WhatsApp", (dialog, which) -> {
+                try {
+                    Uri target = Uri.parse("https://wa.me/" + number).buildUpon()
+                        .appendQueryParameter("text", body).build();
+                    Intent intent = new Intent(Intent.ACTION_VIEW, target);
+                    intent.setPackage("com.whatsapp");
+                    getActivity().startActivity(intent);
+                    call.resolve(new JSObject().put("opened", true).put("approved", true)
+                        .put("sent", false).put("requiresUserSend", true));
+                } catch (Exception error) {
+                    call.reject("Could not open WhatsApp. No message was sent.", error);
+                }
+            })
+            .setNegativeButton("Cancel", (dialog, which) ->
+                call.resolve(new JSObject().put("opened", false).put("approved", false).put("sent", false)))
+            .show());
     }
 
     @PluginMethod

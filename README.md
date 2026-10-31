@@ -40,7 +40,7 @@ Ultran inverts the default:
 Ultran treats the selected LLM as a replaceable reasoning engine, not as the
 entire agent. A shared capability contract supplies task-aware planning
 standards, bounded context and memory, truthfulness rules, untrusted-output
-handling, tool permissions, and independent review for complex or high-impact
+handling, tool permissions, and a separate review pass for complex or high-impact
 answers. The phone's on-device and Ollama paths use the same policy shape; the
 Python agent backend applies it across Echo, local models, and configured
 hosted providers.

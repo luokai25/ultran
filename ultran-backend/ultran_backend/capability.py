@@ -22,7 +22,7 @@ class CapabilityProfile:
 _CRITICAL = re.compile(
     r"\b(medical|diagnos|symptom|medication|dose|legal|lawsuit|contract|tax|investment|investing|"
     r"financial|emergency|security incident|personal data|credential|production deploy|"
-    r"delete database|data loss)\b",
+    r"delete|wipe|purge|erase|drop table|data loss)\b",
     re.IGNORECASE,
 )
 _DEEP = re.compile(

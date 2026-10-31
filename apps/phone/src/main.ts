@@ -771,6 +771,7 @@ async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
 
 async function enableProactiveUpdates(): Promise<void> {
   if (!settings.proactiveUpdates) {
+    if (!baseUrl()) { voiceStatus("Connect your task backend in Settings before enabling proactive updates."); return; }
     if (Capacitor.getPlatform() === "android") {
       const permission = await NativeCompanion.requestNotificationPermission();
       if (!permission.granted) {
@@ -802,7 +803,7 @@ async function enableProactiveUpdates(): Promise<void> {
     proactivePoll = window.setInterval(() => {
       if (settings.proactiveUpdates && baseUrl()) void refreshWorkspace().catch(() => undefined);
     }, 30000);
-    voiceStatus("Proactive updates enabled. Ultran will announce task completions and failures while the app is active.");
+    voiceStatus("Proactive updates enabled. Android checks in the background on an OS-managed schedule (at least every 15 minutes); checks are faster while Ultran is open.");
   } else {
     if (Capacitor.getPlatform() === "android") { try { await NativeCompanion.stopTaskMonitor(); } catch { /* already stopped */ } }
     voiceStatus("Proactive task updates paused.");
@@ -2155,6 +2156,7 @@ voiceBtn.addEventListener("click", () => {
   voiceBtn.setAttribute("aria-pressed", String(settings.voice));
   if (!settings.voice) synth?.cancel();
   saveSettings();
+  if (settings.proactiveUpdates && Capacitor.getPlatform() === "android" && baseUrl()) void NativeCompanion.startTaskMonitor({endpoint:baseUrl(), speakUpdates:settings.voice}).catch(() => undefined);
 });
 micBtn.addEventListener("click", startListening);
 proactiveBtn.setAttribute("aria-pressed", String(Boolean(settings.proactiveUpdates)));

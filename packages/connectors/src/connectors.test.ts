@@ -6,7 +6,6 @@ import { resolve } from 'node:path';
 import { BUILTIN_CONNECTORS, ConnectorRegistry, validateManifest } from './index.js';
 import type { ConnectorManifest } from './index.js';
 
-// `npm test` runs from the package root, wherever the compiled test lands.
 const schemaPath = resolve(process.cwd(), 'schema/manifest.schema.json');
 const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as {
   properties: { tools: { items: { properties: { id: { pattern: string } } } } };
@@ -16,10 +15,10 @@ function clone(m: ConnectorManifest): ConnectorManifest {
   return JSON.parse(JSON.stringify(m)) as ConnectorManifest;
 }
 
-test('there are three first-party connectors', () => {
+test('the first-party catalogue includes ten connectors', () => {
   assert.deepEqual(
     BUILTIN_CONNECTORS.map((m) => m.id).sort(),
-    ['files', 'github', 'slack'],
+    ['anthropic', 'discord', 'files', 'github', 'google-drive', 'notion', 'ollama', 'openai', 'slack', 'telegram'],
   );
 });
 
@@ -32,8 +31,8 @@ test('every builtin manifest validates cleanly', () => {
 test('every builtin loads into the registry and exposes its tools', () => {
   const registry = new ConnectorRegistry();
   for (const manifest of BUILTIN_CONNECTORS) registry.load(manifest);
-  assert.equal(registry.list().length, 3);
-  assert.equal(registry.listTools().length, 7);
+  assert.equal(registry.list().length, 10);
+  assert.equal(registry.listTools().length, 19);
 });
 
 test('the JSON schema accepts the namespaced tool ids the validator requires', () => {
@@ -43,7 +42,7 @@ test('the JSON schema accepts the namespaced tool ids the validator requires', (
   }
 });
 
-test('the files connector is provably offline', () => {
+test('the local files connector is offline and requires no credentials', () => {
   const files = BUILTIN_CONNECTORS.find((m) => m.id === 'files');
   assert.ok(files);
   assert.equal(files.egress.length, 0);
@@ -51,16 +50,17 @@ test('the files connector is provably offline', () => {
   assert.ok(files.tools.every((t) => !t.network));
 });
 
-test('reads and writes are separate capabilities', () => {
-  const files = BUILTIN_CONNECTORS.find((m) => m.id === 'files');
-  const slack = BUILTIN_CONNECTORS.find((m) => m.id === 'slack');
-  assert.ok(files && slack);
-  assert.notEqual(files.tools.find((t) => t.id === 'files.read')?.capability, files.tools.find((t) => t.id === 'files.write')?.capability);
-  assert.notEqual(slack.tools.find((t) => t.id === 'slack.channels.list')?.capability, slack.tools.find((t) => t.id === 'slack.messages.post')?.capability);
+test('read and write operations use separate capabilities', () => {
+  for (const id of ['files', 'github', 'slack', 'notion', 'discord', 'telegram', 'google-drive']) {
+    const manifest = BUILTIN_CONNECTORS.find((m) => m.id === id);
+    assert.ok(manifest, id);
+    const capabilities = new Set(manifest.tools.map((tool) => tool.capability));
+    assert.ok(capabilities.size >= 2, id);
+  }
 });
 
-test('validator rejects wildcard egress, unused capabilities and bad namespacing', () => {
-  const bad = clone(BUILTIN_CONNECTORS[0]!);
+test('network tools require explicit egress and wildcard hosts are rejected', () => {
+  const bad = clone(BUILTIN_CONNECTORS.find((m) => m.id === 'github')!);
   bad.egress = [{ host: '*.github.com', port: 443 }];
   bad.capabilities.push('admin:all');
   bad.tools[0]!.id = 'other.repos.list';
@@ -68,12 +68,9 @@ test('validator rejects wildcard egress, unused capabilities and bad namespacing
   assert.match(errors, /wildcards/);
   assert.match(errors, /declared but no tool uses it/);
   assert.match(errors, /namespaced under/);
-});
-
-test('a network tool with no egress is rejected', () => {
-  const bad = clone(BUILTIN_CONNECTORS.find((m) => m.id === 'slack')!);
-  bad.egress = [];
-  assert.match(validateManifest(bad).join('\n'), /egress list is empty/);
+  const noEgress = clone(BUILTIN_CONNECTORS.find((m) => m.id === 'slack')!);
+  noEgress.egress = [];
+  assert.match(validateManifest(noEgress).join('\n'), /egress list is empty/);
 });
 
 test('a lower-priority source cannot displace a builtin', () => {

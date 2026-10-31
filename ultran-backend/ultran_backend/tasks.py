@@ -18,6 +18,7 @@ class AgentTask:
     allow_tools: bool
     max_tool_calls: int
     session_id: str | None = None
+    team_id: str | None = None
     status: str = "queued"
     attempts: int = 0
     result: dict[str, Any] | None = None
@@ -28,7 +29,7 @@ class AgentTask:
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "agent_id": self.agent_id, "workspace_id": self.workspace_id,
                 "message": self.message, "allow_tools": self.allow_tools,
-                "max_tool_calls": self.max_tool_calls, "session_id": self.session_id, "status": self.status,
+                "max_tool_calls": self.max_tool_calls, "session_id": self.session_id, "team_id": self.team_id, "status": self.status,
                 "attempts": self.attempts, "result": self.result, "error": self.error,
                 "created_at": self.created_at, "updated_at": self.updated_at}
 
@@ -78,6 +79,9 @@ class AgentTaskService:
             columns = {row[1] for row in db.execute("PRAGMA table_info(agent_tasks)")}
             if "session_id" not in columns:
                 db.execute("ALTER TABLE agent_tasks ADD COLUMN session_id TEXT")
+            if "team_id" not in columns:
+                db.execute("ALTER TABLE agent_tasks ADD COLUMN team_id TEXT")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_agent_tasks_team ON agent_tasks(workspace_id, team_id, created_at DESC)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_agent_tasks_workspace ON agent_tasks(workspace_id, created_at DESC)")
             db.execute("""CREATE TABLE IF NOT EXISTS agent_task_events (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
@@ -91,15 +95,15 @@ class AgentTaskService:
         with self._connect() as db:
             db.execute("""INSERT INTO agent_tasks
                 (id, agent_id, workspace_id, message, allow_tools, max_tool_calls, status, attempts,
-                 result, error, created_at, updated_at, session_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 result, error, created_at, updated_at, session_id, team_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET status=excluded.status, attempts=excluded.attempts,
                 result=excluded.result, error=excluded.error, updated_at=excluded.updated_at,
-                session_id=excluded.session_id""",
+                session_id=excluded.session_id, team_id=excluded.team_id""",
                 (task.id, task.agent_id, task.workspace_id, self._encode(task.message),
                  int(task.allow_tools), task.max_tool_calls, task.status, task.attempts,
                  self._encode(json.dumps(task.result, ensure_ascii=False)) if task.result is not None else None,
-                 self._encode(task.error), task.created_at.isoformat(), task.updated_at.isoformat(), task.session_id))
+                 self._encode(task.error), task.created_at.isoformat(), task.updated_at.isoformat(), task.session_id, task.team_id))
 
     def _load(self):
         with self._connect() as db:
@@ -108,7 +112,7 @@ class AgentTaskService:
             status = row["status"]
             if status in {"running", "retrying"}: status = "interrupted"
             task = AgentTask(row["id"], row["agent_id"], row["workspace_id"], self._decode(row["message"]),
-                bool(row["allow_tools"]), row["max_tool_calls"], row["session_id"], status, row["attempts"],
+                bool(row["allow_tools"]), row["max_tool_calls"], row["session_id"], row["team_id"], status, row["attempts"],
                 json.loads(self._decode(row["result"])) if row["result"] else None,
                 self._decode(row["error"]), datetime.fromisoformat(row["created_at"]), utcnow())
             self._tasks[task.id] = task
@@ -116,13 +120,13 @@ class AgentTaskService:
 
     def submit(self, agent_id: str, workspace_id: str, message: str, *,
                allow_tools: bool = True, max_tool_calls: int = 4,
-               session_id: str | None = None) -> AgentTask:
+               session_id: str | None = None, team_id: str | None = None) -> AgentTask:
         if not message.strip() or len(message) > 16000:
             raise ValidationFailed("task message must contain 1 to 16000 characters")
         if not 0 <= max_tool_calls <= 16:
             raise ValidationFailed("max_tool_calls must be between 0 and 16")
         task = AgentTask("task_" + uuid.uuid4().hex[:16], agent_id, workspace_id,
-                         message.strip(), bool(allow_tools), max_tool_calls, session_id)
+                         message.strip(), bool(allow_tools), max_tool_calls, session_id, team_id)
         with self._lock:
             self._tasks[task.id] = task
             self._persist(task)
@@ -204,6 +208,22 @@ class AgentTaskService:
     def list(self, workspace_id: str, *, limit: int = 50) -> list[AgentTask]:
         with self._lock: rows = [t for t in self._tasks.values() if t.workspace_id == workspace_id]
         return sorted(rows, key=lambda t: t.created_at, reverse=True)[:max(0, min(limit, 200))]
+
+    def team(self, workspace_id: str, team_id: str) -> dict[str, Any]:
+        with self._lock:
+            tasks = [task for task in self._tasks.values() if task.workspace_id == workspace_id and task.team_id == team_id]
+        if not tasks:
+            raise NotFound("team run not found", details={"team_id": team_id})
+        counts: dict[str, int] = {}
+        for task in tasks:
+            counts[task.status] = counts.get(task.status, 0) + 1
+        active = counts.get("queued", 0) + counts.get("running", 0) + counts.get("retrying", 0)
+        if active: status = "running"
+        elif counts.get("failed", 0) or counts.get("interrupted", 0): status = "failed"
+        elif counts.get("cancelled", 0): status = "cancelled"
+        else: status = "completed"
+        return {"team_id": team_id, "workspace_id": workspace_id, "status": status, "total": len(tasks),
+                "counts": counts, "tasks": [task.public() for task in sorted(tasks, key=lambda item: item.created_at)]}
 
     def cancel(self, workspace_id: str, task_id: str) -> AgentTask:
         with self._lock:

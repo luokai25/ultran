@@ -176,6 +176,7 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /processTaskUpdates\(tasks\)/);
   assert.match(main, /NativeCompanion\.notify/);
   assert.match(main, /NativeCompanion\.speakInBackground/);
+  assert.match(main, /stopBackgroundSpeech\(\)/);
   assert.match(main, /proactiveUpdates/);
   assert.match(main, /composeSms/);
   assert.match(main, /parseLocalToolRequest/);

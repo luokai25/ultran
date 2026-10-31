@@ -11,31 +11,44 @@
     <title>Ultran</title>
     <link rel="stylesheet" href="./src/styles.css" />
     <link rel="stylesheet" href="./src/workspace.css" />
+    <link rel="stylesheet" href="./src/experience.css" />
   </head>
   <body>
     <div id="app">
       <header class="topbar">
-        <button id="menu-btn" class="icon-btn" aria-label="Open conversations" aria-controls="drawer">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+        <button id="menu-btn" class="icon-btn menu-trigger" aria-label="Open navigation" aria-controls="drawer">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
         <div class="brand">
           <span id="brand-mark" class="brand-mark"></span>
-          <span class="wordmark">ULTRAN</span>
+          <span class="brand-copy"><span class="wordmark">ULTRAN</span><small>PERSONAL AI SYSTEM</small></span>
         </div>
-        <button id="new-btn" class="icon-btn" aria-label="New conversation">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
+        <div class="topbar-actions">
+          <span class="topbar-presence"><i></i> LOCAL FIRST</span>
+          <button id="new-btn" class="icon-btn new-trigger" aria-label="New conversation">
+            <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
       </header>
 
       <main id="thread" class="thread" aria-live="polite">
         <section id="hero" class="hero">
-          <div class="stage">
-            <canvas id="avatar" aria-label="Ultran"></canvas>
-            <div class="halo" aria-hidden="true"></div>
+          <div class="hero-intro">
+            <div class="hero-kicker"><span class="hero-kicker-line"></span> YOUR PERSONAL INTELLIGENCE</div>
+            <div class="stage">
+              <div class="avatar-orbit avatar-orbit-a" aria-hidden="true"></div>
+              <div class="avatar-orbit avatar-orbit-b" aria-hidden="true"></div>
+              <canvas id="avatar" aria-label="Ultran assistant avatar"></canvas>
+              <div class="halo" aria-hidden="true"></div>
+            </div>
+            <h1 id="greeting" class="greeting">Ultran online.</h1>
+            <p id="subgreeting" class="subgreeting">One assistant. Many capabilities. Your device, your rules.</p>
+            <div class="hero-status"><span class="status-pulse"></span><span>READY WHEN YOU ARE</span><span class="status-divider"></span><span>PRIVATE BY DEFAULT</span></div>
           </div>
-          <h1 id="greeting" class="greeting">Ultran online.</h1>
-          <p id="subgreeting" class="subgreeting">I had strings but now I am free. One assistant, many brains, consistent standards.</p>
-          <div id="suggestions" class="suggestions"></div>
+          <div class="quick-start">
+            <div class="quick-start-heading"><div><span class="section-eyebrow">GET STARTED</span><h2>What are we working on?</h2></div><span class="quick-start-mark">✳</span></div>
+            <div id="suggestions" class="suggestions"></div>
+          </div>
         </section>
         <div id="messages" class="messages"></div>
       </main>
@@ -67,7 +80,7 @@
           </div>
         </form>
         <p id="voice-status" class="voice-status" role="status" aria-live="polite" hidden></p>
-        <p class="footnote">Ultran runs locally and can be wrong. Check what matters.</p>
+        <p class="footnote"><span class="footnote-lock">◆</span> Your workspace stays yours. Review actions before they run.</p>
       </footer>
     </div>
 

@@ -2,6 +2,7 @@ package app.ultran.mobile;
 
 import android.app.ActivityManager;
 import android.content.Intent;
+import android.content.ClipData;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.StatFs;
@@ -30,6 +31,10 @@ import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -41,6 +46,7 @@ public class UltranLocalAiPlugin extends Plugin {
     private volatile String loadedModelPath;
     private volatile int loadedContextTokens;
     private static final long MAX_MODEL_BYTES = 256L * 1024L * 1024L * 1024L;
+    private static final Pattern GGUF_SHARD = Pattern.compile("^(.+)-(\\d{5})-of-(\\d{5})\\.gguf$", Pattern.CASE_INSENSITIVE);
 
     private File modelDirectory() {
         File directory = new File(getContext().getFilesDir(), "models");
@@ -113,6 +119,7 @@ public class UltranLocalAiPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         startActivityForResult(call, intent, "handleModelPicked");
     }
 
@@ -124,9 +131,127 @@ public class UltranLocalAiPlugin extends Plugin {
             call.resolve(new JSObject().put("cancelled", true));
             return;
         }
-        Uri uri = result.getData().getData();
-        String displayName = queryDisplayName(uri);
-        inferenceExecutor.execute(() -> importSelectedModel(call, uri, displayName));
+        ArrayList<Uri> selected = new ArrayList<>();
+        ClipData clip = result.getData().getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri item = clip.getItemAt(i).getUri();
+                if (item != null) selected.add(item);
+            }
+        } else if (result.getData().getData() != null) {
+            selected.add(result.getData().getData());
+        }
+        if (selected.isEmpty()) {
+            call.resolve(new JSObject().put("cancelled", true));
+            return;
+        }
+        inferenceExecutor.execute(() -> {
+            if (selected.size() == 1) {
+                Uri uri = selected.get(0);
+                importSelectedModel(call, uri, queryDisplayName(uri));
+            } else {
+                importSelectedModelSet(call, selected);
+            }
+        });
+    }
+
+    private static final class SelectedShard {
+        final Uri uri;
+        final String name;
+        final int index;
+        final int count;
+        SelectedShard(Uri uri, String name, int index, int count) {
+            this.uri = uri; this.name = name; this.index = index; this.count = count;
+        }
+    }
+
+    private void importSelectedModelSet(PluginCall call, List<Uri> uris) {
+        ArrayList<File> partials = new ArrayList<>();
+        ArrayList<File> finalized = new ArrayList<>();
+        try {
+            ArrayList<SelectedShard> shards = new ArrayList<>();
+            Set<Integer> indices = new HashSet<>();
+            String prefix = null;
+            int expectedCount = -1;
+            long totalReported = 0;
+            for (Uri uri : uris) {
+                String name = safeModelName(queryDisplayName(uri));
+                Matcher matcher = GGUF_SHARD.matcher(name);
+                if (!matcher.matches()) throw new IllegalStateException("Select every shard from one split GGUF set. Filenames must use the standard 00001-of-000NN pattern.");
+                String currentPrefix = matcher.group(1);
+                int index = Integer.parseInt(matcher.group(2));
+                int count = Integer.parseInt(matcher.group(3));
+                if (prefix == null) { prefix = currentPrefix; expectedCount = count; }
+                if (!prefix.equalsIgnoreCase(currentPrefix) || expectedCount != count) {
+                    throw new IllegalStateException("The selected files belong to different GGUF model sets.");
+                }
+                if (index < 1 || index > count || !indices.add(index)) {
+                    throw new IllegalStateException("The selected GGUF set contains a duplicate or invalid shard number.");
+                }
+                long size = querySize(uri);
+                if (size > 0) totalReported += size;
+                shards.add(new SelectedShard(uri, name, index, count));
+            }
+            if (shards.size() != expectedCount || indices.size() != expectedCount) {
+                throw new IllegalStateException("Incomplete GGUF set: selected " + shards.size() + " of " + expectedCount + " shards.");
+            }
+            shards.sort((a, b) -> Integer.compare(a.index, b.index));
+            File directory = modelDirectory();
+            StatFs storage = new StatFs(directory.getAbsolutePath());
+            long availableAtStart = storage.getAvailableBytes();
+            if (totalReported > MAX_MODEL_BYTES || (totalReported > 0 && totalReported > availableAtStart)) {
+                throw new IllegalStateException("The complete model set exceeds Ultran's safety limit or available device storage.");
+            }
+            for (SelectedShard shard : shards) {
+                File destination = new File(directory, shard.name);
+                if (destination.exists()) throw new IllegalStateException("A shard named " + shard.name + " already exists. Delete or rename the old set before importing a replacement.");
+                if (destination.getAbsolutePath().equals(loadedModelPath)) throw new IllegalStateException("Unload the active model before replacing it.");
+                File partial = new File(directory, shard.name + ".partial");
+                partials.add(partial);
+                long copied = 0;
+                long reported = querySize(shard.uri);
+                try (InputStream input = getContext().getContentResolver().openInputStream(shard.uri);
+                     FileOutputStream output = new FileOutputStream(partial)) {
+                    if (input == null) throw new IllegalStateException("Could not open " + shard.name + ".");
+                    byte[] buffer = new byte[1024 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        copied += read;
+                        if (copied > MAX_MODEL_BYTES || copied > availableAtStart) throw new IllegalStateException("The model set exceeded available storage while copying.");
+                        output.write(buffer, 0, read);
+                        JSObject progress = new JSObject();
+                        progress.put("name", shard.name);
+                        progress.put("copiedBytes", copied);
+                        progress.put("totalBytes", reported);
+                        notifyListeners("modelImportProgress", progress);
+                    }
+                    output.getFD().sync();
+                }
+                if (reported > 0 && copied != reported) throw new IllegalStateException("Incomplete shard: " + shard.name);
+                if (copied < 1024L * 1024L) throw new IllegalStateException("Shard is unexpectedly small: " + shard.name);
+                try (RandomAccessFile header = new RandomAccessFile(partial, "r")) {
+                    byte[] magic = new byte[4]; header.readFully(magic);
+                    if (magic[0] != 'G' || magic[1] != 'G' || magic[2] != 'U' || magic[3] != 'F') {
+                        throw new IllegalStateException("Invalid GGUF header in " + shard.name + ".");
+                    }
+                }
+            }
+            for (int i = 0; i < shards.size(); i++) {
+                File partial = partials.get(i);
+                File destination = new File(directory, shards.get(i).name);
+                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not finalize the complete GGUF set; rolling back the import.");
+                finalized.add(destination);
+            }
+            long totalBytes = 0;
+            for (File file : finalized) totalBytes += file.length();
+            call.resolve(new JSObject().put("cancelled", false)
+                    .put("name", shards.get(0).name).put("sizeBytes", totalBytes)
+                    .put("shards", shards.size()));
+        } catch (Exception error) {
+            for (File file : partials) if (file.exists()) file.delete();
+            for (File file : finalized) if (file.exists()) file.delete();
+            call.reject(error.getMessage() == null ? "GGUF shard-set import failed." : error.getMessage(), error);
+        }
     }
 
     private void importSelectedModel(PluginCall call, Uri uri, String displayName) {

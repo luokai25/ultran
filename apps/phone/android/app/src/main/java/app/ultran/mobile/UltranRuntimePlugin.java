@@ -291,7 +291,7 @@ public final class UltranRuntimePlugin extends Plugin {
 
     private String checksumForAsset(byte[] manifest, String assetName) {
         String text = new String(manifest, StandardCharsets.UTF_8);
-        for (String line : text.split("\\R")) {
+        for (String line : text.split("\\r?\\n")) {
             String[] fields = line.trim().split("\\s+");
             if (fields.length >= 2 && fields[1].replaceFirst("^\\*", "").equals(assetName)
                     && fields[0].matches("(?i)[a-f0-9]{64}")) {

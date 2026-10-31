@@ -71,6 +71,8 @@ test("brain-independent capability policy is applied to native and Ollama brains
   assert.match(main, /shouldVerifyDraft\(text\)/);
   assert.match(main, /shouldVerifyDraft\(task\)/);
   assert.match(main, /reviewLocalDraft\(task, content\)/);
+  assert.match(main, /else if \(shouldVerifyDraft\(task\)\)/);
+  assert.match(main, /let finalFollowup = followup\.content/);
   assert.match(capabilityKernel, /export function profileTask/);
   assert.match(capabilityKernel, /export function buildCapabilityPrompt/);
   assert.match(capabilityKernel, /export function buildReviewPrompt/);

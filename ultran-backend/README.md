@@ -37,3 +37,27 @@ python -m pytest -q
 
 Provider connection tests use mocked HTTP clients. They verify adapter behavior
 without claiming that real provider accounts or API keys have been exercised.
+
+## Composio connections (optional)
+
+Ultran can use Composio's hosted OAuth and MCP gateway for cloud services. Composio
+handles provider authorization, token exchange, refresh, and upstream tool execution;
+Ultran does not receive provider OAuth tokens.
+
+1. Create a free project at https://platform.composio.dev.
+2. Add the project API key to the backend environment as `ULTRAN_COMPOSIO_API_KEY`.
+3. Restart the backend. Check `GET /v1/connectors/composio/status`.
+4. Start an OAuth flow with `POST /v1/connectors/composio/authorize/{toolkit}`.
+   The response contains a hosted `redirect_url` for the app to open in the system browser.
+5. List connected accounts with `GET /v1/connectors/composio/connections`.
+6. Create a workspace-scoped MCP session with `POST /v1/connectors/composio/session`.
+
+The session and account records are scoped to an opaque ID derived from the
+Ultran workspace. The backend returns only redacted connection metadata. The
+Composio project key must remain on the backend and must never be bundled into
+the APK. The existing local connectors continue to work without Composio.
+
+**Deployment note:** the current workspace header is a local-development boundary,
+not end-user authentication. Before exposing this API to multiple internet users,
+Ultran must derive workspace IDs from authenticated accounts rather than trusting
+a caller-supplied `X-Ultran-Workspace` header.

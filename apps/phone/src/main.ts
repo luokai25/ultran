@@ -125,6 +125,10 @@ const navChatButton = req<HTMLButtonElement>("#nav-chat");
 const navAgentsButton = req<HTMLButtonElement>("#nav-agents");
 const navConnectorsButton = req<HTMLButtonElement>("#nav-connectors");
 const navSettingsButton = req<HTMLButtonElement>("#nav-settings");
+const navWorldsButton = req<HTMLButtonElement>("#nav-worlds");
+const navLuonixButton = req<HTMLButtonElement>("#nav-luonix");
+const navMoreButton = req<HTMLButtonElement>("#nav-more");
+const featureScreens = Array.from(document.querySelectorAll<HTMLElement>(".feature-screen"));
 const connectorsButton = req<HTMLButtonElement>("#connectors-btn");
 const connectorsBackButton = req<HTMLButtonElement>("#connectors-back");
 const drawer = req<HTMLElement>("#drawer");
@@ -160,6 +164,7 @@ const endpointNote = req<HTMLElement>("#endpoint-note");
 const themesEl = req<HTMLElement>("#themes");
 
 req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
+req<HTMLElement>("#hero-mark").innerHTML = markSvg(116);
 req<HTMLElement>("#drawer-mark").innerHTML = markSvg(20);
 const favicon = document.createElement("link");
 favicon.rel = "icon";
@@ -2311,7 +2316,7 @@ for (const [label, prompt] of SUGGESTIONS) {
 }
 
 const hour = new Date().getHours();
-greetingEl.textContent = hour < 5 ? "Still awake." : hour < 12 ? "Good morning." : hour < 18 ? "Ultran online." : "Good evening.";
+greetingEl.textContent = (hour < 5 ? "Still awake" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") + ".";
 
 promptEl.addEventListener("input", autosize);
 promptEl.addEventListener("keydown", (event) => {
@@ -2376,7 +2381,25 @@ function setActiveNavigation(active: HTMLButtonElement): void {
   });
 }
 
+function hideFeatureScreens(): void {
+  featureScreens.forEach((screen) => { screen.hidden = true; });
+  app.dataset.page = "chat";
+}
+
+function showFeatureScreen(id: string, active: HTMLButtonElement): void {
+  closeWorkspace();
+  if (!sheetWrap.hidden) closeSheet();
+  connectorsBackButton.click();
+  closeDrawer();
+  featureScreens.forEach((screen) => { screen.hidden = screen.id !== id; });
+  app.dataset.page = id.replace("-screen", "");
+  setActiveNavigation(active);
+  const screen = req<HTMLElement>(`#${id}`);
+  screen.scrollTop = 0;
+}
+
 function closeOtherSurfaces(): void {
+  hideFeatureScreens();
   closeWorkspace();
   if (!sheetWrap.hidden) closeSheet();
   connectorsBackButton.click();
@@ -2385,28 +2408,29 @@ function closeOtherSurfaces(): void {
 
 navChatButton.addEventListener("click", () => {
   closeOtherSurfaces();
+  hideFeatureScreens();
   setActiveNavigation(navChatButton);
 });
-navAgentsButton.addEventListener("click", () => {
-  if (!sheetWrap.hidden) closeSheet();
-  connectorsBackButton.click();
-  setActiveNavigation(navAgentsButton);
-  openWorkspace();
-});
+navAgentsButton.addEventListener("click", () => showFeatureScreen("agents-screen", navAgentsButton));
+navWorldsButton.addEventListener("click", () => showFeatureScreen("worlds-screen", navWorldsButton));
+navLuonixButton.addEventListener("click", () => showFeatureScreen("luonix-screen", navLuonixButton));
+navMoreButton.addEventListener("click", () => showFeatureScreen("more-screen", navMoreButton));
 navConnectorsButton.addEventListener("click", () => {
+  hideFeatureScreens();
   closeWorkspace();
   if (!sheetWrap.hidden) closeSheet();
-  setActiveNavigation(navConnectorsButton);
+  setActiveNavigation(navMoreButton);
   connectorsButton.click();
 });
 navSettingsButton.addEventListener("click", () => {
+  hideFeatureScreens();
   closeWorkspace();
   connectorsBackButton.click();
-  setActiveNavigation(navSettingsButton);
+  setActiveNavigation(navMoreButton);
   openSheet();
 });
-connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
-connectorsBackButton.addEventListener("click", () => setActiveNavigation(navChatButton));
+connectorsButton.addEventListener("click", () => setActiveNavigation(navMoreButton));
+connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => setActiveNavigation(navChatButton));
 setActiveNavigation(navChatButton);
 menuBtn.addEventListener("click", openDrawer);
@@ -2414,8 +2438,21 @@ req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
-req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { setActiveNavigation(navSettingsButton); openSheet(); });
+req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navMoreButton); openSheet(); });
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
+req<HTMLButtonElement>("#agents-workspace-open").addEventListener("click", () => openWorkspace());
+req<HTMLButtonElement>("#more-connectors-btn").addEventListener("click", () => navConnectorsButton.click());
+req<HTMLButtonElement>("#more-settings-btn").addEventListener("click", () => navSettingsButton.click());
+req<HTMLButtonElement>("#more-vault-btn").addEventListener("click", () => showFeatureScreen("vault-screen", navMoreButton));
+req<HTMLButtonElement>("#vault-back").addEventListener("click", () => showFeatureScreen("more-screen", navMoreButton));
+req<HTMLButtonElement>("#world-lou-open").addEventListener("click", () => { navChatButton.click(); void submit("Help me design Lou World as a god-like sandbox universe with civilizations, worlds, magic, technology, and evolving lore."); });
+for (const tile of document.querySelectorAll<HTMLButtonElement>("[data-world-prompt]")) tile.addEventListener("click", () => { const prompt = tile.dataset.worldPrompt ?? "Help me imagine a new world."; navChatButton.click(); void submit(prompt); });
+for (const filter of document.querySelectorAll<HTMLButtonElement>("[data-agent-filter]")) filter.addEventListener("click", () => { document.querySelectorAll("[data-agent-filter]").forEach((button) => button.classList.toggle("is-selected", button === filter)); document.querySelectorAll<HTMLElement>("[data-agent-kind]").forEach((card) => { card.hidden = filter.dataset.agentFilter !== "all" && !(filter.dataset.agentFilter === "local" ? card.dataset.agentKind === "local" : card.dataset.agentKind === "active"); }); });
+for (const card of document.querySelectorAll<HTMLElement>(".agent-card")) { card.tabIndex = 0; card.setAttribute("role", "button"); card.setAttribute("aria-label", `Open ${card.querySelector("h2")?.textContent ?? "agent"} workspace`); const open = () => { if (card.dataset.agentKind === "local") { navChatButton.click(); return; } openWorkspace(); }; card.addEventListener("click", open); card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } }); }
+for (const filter of document.querySelectorAll<HTMLButtonElement>("[data-feed-filter]")) filter.addEventListener("click", () => { document.querySelectorAll("[data-feed-filter]").forEach((button) => button.classList.toggle("is-selected", button === filter)); });
+req<HTMLButtonElement>(".like-button").addEventListener("click", (event) => { const button = event.currentTarget as HTMLButtonElement; const liked = button.getAttribute("aria-pressed") !== "true"; button.setAttribute("aria-pressed", String(liked)); button.textContent = liked ? "♥" : "♡"; });
+req<HTMLButtonElement>("#luonix-create").addEventListener("click", () => req<HTMLButtonElement>("#luonix-draft-btn").click());
+req<HTMLButtonElement>("#luonix-draft-btn").addEventListener("click", () => { const picker = document.createElement("input"); picker.type = "file"; picker.accept = "image/*,video/*"; picker.addEventListener("change", () => { const file = picker.files?.[0]; if (!file) return; const notice = document.createElement("p"); notice.className = "feature-disclaimer"; notice.textContent = `Local draft selected: ${file.name} (${Math.round(file.size / 1024)} KB). It has not been uploaded or published.`; req<HTMLElement>("#luonix-screen").querySelector(".feature-callout")?.after(notice); }); picker.click(); });
 androidBatteryAccessButton.addEventListener("click", () => {
   if (Capacitor.getPlatform() !== "android") return;
   void NativeCompanion.requestNotificationPermission()
@@ -2433,8 +2470,8 @@ androidAppSettingsButton.addEventListener("click", () => {
     .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open app settings."; });
 });
 
-req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { setActiveNavigation(navAgentsButton); openWorkspace(); });
-req<HTMLButtonElement>("#workspace-back").addEventListener("click", closeWorkspace);
+req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navAgentsButton); openWorkspace(); });
+req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => { closeWorkspace(); showFeatureScreen("agents-screen", navAgentsButton); });
 req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));
 req<HTMLButtonElement>("#workspace-team-open").addEventListener("click", () => void openTeamBuilder().catch(e => workspaceNotice(e instanceof Error ? e.message : "Could not load agents")));
 req<HTMLButtonElement>("#workspace-team-cancel").addEventListener("click", () => { workspaceTeamBuilder.hidden = true; });

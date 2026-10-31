@@ -169,18 +169,6 @@
           <progress id="ultran-runtime-progress" class="model-download-progress" max="100" value="0" aria-label="Termux runtime download progress" hidden></progress>
           <p id="ultran-terminal-status" class="native-model-status" role="status">Checking built-in runtime…</p>
         </section>
-        <section class="field" aria-labelledby="termux-bridge-heading">
-          <span id="termux-bridge-heading">Termux phone bridge</span>
-          <small>Optional localhost link to Termux for approved file access. Install the bridge from the bundled termux-bridge folder, run it in Termux, and keep it bound to this phone only.</small>
-          <input id="termux-bridge-endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:8765" />
-          <input id="termux-bridge-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Pairing token from Termux" aria-label="Termux bridge pairing token" />
-          <p id="termux-bridge-status" class="native-model-status" role="status">Termux bridge not connected.</p>
-          <div class="sheet-actions"><button id="termux-bridge-test" class="ghost" type="button">Test bridge</button><button id="termux-bridge-device" class="ghost" type="button" disabled>Read device info</button></div>
-          <label class="field"><span>Ultran shared folder path</span><input id="termux-file-path" type="text" autocomplete="off" spellcheck="false" value="." placeholder="notes/todo.txt" /></label>
-          <div class="sheet-actions"><button id="termux-files-list" class="ghost" type="button" disabled>List folder</button><button id="termux-file-read" class="ghost" type="button" disabled>Read text file</button></div>
-          <textarea id="termux-file-content" rows="5" maxlength="262144" spellcheck="false" placeholder="File content appears here. Writing requires confirmation."></textarea>
-          <button id="termux-file-write" class="ghost danger" type="button" disabled>Write file with approval</button>
-        </section>
         <section class="field native-model-manager" aria-labelledby="native-model-heading">
           <span id="native-model-heading">On-device AI model</span>
           <small>Runs llama.cpp inside the Android app. GGUF weights stay in private app storage and use file-backed memory mapping. This can reduce anonymous RAM use, but it does not guarantee every model will fit. llama.cpp's row-lazy path applies only to tensors marked by a supported architecture, not every transformer layer. Split GGUF models can be imported by selecting every numbered shard together. The context cache still needs RAM, and very large models can be extremely slow on phone storage and CPU. Start with a 1B–3B Q4 model, then test larger ones.</small>

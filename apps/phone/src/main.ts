@@ -1208,6 +1208,9 @@ async function remoteReply(
   onEvent?: (event: Record<string, unknown>) => void,
   nativeToolFollowup = false,
 ): Promise<ChatReply> {
+  const handleNativeTool = async (final: ChatReply): Promise<ChatReply> => {
+    return handleNativeTool(final);
+  };
   const run = async (): Promise<ChatReply> => {
     const agentId = await ensureAgent();
     const body = JSON.stringify({
@@ -1227,10 +1230,10 @@ async function remoteReply(
         throw new Error("stale");
       }
       if (!fallback.ok) throw new Error(`brain returned ${fallback.status}`);
-      return (await fallback.json()) as ChatReply;
+      return handleNativeTool((await fallback.json()) as ChatReply);
     }
     if (!res.ok) throw new Error(`brain returned ${res.status}`);
-    if (!res.body) return (await res.json()) as ChatReply;
+    if (!res.body) return handleNativeTool((await res.json()) as ChatReply);
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";

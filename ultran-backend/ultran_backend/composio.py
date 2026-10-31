@@ -208,6 +208,12 @@ class ComposioGateway:
                 # Validate schemas before an approval prompt is shown.
                 from .mcp.schema import validate_arguments
                 cleaned = validate_arguments(spec.name, spec.input_schema, args)
+                call_id = hashlib.sha256(
+                    json.dumps(
+                        {"tool": name, "arguments": cleaned},
+                        sort_keys=True, separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest()[:20]
                 mutating = spec.capabilities != frozenset({"read"})
                 if mutating or spec.requires_approval:
                     approval = self._approval_gate.request(
@@ -227,7 +233,7 @@ class ComposioGateway:
                             "arguments": cleaned,
                         }
                     results.append({
-                        "connector": "composio", "action": name, "ok": False,
+                        "connector": "composio", "action": name, "call_id": call_id, "ok": False,
                         "approval_required": True, "approval_id": approval.id,
                         "capabilities": sorted(spec.capabilities),
                         "detail": "Waiting for human approval.",
@@ -236,7 +242,7 @@ class ComposioGateway:
                 if spec.capabilities != frozenset({"read"}):
                     continue
                 results.append({
-                    "connector": "composio", "action": name,
+                    "connector": "composio", "action": name, "call_id": call_id,
                     **self._invoke_with_pool(pool, workspace_id, spec, cleaned),
                 })
             return results

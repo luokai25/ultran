@@ -58,7 +58,7 @@ export function budgetConversation<T extends { role: string; content: string }>(
     if (content.length > limit) {
       const head = Math.ceil(limit * 0.65);
       const tail = Math.max(0, limit - head - 24);
-      content = content.slice(0, head) + "\\n[… earlier context omitted …]\\n" + (tail ? content.slice(-tail) : "");
+      content = content.slice(0, head) + "\n[… earlier context omitted …]\n" + (tail ? content.slice(-tail) : "");
     }
     selected.unshift({ ...message, content } as T);
     used += content.length;

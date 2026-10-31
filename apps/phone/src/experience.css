@@ -43,3 +43,10 @@ button,input,textarea,select{font:inherit}button{touch-action:manipulation}butto
 #link-pill{flex:0 0 auto;margin-left:0;padding-inline:5px;font-size:7px;letter-spacing:.07em}
 #send-btn{position:relative;z-index:2;flex:0 0 38px;width:38px;margin-left:0}
 @media(max-width:390px){#link-pill{display:none}.composer-row{gap:5px}.tool-strip{gap:5px}}
+/* Long settings and connector sheets scroll inside their own safe-area surface. */
+.sheet-wrap{overflow-y:auto;overscroll-behavior:contain}
+.sheet{max-height:calc(100dvh - var(--safe-top));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(205,169,77,.24) transparent}
+.sheet-head{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-22px -19px 16px;padding:22px 19px 11px;border-bottom:1px solid rgba(255,255,255,.07);background:linear-gradient(160deg,#171b1c,#101314)}
+.sheet-head h2{margin:0}
+.workspace-team-open{display:flex;align-items:center;justify-content:center;gap:9px}
+.workspace-team-open svg{flex:0 0 auto}

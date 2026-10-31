@@ -31,13 +31,15 @@ _DEEP = re.compile(
     r"integration|code|program|script|test|deploy|migration|optimi[sz]e)\b",
     re.IGNORECASE,
 )
+_ARABIC_CRITICAL = re.compile(r"(?:طبي|دواء|جرعة|قانوني|مالي|استثمار|احذف|حذف|امسح|تدمير|بيانات شخصية|قاعدة البيانات)", re.IGNORECASE)
+_ARABIC_DEEP = re.compile(r"(?:ابن|بناء|برمج|كود|تصميم|تحليل|اختبر|اختبار|بحث|خطة|تكامل|تصحيح|نشر|مراجعة|تحسين|وكيل|سير العمل)", re.IGNORECASE)
 
 
 def profile_task(task: str) -> CapabilityProfile:
     text = task.strip()
-    if _CRITICAL.search(text):
+    if _CRITICAL.search(text) or _ARABIC_CRITICAL.search(text):
         return CapabilityProfile("critical", 20, 12_000, 4_000, 0.12, True)
-    if _DEEP.search(text) or len(text) > 700 or text.count("\n") >= 5:
+    if _DEEP.search(text) or _ARABIC_DEEP.search(text) or len(text) > 700 or text.count("\n") >= 5:
         return CapabilityProfile("deep", 20, 12_000, 4_000, 0.2, True)
     if len(text) > 180 or re.search(r"\b(why|how|explain|pros and cons)\b", text, re.IGNORECASE):
         return CapabilityProfile("standard", 16, 8_000, 2_500, 0.3, False)

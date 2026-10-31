@@ -9,6 +9,7 @@ from .billing import BillingService
 from .brain import BrainRuntime
 from .builder import BuilderService
 from .config import Settings
+from .composio import ComposioGateway
 from .connectors import ConnectorRegistry, CredentialVault, load_catalog
 from .connectors.registry import mcp_connector_id
 from .deploy import DeployService
@@ -35,6 +36,7 @@ class Container:
     #: MCP connector runtime (v2). ``registry`` is bound to these two.
     mcp_pool: McpClientPool
     mcp_gateway: ToolGateway
+    composio: ComposioGateway
 
     @classmethod
     def build(cls, settings: Settings | None = None) -> Container:
@@ -83,6 +85,10 @@ class Container:
             deploys=DeployService(root=settings.data_dir / "deploys"),
             mcp_pool=mcp_pool,
             mcp_gateway=mcp_gateway,
+            composio=ComposioGateway(
+                api_key=settings.composio_api_key,
+                callback_url=settings.composio_callback_url,
+            ),
         )
 
     # ------------------------------------------------------------------ #

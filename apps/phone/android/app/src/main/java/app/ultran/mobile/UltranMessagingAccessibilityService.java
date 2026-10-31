@@ -50,7 +50,7 @@ public final class UltranMessagingAccessibilityService extends AccessibilityServ
         if (node == null) return false;
         CharSequence className = node.getClassName();
         CharSequence text = node.getText();
-        if (className != null && "android.widget.EditText".contentEquals(className)
+        if (node.isEditable() && className != null && "android.widget.EditText".contentEquals(className)
             && text != null && expected.contentEquals(text)) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);

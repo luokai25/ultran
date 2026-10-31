@@ -133,6 +133,10 @@ const termuxFilesListButton = req<HTMLButtonElement>("#termux-files-list");
 const termuxFileReadButton = req<HTMLButtonElement>("#termux-file-read");
 const termuxFileWriteButton = req<HTMLButtonElement>("#termux-file-write");
 const localModelEl = req<HTMLInputElement>("#local-model");
+const ollamaModelsRefreshButton = req<HTMLButtonElement>("#ollama-models-refresh");
+const ollamaModelPullButton = req<HTMLButtonElement>("#ollama-model-pull");
+const ollamaModelSelect = req<HTMLSelectElement>("#ollama-model-list");
+const ollamaLibraryStatus = req<HTMLElement>("#ollama-library-status");
 const endpointNote = req<HTMLElement>("#endpoint-note");
 const themesEl = req<HTMLElement>("#themes");
 
@@ -1639,6 +1643,93 @@ async function testLink(): Promise<void> {
   }
 }
 
+async function refreshOllamaModels(): Promise<void> {
+  const url = normalizeModelEndpoint(localModelEndpointEl.value);
+  if (!url || !isPrivateModelEndpoint(url)) {
+    ollamaLibraryStatus.textContent = "Enter a localhost or private-LAN Ollama endpoint first.";
+    return;
+  }
+  ollamaModelsRefreshButton.disabled = true;
+  ollamaLibraryStatus.textContent = "Connecting to Ollama…";
+  try {
+    const response = await fetch(url + "/api/tags", { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const body = await response.json() as { models?: Array<{ name?: string; size?: number; details?: { parameter_size?: string; quantization_level?: string } }> };
+    const models = (body.models ?? []).filter((model) => typeof model.name === "string");
+    ollamaModelSelect.replaceChildren();
+    for (const model of models) {
+      const option = document.createElement("option");
+      option.value = model.name!;
+      option.textContent = model.name + (model.size ? " · " + formatBytes(model.size) : "");
+      ollamaModelSelect.append(option);
+    }
+    ollamaModelSelect.hidden = models.length === 0;
+    if (models.some((model) => model.name === localModelEl.value.trim())) ollamaModelSelect.value = localModelEl.value.trim();
+    ollamaLibraryStatus.textContent = models.length
+      ? `Connected. Found ${models.length} installed model(s). Choose one to connect Ultran to it.`
+      : "Ollama is reachable but has no models installed. Enter a model name above and choose Download model.";
+  } catch (error) {
+    ollamaLibraryStatus.textContent = "Could not reach Ollama: " + (error instanceof Error ? error.message : "network error") + ". Check the endpoint and OLLAMA_ORIGINS CORS settings.";
+  } finally {
+    ollamaModelsRefreshButton.disabled = false;
+  }
+}
+
+async function pullOllamaModel(): Promise<void> {
+  const url = normalizeModelEndpoint(localModelEndpointEl.value);
+  const model = localModelEl.value.trim();
+  if (!url || !isPrivateModelEndpoint(url)) {
+    ollamaLibraryStatus.textContent = "Enter a localhost or private-LAN Ollama endpoint first.";
+    return;
+  }
+  if (!/^[A-Za-z0-9_.:/-]{1,180}$/.test(model) || model.includes("..")) {
+    ollamaLibraryStatus.textContent = "Enter a valid Ollama model name, such as qwen3:4b.";
+    return;
+  }
+  if (!window.confirm(`Ask the configured Ollama runtime to download "${model}"? This may use several gigabytes of network and disk space on that machine.`)) return;
+  ollamaModelPullButton.disabled = true;
+  ollamaModelsRefreshButton.disabled = true;
+  ollamaLibraryStatus.textContent = "Starting download of " + model + "…";
+  try {
+    const response = await fetch(url + "/api/pull", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model, stream: true }),
+      signal: AbortSignal.timeout(30 * 60 * 1000),
+    });
+    if (!response.ok) throw new Error("Ollama pull failed with HTTP " + response.status);
+    if (!response.body) throw new Error("Ollama did not provide download progress.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let lastStatus = "Downloading " + model + "…";
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const item = JSON.parse(line) as { status?: string; completed?: number; total?: number; error?: string };
+        if (item.error) throw new Error(item.error);
+        lastStatus = item.status ?? lastStatus;
+        if (item.total && item.total > 0) lastStatus += ` · ${Math.min(100, Math.round((item.completed ?? 0) / item.total * 100))}% · ${formatBytes(item.completed ?? 0)} / ${formatBytes(item.total)}`;
+        ollamaLibraryStatus.textContent = lastStatus;
+      }
+      if (done) break;
+    }
+    settings.localModel = model;
+    saveSettings();
+    await refreshOllamaModels();
+    ollamaLibraryStatus.textContent = `Downloaded ${model}. Ultran can now use it through this Ollama connection.`;
+  } catch (error) {
+    ollamaLibraryStatus.textContent = "Model download failed: " + (error instanceof Error ? error.message : "network error");
+  } finally {
+    ollamaModelPullButton.disabled = false;
+    ollamaModelsRefreshButton.disabled = false;
+  }
+}
+
 async function testLocalModel(): Promise<void> {
   const url = normalizeModelEndpoint(localModelEndpointEl.value);
   const model = localModelEl.value.trim();
@@ -1830,6 +1921,11 @@ req<HTMLButtonElement>("#workspace-synthesize").addEventListener("click", () => 
 req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
 req<HTMLButtonElement>("#test-local-model-btn").addEventListener("click", () => void testLocalModel());
+ollamaModelsRefreshButton.addEventListener("click", () => void refreshOllamaModels());
+ollamaModelPullButton.addEventListener("click", () => void pullOllamaModel());
+ollamaModelSelect.addEventListener("change", () => {
+  if (ollamaModelSelect.value) localModelEl.value = ollamaModelSelect.value;
+});
 req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () => void importNativeModel());
 modelSearchForm.addEventListener("submit", (event) => {
   event.preventDefault();

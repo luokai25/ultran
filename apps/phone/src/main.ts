@@ -2415,6 +2415,7 @@ scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
 req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { setActiveNavigation(navSettingsButton); openSheet(); });
+req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
 androidBatteryAccessButton.addEventListener("click", () => {
   if (Capacitor.getPlatform() !== "android") return;
   void NativeCompanion.requestNotificationPermission()

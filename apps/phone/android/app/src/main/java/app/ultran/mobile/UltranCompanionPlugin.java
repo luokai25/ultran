@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
+import android.text.TextUtils;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
@@ -92,6 +94,57 @@ public final class UltranCompanionPlugin extends Plugin {
         } catch (Exception error) {
             call.reject("Could not stop background task monitoring.", error);
         }
+    }
+
+
+    @PluginMethod
+    public void openWhatsAppMessage(PluginCall call) {
+        String rawNumber = call.getString("number", "").trim();
+        String body = call.getString("body", "").trim();
+        String number = rawNumber.replaceAll("[^0-9]", "");
+        if (number.length() < 7 || number.length() > 15 || body.isEmpty() || body.length() > 4000) {
+            call.reject("Provide an international phone number and a message of up to 4,000 characters.");
+            return;
+        }
+        String component = getContext().getPackageName() + "/" + UltranMessagingAccessibilityService.class.getName();
+        String enabled = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        boolean serviceEnabled = enabled != null && enabled.contains(component);
+        if (!serviceEnabled) {
+            getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+                .setTitle("Enable Ultran phone actions")
+                .setMessage("To send an approved WhatsApp message, Android requires you to enable Ultran's Accessibility Service. It only acts on a WhatsApp message after you approve its exact recipient and text in Ultran. You can disable it any time in Android Accessibility settings.")
+                .setPositiveButton("Open Accessibility settings", (dialog, which) -> {
+                    getActivity().startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    call.resolve(new JSObject().put("openedSettings", true).put("sent", false));
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("openedSettings", false).put("sent", false)))
+                .show());
+            return;
+        }
+        if (getContext().getPackageManager().getLaunchIntentForPackage("com.whatsapp") == null) {
+            call.reject("WhatsApp is not installed. Install it or use the SMS handoff.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Approve WhatsApp message")
+            .setMessage("Send this exact message to +"+number+" using WhatsApp?\n\n"+body+"\n\nUltran will open WhatsApp and tap Send once. This approval expires after 60 seconds.")
+            .setPositiveButton("Approve and send", (dialog, which) -> {
+                getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE)
+                    .edit().putString("approved_text", body)
+                    .putLong("expires_at", System.currentTimeMillis() + 60000L).apply();
+                try {
+                    String url = "https://wa.me/" + number + "?text=" + Uri.encode(body);
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    intent.setPackage("com.whatsapp");
+                    getActivity().startActivity(intent);
+                    call.resolve(new JSObject().put("opened", true).put("approved", true).put("sent", "pending_confirmation_in_whatsapp"));
+                } catch (Exception error) {
+                    getContext().getSharedPreferences("ultran_messaging_approval", android.content.Context.MODE_PRIVATE).edit().clear().apply();
+                    call.reject("Could not open WhatsApp. The one-use approval was cancelled.", error);
+                }
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("approved", false).put("sent", false)))
+            .show());
     }
 
     @PluginMethod

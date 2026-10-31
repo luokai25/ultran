@@ -7,13 +7,16 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel, persona, orchestrator, policyGate, ledger, runState] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, manifest, orchestrator, policyGate, ledger, runState] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
   read("android/app/src/main/java/app/ultran/mobile/UltranRuntimePlugin.java"),
   read("src/capability-kernel.ts"),
   read("src/ultran-persona.ts"),
+  read("android/app/src/main/java/app/ultran/mobile/UltranCompanionPlugin.java"),
+  read("android/app/src/main/java/app/ultran/mobile/UltranVoiceService.java"),
+  read("android/app/src/main/AndroidManifest.xml"),
   read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
   read("../../services/agent-core/src/monetization/policy-gate.ts"),
   read("../../services/agent-core/src/monetization/ledger.ts"),
@@ -145,4 +148,25 @@ test("Ultran identity, motto, voice signature, and voice dictation are wired acr
   assert.match(main, /ULTRAN_MOTTO/);
   assert.ok(html.includes('id="mic-btn"'));
   assert.ok(html.includes('id="voice-status"'));
+});
+
+
+test("Android companion exposes user-approved SMS, task notifications and background speech", () => {
+  assert.match(companion, /Intent\.ACTION_SENDTO/);
+  assert.match(companion, /Review text message/);
+  assert.match(companion, /Nothing will be sent until you press Send/);
+  assert.match(companion, /POST_NOTIFICATIONS/);
+  assert.match(companion, /Ultran task updates/);
+  assert.match(companion, /startForegroundService/);
+  assert.match(voiceService, /TextToSpeech/);
+  assert.match(voiceService, /startForeground/);
+  assert.match(manifest, /FOREGROUND_SERVICE_MEDIA_PLAYBACK/);
+  assert.match(manifest, /UltranVoiceService/);
+  assert.match(main, /processTaskUpdates\(tasks\)/);
+  assert.match(main, /NativeCompanion\.notify/);
+  assert.match(main, /NativeCompanion\.speakInBackground/);
+  assert.match(main, /proactiveUpdates/);
+  assert.match(main, /composeSms/);
+  assert.ok(html.includes('id="proactive-btn"'));
+  assert.ok(html.includes('id="sms-btn"'));
 });

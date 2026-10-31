@@ -70,6 +70,21 @@ class AgentOut(BaseModel):
     total_tokens: int = 0
 
 
+class AgentMemoryCreate(_Strict):
+    content: str = Field(min_length=1, max_length=5000)
+    category: str = Field(default="general", min_length=1, max_length=48)
+
+
+class AgentMemoryOut(BaseModel):
+    id: str
+    agent_id: str
+    workspace_id: str
+    content: str
+    category: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class ChatTurn(_Strict):
     message: str = Field(min_length=1, max_length=16_000)
     session_id: str | None = Field(default=None, max_length=64)

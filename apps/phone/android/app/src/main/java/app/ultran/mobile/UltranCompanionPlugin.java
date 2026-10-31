@@ -119,6 +119,72 @@ public final class UltranCompanionPlugin extends Plugin {
             .show());
     }
 
+
+    @PluginMethod
+    public void composeWhatsApp(PluginCall call) {
+        String recipient = call.getString("number", "").replaceAll("[^0-9]", "");
+        String body = call.getString("body", "").trim();
+        if (recipient.length() < 7 || recipient.length() > 15 || body.isEmpty() || body.length() > 4000) {
+            call.reject("Provide a WhatsApp number with country code and a message up to 4,000 characters.");
+            return;
+        }
+        Uri target = Uri.parse("https://wa.me/" + recipient).buildUpon()
+            .appendQueryParameter("text", body).build();
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Review WhatsApp message")
+            .setMessage("Ultran wants to open WhatsApp with this message prepared. Nothing will be sent until you press Send in WhatsApp.\n\nTo: +" + recipient + "\n\n" + body)
+            .setPositiveButton("Open WhatsApp", (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_VIEW, target);
+                intent.setPackage("com.whatsapp");
+                try {
+                    getActivity().startActivity(intent);
+                    call.resolve(new JSObject().put("opened", true).put("sent", false));
+                } catch (Exception error) {
+                    Intent fallback = new Intent(Intent.ACTION_VIEW, target);
+                    try {
+                        getActivity().startActivity(fallback);
+                        call.resolve(new JSObject().put("opened", true).put("sent", false).put("fallback", true));
+                    } catch (Exception fallbackError) {
+                        call.reject("WhatsApp or a compatible link handler is not installed.", fallbackError);
+                    }
+                }
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false).put("sent", false)))
+            .show());
+    }
+
+    @PluginMethod
+    public void openApp(PluginCall call) {
+        String app = call.getString("app", "").trim().toLowerCase(java.util.Locale.ROOT);
+        String label;
+        String packageName;
+        switch (app) {
+            case "whatsapp": label = "WhatsApp"; packageName = "com.whatsapp"; break;
+            case "whatsapp-business": label = "WhatsApp Business"; packageName = "com.whatsapp.w4b"; break;
+            case "telegram": label = "Telegram"; packageName = "org.telegram.messenger"; break;
+            case "messages": label = "Messages"; packageName = "com.google.android.apps.messaging"; break;
+            case "gmail": label = "Gmail"; packageName = "com.google.android.gm"; break;
+            case "phone": label = "Phone"; packageName = "com.google.android.dialer"; break;
+            case "calendar": label = "Calendar"; packageName = "com.google.android.calendar"; break;
+            default: call.reject("This app is not in Ultran's approved launch list."); return;
+        }
+        final String chosenLabel = label;
+        final String chosenPackage = packageName;
+        getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+            .setTitle("Open " + chosenLabel + "?")
+            .setMessage("Ultran is asking permission to open " + chosenLabel + ".")
+            .setPositiveButton("Open app", (dialog, which) -> {
+                Intent launch = getContext().getPackageManager().getLaunchIntentForPackage(chosenPackage);
+                if (launch == null) { call.reject(chosenLabel + " is not installed or cannot be opened."); return; }
+                try {
+                    getActivity().startActivity(launch);
+                    call.resolve(new JSObject().put("opened", true).put("app", app));
+                } catch (Exception error) { call.reject("Could not open " + chosenLabel + ".", error); }
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> call.resolve(new JSObject().put("opened", false)))
+            .show());
+    }
+
     @PluginMethod
     public void speakInBackground(PluginCall call) {
         String text = call.getString("text", "").trim();

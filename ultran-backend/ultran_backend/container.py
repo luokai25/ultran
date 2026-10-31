@@ -76,7 +76,10 @@ class Container:
             vault=vault,
             sandbox=sandbox,
             brain=brain,
-            agents=AgentService(brain, sandbox, vault),
+            agents=AgentService(brain, sandbox, vault, composio=ComposioGateway(
+                api_key=settings.composio_api_key,
+                callback_url=settings.composio_callback_url,
+            )),
             avatar=AvatarService(),
             voice=VoiceService(),
             builder=BuilderService(),

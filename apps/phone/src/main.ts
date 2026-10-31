@@ -855,6 +855,10 @@ async function attachRequestedArtifact(task: string, content: string, body: HTML
   return [{ connector: "artifacts", action: `create_${format}`, ok: false, detail: "The file service is unavailable; connect Ultran's local control plane and retry." }];
 }
 
+function artifactPreviewUrl(url: string): string {
+  return url.startsWith("blob:") || /^https?:\/\//i.test(url) ? url : `${baseUrl()}${url}`;
+}
+
 function downloadArtifact(url: string, filename: string): void {
   if (url.startsWith("blob:")) {
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); return;
@@ -927,7 +931,7 @@ async function refreshWorkspace(): Promise<void> {
   for (const file of artifacts) {
     const card = workspaceNode("article", "workspace-file"); card.append(workspaceNode("span", "workspace-file-icon", file.format.toUpperCase()));
     const copy = workspaceNode("div", "workspace-file-copy"); copy.append(workspaceNode("strong", "", file.title), workspaceNode("small", "", `${(file.size/1024).toFixed(1)} KB`)); card.append(copy);
-    const preview = workspaceNode("button", "", "Preview"); preview.addEventListener("click", () => showArtifactPreview(file.preview_url, file.title));
+    const preview = workspaceNode("button", "", "Preview"); preview.addEventListener("click", () => showArtifactPreview(artifactPreviewUrl(file.preview_url), file.title));
     const download = workspaceNode("button", "", "Download"); download.addEventListener("click", () => void Browser.open({url:`${baseUrl()}${file.download_url}`})); card.append(preview, download); workspaceArtifacts.append(card);
   }
 }
@@ -1147,7 +1151,7 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
         const preview = document.createElement("button");
         preview.type = "button";
         preview.textContent = "Preview";
-        preview.addEventListener("click", () => showArtifactPreview(call.artifact!.preview_url, call.artifact!.title));
+        preview.addEventListener("click", () => showArtifactPreview(artifactPreviewUrl(call.artifact!.preview_url), call.artifact!.title));
         const download = document.createElement("button");
         download.type = "button";
         download.textContent = "Download";

@@ -34,19 +34,20 @@
       <main id="thread" class="thread" aria-live="polite">
         <section id="hero" class="hero">
           <div class="hero-intro">
-            <div class="hero-kicker"><span class="hero-kicker-line"></span> YOUR PERSONAL INTELLIGENCE</div>
+            <div class="hero-kicker"><span class="hero-kicker-line"></span> YOUR PERSONAL AI</div>
             <div class="stage">
               <div class="avatar-orbit avatar-orbit-a" aria-hidden="true"></div>
               <div class="avatar-orbit avatar-orbit-b" aria-hidden="true"></div>
               <canvas id="avatar" aria-label="Ultran assistant avatar"></canvas>
+              <span id="hero-mark" class="hero-brand-mark" aria-hidden="true"></span>
               <div class="halo" aria-hidden="true"></div>
             </div>
-            <h1 id="greeting" class="greeting">Ultran online.</h1>
-            <p id="subgreeting" class="subgreeting">One assistant. Many capabilities. Your device, your rules.</p>
-            <div class="hero-status"><span class="status-pulse"></span><span>READY WHEN YOU ARE</span><span class="status-divider"></span><span>PRIVATE BY DEFAULT</span></div>
+            <h1 id="greeting" class="greeting">Good evening.</h1>
+            <p id="subgreeting" class="subgreeting">What shall we do today?</p>
+            <div class="hero-status"><span class="status-pulse"></span><span>LOCAL FIRST</span><span class="status-divider"></span><span>YOUR DEVICE, YOUR RULES</span></div>
           </div>
           <div class="quick-start">
-            <div class="quick-start-heading"><div><span class="section-eyebrow">GET STARTED</span><h2>What are we working on?</h2></div><span class="quick-start-mark">✳</span></div>
+            <div class="quick-start-heading"><div><span class="section-eyebrow">QUICK ACTIONS</span><h2>What can I help with?</h2></div><span class="quick-start-mark">✳</span></div>
             <div id="suggestions" class="suggestions"></div>
           </div>
         </section>
@@ -84,23 +85,48 @@
         <p id="voice-status" class="voice-status" role="status" aria-live="polite" hidden></p>
         <p class="footnote"><span class="footnote-lock">◆</span> Private by design · Review actions before they run.</p>
       </footer>
+      <section id="agents-screen" class="feature-screen" aria-label="AI agents" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">YOUR AI TEAM</span><h1>Agents</h1><p>Your agents, ready to work.</p></div><button id="agents-workspace-open" class="gold-button" type="button">Open workspace <span aria-hidden="true">↗</span></button></header>
+        <div class="feature-filters" role="group" aria-label="Agent filter"><button class="filter-chip is-selected" type="button" data-agent-filter="all">All</button><button class="filter-chip" type="button" data-agent-filter="active">Active</button><button class="filter-chip" type="button" data-agent-filter="local">Local-first</button></div>
+        <div class="agent-cards">
+          <article class="agent-card" data-agent-kind="local"><div class="agent-avatar agent-avatar-ultran"><span>U</span></div><div class="agent-card-copy"><h2>Ultran Assistant</h2><span class="agent-status"><i></i> Ready</span><p>Your personal AI assistant</p></div><span class="card-chevron">›</span></article>
+          <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-code"><span>&lt;/&gt;</span></div><div class="agent-card-copy"><h2>Code Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Help plan, review and debug code</p></div><span class="card-chevron">›</span></article>
+          <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-web"><span>◎</span></div><div class="agent-card-copy"><h2>Research Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Research and organize information</p></div><span class="card-chevron">›</span></article>
+        </div>
+        <div class="feature-callout"><span class="callout-icon">✳</span><div><strong>Tasks stay under your control</strong><p>Review permissions and approve write-capable actions before they run.</p></div></div>
+      </section>
+      <section id="worlds-screen" class="feature-screen" aria-label="Worlds" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">EXPLORE THE IMPOSSIBLE</span><h1>Worlds</h1><p>Places to imagine, build, and explore.</p></div></header>
+        <button class="world-hero" id="world-lou-open" type="button"><span class="world-art world-art-castle" aria-hidden="true"><i></i><b></b></span><span class="world-copy"><span class="feature-eyebrow">FEATURED WORLD</span><strong>Lou World</strong><small>A god-like sandbox concept, ready to explore as a creative prompt.</small><span class="gold-link">Start imagining <b>→</b></span></span></button>
+        <div class="world-grid"><button class="world-tile" type="button" data-world-prompt="Help me design a rich fantasy realm with kingdoms, magic systems, and ancient ruins."><span class="world-art world-art-fantasy" aria-hidden="true">✧</span><strong>Fantasy Realm</strong><small>Magic and myth</small></button><button class="world-tile" type="button" data-world-prompt="Help me design a believable sci-fi universe with planets, factions, and advanced technology."><span class="world-art world-art-space" aria-hidden="true">◉</span><strong>Sci-Fi Universe</strong><small>Beyond the stars</small></button></div>
+        <p class="feature-disclaimer">World cards open a creative session with Ultran. They do not claim a playable game is installed.</p>
+      </section>
+      <section id="luonix-screen" class="feature-screen" aria-label="Luonix feed" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">WATCH · CREATE · SHARE</span><h1>Luonix</h1><p>A home for short-form ideas and media.</p></div><button id="luonix-create" class="gold-button" type="button">Create <span aria-hidden="true">＋</span></button></header>
+        <div class="feature-filters" role="group" aria-label="Luonix feed"><button class="filter-chip is-selected" type="button" data-feed-filter="for-you">For You</button><button class="filter-chip" type="button" data-feed-filter="following">Following</button><button class="filter-chip" type="button" data-feed-filter="trending">Trending</button></div>
+        <article class="luonix-preview"><div class="luonix-art" aria-hidden="true"><span class="luonix-play">▶</span><span class="luonix-art-label">YOUR NEXT IDEA STARTS HERE</span></div><div class="luonix-post-meta"><div class="mini-avatar">U</div><div><strong>Ultran Studio</strong><small>Sample preview · stored on this screen only</small></div><button class="like-button" type="button" aria-pressed="false" aria-label="Like preview">♡</button></div><p class="luonix-caption">Make something worth sharing. Your media and publishing tools will appear here when configured.</p></article>
+        <div class="feature-callout"><span class="callout-icon">＋</span><div><strong>Create a post</strong><p>Choose a photo or video from your gallery to prepare a local draft.</p><button id="luonix-draft-btn" class="text-action" type="button">Prepare a draft</button></div></div>
+      </section>
+      <section id="more-screen" class="feature-screen" aria-label="More Ultran features" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">ULTRAN</span><h1>More</h1><p>Your tools, privacy, and personal space.</p></div></header>
+        <button id="more-connectors-btn" class="more-row" type="button"><span class="more-icon">⌘</span><span><strong>Tools &amp; Connectors</strong><small>Connect services and review permissions</small></span><b>›</b></button>
+        <button id="more-vault-btn" class="more-row" type="button"><span class="more-icon">♙</span><span><strong>Vault</strong><small>Private space and secure-storage setup</small></span><b>›</b></button>
+        <button id="more-settings-btn" class="more-row" type="button"><span class="more-icon">⚙</span><span><strong>Settings</strong><small>Account, local AI, runtime and privacy</small></span><b>›</b></button>
+        <div class="vault-privacy-card"><div class="vault-shield">♙</div><h2>Your data stays yours</h2><p>Ultran keeps local-first features and permissions visible. Sensitive actions require your approval.</p></div>
+        <p class="feature-version">ULTRAN · PERSONAL AI SYSTEM</p>
+      </section>
+      <section id="vault-screen" class="feature-screen" aria-label="Vault" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">PRIVATE BY DESIGN</span><h1>Vault</h1><p>Your private space.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to More">‹</button></header>
+        <div class="vault-hero"><div class="vault-shield">♙</div><h2>Keep your data safe</h2><p>Ultran's secure-storage controls will be surfaced here. No files are represented as encrypted until encrypted storage is implemented and verified.</p></div>
+        <div class="vault-entry"><span class="more-icon">▤</span><span><strong>Private notes</strong><small>Local notes feature not yet connected</small></span><b>›</b></div><div class="vault-entry"><span class="more-icon">▣</span><span><strong>Private files</strong><small>File vault feature not yet connected</small></span><b>›</b></div><div class="vault-entry"><span class="more-icon">▧</span><span><strong>Secure gallery</strong><small>Gallery vault feature not yet connected</small></span><b>›</b></div>
+      </section>
       <nav class="bottom-nav" aria-label="Main navigation">
-        <button id="nav-chat" class="nav-item" type="button" aria-current="page">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.8A2.8 2.8 0 0 1 7.8 3h8.4A2.8 2.8 0 0 1 19 5.8v7.4a2.8 2.8 0 0 1-2.8 2.8H11l-4.8 4v-4.2a2.8 2.8 0 0 1-1.2-2.3z"/></svg>
-          <span>Chat</span>
-        </button>
-        <button id="nav-agents" class="nav-item" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="12" rx="3"/><path d="M9 11h.01M15 11h.01M9 15h6M12 3v3M3 10h2M19 10h2"/></svg>
-          <span>Agents</span>
-        </button>
-        <button id="nav-connectors" class="nav-item" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5M16 3v5M6 8h12v4a6 6 0 0 1-12 0zM12 18v3M9 21h6"/></svg>
-          <span>Connect</span>
-        </button>
-        <button id="nav-settings" class="nav-item" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0V19a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.5l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5v-.2a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
-          <span>Settings</span>
-        </button>
+        <button id="nav-chat" class="nav-item" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.8A2.8 2.8 0 0 1 7.8 3h8.4A2.8 2.8 0 0 1 19 5.8v7.4a2.8 2.8 0 0 1-2.8 2.8H11l-4.8 4v-4.2a2.8 2.8 0 0 1-1.2-2.3z"/></svg><span>Chats</span></button>
+        <button id="nav-agents" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="12" rx="3"/><path d="M9 11h.01M15 11h.01M9 15h6M12 3v3M3 10h2M19 10h2"/></svg><span>Agents</span></button>
+        <button id="nav-worlds" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(-24 12 12)"/><path d="M12 5v14"/></svg><span>Worlds</span></button>
+        <button id="nav-luonix" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5a1.5 1.5 0 0 1 2.3-1.28l10.2 6.3a2.9 2.9 0 0 1 0 4.96l-10.2 6.3A1.5 1.5 0 0 1 7 19.5z"/></svg><span>Luonix</span></button>
+        <button id="nav-more" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="5" height="5" rx="1"/><rect x="15" y="4" width="5" height="5" rx="1"/><rect x="4" y="15" width="5" height="5" rx="1"/><rect x="15" y="15" width="5" height="5" rx="1"/></svg><span>More</span></button>
+        <button id="nav-connectors" class="nav-item nav-compat" type="button" hidden><span>Connect</span></button><button id="nav-settings" class="nav-item nav-compat" type="button" hidden><span>Settings</span></button>
       </nav>
     </div>
 

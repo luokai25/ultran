@@ -946,6 +946,12 @@ def _requested_artifact_format(message: str) -> str | None:
     for extension in extensions:
         if "." + extension in low or extension + " file" in low or extension + " script" in low or extension + " source" in low:
             return extension
+    for language, extension in (("python", "py"), ("javascript", "js"), ("typescript", "ts"),
+                                ("kotlin", "kt"), ("golang", "go"), ("rust", "rs"),
+                                ("c++", "cpp"), ("c language", "c"), ("bash", "sh"),
+                                ("shell script", "sh")):
+        if language in low and any(word in words for word in ("code", "script", "file", "source")):
+            return extension
     for fmt, terms in formats:
         if any(term in low for term in terms):
             return fmt

@@ -45,6 +45,7 @@ public class UltranLocalAiPlugin extends Plugin {
     private final ExecutorService inferenceExecutor = Executors.newSingleThreadExecutor();
     private volatile String loadedModelPath;
     private volatile int loadedContextTokens;
+    private volatile boolean loadedLargeModelMode;
     private static final long MAX_MODEL_BYTES = 256L * 1024L * 1024L * 1024L;
     private static final Pattern GGUF_SHARD = Pattern.compile("^(.+)-(\\d{5})-of-(\\d{5})\\.gguf$", Pattern.CASE_INSENSITIVE);
 
@@ -521,7 +522,7 @@ public class UltranLocalAiPlugin extends Plugin {
         }
 
         if (model.getAbsolutePath().equals(loadedModelPath)) {
-            call.resolve(new JSObject().put("loaded", true).put("name", name).put("contextTokens", loadedContextTokens > 0 ? loadedContextTokens : 2048).put("device", "CPU").put("memoryMapped", true));
+            call.resolve(new JSObject().put("loaded", true).put("name", name).put("contextTokens", loadedContextTokens > 0 ? loadedContextTokens : 2048).put("device", "CPU").put("memoryMapped", true).put("largeModelMode", loadedLargeModelMode));
             return;
         }
 
@@ -546,11 +547,13 @@ public class UltranLocalAiPlugin extends Plugin {
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;
                     loadedContextTokens = 0;
+                    loadedLargeModelMode = false;
                     call.reject(error);
                     return;
                 }
                 loadedModelPath = model.getAbsolutePath();
                 loadedContextTokens = contextTokens;
+                loadedLargeModelMode = aggressiveLazyLoading;
                 JSObject response = new JSObject();
                 response.put("loaded", true);
                 response.put("name", name);
@@ -562,6 +565,7 @@ public class UltranLocalAiPlugin extends Plugin {
             } catch (Throwable error) {
                 loadedModelPath = null;
                 loadedContextTokens = 0;
+                loadedLargeModelMode = false;
                 call.reject(error.getMessage() == null ? "Native model loading failed." : error.getMessage());
             }
         });
@@ -625,6 +629,7 @@ public class UltranLocalAiPlugin extends Plugin {
             NativeLlama.nativeUnloadModel();
             loadedModelPath = null;
             loadedContextTokens = 0;
+            loadedLargeModelMode = false;
             call.resolve(new JSObject().put("loaded", false));
         });
     }

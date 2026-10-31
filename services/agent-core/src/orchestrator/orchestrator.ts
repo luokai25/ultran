@@ -292,6 +292,8 @@ export class Orchestrator {
       }
 
       this.append(state, { type: 'tool.invoked', runId: state.runId, stepId: step.id, toolId: tool.id, argsHash: hashArgs(call.args), at: Date.now() });
+      this.opts.policyGate.recordUsage(state.runId, 'tool.calls', 1, `${state.runId}:${step.id}:tool.calls`);
+      this.append(state, { type: 'meter.emitted', runId: state.runId, meter: 'tool.calls', amount: 1, at: Date.now() });
       const result: ToolResult = await this.opts.sandbox.invoke({
         toolId: tool.id, capability: tool.capability, args: call.args, grantId,
       });

@@ -26,7 +26,7 @@ AirLLM depends on Python, PyTorch, Transformers, Accelerate, SafeTensors and opt
 - Android no longer rejects a model merely because its file is larger than 70% of free RAM. The previous guard incorrectly assumed the full mapped checkpoint must be resident.
 - The context cache is selected from current available memory: 512 tokens below 1 GiB free, 1,024 below 2 GiB, otherwise 2,048.
 - Prompt batches are limited to 64 tokens to reduce transient allocations.
-- Import and direct Hugging Face download have a 256 GB safety ceiling and still check actual free storage while writing a temporary file. This ceiling is not a promise that Android hardware can run a model of that size.
+- Import and direct Hugging Face download have a 256 GB safety ceiling and still check actual free storage while writing a temporary file. Split GGUF imports are multi-selected, filename/count checked, staged, and committed as one set; the model list exposes only the first shard as the logical model. llama.cpp's pinned loader automatically discovers the remaining standard `-00001-of-000NN.gguf` files. This ceiling is not a promise that Android hardware can run a model of that size.
 - Existing GGUF validation, SHA-256 validation when supplied, atomic finalization, serialized load/inference/delete operations, and local-only model storage remain in place.
 
 ## Important distinction: mmap is not magic

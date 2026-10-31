@@ -273,3 +273,37 @@ def test_pending_excludes_decided_and_expired(gate):
 def test_unknown_approval_raises_not_found(gate):
     with pytest.raises(NotFound):
         gate.get("apr_missing")
+
+
+def test_approval_gate_restores_pending_and_decided_history(tmp_path):
+    path = str(tmp_path / "approvals.sqlite3")
+    first = ApprovalGate(ttl_s=60, db_path=path)
+    pending = first.request("workspace-a", "mcp.send_email", "args-hash", reason="Send email")
+    assert first.pending("workspace-a")[0].id == pending.id
+
+    restarted = ApprovalGate(ttl_s=60, db_path=path)
+    restored = restarted.get(pending.id)
+    assert restored.state == "pending"
+    assert restored.reason == "Send email"
+    decided = restarted.decide(pending.id, approved=False, decided_by="human")
+
+    after_another_restart = ApprovalGate(ttl_s=60, db_path=path)
+    assert after_another_restart.get(pending.id).state == "denied"
+    assert after_another_restart.get(pending.id).decided_by == "human"
+    assert after_another_restart.pending("workspace-a") == []
+
+
+def test_approval_gate_persists_expiration(tmp_path):
+    from datetime import timedelta
+    from ultran_backend.mcp.protocol import utcnow
+
+    path = str(tmp_path / "approvals.sqlite3")
+    gate = ApprovalGate(ttl_s=60, db_path=path)
+    approval = gate.request("workspace-a", "mcp.write", "hash")
+    approval.expires_at = utcnow() - timedelta(seconds=1)
+    gate._save(approval)
+    restarted = ApprovalGate(ttl_s=60, db_path=path)
+    assert restarted.pending("workspace-a") == []
+    with pytest.raises(ValidationFailed, match="expired"):
+        restarted.decide(approval.id, approved=True)
+    assert restarted.get(approval.id).state == "expired"

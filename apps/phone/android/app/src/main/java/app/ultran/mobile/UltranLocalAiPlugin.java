@@ -23,6 +23,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -193,6 +197,113 @@ public class UltranLocalAiPlugin extends Plugin {
             }
         } catch (Exception ignored) {}
         return -1;
+    }
+
+    @PluginMethod
+    public void downloadModel(PluginCall call) {
+        final String name;
+        final String source;
+        final String expectedSha256;
+        try {
+            name = safeModelName(call.getString("name"));
+            source = call.getString("url");
+            expectedSha256 = call.getString("sha256", "").trim().toLowerCase(Locale.ROOT);
+            if (source == null || source.length() > 4096) throw new IllegalArgumentException("A Hugging Face model URL is required.");
+            URL parsed = new URL(source);
+            if (!"https".equalsIgnoreCase(parsed.getProtocol()) || !"huggingface.co".equalsIgnoreCase(parsed.getHost())) {
+                throw new IllegalArgumentException("Downloads must start from the official https://huggingface.co host.");
+            }
+            if (!expectedSha256.isEmpty() && !expectedSha256.matches("[a-f0-9]{64}")) {
+                throw new IllegalArgumentException("Invalid SHA-256 checksum.");
+            }
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Invalid model download request." : error.getMessage());
+            return;
+        }
+
+        inferenceExecutor.execute(() -> {
+            File partial = null;
+            HttpURLConnection connection = null;
+            try {
+                File destination = new File(modelDirectory(), name);
+                if (destination.getAbsolutePath().equals(loadedModelPath)) {
+                    call.reject("Unload this model before replacing it.");
+                    return;
+                }
+                StatFs storage = new StatFs(modelDirectory().getAbsolutePath());
+                final long availableAtStart = storage.getAvailableBytes();
+                URL current = new URL(source);
+                for (int redirects = 0; redirects <= 5; redirects++) {
+                    connection = (HttpURLConnection) current.openConnection();
+                    connection.setConnectTimeout(15000);
+                    connection.setReadTimeout(30000);
+                    connection.setInstanceFollowRedirects(false);
+                    connection.setRequestProperty("User-Agent", "Ultran-Android/0.1");
+                    int code = connection.getResponseCode();
+                    if (code >= 300 && code < 400) {
+                        String location = connection.getHeaderField("Location");
+                        connection.disconnect();
+                        connection = null;
+                        if (location == null || redirects == 5) throw new IllegalStateException("Too many or invalid model download redirects.");
+                        URL next = new URL(current, location);
+                        String host = next.getHost().toLowerCase(Locale.ROOT);
+                        if (!"https".equalsIgnoreCase(next.getProtocol()) ||
+                                !(host.equals("huggingface.co") || host.endsWith(".huggingface.co") || host.equals("hf.co") || host.endsWith(".hf.co"))) {
+                            throw new IllegalStateException("Model download redirected to an untrusted host.");
+                        }
+                        current = next;
+                        continue;
+                    }
+                    if (code != HttpURLConnection.HTTP_OK) throw new IllegalStateException("Hugging Face download failed with HTTP " + code + ".");
+                    break;
+                }
+                long total = connection.getContentLengthLong();
+                final long maxBytes = 8L * 1024L * 1024L * 1024L;
+                if (total > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 8 GB download limit.");
+                if (total > 0 && total > availableAtStart) throw new IllegalStateException("Not enough free device storage for this model.");
+                partial = new File(modelDirectory(), name + ".partial");
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                long received = 0;
+                try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(partial)) {
+                    byte[] buffer = new byte[256 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        received += read;
+                        if (received > maxBytes || received > availableAtStart) throw new IllegalStateException("Model download exceeded the available storage limit.");
+                        digest.update(buffer, 0, read);
+                        output.write(buffer, 0, read);
+                        JSObject progress = new JSObject();
+                        progress.put("name", name);
+                        progress.put("copiedBytes", received);
+                        progress.put("totalBytes", total);
+                        notifyListeners("modelImportProgress", progress);
+                    }
+                    output.getFD().sync();
+                }
+                if (total > 0 && received != total) throw new IllegalStateException("Model download was incomplete.");
+                if (received < 1024L * 1024L) throw new IllegalStateException("Downloaded file is too small to be a GGUF model.");
+                if (!expectedSha256.isEmpty()) {
+                    StringBuilder actual = new StringBuilder();
+                    for (byte value : digest.digest()) actual.append(String.format(Locale.ROOT, "%02x", value & 0xff));
+                    if (!expectedSha256.equals(actual.toString())) throw new IllegalStateException("SHA-256 checksum mismatch; downloaded file was rejected.");
+                }
+                try (RandomAccessFile header = new RandomAccessFile(partial, "r")) {
+                    byte[] magic = new byte[4];
+                    header.readFully(magic);
+                    if (magic[0] != 'G' || magic[1] != 'G' || magic[2] != 'U' || magic[3] != 'F') {
+                        throw new IllegalStateException("Downloaded file does not have a valid GGUF header.");
+                    }
+                }
+                if (destination.exists() && !destination.delete()) throw new IllegalStateException("Could not replace existing model file.");
+                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not finalize downloaded model.");
+                call.resolve(new JSObject().put("downloaded", true).put("name", name).put("sizeBytes", received));
+            } catch (Exception error) {
+                if (partial != null && partial.exists()) partial.delete();
+                call.reject(error.getMessage() == null ? "Model download failed." : error.getMessage(), error);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
     }
 
     @PluginMethod

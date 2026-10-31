@@ -77,6 +77,7 @@ public final class UltranTaskMonitorWorker extends Worker {
                 android.content.SharedPreferences prefs = getApplicationContext().getSharedPreferences("ultran_task_monitor", Context.MODE_PRIVATE);
                 JSONObject previous = new JSONObject(prefs.getString("statuses", "{}"));
                 JSONObject current = new JSONObject();
+                boolean spokenUpdate = false;
                 for (int i = 0; i < Math.min(tasks.length(), 100); i++) {
                     JSONObject task = tasks.optJSONObject(i);
                     if (task == null) continue;
@@ -95,7 +96,10 @@ public final class UltranTaskMonitorWorker extends Worker {
                     if (objective.length() > 100) objective = objective.substring(0, 97) + "...";
                     String detail = objective + (done ? " completed successfully." : failed ? " · " + state : active ? " · " + state : "");
                     postNotification(title, detail, id.hashCode());
-                    if (getInputData().getBoolean("speakUpdates", false) && (done || failed)) speakUpdate(title + ". " + detail);
+                    if (!spokenUpdate && getInputData().getBoolean("speakUpdates", false) && (done || failed)) {
+                        speakUpdate(title + ". " + detail);
+                        spokenUpdate = true;
+                    }
                 }
                 prefs.edit().putString("statuses", current.toString()).apply();
             }

@@ -48,42 +48,26 @@ SPLASHES = {
 }
 
 # ---------------------------------------------------------------------------
-# The Ultran mark: a faceted gold war-helm with two slanted sensor eyes.
-#
-# Geometry lives here once, in a 108x108 viewport (the Android adaptive-icon
-# grid, with the helm inside the 66-unit safe zone). The PNG icons, the splash
-# screens and the adaptive-icon vector are all produced from these polygons, and
-# apps/phone/src/mark.ts carries the same numbers for the in-app mark.
+# Ultran's new monogram: a precise gold shield with a bright U glyph.
+# Geometry is shared with apps/phone/src/mark.ts.
 # ---------------------------------------------------------------------------
 
 Poly = list[tuple[float, float]]
 VIEWPORT = 108.0
 
-SHELL: Poly = [(54, 22), (75, 31), (81, 53), (70, 76), (54, 87), (38, 76), (27, 53), (33, 31)]
-FACET_LIGHT: Poly = [(54, 22), (75, 31), (54, 44), (33, 31)]
-FACET_DEEP: Poly = [(81, 53), (70, 76), (54, 87), (54, 60)]
-FACE: Poly = [(54, 36), (68, 41), (71, 54), (63, 69), (54, 74), (45, 69), (37, 54), (40, 41)]
-EYE_L: Poly = [(40, 49), (51, 53), (51, 58), (41, 55)]
-EYE_R: Poly = [(57, 53), (68, 49), (67, 55), (57, 58)]
-GRILLE: list[Poly] = [
-    [(48, 65), (60, 65), (60, 67), (48, 67)],
-    [(49, 69), (59, 69), (59, 70.6), (49, 70.6)],
-]
-CREST: Poly = [(53, 22), (55, 22), (55, 35), (53, 35)]
+SHELL: Poly = [(54,14),(83,29),(83,70),(54,94),(25,70),(25,29)]
+INNER: Poly = [(54,24),(73,35),(73,65),(54,81),(35,65),(35,35)]
+MONOGRAM: Poly = [(39,38),(48,38),(48,58),(51,63),(57,63),(60,58),(60,38),(69,38),(69,60),(63,71),(45,71),(39,60)]
+CREST: Poly = [(54,23),(60,31),(54,35),(48,31)]
 
 LAYERS: list[tuple[Poly, tuple[int, int, int]]] = [
     (SHELL, GOLD),
-    (FACET_LIGHT, GOLD_BRIGHT),
-    (FACET_DEEP, GOLD_DEEP),
-    (FACE, CARBON),
-    (EYE_L, GOLD_BRIGHT),
-    (EYE_R, GOLD_BRIGHT),
-    *[(g, GOLD_DEEP) for g in GRILLE],
-    (CREST, OBSIDIAN),
+    (INNER, OBSIDIAN),
+    (MONOGRAM, GOLD_BRIGHT),
+    (CREST, GOLD_BRIGHT),
 ]
 
-SS = 4  # supersampling factor, so the facets are antialiased without gradients
-
+SS = 4  # supersampling factor for clean launcher artwork
 
 def _hex(rgb: tuple[int, int, int]) -> str:
     return "#{:02X}{:02X}{:02X}".format(*rgb)

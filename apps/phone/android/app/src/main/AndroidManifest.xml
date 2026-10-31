@@ -41,7 +41,6 @@
 
         </activity>
 
-        <activity android:name=".UltranTerminalActivity" android:exported="false" android:label="Ultran Terminal" android:windowSoftInputMode="adjustResize" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

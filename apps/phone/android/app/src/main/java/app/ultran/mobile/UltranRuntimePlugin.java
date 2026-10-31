@@ -397,6 +397,8 @@ public final class UltranRuntimePlugin extends Plugin {
         File staging = new File(root, "usr-staging");
         File destination = prefix();
         File backup = new File(root, "usr-backup");
+        boolean previousPrefixBackedUp = false;
+        boolean newPrefixActivated = false;
         try {
             long archiveSize = querySize(uri);
             if (archiveSize > MAX_ARCHIVE_BYTES) {
@@ -490,11 +492,14 @@ public final class UltranRuntimePlugin extends Plugin {
 
             deleteRecursively(backup);
             boolean hadPreviousPrefix = destination.exists() || isSymbolicLink(destination);
-            if (hadPreviousPrefix && !destination.renameTo(backup)) throw new IllegalStateException("Could not safely back up the existing runtime.");
+            if (hadPreviousPrefix) {
+                if (!destination.renameTo(backup)) throw new IllegalStateException("Could not safely back up the existing runtime.");
+                previousPrefixBackedUp = true;
+            }
             if (!staging.renameTo(destination)) {
-                if (hadPreviousPrefix) backup.renameTo(destination);
                 throw new IllegalStateException("Could not activate the extracted runtime.");
             }
+            newPrefixActivated = true;
 
             // The official Termux installer runs this second stage after extraction.
             // It configures package post-install scripts; without it, a bootstrap can
@@ -505,14 +510,19 @@ public final class UltranRuntimePlugin extends Plugin {
                 markerOutput.write(("termux-packages bootstrap; installed=" + System.currentTimeMillis() + "\n").getBytes(StandardCharsets.UTF_8));
                 markerOutput.getFD().sync();
             }
-            try { deleteRecursively(backup); } catch (Exception ignored) { }
+            try {
+                deleteRecursively(backup);
+                previousPrefixBackedUp = false;
+            } catch (Exception ignored) { }
             call.resolve(new JSObject().put("installed", true).put("prefix", destination.getAbsolutePath()).put("entries", entryCount).put("uncompressedBytes", totalBytes));
         } catch (Exception error) {
             try {
-                if (destination.exists() || isSymbolicLink(destination)) {
+                if (newPrefixActivated && (destination.exists() || isSymbolicLink(destination))) {
                     deleteRecursively(destination);
                 }
-                if (backup.exists() || isSymbolicLink(backup)) backup.renameTo(destination);
+                if (previousPrefixBackedUp && (backup.exists() || isSymbolicLink(backup))) {
+                    backup.renameTo(destination);
+                }
             } catch (Exception ignored) { }
             try { deleteRecursively(staging); } catch (Exception ignored) { }
             call.reject(error.getMessage() == null ? "Could not install the Termux bootstrap." : error.getMessage(), error);

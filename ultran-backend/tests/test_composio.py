@@ -216,3 +216,86 @@ def test_composio_tool_routes_are_workspace_scoped(client, container):
     )
     assert invoked.json()["workspace"] == "kai-workspace"
     assert invoked.json()["arguments"] == {"query": "inbox"}
+
+
+
+def test_agent_planner_runs_read_only_composio_tool(monkeypatch):
+    from ultran_backend.composio import ComposioGateway
+
+    spec = SimpleNamespace(
+        name="search_messages", title="Search messages", description="Search email messages",
+        input_schema={"type": "object", "properties": {"query": {"type": "string"}},
+                      "required": ["query"]},
+        capabilities=frozenset({"read"}), requires_approval=False, id="composio.search_messages",
+    )
+    class Pool:
+        closed = False
+        def list_tools(self):
+            return [spec]
+        def close(self):
+            self.closed = True
+    pool = Pool()
+    gateway = ComposioGateway(api_key="test-key")
+    gateway.create_session = lambda workspace: {"mcp": {"url": "https://mcp.example", "headers": {}}}
+    monkeypatch.setattr("ultran_backend.mcp.McpClientPool", lambda: pool)
+    monkeypatch.setattr("ultran_backend.mcp.ServerSpec", lambda **kwargs: SimpleNamespace(**kwargs))
+    invoked = {}
+    gateway._invoke_with_pool = lambda p, workspace, tool, args, approval=None: (
+        invoked.update({"workspace": workspace, "tool": tool.name, "args": args}) or
+        {"ok": True, "detail": "one result"}
+    )
+    result = gateway.plan_and_execute(
+        "workspace-a", "agent-a", "search my inbox",
+        lambda prompt, message: {"calls": [{"tool": "search_messages", "arguments": {"query": "inbox"}}]},
+    )
+    assert result[0]["ok"] is True
+    assert invoked == {"workspace": "workspace-a", "tool": "search_messages", "args": {"query": "inbox"}}
+    assert pool.closed is True
+
+
+def test_agent_planner_pauses_write_tool_for_human_approval(monkeypatch):
+    spec = SimpleNamespace(
+        name="send_email", title="Send email", description="Send an email",
+        input_schema={"type": "object", "properties": {"to": {"type": "string"}},
+                      "required": ["to"]},
+        capabilities=frozenset({"write"}), requires_approval=True, id="composio.send_email",
+    )
+    class Pool:
+        closed = False
+        def list_tools(self):
+            return [spec]
+        def close(self):
+            self.closed = True
+    pool = Pool()
+    gateway = ComposioGateway(api_key="test-key")
+    gateway.create_session = lambda workspace: {"mcp": {"url": "https://mcp.example", "headers": {}}}
+    monkeypatch.setattr("ultran_backend.mcp.McpClientPool", lambda: pool)
+    monkeypatch.setattr("ultran_backend.mcp.ServerSpec", lambda **kwargs: SimpleNamespace(**kwargs))
+    gateway._invoke_with_pool = lambda *args, **kwargs: pytest.fail("write action ran before approval")
+    result = gateway.plan_and_execute(
+        "workspace-a", "agent-a", "send email",
+        lambda prompt, message: {"calls": [{"tool": "send_email", "arguments": {"to": "a@example.com"}}]},
+    )
+    assert result[0]["approval_required"] is True
+    assert result[0]["approval_id"].startswith("apr_")
+    approvals = gateway.pending_approvals("workspace-a")
+    assert approvals[0]["arguments"] == {"to": "a@example.com"}
+    assert approvals[0]["agent_id"] == "agent-a"
+    assert pool.closed is True
+
+
+def test_approval_decision_is_workspace_scoped_and_denial_never_executes():
+    from ultran_backend.errors import NotFound
+
+    gateway = ComposioGateway(api_key="test-key")
+    approval = gateway._approval_gate.request("workspace-a", "composio.send_email", "hash")
+    gateway._pending_calls[approval.id] = {
+        "workspace_id": "workspace-a", "agent_id": "agent-a",
+        "tool_name": "send_email", "arguments": {"to": "a@example.com"},
+    }
+    with pytest.raises(NotFound):
+        gateway.decide_approval("workspace-b", approval.id, approved=True)
+    result = gateway.decide_approval("workspace-a", approval.id, approved=False)
+    assert result["executed"] is False
+    assert result["approval"]["state"] == "denied"
+    assert approval.id not in gateway._pending_calls

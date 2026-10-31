@@ -36,7 +36,11 @@ public final class UltranMessagingAccessibilityService extends AccessibilityServ
             if (send == null || !send.isEnabled()) return;
             // One-shot consume before the action to prevent duplicate sends.
             clearApproval(prefs);
-            send.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            try {
+                send.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            } finally {
+                send.recycle();
+            }
         } finally {
             root.recycle();
         }
@@ -44,8 +48,10 @@ public final class UltranMessagingAccessibilityService extends AccessibilityServ
 
     private boolean composerContainsExactText(AccessibilityNodeInfo node, String expected) {
         if (node == null) return false;
+        CharSequence className = node.getClassName();
         CharSequence text = node.getText();
-        if (text != null && expected.contentEquals(text)) return true;
+        if (className != null && "android.widget.EditText".contentEquals(className)
+            && text != null && expected.contentEquals(text)) return true;
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {

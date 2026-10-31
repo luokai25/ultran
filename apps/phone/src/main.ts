@@ -1406,7 +1406,7 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
     if (parsed.tool === "whatsapp.compose" && typeof parsed.number === "string" && typeof parsed.body === "string") {
       const number = parsed.number.trim();
       const body = parsed.body.trim();
-      if (!/^\\+?[0-9(). -]{7,24}$/.test(number) || !body || body.length > 4000 || body.includes("\\0")) return null;
+      if (!/^\+?[0-9(). -]{7,24}$/.test(number) || !body || body.length > 4000 || body.includes("\0")) return null;
       return { tool: "whatsapp.compose", number, body };
     }
     const allowedApps = ["whatsapp", "whatsapp-business", "telegram", "messages", "gmail", "phone", "calendar"] as const;

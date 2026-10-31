@@ -108,6 +108,7 @@ public final class UltranCommandWorker extends Worker {
             env.put("TERMUX__ROOTFS_SUBDIR", "files/ultran-runtime");
             env.put("TERMUX__UID", Integer.toString(android.os.Process.myUid()));
             env.put("TERMUX__USER_ID", Integer.toString(android.os.Process.myUid()));
+            env.put("TERMUX_USER_ID", Integer.toString(android.os.Process.myUid()));
             env.put("TERMUX_APP__PACKAGE_NAME", context.getPackageName());
             env.put("TERMUX_APP__DATA_DIR", appData.getAbsolutePath());
             env.put("TERMUX__PROJECT_DIR", project.getAbsolutePath());

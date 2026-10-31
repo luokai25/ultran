@@ -430,11 +430,10 @@ async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
         download.type = "button";
         download.className = "solid";
         if (shardMatch && shardCount > 1) {
-          download.textContent = shardFiles.length === shardCount ? "Open shard set" : "Incomplete set";
+          download.textContent = shardFiles.length === shardCount ? "Download all parts" : "Incomplete set";
           download.disabled = shardFiles.length !== shardCount;
           download.addEventListener("click", () => {
-            modelLibraryStatus.textContent = "Download all " + shardCount + " numbered GGUF parts from the repository, then use Import GGUF and select every part together.";
-            void Browser.open({ url: "https://huggingface.co/" + model.id + "/tree/" + (details.sha ?? "main") });
+            void downloadHubModelSet(model, shardFiles, details.sha, shardMatch[1], shardCount);
           });
         } else {
           download.textContent = "Download";
@@ -502,6 +501,64 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     modelLibraryStatus.textContent = "Download complete. The model is stored privately on this device and is ready to load.";
   } catch (error) {
     modelLibraryStatus.textContent = "Download failed: " + (error instanceof Error ? error.message : "unknown error");
+  } finally {
+    modelDownloadInProgress = false;
+    modelDownloadProgressEl.hidden = true;
+    modelDownloadProgressEl.value = 0;
+    modelDownloadProgressEl.setAttribute("value", "0");
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revision?: string, prefix?: string, shardCount?: number): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") {
+    modelLibraryStatus.textContent = "Split model downloads require the Android APK.";
+    return;
+  }
+  const parts = [...shardFiles].sort((a, b) => {
+    const aName = a.rfilename.split("/").pop() ?? "";
+    const bName = b.rfilename.split("/").pop() ?? "";
+    const aIndex = Number(aName.match(/-(\\d{5})-of-\\d{5}\\.gguf$/i)?.[1] ?? 0);
+    const bIndex = Number(bName.match(/-(\\d{5})-of-\\d{5}\\.gguf$/i)?.[1] ?? 0);
+    return aIndex - bIndex;
+  });
+  if (!shardCount || parts.length !== shardCount || !prefix) {
+    modelLibraryStatus.textContent = "This split model is incomplete in the repository listing. Ultran will not install a partial set.";
+    return;
+  }
+  const totalBytes = parts.reduce((sum, part) => sum + (part.lfs?.size ?? part.size ?? 0), 0);
+  if (totalBytes <= 0 || totalBytes > 256 * 1024 * 1024 * 1024) {
+    modelLibraryStatus.textContent = "The complete shard set has an unknown or unsupported total size.";
+    return;
+  }
+  if (!window.confirm("Download all " + shardCount + " verified GGUF parts for " + model.id + " (" + formatBytes(totalBytes) + ") into Ultran's private storage? Check the model license before use.")) return;
+  modelDownloadInProgress = true;
+  modelDownloadProgressEl.hidden = false;
+  modelDownloadProgressEl.max = 100;
+  modelDownloadProgressEl.value = 0;
+  modelLibraryStatus.textContent = "Preparing " + shardCount + "-part model download…";
+  const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
+    for (let index = 0; index < parts.length; index++) {
+      const part = parts[index];
+      const name = part.rfilename.split("/").pop() ?? "";
+      if (!/^[A-Za-z0-9._ -]{1,155}\\.gguf$/i.test(name)) throw new Error("Unsupported shard filename: " + name);
+      const rawSha = part.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
+      const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
+      const encodedPath = part.rfilename.split("/").map(encodeURIComponent).join("/");
+      const url = "https://huggingface.co/" + model.id + "/resolve/" + revisionPath + "/" + encodedPath + "?download=true";
+      modelLibraryStatus.textContent = "Downloading shard " + (index + 1) + " of " + parts.length + " · " + name;
+      await NativeLocalAI.downloadModel({ name, url, ...(sha ? { sha256: sha } : {}) });
+    }
+    await refreshNativeModels();
+    const firstName = parts[0].rfilename.split("/").pop() ?? "";
+    nativeModelSelect.value = firstName;
+    nativeModelStatus.textContent = "Imported complete split model · " + shardCount + " verified shards · " + formatBytes(totalBytes) + ". Load it when ready.";
+    modelLibraryStatus.textContent = "All " + shardCount + " GGUF shards downloaded and individually verified. Ultran now lists them as one model.";
+  } catch (error) {
+    modelLibraryStatus.textContent = "Split model download stopped: " + (error instanceof Error ? error.message : "unknown error") + ". Previously verified shards remain private; retrying the complete set safely replaces each shard only after verification.";
   } finally {
     modelDownloadInProgress = false;
     modelDownloadProgressEl.hidden = true;

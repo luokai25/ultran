@@ -195,7 +195,7 @@ test("Android companion exposes user-approved SMS, task notifications and backgr
   assert.match(main, /nativePhoneIntent/);
   assert.match(main, /handleNativeTool/);
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);
-  assert.match(main, /nativeToolFollowup \? 0 : 8/);
+  assert.match(main, /nativeToolFollowup \|\| nativePhoneIntent \? 0 : 8/);
   assert.match(companion, /Approve(?: and send)? WhatsApp message/);
   assert.match(companion, /approved_text/);
   assert.match(companion, /UltranMessagingAccessibilityService/);

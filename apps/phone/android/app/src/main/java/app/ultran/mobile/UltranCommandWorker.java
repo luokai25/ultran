@@ -92,7 +92,7 @@ public final class UltranCommandWorker extends Worker {
                     .build());
             }
             String shell = bash.getAbsolutePath();
-            ProcessBuilder builder = new ProcessBuilder(shell, "-c", command);
+            ProcessBuilder builder = new ProcessBuilder(shell, "--login", "-c", command);
             builder.directory(home);
             builder.redirectErrorStream(true);
             Map<String, String> env = builder.environment();

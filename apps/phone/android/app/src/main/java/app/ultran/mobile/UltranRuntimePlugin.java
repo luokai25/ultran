@@ -549,6 +549,12 @@ public final class UltranRuntimePlugin extends Plugin {
         File appsByIdentifier = new File(apps, "i");
         File appsByUid = new File(apps, "u");
         File cache = new File(appData, "cache");
+        File[] requiredDirectories = {home, temp, new File(project, "core"), appsByIdentifier, appsByUid, cache, new File(home, ".termux")};
+        for (File directory : requiredDirectories) {
+            if (!directory.exists() && !directory.mkdirs() && !directory.isDirectory()) {
+                throw new IllegalStateException("Could not prepare a private directory for Termux bootstrap setup: " + directory.getName());
+            }
+        }
 
         ProcessBuilder builder = new ProcessBuilder(bash.getAbsolutePath(), script.getAbsolutePath());
         builder.directory(home);

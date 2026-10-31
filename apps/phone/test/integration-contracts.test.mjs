@@ -154,7 +154,7 @@ test("Ultran identity, motto, voice signature, and voice dictation are wired acr
 
 
 test("Android companion uses scoped user handoffs and optional notifications without accessibility automation", () => {
-  assert.match(companion, /Intent\\.ACTION_SENDTO/);
+  assert.match(companion, /Intent\.ACTION_SENDTO/);
   assert.match(companion, /Review text message/);
   assert.match(companion, /Nothing will be sent until you press Send/);
   assert.match(companion, /POST_NOTIFICATIONS/);
@@ -164,12 +164,12 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(companion, /press Send yourself/);
   assert.match(companion, /getBackgroundAccessStatus/);
   assert.match(companion, /openAppBatterySettings/);
-  assert.doesNotMatch(companion, /UltranMessagingAccessibilityService|Settings\\.Secure|ACTION_ACCESSIBILITY_SETTINGS/);
+  assert.doesNotMatch(companion, /UltranMessagingAccessibilityService|Settings\.Secure|ACTION_ACCESSIBILITY_SETTINGS/);
   assert.match(voiceService, /TextToSpeech/);
   assert.match(voiceService, /startForeground/);
   assert.match(taskMonitor, /PeriodicWorkRequest/);
-  assert.match(taskMonitor, /15, TimeUnit\\.MINUTES/);
-  assert.match(taskMonitor, /speakUpdate\\(title/);
+  assert.match(taskMonitor, /15, TimeUnit\.MINUTES/);
+  assert.match(taskMonitor, /speakUpdate\(title/);
   assert.match(taskMonitor, /VISIBILITY_PRIVATE/);
   assert.match(companion, /VISIBILITY_PRIVATE/);
   assert.match(manifest, /POST_NOTIFICATIONS/);
@@ -177,23 +177,23 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.doesNotMatch(manifest, /BIND_ACCESSIBILITY_SERVICE|UltranMessagingAccessibilityService|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS|MANAGE_EXTERNAL_STORAGE|READ_SMS|SEND_SMS|READ_CALL_LOG|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_EXTERNAL_STORAGE/);
   assert.match(fileProviderPaths, /cache-path/);
   assert.doesNotMatch(fileProviderPaths, /external-path|external-files-path/);
-  assert.match(main, /startTaskMonitor\\(\\{endpoint: baseUrl\\(\\), speakUpdates: settings\\.voice\\}\\)/);
-  assert.match(main, /NativeCompanion\\.notify/);
-  assert.match(main, /NativeCompanion\\.speakInBackground/);
-  assert.match(main, /stopBackgroundSpeech\\(\\)/);
+  assert.match(main, /startTaskMonitor\(\{endpoint: baseUrl\(\), speakUpdates: settings\.voice\}\)/);
+  assert.match(main, /NativeCompanion\.notify/);
+  assert.match(main, /NativeCompanion\.speakInBackground/);
+  assert.match(main, /stopBackgroundSpeech\(\)/);
   assert.match(main, /proactiveUpdates/);
   assert.match(main, /composeSms/);
   assert.match(main, /parseLocalToolRequest/);
-  assert.match(main, /parsed\\.tool === "whatsapp\\.compose"/);
-  assert.match(main, /parsed\\.tool === "telegram\\.compose"/);
+  assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
+  assert.match(main, /parsed\.tool === "telegram\.compose"/);
   assert.match(companion, /public void composeTelegram/);
   assert.match(main, /openWhatsAppMessage/);
-  assert.match(main, /parsed\\.tool === "app\\.open"/);
-  assert.match(main, /client_capabilities: Capacitor\\.getPlatform\\(\\) === "android"/);
+  assert.match(main, /parsed\.tool === "app\.open"/);
+  assert.match(main, /client_capabilities: Capacitor\.getPlatform\(\) === "android"/);
   assert.match(main, /nativePhoneIntent/);
   assert.match(main, /handleNativeTool/);
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);
-  assert.match(main, /parsed\\.tool === "sms\\.compose"/);
+  assert.match(main, /parsed\.tool === "sms\.compose"/);
   assert.match(main, /runApprovedLocalTool/);
   assert.match(main, /Only one local tool call may run per turn/);
   assert.ok(html.includes('id="proactive-btn"'));
@@ -207,25 +207,5 @@ test("WhatsApp handoff never sends or taps automatically", () => {
   assert.match(main, /press Send manually in WhatsApp/);
   assert.match(main, /No message has been sent yet/);
   assert.doesNotMatch(manifest, /BIND_ACCESSIBILITY_SERVICE|UltranMessagingAccessibilityService/);
-  assert.doesNotMatch(companion, /AccessibilityNodeInfo|Settings\\.Secure|ACTION_ACCESSIBILITY_SETTINGS/);
-});
-
-
-
-test("WhatsApp sending requires one-shot approval and exact composer match", () => {
-  assert.match(manifest, /UltranMessagingAccessibilityService/);
-  assert.match(manifest, /BIND_ACCESSIBILITY_SERVICE/);
-  assert.match(accessibilityConfig, /canRetrieveWindowContent="true"/);
-  assert.match(companion, /Approve(?: and send)? WhatsApp message/);
-  assert.match(companion, /approved_text/);
-  assert.match(companion, /expires_at/);
-  assert.match(companion, /ACTION_ACCESSIBILITY_SETTINGS/);
-  assert.match(messagingService, /com\.whatsapp/);
-  assert.match(messagingService, /android\.widget\.EditText/);
-  assert.match(messagingService, /expected\.contentEquals\(text\)/);
-  assert.match(messagingService, /clearApproval\(prefs\)/);
-  assert.match(messagingService, /AccessibilityNodeInfo\.ACTION_CLICK/);
-  assert.match(main, /parsed\.tool === "whatsapp\.compose"/);
-  assert.match(main, /NativeCompanion\.openWhatsAppMessage/);
-  assert.match(main, /delivery status as unconfirmed/i);
+  assert.doesNotMatch(companion, /AccessibilityNodeInfo|Settings\.Secure|ACTION_ACCESSIBILITY_SETTINGS/);
 });

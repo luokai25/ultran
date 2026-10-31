@@ -32,7 +32,7 @@ test('every builtin loads into the registry and exposes its tools', () => {
   const registry = new ConnectorRegistry();
   for (const manifest of BUILTIN_CONNECTORS) registry.load(manifest);
   assert.equal(registry.list().length, 10);
-  assert.equal(registry.listTools().length, 19);
+  assert.equal(registry.listTools().length, 21);
 });
 
 test('the JSON schema accepts the namespaced tool ids the validator requires', () => {

@@ -82,8 +82,6 @@ public final class UltranCommandWorker extends Worker {
                 markerOutput.write("started".getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 markerOutput.getFD().sync();
             }
-            postNotification("Ultran is working", "An approved local task is running in the background.", true);
-
             File bash = new File(prefix, "bin/bash");
             boolean termuxReady = new File(prefix, ".ultran-bootstrap-installed").isFile() && bash.canExecute();
             if (!termuxReady) {
@@ -92,6 +90,7 @@ public final class UltranCommandWorker extends Worker {
                     .putBoolean("termuxRuntime", false)
                     .build());
             }
+            postNotification("Ultran is working", "An approved local task is running in the background.", true);
             String shell = bash.getAbsolutePath();
             ProcessBuilder builder = new ProcessBuilder(shell, "--login", "-c", command);
             builder.directory(home);

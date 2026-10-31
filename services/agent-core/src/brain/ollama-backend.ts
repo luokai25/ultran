@@ -99,7 +99,11 @@ export class OllamaBackend implements BrainBackend {
         model: handle.ref.id,
         messages,
         stream: true,
-        options: { temperature: req.temperature ?? 0.2, num_predict: req.maxTokens ?? 512 },
+        options: {
+          temperature: req.temperature ?? 0.2,
+          num_predict: req.maxTokens ?? 512,
+          num_ctx: handle.ref.contextWindow,
+        },
         ...(req.stop?.length ? { stop: req.stop } : {}),
         ...(req.responseSchema ? { format: req.responseSchema } : {}),
       }),

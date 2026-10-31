@@ -102,7 +102,7 @@ public final class UltranRuntimePlugin extends Plugin {
             return;
         }
         if (!commandApprovalPending.compareAndSet(false, true)) {
-            call.reject("Another local command is already awaiting approval or running.");
+            call.reject("Another local command is already awaiting approval.");
             return;
         }
         getActivity().runOnUiThread(() -> {
@@ -179,6 +179,9 @@ public final class UltranRuntimePlugin extends Plugin {
                     result.put("exitCode", output.getInt(UltranCommandWorker.KEY_EXIT_CODE, -1));
                 }
                 result.put("timedOut", output.getBoolean(UltranCommandWorker.KEY_TIMED_OUT, false));
+                if (output.hasKeyWithValueOfType("termuxRuntime", Boolean.class)) {
+                    result.put("termuxRuntime", output.getBoolean("termuxRuntime", false));
+                }
                 String error = output.getString(UltranCommandWorker.KEY_ERROR);
                 if (error != null) result.put("error", error);
                 Data progress = info.getProgress();

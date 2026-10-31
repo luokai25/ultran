@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover - CI installs Pillow explicitly
     sys.exit("Pillow is required: pip install pillow")
 
 VOID = (5, 5, 5)
-OBSIDIAN = (11, 11, 13)
+OBSIDIAN = (11, 13, 15)
 CARBON = (19, 19, 23)
 GOLD = (212, 175, 55)
 GOLD_BRIGHT = (245, 215, 110)

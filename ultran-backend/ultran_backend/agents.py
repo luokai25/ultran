@@ -606,7 +606,7 @@ class AgentService:
                 messages, model=agent.model, temperature=task_temperature,
                 backend_override=backend_override,
             )
-        # Complex and high-impact tasks receive an independent quality pass.
+        # Complex and high-impact tasks receive a separate quality pass.
         # A failed review never destroys the usable first answer.
         if profile.verify_draft and reply.backend.lower() != "echo":
             emit({"type": "thinking", "stage": "quality", "label": "Checking the answer for errors and missing constraints"})

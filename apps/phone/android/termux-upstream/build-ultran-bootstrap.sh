@@ -12,7 +12,7 @@ readonly ULTRAN_ROOTFS_SUBDIR="files/ultran-runtime"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 readonly OUTPUT_DIR="${ULTRAN_BOOTSTRAP_OUTPUT_DIR:-$REPO_ROOT/dist/termux-bootstrap}"
-readonly EXTRA_PACKAGES="${ULTRAN_BOOTSTRAP_PACKAGES:-git,python}"
+readonly EXTRA_PACKAGES="${ULTRAN_BOOTSTRAP_PACKAGES:-git,python,proot,proot-distro,wget,openssh}"
 
 for command_name in git python3 docker; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -51,7 +51,7 @@ for old, new in replacements:
 path.write_text(source)
 PY
 
-build_args=(--android10 --architectures aarch64,x86_64)
+build_args=(--architectures aarch64,x86_64)
 if [[ -n "$EXTRA_PACKAGES" ]]; then
     build_args+=(--add "$EXTRA_PACKAGES")
 fi

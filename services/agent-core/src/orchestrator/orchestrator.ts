@@ -299,9 +299,19 @@ export class Orchestrator {
         break;
       }
 
-      this.append(state, { type: 'tool.invoked', runId: state.runId, stepId: step.id, toolId: tool.id, argsHash: hashArgs(call.args), at: Date.now() });
-      this.opts.policyGate.recordUsage(state.runId, 'tool.calls', 1, `${state.runId}:${step.id}:tool.calls`);
+      const metered = this.opts.policyGate.recordUsage(
+        state.runId, 'tool.calls', 1, `${state.runId}:${step.id}:tool.calls`,
+      );
+      if (!metered) {
+        const reason = 'Duplicate step execution detected by the usage ledger; refusing to repeat a possible side effect.';
+        this.append(state, { type: 'step.failed', runId: state.runId, stepId: step.id, reason, at: Date.now() });
+        outcomes.push({ stepId: step.id, description: step.description, toolId: tool.id, ok: false, result: reason });
+        state.status = 'cancelled';
+        stopReason = reason;
+        break;
+      }
       this.append(state, { type: 'meter.emitted', runId: state.runId, meter: 'tool.calls', amount: 1, at: Date.now() });
+      this.append(state, { type: 'tool.invoked', runId: state.runId, stepId: step.id, toolId: tool.id, argsHash: hashArgs(call.args), at: Date.now() });
       const result: ToolResult = await this.opts.sandbox.invoke({
         toolId: tool.id, capability: tool.capability, args: call.args, grantId,
       });

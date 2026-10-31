@@ -1694,7 +1694,7 @@ function setThinking(next: boolean): void {
 }
 
 /* ------------------------------------------------------------------ *
- * Voice - on-device speech only
+ * Voice - system speech synthesis plus optional OS/browser dictation
  * ------------------------------------------------------------------ */
 
 const synth = window.speechSynthesis as SpeechSynthesis | undefined;

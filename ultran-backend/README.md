@@ -55,7 +55,32 @@ Ultran does not receive provider OAuth tokens.
 The session and account records are scoped to an opaque ID derived from the
 Ultran workspace. The backend returns only redacted connection metadata. The
 Composio project key must remain on the backend and must never be bundled into
-the APK. The existing local connectors continue to work without Composio.
+the APK. The agent runtime can now opt into this tool set by including the virtual
+connector ID `composio` in an agent's `tools` array. On each enabled turn,
+Ultran creates a short-lived MCP session for that workspace, asks the agent's
+configured brain to produce a schema-bound tool plan, validates the arguments,
+and executes eligible read-only calls through the MCP gateway.
+
+**Write and permission controls**
+
+- Only tools classified as exactly `read` can run without a human decision.
+- Any write, delete, execute, admin, network, or otherwise non-read capability
+  is paused for explicit approval. Unknown tool capabilities are not treated as
+  safe reads.
+- Review pending requests with `GET /v1/connectors/composio/approvals`.
+  The response includes the exact proposed tool and arguments.
+- Approve with `POST /v1/connectors/composio/approvals/{approval_id}/approve`.
+  Ultran reopens a workspace-specific session, revalidates the tool schema,
+  checks the approved arguments have not changed, and executes once.
+- Deny with `POST /v1/connectors/composio/approvals/{approval_id}/deny`.
+  Approval requests expire after five minutes. Pending approvals are held in
+  backend memory and are invalidated by a backend restart.
+
+Approvals are per call, not blanket permission for a provider. A model cannot
+approve its own write actions. Keep the backend behind real account
+authentication before exposing these endpoints to untrusted users.
+
+The existing local connectors continue to work without Composio.
 
 **Deployment note:** the current workspace header is a local-development boundary,
 not end-user authentication. Before exposing this API to multiple internet users,

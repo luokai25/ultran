@@ -188,6 +188,40 @@ def test_chat_returns_content_and_tokens():
     assert result["session_id"].startswith("ss_")
 
 
+def test_chat_exposes_native_phone_tools_only_to_android_capable_clients(monkeypatch):
+    svc = service()
+    agent = svc.create(name="Phone-enabled Ultran")
+    captured = []
+    original_complete = svc.brain.complete
+
+    def capture(messages, **kwargs):
+        captured.extend(messages)
+        return original_complete(messages, **kwargs)
+
+    monkeypatch.setattr(svc.brain, "complete", capture)
+    svc.chat(agent.id, "send a WhatsApp message", client_capabilities=["android_phone_actions"])
+    system_prompt = captured[0].content
+    assert "ANDROID PHONE ACTIONS" in system_prompt
+    assert 'ULTRAN_TOOL_CALL:{"tool":"whatsapp.compose"' in system_prompt
+    assert "Never invent a recipient or phone number" in system_prompt
+    assert "native approval" in system_prompt
+
+
+def test_chat_does_not_advertise_native_phone_tools_without_client_capability(monkeypatch):
+    svc = service()
+    agent = svc.create(name="Web Ultran")
+    captured = []
+    original_complete = svc.brain.complete
+
+    def capture(messages, **kwargs):
+        captured.extend(messages)
+        return original_complete(messages, **kwargs)
+
+    monkeypatch.setattr(svc.brain, "complete", capture)
+    svc.chat(agent.id, "send a WhatsApp message")
+    assert "ANDROID PHONE ACTIONS" not in captured[0].content
+
+
 def test_chat_keeps_history_across_turns():
     svc = service()
     a = svc.create(name="One")

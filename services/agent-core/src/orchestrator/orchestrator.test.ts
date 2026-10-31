@@ -200,5 +200,5 @@ test('nested schema violations stop before the sandbox can cause a side effect',
   const state = await waitForRun(orchestrator, runId);
   assert.equal(state.status, 'failed');
   assert.equal(invocations, 0);
-  assert.ok(state.events.some((event) => event.type === 'step.failed' && event.reason.includes('argument "mode" must be string')));
+  assert.ok(state.events.some((event) => event.type === 'step.failed' && event.reason.includes('args.options.mode must be string')));
 });

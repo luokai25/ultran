@@ -137,19 +137,26 @@ can import a GGUF file from storage or search the live Hugging Face catalog,
 inspect repository files, and download GGUF weights directly into private app
 storage. Downloads are restricted to HTTPS Hugging Face URLs, checked against
 the GGUF header, checked against the repository's SHA-256 file digest when
-available, limited to 8 GB, and written through a temporary file before
-activation. Model weights are not bundled in the APK. The model browser
-includes popular family shortcuts, a file-size filter, live download progress,
-license tags from repository metadata, and device-aware guidance based on
-reported RAM, free storage, CPU cores, and ABI. The size filter is a rough
-starting point, not a guarantee that a model will fit: runtime memory use also
-depends on context length, model architecture, and other apps. Review the
+available, limited by a 256 GB safety ceiling and actual free storage, and
+written through a temporary file before activation. Split GGUF models can be
+imported by selecting all numbered shards together; Ultran validates the
+complete set and presents it as one logical model. Model weights are not
+bundled in the APK. The model browser includes popular family shortcuts, a
+file-size filter, live download progress, license tags from repository
+metadata, and device-aware guidance based on reported RAM, free storage, CPU
+cores, and ABI. The native loader uses llama.cpp file-backed MMAP and automatic
+lazy tensor loading, so the whole checkpoint does not need to be resident in
+anonymous RAM. Context cache size adapts to available memory and prompt batches
+are reduced. This is the first mobile low-residency stage inspired by the
+public AirLLM architecture study, not yet its explicit per-layer/per-expert
+module eviction pipeline. The size filter is a rough starting point, not a
+guarantee that a model will run: the KV cache, active tensors, scratch buffers,
+CPU bandwidth, storage speed, and thermal limits still matter. Review the
 upstream model card and license before downloading or using any weights. The
-initial runtime targets arm64-v8a and x86_64, uses a 2,048-token context and up
-to four CPU threads, and is intended to start with 1B–3B Q4 quantized models.
-Larger models can be slow or exceed available RAM. This first native runtime is
-CPU-only; GPU acceleration and streamed native token callbacks remain future
-optimizations.
+runtime targets arm64-v8a and x86_64, remains CPU-only, and is intended to start
+with 1B–3B Q4 models before testing larger checkpoints. GPU acceleration,
+explicit module-level eviction/prefetch, and streamed native token callbacks
+remain future optimizations.
 
 A local Ollama-compatible runtime is also supported as an optional bridge.
 Configure its localhost or private-LAN address in Settings → Local model

@@ -53,14 +53,14 @@ type NativeLocalAIPlugin = {
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
 const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>; composeSms(options:{number:string;body:string}):Promise<{opened:boolean;sent:boolean}>; openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;approved?:boolean;sent?:boolean;requiresUserSend?:boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; composeTelegram(options:{body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}>; openAppBatterySettings():Promise<{opened:boolean}>; getBackgroundAccessStatus():Promise<{notifications:boolean;manufacturer:string;model:string;sdk:number}> }>("UltranCompanion");
 const NativeRuntime = registerPlugin<{
-  getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; aptAvailable?: boolean; packageManagerEnabled?: boolean; packageManagerNote?: string; prefix: string; architecture: string }>;
+  getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prootAvailable?: boolean; wgetAvailable?: boolean; sshAvailable?: boolean; aptAvailable?: boolean; packageManagerEnabled?: boolean; packageManagerNote?: string; prefix: string; architecture: string }>;
   pickBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   downloadBootstrap(): Promise<{ cancelled?: boolean; installed?: boolean; prefix?: string; entries?: number; uncompressedBytes?: number }>;
   addListener(eventName: "runtimeDownloadProgress", listener: (event: { downloadedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
   runCommand(options: { command: string }): Promise<{ approved: boolean; queued?: boolean; jobId?: string; status?: string }>;
-  getCommandStatus(options: { jobId: string }): Promise<{ found: boolean; jobId?: string; status?: string; output?: string; exitCode?: number; timedOut?: boolean; error?: string; termuxRuntime?: boolean }>;
+  getCommandStatus(options: { jobId: string }): Promise<{ found: boolean; jobId?: string; status?: string; phase?: string; output?: string; progressOutput?: string; elapsedMs?: number; progressTruncated?: boolean; exitCode?: number; timedOut?: boolean; error?: string; termuxRuntime?: boolean }>;
   cancelCommand(options: { jobId: string }): Promise<{ jobId: string; status: string }>;
-  listCommandJobs(): Promise<{ jobs: Array<{ jobId: string; status: string; output?: string; error?: string; exitCode?: number }> }>;
+  listCommandJobs(): Promise<{ jobs: Array<{ jobId: string; status: string; phase?: string; progressOutput?: string; elapsedMs?: number; output?: string; error?: string; exitCode?: number }> }>;
 }>("UltranRuntime");
 type Store = { conversations: Conversation[]; activeId: string | null; agentId?: string };
 
@@ -2567,7 +2567,14 @@ const refreshRuntimeStatus = async () => {
     } else if (!status.runtimeReady) {
       runtimeStatus.textContent = `Runtime files detected at ${status.prefix}, but the bundled Bash shell is missing or not executable. Reinstall the verified runtime before relying on Termux commands.`;
     } else {
-      const tools = [status.gitAvailable ? "Git" : null, status.pythonAvailable ? "Python" : null, status.aptAvailable ? (status.packageManagerEnabled ? "APT enabled" : "APT repository not configured") : null].filter(Boolean).join(" · ");
+      const tools = [
+        status.gitAvailable ? "Git" : null,
+        status.pythonAvailable ? "Python" : null,
+        status.prootAvailable ? "proot" : null,
+        status.wgetAvailable ? "wget" : null,
+        status.sshAvailable ? "OpenSSH" : null,
+        status.aptAvailable ? (status.packageManagerEnabled ? "APT enabled" : "APT repository not configured") : null,
+      ].filter(Boolean).join(" · ");
       runtimeStatus.textContent = `Headless Termux runtime ready · ${status.architecture} · Bash${tools ? " · " + tools : ""} · ${status.prefix}`;
     }
   } catch {

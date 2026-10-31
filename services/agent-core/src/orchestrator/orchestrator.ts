@@ -285,13 +285,13 @@ export class Orchestrator {
         break;
       }
 
+      this.append(state, { type: 'approval.required', runId: state.runId, stepId: step.id, toolId: tool.id, capability: tool.capability, at: Date.now() });
       const grantId = await this.opts.authorizeTool({
         runId: state.runId, stepId: step.id, toolId: tool.id, capability: tool.capability,
         description: step.description, args: call.args,
       });
       if (!grantId) {
         const reason = 'Human approval was denied or cancelled; the tool was not invoked.';
-        this.append(state, { type: 'approval.required', runId: state.runId, stepId: step.id, toolId: tool.id, capability: tool.capability, at: Date.now() });
         this.append(state, { type: 'step.failed', runId: state.runId, stepId: step.id, reason, at: Date.now() });
         outcomes.push({ stepId: step.id, description: step.description, toolId: tool.id, ok: false, result: reason });
         state.status = 'cancelled';

@@ -56,6 +56,24 @@ def composio_tool_invoke(
         workspace, payload.tool_name, payload.arguments
     )
 
+
+@router.get("/composio/approvals")
+def composio_approvals(container: ContainerDep, workspace: WorkspaceDep):
+    """List pending workspace approvals, including the exact proposed arguments."""
+    return {"approvals": container.composio.pending_approvals(workspace)}
+
+
+@router.post("/composio/approvals/{approval_id}/approve")
+def composio_approve(approval_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Approve and execute exactly the reviewed tool call, once."""
+    return container.composio.decide_approval(workspace, approval_id, approved=True)
+
+
+@router.post("/composio/approvals/{approval_id}/deny")
+def composio_deny(approval_id: str, container: ContainerDep, workspace: WorkspaceDep):
+    """Deny a pending tool call without executing it."""
+    return container.composio.decide_approval(workspace, approval_id, approved=False)
+
 @router.get("/composio/connections")
 def composio_connections(container: ContainerDep, workspace: WorkspaceDep):
     """List this workspace's connected accounts with credentials redacted."""

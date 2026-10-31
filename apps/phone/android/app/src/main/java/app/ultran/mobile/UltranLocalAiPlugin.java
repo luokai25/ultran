@@ -539,12 +539,23 @@ public class UltranLocalAiPlugin extends Plugin {
                 // Model weights are file-backed. Do not compare the complete checkpoint
                 // size with free RAM: mmap + lazy tensor loading lets the OS page weights
                 // in on demand. The KV cache is still resident, so adapt context to headroom.
-                final int contextTokens = memory.availMem > 0 && memory.availMem < 1024L * 1024L * 1024L
+                final int preferredContext = memory.availMem > 0 && memory.availMem < 1024L * 1024L * 1024L
                         ? 512
                         : memory.availMem > 0 && memory.availMem < 2L * 1024L * 1024L * 1024L
                         ? 1024 : 2048;
                 final boolean aggressiveLazyLoading = memory.availMem <= 0 || modelSetSize(model) > (long) (memory.availMem * 0.70);
+                int contextTokens = preferredContext;
                 String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                // If model mapping succeeds but the KV cache is too large, retry with
+                // a smaller context. Do not hide corrupt-model or architecture errors.
+                if (error != null && error.contains("context cache") && contextTokens > 512) {
+                    contextTokens = contextTokens > 1024 ? 1024 : 512;
+                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                }
+                if (error != null && error.contains("context cache") && contextTokens > 512) {
+                    contextTokens = 512;
+                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                }
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;
                     loadedContextTokens = 0;

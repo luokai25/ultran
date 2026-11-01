@@ -225,8 +225,11 @@ jobs:
           fi
 
           mkdir -p "$RUNNER_TEMP/out"
-          cp "$APK" "$GITHUB_WORKSPACE/ultran-release.apk"
-          echo "apk=$GITHUB_WORKSPACE/ultran-release.apk" >> "$GITHUB_OUTPUT"
+          cp "$APK" "$RUNNER_TEMP/ultran-release.apk"
+          test -s "$RUNNER_TEMP/ultran-release.apk"
+          sha256sum "$RUNNER_TEMP/ultran-release.apk"
+          echo "apk=$RUNNER_TEMP/ultran-release.apk" >> "$GITHUB_OUTPUT"
+          echo "Verified APK copied to runner temp: $RUNNER_TEMP/ultran-release.apk"
 
       # A successful Gradle build and signature check do not prove that
       # PackageManager can parse/install the APK. Test the exact release file
@@ -241,8 +244,15 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            APK="${{ github.workspace }}/ultran-release.apk"
-            test -s "$APK"
+            echo "Smoke-test working directory: $(pwd)"
+            echo "Runner temp: $RUNNER_TEMP"
+            find "$GITHUB_WORKSPACE" "$RUNNER_TEMP" -maxdepth 3 -name 'ultran-release.apk' -type f -ls || true
+            APK="${{ runner.temp }}/ultran-release.apk"
+            if [ ! -s "$APK" ]; then
+              echo "::error::APK missing from expected path: $APK"
+              exit 1
+            fi
+            sha256sum "$APK"
             adb install -r "$APK"
             adb shell monkey -p app.ultran.mobile 1
             adb shell dumpsys package app.ultran.mobile | grep -q "versionName=${{ steps.version.outputs.name }}"

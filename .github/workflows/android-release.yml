@@ -225,8 +225,8 @@ jobs:
           fi
 
           mkdir -p "$RUNNER_TEMP/out"
-          cp "$APK" "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
-          echo "apk=$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk" >> "$GITHUB_OUTPUT"
+          cp "$APK" "$GITHUB_WORKSPACE/ultran-release.apk"
+          echo "apk=$GITHUB_WORKSPACE/ultran-release.apk" >> "$GITHUB_OUTPUT"
 
       # A successful Gradle build and signature check do not prove that
       # PackageManager can parse/install the APK. Test the exact release file
@@ -241,7 +241,7 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            APK="${{ runner.temp }}/out/ultran-${{ steps.version.outputs.name }}.apk"
+            APK="${{ github.workspace }}/ultran-release.apk"
             test -s "$APK"
             adb install -r "$APK"
             adb shell monkey -p app.ultran.mobile 1

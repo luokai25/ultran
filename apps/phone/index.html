@@ -24,6 +24,7 @@
           <span class="brand-copy"><span class="wordmark">ULTRAN</span><small>PERSONAL AI SYSTEM</small></span>
         </div>
         <div class="topbar-actions">
+          <button id="global-search-open" class="icon-btn global-search-open" type="button" aria-label="Search Ultran" title="Search"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg></button>
           <button id="chat-model-button" class="chat-model-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-model-menu"><span class="chat-model-indicator"></span><span id="chat-model-label">Choose model</span><span aria-hidden="true">⌄</span></button>
           <span class="topbar-presence"><i></i> LOCAL FIRST</span>
           <button id="new-btn" class="icon-btn new-trigger" aria-label="New conversation">
@@ -32,6 +33,7 @@
         </div>
       </header>
 
+      <section id="global-search" class="global-search" role="dialog" aria-modal="true" aria-label="Search Ultran" hidden><div class="global-search-card"><div class="global-search-head"><div><span class="section-eyebrow">ULTRAN SEARCH</span><strong>Find anything</strong></div><button id="global-search-close" class="icon-btn" type="button" aria-label="Close search">×</button></div><label class="global-search-input-wrap"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg><input id="global-search-input" type="search" placeholder="Search chats, files, tools, knowledge…" autocomplete="off" /></label><div class="global-search-filters"><span>ALL</span><span>CHATS</span><span>KNOWLEDGE</span><span>TOOLS</span></div><div id="global-search-results" class="global-search-results"><div class="search-empty">Search across your conversations, semantic memory and available tools.</div></div><div class="global-search-foot"><kbd>ESC</kbd><span>to close</span><kbd>Ctrl K</kbd><span>to open</span></div></div></section>
       <section id="chat-model-menu" class="chat-model-menu" role="dialog" aria-label="Choose an AI model" hidden>
         <div class="chat-model-menu-head"><div><span class="section-eyebrow">ACTIVE BRAIN</span><strong id="chat-model-current">No model selected</strong></div><button id="chat-model-close" class="icon-btn" type="button" aria-label="Close model picker">×</button></div>
         <p id="chat-model-status" role="status">Choose a model available on this device or configure a connection.</p>
@@ -117,15 +119,18 @@
       <section id="more-screen" class="feature-screen" aria-label="More Ultran features" hidden>
         <header class="feature-head"><div><span class="feature-eyebrow">ULTRAN</span><h1>More</h1><p>Your tools, privacy, and personal space.</p></div></header>
         <button id="more-connectors-btn" class="more-row" type="button"><span class="more-icon">⌘</span><span><strong>Tools &amp; Connectors</strong><small>Connect services and review permissions</small></span><b>›</b></button>
-        <button id="more-vault-btn" class="more-row" type="button"><span class="more-icon">♙</span><span><strong>Vault</strong><small>Private space and secure-storage setup</small></span><b>›</b></button>
+        <button id="more-vault-btn" class="more-row" type="button"><span class="more-icon">◎</span><span><strong>Mind Map</strong><small>Your Obsidian-style knowledge vault across every chat</small></span><b>›</b></button>
         <button id="more-settings-btn" class="more-row" type="button"><span class="more-icon">⚙</span><span><strong>Settings</strong><small>Account, local AI, runtime and privacy</small></span><b>›</b></button>
-        <div class="vault-privacy-card"><div class="vault-shield">♙</div><h2>Your data stays yours</h2><p>Ultran keeps local-first features and permissions visible. Sensitive actions require your approval.</p></div>
+        <div class="vault-privacy-card"><div class="vault-shield">♙</div><h2>Your data stays yours</h2><p>Ultran keeps local-first features and permissions visible. Sensitive actions require your approval. No files are represented as encrypted until encrypted storage is implemented and verified.</p></div>
         <p class="feature-version">ULTRAN · PERSONAL AI SYSTEM</p>
       </section>
-      <section id="vault-screen" class="feature-screen" aria-label="Vault" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">PRIVATE BY DESIGN</span><h1>Vault</h1><p>Your private space.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to More">‹</button></header>
-        <div class="vault-hero"><div class="vault-shield">♙</div><h2>Keep your data safe</h2><p>Ultran's secure-storage controls will be surfaced here. No files are represented as encrypted until encrypted storage is implemented and verified.</p></div>
-        <div class="vault-entry"><span class="more-icon">▤</span><span><strong>Private notes</strong><small>Local notes feature not yet connected</small></span><b>›</b></div><div class="vault-entry"><span class="more-icon">▣</span><span><strong>Private files</strong><small>File vault feature not yet connected</small></span><b>›</b></div><div class="vault-entry"><span class="more-icon">▧</span><span><strong>Secure gallery</strong><small>Gallery vault feature not yet connected</small></span><b>›</b></div>
+      <section id="vault-screen" class="feature-screen mindmap-screen" aria-label="Combined knowledge mind map" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">YOUR SECOND BRAIN · LOCAL</span><h1>Mind Map</h1><p>One connected knowledge graph from every conversation.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to More">‹</button></header>
+        <div class="mindmap-toolbar"><span id="mindmap-stats">Combining all sessions…</span><button id="mindmap-refresh" class="ghost" type="button">Rebuild map</button></div>
+        <div class="mindmap-canvas-wrap"><svg id="mindmap-canvas" class="mindmap-canvas" viewBox="0 0 900 650" role="img" aria-label="Interactive knowledge map of all conversations"></svg><div id="mindmap-empty" class="mindmap-empty" hidden>Start chatting. Ultran will continuously organise topics, decisions, projects and ideas from every session here.</div></div>
+        <div class="mindmap-legend"><span><i class="mindmap-dot project"></i>Projects</span><span><i class="mindmap-dot topic"></i>Topics</span><span><i class="mindmap-dot decision"></i>Decisions</span><span><i class="mindmap-dot session"></i>Sessions</span></div>
+        <div class="mindmap-detail" id="mindmap-detail"><strong>Knowledge vault</strong><p>Choose a node to inspect its linked conversations and source messages.</p></div>
+        <div class="mindmap-footer"><span id="mindmap-organizer">Waiting for the selected model…</span><button id="mindmap-export" class="ghost" type="button">Export Obsidian Markdown</button></div>
       </section>
       <nav class="bottom-nav" aria-label="Main navigation">
         <button id="nav-chat" class="nav-item" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.8A2.8 2.8 0 0 1 7.8 3h8.4A2.8 2.8 0 0 1 19 5.8v7.4a2.8 2.8 0 0 1-2.8 2.8H11l-4.8 4v-4.2a2.8 2.8 0 0 1-1.2-2.3z"/></svg><span>Chats</span></button>
@@ -260,54 +265,15 @@
           </div>
           <section class="model-discovery" aria-labelledby="model-discovery-title">
             <div class="model-discovery-heading">
-              <div><strong id="model-discovery-title">Model library</strong><small>Discover open models from Hugging Face</small></div>
+              <div><strong id="model-discovery-title">Model library</strong><small>Curated models with fixed repository and direct GGUF file paths</small></div>
               <span class="model-library-badge">GGUF · LOCAL</span>
             </div>
-            <form id="model-search-form" class="model-search">
-              <input id="model-search" type="search" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search Llama, Qwen, Gemma, Phi…" aria-label="Search Hugging Face models" />
-              <button class="solid" type="submit">Explore</button>
-            </form>
-            <div class="model-quick-search" role="group" aria-label="Popular model families">
-              <button class="ghost" type="button" data-model-query="Qwen">Qwen</button>
-              <button class="ghost" type="button" data-model-query="Llama">Llama</button>
-              <button class="ghost" type="button" data-model-query="Gemma">Gemma</button>
-              <button class="ghost" type="button" data-model-query="Phi">Phi</button>
-              <button class="ghost" type="button" data-model-query="SmolLM">Tiny models</button>
-            </div>
-            <label class="model-size-filter" for="model-size-filter">
-              <span>Show model files</span>
-              <select id="model-size-filter">
-                <option value="all">All sizes (up to 256 GB)</option>
-                <option value="2gb">Phone-friendly (≤ 2 GB)</option>
-                <option value="1gb">Lightweight (≤ 1 GB)</option>
-              </select>
-            </label>
-            <p class="model-device-tip">For phones, start with a 1B–3B Q4 model. File size is only a rough guide: RAM, context length, and thermal throttling matter too.</p>
+            <p class="model-device-tip">Recommended: Qwen 2.5 1.5B for a balanced starter, Gemma 3 1B for lower storage, or Qwen 3 1.7B for more demanding reasoning. Keep extra free storage for context and temporary files.</p>
             <p id="model-library-status" class="native-model-status" role="status" aria-live="polite">Search the Hugging Face catalog. Downloaded weights stay in Ultran's private app storage.</p>
             <progress id="model-download-progress" class="model-download-progress" max="100" value="0" aria-label="Model download progress" hidden></progress>
             <div id="model-library-results" class="model-library-results"></div>
-            <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the on-device llama.cpp runtime.</small>
+            <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the current on-device text inference engine. Image, video and audio generation require additional native engines and decoders.</small>
           </section>
-        </section>
-        <label class="field">
-          <span>Local model endpoint (Ollama fallback)</span>
-          <input id="local-model-endpoint" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://127.0.0.1:11434" />
-          <small>Inference is sent directly from Ultran to this Ollama instance, not through an Ultran server. On Android, Ollama must be running locally or on a trusted LAN host.</small>
-        </label>
-        <label class="field">
-          <span>Local model name</span>
-          <input id="local-model" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="llama3.2:3b" />
-        </label>
-
-        <section class="field ollama-library" aria-labelledby="ollama-library-title">
-          <span id="ollama-library-title">Ollama model connection</span>
-          <small>Connect to an Ollama runtime on this device or a trusted private network. Browse installed models or pull a model by name, for example qwen3:4b or llama3.2:3b.</small>
-          <div class="sheet-actions">
-            <button id="ollama-models-refresh" class="ghost" type="button">Find installed models</button>
-            <button id="ollama-model-pull" class="solid" type="button">Download model</button>
-          </div>
-          <select id="ollama-model-list" aria-label="Installed Ollama models" hidden></select>
-          <p id="ollama-library-status" class="native-model-status" role="status">Set the Ollama endpoint above to browse or download models.</p>
         </section>
         <div class="field">
           <span>Theme</span>

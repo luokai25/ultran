@@ -122,6 +122,8 @@ export function buildToolManual(tools: ToolSchema[]): string {
     'DISCOVERY: Choose only an exact tool ID from the live catalogue below. Tool IDs are case-sensitive.',
     'SELECTION: Use a tool when it materially helps complete the user\'s requested outcome. Do not call tools merely to appear active.',
     'ARGUMENTS: Follow inputSchema exactly. Include every required field, use the declared types and enums, and do not add undeclared fields when additionalProperties is false.',
+    'NORMALIZED CALL: The host adapter converts provider-native function calls or structured output into {"toolId":"exact.catalogue.id","args":{...}}. Never assume a provider-specific wire format is universal; do not wrap the normalized object in prose or markdown when the host requests structured output.',
+    'EXAMPLE: If the catalogue contains a tool with id "files.list" and its schema requires {"path":{"type":"string"}}, the normalized call is {"toolId":"files.list","args":{"path":"."}}. This is illustrative only: call files.list only if that exact ID is present in the live catalogue and its actual schema matches.',
     'MISSING INPUT: Never guess account IDs, recipients, paths, dates, or other consequential values. Ask for the one essential missing detail or use a read-only discovery tool first.',
     'SEQUENCING: Use read-only discovery before consequential writes when it can verify targets or current state. Pass only verified results into later calls.',
     'APPROVAL: A tool call is a request, not permission. Never claim approval or bypass the host approval flow. If approval is denied, cancelled, or unavailable, do not retry through another route.',

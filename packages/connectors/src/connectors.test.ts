@@ -89,6 +89,8 @@ test('the shared tool manual teaches providers the same safe calling contract', 
   const manual = buildToolManual(registry.listTools());
   assert.match(manual, /case-sensitive/);
   assert.match(manual, /inputSchema/);
+  assert.match(manual, /NORMALIZED CALL/);
+  assert.match(manual, /toolId.*args/);
   assert.match(manual, /approval flow/);
   assert.match(manual, /successful result/);
   assert.ok(manual.includes('files.list'));

@@ -91,7 +91,7 @@ test('the shared tool manual teaches providers the same safe calling contract', 
   assert.match(manual, /inputSchema/);
   assert.match(manual, /approval flow/);
   assert.match(manual, /successful result/);
-  assert.match(manual, /files\\./);
+  assert.ok(manual.includes('files.list'));
 });
 
 test('the shared tool manual explicitly handles an empty registry', () => {

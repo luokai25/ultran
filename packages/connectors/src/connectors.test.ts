@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { BUILTIN_CONNECTORS, buildToolManual, ConnectorRegistry, validateManifest } from './index.js';
 import type { ConnectorManifest } from './index.js';
+import { diagnoseCapabilities, normalizeToolCall, toolCallResult } from './index.js';
 
 const schemaPath = resolve(process.cwd(), 'schema/manifest.schema.json');
 const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as {
@@ -100,4 +101,96 @@ test('the shared tool manual explicitly handles an empty registry', () => {
   const manual = buildToolManual([]);
   assert.match(manual, /No tools are currently registered/);
   assert.match(manual, /Do not invent tool names/);
+});
+
+
+test('normalizes the canonical JSON tool-call contract', () => {
+  const result = normalizeToolCall('{"toolId":"files.list","args":{"path":"."}}', BUILTIN_CONNECTORS.flatMap((m) => m.tools));
+  assert.deepEqual(result, { ok: true, call: { toolId: 'files.list', args: { path: '.' } } });
+});
+
+test('normalizes provider-native function and input calls', () => {
+  assert.deepEqual(normalizeToolCall({ function: { name: 'github.issues.list', arguments: '{"owner":"a","repo":"b"}' } }), {
+    ok: true, call: { toolId: 'github.issues.list', args: { owner: 'a', repo: 'b' } },
+  });
+  assert.deepEqual(normalizeToolCall({ name: 'telegram.message.prepare', input: { body: 'hello' } }), {
+    ok: true, call: { toolId: 'telegram.message.prepare', args: { body: 'hello' } },
+  });
+});
+
+test('normalizes the phone brain marker and fenced JSON without parsing arbitrary prose', () => {
+  assert.deepEqual(normalizeToolCall('ULTRAN_TOOL_CALL:{"tool":"runtime.jobs"}'), {
+    ok: true, call: { toolId: 'runtime.jobs', args: {} },
+  });
+  assert.deepEqual(normalizeToolCall('ULTRAN_TOOL_CALL:{\"tool\":\"runtime.exec\",\"command\":\"pwd\"}'), {
+    ok: true, call: { toolId: 'runtime.exec', args: { command: 'pwd' } },
+  });
+  assert.deepEqual(normalizeToolCall('```json\n{"toolId":"files.list","args":{}}\n```'), {
+    ok: true, call: { toolId: 'files.list', args: {} },
+  });
+  assert.equal(normalizeToolCall('I think we should use files.list now.').ok, false);
+});
+
+test('rejects malformed, missing, invalid, and unavailable tool calls', () => {
+  assert.equal(normalizeToolCall('{bad json').ok, false);
+  assert.equal(normalizeToolCall({ args: {} }).ok, false);
+  assert.equal(normalizeToolCall({ toolId: 'files.list', args: [] }).ok, false);
+  assert.deepEqual(normalizeToolCall({ toolId: 'files.delete', args: {} }, BUILTIN_CONNECTORS.flatMap((m) => m.tools)), {
+    ok: false, error: 'unknown_tool', message: 'Tool "files.delete" is not in the currently available catalogue.',
+  });
+});
+
+test('tool result contract cannot report success and failure simultaneously', () => {
+  assert.deepEqual(toolCallResult({ toolId: 'files.list', ok: true, output: [] }), { toolId: 'files.list', ok: true, output: [] });
+  assert.throws(() => toolCallResult({ toolId: 'files.list', ok: false }), /must contain an error/);
+  assert.throws(() => toolCallResult({ toolId: 'files.list', ok: true, error: { code: 'bad', message: 'bad' } }), /cannot contain an error/);
+});
+
+
+test('capability diagnostics do not confuse registration with execution', () => {
+  const tool = BUILTIN_CONNECTORS.find((m) => m.id === 'files')!.tools[0]!;
+  const [registered] = diagnoseCapabilities([tool]);
+  assert.ok(registered);
+  assert.equal(registered.registered, true);
+  assert.equal(registered.implemented, false);
+  assert.equal(registered.available, false);
+  assert.equal(registered.authorized, false);
+  assert.equal(registered.verified, false);
+  assert.equal(registered.state, 'missing_handler');
+
+  const [implemented] = diagnoseCapabilities([tool], { implementedToolIds: [tool.id] });
+  assert.equal(implemented?.state, 'unavailable');
+  assert.equal(implemented?.implemented, true);
+  assert.equal(implemented?.available, false);
+});
+
+test('capability diagnostics require availability and grants before verification', () => {
+  const tool = BUILTIN_CONNECTORS.find((m) => m.id === 'files')!.tools[0]!;
+  const evidence = {
+    implementedToolIds: [tool.id],
+    availableToolIds: [tool.id],
+    authorizedToolIds: [tool.id],
+    checkedAt: '2026-10-31T12:00:00.000Z',
+  };
+  const [ready] = diagnoseCapabilities([tool], evidence);
+  assert.equal(ready?.state, 'unverified');
+  assert.equal(ready?.authorized, true);
+  assert.equal(ready?.verified, false);
+  assert.equal(ready?.checkedAt, evidence.checkedAt);
+
+  const [verified] = diagnoseCapabilities([tool], { ...evidence, verifiedToolIds: [tool.id] });
+  assert.equal(verified?.state, 'verified');
+  assert.equal(verified?.verified, true);
+});
+
+test('capability diagnostics preserve host reasons and fail closed on incomplete evidence', () => {
+  const tool = BUILTIN_CONNECTORS.find((m) => m.id === 'github')!.tools[0]!;
+  const [status] = diagnoseCapabilities([tool], {
+    implementedToolIds: [tool.id],
+    availableToolIds: [tool.id],
+    reasons: { [tool.id]: 'GitHub session is not connected for this account.' },
+  });
+  assert.equal(status?.state, 'unauthorized');
+  assert.equal(status?.reason, 'GitHub session is not connected for this account.');
+  assert.equal(status?.verified, false);
 });

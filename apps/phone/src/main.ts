@@ -1844,35 +1844,100 @@ async function initializeAvatar(): Promise<void> {
     try {
       const THREE = await import("three");
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
       const scene3d = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      camera.position.set(0, 0.1, 4.6);
-      const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
-      keyLight.position.set(2.4, 3.2, 3.6);
-      const rimLight = new THREE.DirectionalLight(THEMES.palace.accent, 1.1);
-      rimLight.position.set(-3, 1.2, -2.4);
-      scene3d.add(keyLight, rimLight, new THREE.AmbientLight(0x2a2a33, 1.4));
-      const accent = new THREE.Color(THEMES.palace.accent);
-      const head = new THREE.Group();
-      scene3d.add(head);
-      const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x1b1b21, metalness: 0.92, roughness: 0.28, flatShading: true }));
-      const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.004, 1), new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.16 }));
-      const eyeMaterial = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 2.4, metalness: 0.2, roughness: 0.4 });
-      const eyeGeometry = new THREE.SphereGeometry(0.115, 20, 20);
-      const eyeL = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      const eyeR = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      eyeL.position.set(-0.3, 0.16, 0.9);
-      eyeR.position.set(0.3, 0.16, 0.9);
-      const jaw = new THREE.Group();
-      jaw.position.set(0, -0.34, 0.72);
-      const jawPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.1, 0.3), new THREE.MeshStandardMaterial({ color: 0x131317, metalness: 0.9, roughness: 0.35, flatShading: true }));
-      const jawGlow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.85 }));
-      jawGlow.position.set(0, 0.06, 0.16);
-      jaw.add(jawPlate, jawGlow);
-      head.add(shell, wire, eyeL, eyeR, jaw);
-      let jawValue = 0;
-      let pulse = 0;
+      camera.position.set(0, 0, 4.35);
+      const coreLight = new THREE.PointLight(0xff263b, 3.2, 5.5);
+      coreLight.position.set(0, 0, 0.35);
+      const rimLight = new THREE.DirectionalLight(0xff3448, 2.2);
+      rimLight.position.set(-3, 2, -2);
+      scene3d.add(coreLight, rimLight, new THREE.AmbientLight(0x28232a, 0.7));
+
+      const heart = new THREE.Group();
+      scene3d.add(heart);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.67, 48, 36), new THREE.MeshPhysicalMaterial({ color: 0x8e071a, emissive: 0xd20d2b, emissiveIntensity: 1.45, roughness: 0.28, metalness: 0.18, clearcoat: 0.9 }));
+      heart.add(core);
+      const plasma = new THREE.Mesh(new THREE.IcosahedronGeometry(0.61, 3), new THREE.MeshBasicMaterial({ color: 0xff263b, wireframe: true, transparent: true, opacity: 0.28 }));
+      const plasmaInner = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 2), new THREE.MeshBasicMaterial({ color: 0xff6a72, wireframe: true, transparent: true, opacity: 0.2 }));
+      heart.add(plasma, plasmaInner);
+
+      const shell = new THREE.Group();
+      heart.add(shell);
+      const shardCount = 1050;
+      const shardGeometry = new THREE.BoxGeometry(0.052, 0.032, 0.018);
+      const rimGeometry = new THREE.BoxGeometry(0.061, 0.041, 0.012);
+      const shardMaterial = new THREE.MeshStandardMaterial({ color: 0x09090d, metalness: 0.96, roughness: 0.24, flatShading: true });
+      const rimMaterial = new THREE.MeshBasicMaterial({ color: 0xc80f2b, transparent: true, opacity: 0.88 });
+      const rims = new THREE.InstancedMesh(rimGeometry, rimMaterial, shardCount);
+      const shards = new THREE.InstancedMesh(shardGeometry, shardMaterial, shardCount);
+      const normal = new THREE.Vector3();
+      const position = new THREE.Vector3();
+      const scale = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const matrix = new THREE.Matrix4();
+      const outward = new THREE.Vector3(0, 0, 1);
+      for (let i = 0; i < shardCount; i += 1) {
+        const y = 1 - (i / (shardCount - 1)) * 2;
+        const ring = Math.sqrt(Math.max(0, 1 - y * y));
+        const theta = Math.PI * (3 - Math.sqrt(5)) * i;
+        normal.set(Math.cos(theta) * ring, y, Math.sin(theta) * ring).normalize();
+        quaternion.setFromUnitVectors(outward, normal);
+        quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(normal, (i % 13) * 0.41));
+        const size = 0.72 + ((i * 17) % 11) / 18;
+        position.copy(normal).multiplyScalar(0.99 + (i % 7) * 0.004);
+        scale.set(size, size, 1);
+        matrix.compose(position, quaternion, scale);
+        rims.setMatrixAt(i, matrix);
+        position.copy(normal).multiplyScalar(1.004 + (i % 7) * 0.004);
+        scale.set(size * 0.88, size * 0.84, 1);
+        matrix.compose(position, quaternion, scale);
+        shards.setMatrixAt(i, matrix);
+      }
+      rims.instanceMatrix.needsUpdate = true;
+      shards.instanceMatrix.needsUpdate = true;
+      shell.add(rims, shards);
+
+      const threads = new THREE.Group();
+      const threadMaterial = new THREE.LineBasicMaterial({ color: 0xf21d3b, transparent: true, opacity: 0.42 });
+      const addThread = (points: THREE.Vector3[]): void => {
+        threads.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), threadMaterial));
+      };
+      for (const latitude of [-1.05, -0.68, -0.32, 0, 0.32, 0.68, 1.05]) {
+        const radius = Math.sqrt(1 - latitude * latitude) * 1.035;
+        const points: THREE.Vector3[] = [];
+        for (let step = 0; step <= 96; step += 1) {
+          const angle = (step / 96) * Math.PI * 2;
+          points.push(new THREE.Vector3(Math.cos(angle) * radius, latitude * 1.035, Math.sin(angle) * radius));
+        }
+        addThread(points);
+      }
+      for (let meridian = 0; meridian < 10; meridian += 1) {
+        const angle = (meridian / 10) * Math.PI * 2;
+        const points: THREE.Vector3[] = [];
+        for (let step = 0; step <= 64; step += 1) {
+          const phi = (step / 64) * Math.PI;
+          points.push(new THREE.Vector3(Math.sin(phi) * Math.cos(angle) * 1.035, Math.cos(phi) * 1.035, Math.sin(phi) * Math.sin(angle) * 1.035));
+        }
+        addThread(points);
+      }
+      shell.add(threads);
+
+      const dustPositions = new Float32Array(720 * 3);
+      for (let i = 0; i < 720; i += 1) {
+        const radius = 1.12 + Math.random() * 0.34;
+        const y = Math.random() * 2 - 1;
+        const angle = Math.random() * Math.PI * 2;
+        const ring = Math.sqrt(1 - y * y);
+        dustPositions[i * 3] = Math.cos(angle) * ring * radius;
+        dustPositions[i * 3 + 1] = y * radius;
+        dustPositions[i * 3 + 2] = Math.sin(angle) * ring * radius;
+      }
+      const dustGeometry = new THREE.BufferGeometry();
+      dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
+      const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xff5362, size: 0.012, transparent: true, opacity: 0.72 }));
+      heart.add(dust);
+
       let visible = true;
       let looping = false;
       const clock = new THREE.Clock();
@@ -1888,26 +1953,36 @@ async function initializeAvatar(): Promise<void> {
         if (!visible) { looping = false; return; }
         const dt = Math.min(clock.getDelta(), 0.05);
         const t = clock.elapsedTime;
-        head.position.y = Math.sin(t * 0.9) * 0.045;
-        head.rotation.y = Math.sin(t * (thinking ? 1.3 : 0.42)) * (thinking ? 0.34 : 0.22);
-        head.rotation.x = Math.sin(t * 0.31) * 0.05;
-        const jawTarget = speaking ? 0.34 : 0;
-        jawValue += (jawTarget - jawValue) * Math.min(1, dt * 12);
-        jaw.rotation.x = jawValue + (speaking ? Math.abs(Math.sin(t * 11)) * 0.16 : 0);
-        pulse += dt * (speaking || thinking ? 6.5 : 1.6);
-        eyeMaterial.emissiveIntensity = 1.9 + Math.sin(pulse) * (speaking || thinking ? 0.9 : 0.35);
-        (jawGlow.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = 0.55 + Math.sin(pulse) * 0.3;
-        wire.rotation.y = -t * 0.12;
+        const active = speaking || thinking;
+        heart.scale.setScalar(1 + Math.sin(t * 1.35) * 0.03);
+        heart.rotation.y = Math.sin(t * 0.22) * 0.1;
+        core.rotation.y = t * 0.12;
+        plasma.rotation.set(t * 0.11, -t * 0.18, t * 0.07);
+        plasmaInner.rotation.set(-t * 0.16, t * 0.21, -t * 0.1);
+        shell.rotation.y = t * (active ? 0.16 : 0.055);
+        shell.rotation.x = Math.sin(t * 0.17) * 0.045;
+        dust.rotation.y = -t * 0.025;
+        core.material.emissiveIntensity = 1.25 + Math.sin(t * (active ? 7 : 1.4)) * (active ? 0.5 : 0.16);
+        threadMaterial.opacity = 0.3 + (Math.sin(t * 1.8) + 1) * 0.08;
+        if (app.dataset.health === "broken") {
+          core.material.emissiveIntensity = 0.12;
+          rimMaterial.opacity = Math.sin(t * 17) > 0.35 ? 0.7 : 0.05;
+          threadMaterial.opacity = Math.sin(t * 17) > 0.35 ? 0.5 : 0.04;
+        } else {
+          rimMaterial.opacity = 0.82;
+        }
         renderer.render(scene3d, camera);
         requestAnimationFrame(frame);
       };
-      avatarTheme = (theme) => {
-        accent.setHex(theme.accent);
-        (wire.material as InstanceType<typeof THREE.MeshBasicMaterial>).color.setHex(theme.accent);
-        eyeMaterial.color.setHex(theme.accent);
-        eyeMaterial.emissive.setHex(theme.accent);
-        (jawGlow.material as InstanceType<typeof THREE.MeshBasicMaterial>).color.setHex(theme.accent);
-        rimLight.color.setHex(theme.accent);
+      avatarTheme = () => {
+        core.material.color.setHex(0x8e071a);
+        core.material.emissive.setHex(0xd20d2b);
+        plasma.material.color.setHex(0xff263b);
+        plasmaInner.material.color.setHex(0xff6a72);
+        rimMaterial.color.setHex(0xc80f2b);
+        threadMaterial.color.setHex(0xf21d3b);
+        rimLight.color.setHex(0xff3448);
+        coreLight.color.setHex(0xff263b);
       };
       avatarResize = resizeAvatar;
       avatarSync = () => {
@@ -1920,7 +1995,7 @@ async function initializeAvatar(): Promise<void> {
       avatarSync();
     } catch (error) {
       avatarInit = null;
-      console.warn("Ultran avatar could not be initialized", error);
+      console.warn("Ultran core could not be initialized", error);
       canvas.hidden = true;
     }
   })();

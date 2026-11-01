@@ -1987,7 +1987,7 @@ async function initializeAvatar(): Promise<void> {
       };
       for (const latitude of [-1.05, -0.68, -0.32, 0, 0.32, 0.68, 1.05]) {
         const radius = Math.sqrt(1 - latitude * latitude) * 1.035;
-        const points: THREE.Vector3[] = [];
+        const points: InstanceType<typeof THREE.Vector3>[] = [];
         for (let step = 0; step <= 96; step += 1) {
           const angle = (step / 96) * Math.PI * 2;
           points.push(new THREE.Vector3(Math.cos(angle) * radius, latitude * 1.035, Math.sin(angle) * radius));
@@ -1996,7 +1996,7 @@ async function initializeAvatar(): Promise<void> {
       }
       for (let meridian = 0; meridian < 10; meridian += 1) {
         const angle = (meridian / 10) * Math.PI * 2;
-        const points: THREE.Vector3[] = [];
+        const points: InstanceType<typeof THREE.Vector3>[] = [];
         for (let step = 0; step <= 64; step += 1) {
           const phi = (step / 64) * Math.PI;
           points.push(new THREE.Vector3(Math.sin(phi) * Math.cos(angle) * 1.035, Math.cos(phi) * 1.035, Math.sin(phi) * Math.sin(angle) * 1.035));

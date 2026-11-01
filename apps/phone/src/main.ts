@@ -35,7 +35,7 @@ type Conversation = {
   sessionId?: string;
   messages: Message[];
 };
-type ThemeId = "palace" | "forge" | "vault" | "war-room";
+type ThemeId = "ultran";
 type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
 type NativeModel = { name: string; sizeBytes: number; loaded: boolean; shards?: number };
 type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[] };
@@ -70,10 +70,7 @@ type Store = { conversations: Conversation[]; activeId: string | null; agentId?:
 type Theme = { label: string; accent: number; bright: string; fog: number };
 
 const THEMES: Record<ThemeId, Theme> = {
-  palace: { label: "Palace", accent: 0xd4af37, bright: "#f5d76e", fog: 0x050505 },
-  forge: { label: "Forge", accent: 0xff8a3d, bright: "#ffb27a", fog: 0x0a0603 },
-  vault: { label: "Vault", accent: 0x9ad1ff, bright: "#cdeaff", fog: 0x04070a },
-  "war-room": { label: "War Room", accent: 0xe5484d, bright: "#ff8a8d", fog: 0x070404 },
+  ultran: { label: "Ultran", accent: 0xe52d41, bright: "#ff7180", fog: 0x070306 },
 };
 
 const SUGGESTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -209,9 +206,9 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", voice: false, theme: "palace", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
+const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", voice: false, theme: "ultran", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
-if (!(settings.theme in THEMES)) settings.theme = "palace";
+if (!(settings.theme in THEMES)) settings.theme = "ultran";
 
 const saveSettings = (): void => writeJson(SETTINGS_KEY, settings);
 let nativeModelLoaded = false;
@@ -1914,7 +1911,7 @@ function applyTheme(id: ThemeId): void {
   css.setProperty("--accent-glow", `#${theme.accent.toString(16).padStart(6, "0")}55`);
   css.setProperty("--eye", theme.bright);
   avatarTheme?.(theme);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#070809");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#080609");
   for (const button of themesEl.querySelectorAll<HTMLButtonElement>(".theme")) {
     button.setAttribute("aria-pressed", String(button.dataset.theme === id));
   }

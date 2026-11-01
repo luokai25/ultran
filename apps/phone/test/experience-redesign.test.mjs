@@ -49,15 +49,15 @@ test("plasma orb identity stays aligned across web, Android generator, and adapt
     read("android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml"),
     read("android/app/src/main/res/drawable/ic_launcher_background.xml"),
   ]);
-  assert.match(mark, /<ellipse cx="54" cy="54" rx="47" ry="17"/);
+  assert.match(mark, /ultran-core/);
   assert.match(mark, /<circle cx="54" cy="54" r="11"/);
   assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
-  assert.ok(generator.includes("Two orbital ellipses and a luminous nucleus"));
+  assert.ok(generator.includes("Two orbital ellipses and a three-layer plasma nucleus"));
   assert.doesNotMatch(generator, /U_START|U_CURVE|U_STROKE|CREST/);
-  assert.match(vector, /android:strokeColor="#CDA94D" android:strokeWidth="2.5"/);
-  assert.match(vector, /android:strokeColor="#F0D58A" android:strokeWidth="2.4"/);
+  assert.match(vector, /android:strokeColor="#E52D41" android:strokeWidth="2.5"/);
+  assert.match(vector, /android:strokeColor="#FF7180" android:strokeWidth="2.4"/);
   assert.doesNotMatch(mark, /M34 34v21/);
-  assert.match(background, /#0B0D0F/);
+  assert.match(background, /#080609/);
   assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
 });
 
@@ -136,10 +136,27 @@ test("model import is directly reachable from the model picker", async () => {
   assert.match(main, /#chat-model-import[\s\S]*?importNativeModel\(\)/);
 });
 
-test("the gold identity is a single stylesheet layer and mobile content stays within the viewport", async () => {
+test("the plasma-red identity is unified and mobile content stays within the viewport", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const experience = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
   assert.doesNotMatch(html, /redline\.css/);
   assert.match(experience, /html,body\{width:100%;max-width:100%;overflow-x:hidden\}/);
   assert.match(experience, /#app\{width:100%;max-width:760px;min-width:0/);
+});
+
+\ntest("version 3 keeps one red theme and retains native capability entry points", async () => {
+  const [pkg, main, html, mark] = await Promise.all([
+    read("package.json"), read("src/main.ts"), read("index.html"), read("src/mark.ts"),
+  ]);
+  assert.match(pkg, /"version": "3\\.0\\.0"/);
+  assert.match(main, /type ThemeId = "ultran"/);
+  assert.match(main, /accent: 0xe52d41/);
+  assert.match(main, /importNativeModel\\(\\)/);
+  assert.match(main, /initConnectors\\(/);
+  assert.match(main, /NativeRuntime/);
+  assert.match(main, /NativeCompanion/);
+  assert.match(html, /id="chat-model-import"/);
+  assert.match(html, /id="ultran-runtime-download"/);
+  assert.match(mark, /ultran-core/);
+  assert.match(mark, /#ff304b/);
 });

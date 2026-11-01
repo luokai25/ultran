@@ -24,8 +24,8 @@ except ImportError:  # pragma: no cover - CI installs Pillow explicitly
 
 VOID = (7, 8, 9)
 OBSIDIAN = (11, 13, 15)
-GOLD = (205, 169, 77)
-GOLD_BRIGHT = (240, 213, 138)
+PLASMA = (229, 45, 65)
+PLASMA_BRIGHT = (255, 113, 128)
 
 RES = "app/src/main/res"
 
@@ -86,9 +86,9 @@ def draw_mark(img: Image.Image, size: float, ox: float, oy: float) -> None:
     cx, cy = _scaled_point(ORBIT_CENTER, scale, ox, oy)
     radius = ORBIT_RADIUS * scale
     stroke = max(1, round(ORBIT_STROKE * scale))
-    draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=GOLD, width=stroke)
-    # Two orbital ellipses and a luminous nucleus: the actual Ultran orb, no lettermark.
-    for rx, ry, angle, color, width in [(47,17,-32,GOLD_BRIGHT,2.4),(44,13,48,GOLD,1.5)]:
+    draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=PLASMA, width=stroke)
+    # Two orbital ellipses and a three-layer plasma nucleus: the Ultran orb, no lettermark.
+    for rx, ry, angle, color, width in [(47,17,-32,PLASMA_BRIGHT,2.4),(44,13,48,PLASMA,1.5)]:
         layer = Image.new("RGBA", img.size, (0,0,0,0))
         ld = ImageDraw.Draw(layer)
         box=(cx-rx*scale,cy-ry*scale,cx+rx*scale,cy+ry*scale)
@@ -96,7 +96,7 @@ def draw_mark(img: Image.Image, size: float, ox: float, oy: float) -> None:
         layer=layer.rotate(angle, resample=Image.Resampling.BICUBIC, center=(cx,cy))
         img.alpha_composite(layer) if img.mode == "RGBA" else img.paste(layer, (0,0), layer)
     glow=max(2,round(27*scale))
-    for rr, color in [(glow,GOLD),(round(glow*.42),GOLD_BRIGHT),(round(glow*.18),(255,249,232))]:
+    for rr, color in [(glow,PLASMA),(round(glow*.42),PLASMA_BRIGHT),(round(glow*.18),(255,244,245))]:
         draw.ellipse((cx-rr,cy-rr,cx+rr,cy+rr), fill=color)
 
 
@@ -116,16 +116,16 @@ def vector_drawable() -> str:
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#00000000" android:strokeColor="#CDA94D" android:strokeWidth="2.5"
+    <path android:fillColor="#00000000" android:strokeColor="#E52D41" android:strokeWidth="2.5"
         android:pathData="M54,15 A39,39 0,1 1,53.99,15 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#F0D58A" android:strokeWidth="2.4"
+    <path android:fillColor="#00000000" android:strokeColor="#FF7180" android:strokeWidth="2.4"
         android:pathData="M9,54 A45,16 0,1 0,99,54 A45,16 0,1 0,9,54" />
-    <path android:fillColor="#00000000" android:strokeColor="#CDA94D" android:strokeWidth="1.5"
+    <path android:fillColor="#00000000" android:strokeColor="#E52D41" android:strokeWidth="1.5"
         android:pathData="M10,54 A44,13 0,1 1,98,54 A44,13 0,1 1,10,54" />
-    <path android:fillColor="#CDA94D" android:pathData="M81,54 A27,27 0,1 1,27,54 A27,27 0,1 1,81,54" android:fillAlpha="0.48" />
-    <path android:fillColor="#F0D58A" android:pathData="M65,54 A11,11 0,1 1,43,54 A11,11 0,1 1,65,54" />
-    <path android:fillColor="#FFF9E8" android:pathData="M59,54 A5,5 0,1 1,49,54 A5,5 0,1 1,59,54" />
-    <path android:fillColor="#F0D58A" android:pathData="M94.5,33 A3.5,3.5 0,1 1,87.5,33 A3.5,3.5 0,1 1,94.5,33" />
+    <path android:fillColor="#E52D41" android:pathData="M81,54 A27,27 0,1 1,27,54 A27,27 0,1 1,81,54" android:fillAlpha="0.48" />
+    <path android:fillColor="#FF7180" android:pathData="M65,54 A11,11 0,1 1,43,54 A11,11 0,1 1,65,54" />
+    <path android:fillColor="#FFF4F5" android:pathData="M59,54 A5,5 0,1 1,49,54 A5,5 0,1 1,59,54" />
+    <path android:fillColor="#FF7180" android:pathData="M94.5,33 A3.5,3.5 0,1 1,87.5,33 A3.5,3.5 0,1 1,94.5,33" />
 </vector>
 """
 

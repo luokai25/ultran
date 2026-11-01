@@ -1,12 +1,26 @@
-/** Ultran's plasma-orb identity, shared by the app UI, browser icon and launcher. */
-export function markSvg(size = 24, glow = "#f0d58a"): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="${size}" height="${size}" aria-hidden="true" focusable="false">` +
-    `<defs><radialGradient id="core"><stop stop-color="#fff4c7"/><stop offset=".24" stop-color="${glow}"/><stop offset=".62" stop-color="#cda94d" stop-opacity=".48"/><stop offset="1" stop-color="#cda94d" stop-opacity="0"/></radialGradient></defs>` +
-    `<circle cx="54" cy="54" r="39" fill="none" stroke="#cda94d" stroke-width="2.5" opacity=".82"/>` +
-    `<ellipse cx="54" cy="54" rx="47" ry="17" fill="none" stroke="${glow}" stroke-width="2.4" transform="rotate(-32 54 54)" opacity=".9"/>` +
-    `<ellipse cx="54" cy="54" rx="44" ry="13" fill="none" stroke="#cda94d" stroke-width="1.5" transform="rotate(48 54 54)" opacity=".7"/>` +
-    `<circle cx="54" cy="54" r="27" fill="url(#core)"/><circle cx="54" cy="54" r="11" fill="${glow}" opacity=".92"/><circle cx="54" cy="54" r="5" fill="#fff9e8"/>` +
-    `<circle cx="91" cy="33" r="3.5" fill="${glow}"/><circle cx="19" cy="68" r="2.5" fill="#cda94d"/>` +
-    `</svg>`;
+/** Ultran v3 plasma-core identity, shared by the app UI, browser icon and launcher. */
+export function markSvg(size = 24, glow = "#ff5366"): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="${size}" height="${size}" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="ultran-core"><stop stop-color="#fff4f5"/><stop offset=".16" stop-color="#ff9aa4"/><stop offset=".42" stop-color="#ff304b"/><stop offset=".76" stop-color="#8d071d" stop-opacity=".88"/><stop offset="1" stop-color="#3a0611" stop-opacity="0"/></radialGradient>
+      <filter id="ultran-glow"><feGaussianBlur stdDeviation="3.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <g fill="none" stroke="#f21d3b" stroke-linecap="round" opacity=".62">
+      <path d="M8 52 C23 9 80 5 101 43 C116 70 72 104 30 91 C8 84 -1 68 8 52Z" stroke-width="1.5"/>
+      <path d="M15 72 C27 26 77 17 95 49 M18 37 C45 5 91 26 91 66" stroke-width=".8" opacity=".8"/>
+      <path d="M12 56 L35 35 L52 48 L74 24 L96 41 M15 75 L39 61 L57 79 L82 58 L98 70" stroke-width=".7" opacity=".65"/>
+    </g>
+    <g filter="url(#ultran-glow)">
+      <path d="M18 43 L34 18 L46 37 L39 54 L19 61Z" fill="#08090d" stroke="#ff304b" stroke-width="1.6"/>
+      <path d="M75 17 L93 34 L82 53 L66 44 L62 29Z" fill="#09090d" stroke="#ff304b" stroke-width="1.6"/>
+      <path d="M82 69 L97 78 L77 98 L61 82 L67 66Z" fill="#09090d" stroke="#d91532" stroke-width="1.6"/>
+      <path d="M15 76 L31 66 L43 82 L31 98 L12 91Z" fill="#09090d" stroke="#d91532" stroke-width="1.4"/>
+      <circle cx="54" cy="54" r="30" fill="url(#ultran-core)" stroke="#ff304b" stroke-width="1.8"/>
+      <circle cx="54" cy="54" r="20" fill="none" stroke="#ff7180" stroke-width="1.4" opacity=".88"/>
+      <circle cx="54" cy="54" r="11" fill="#ff304b" opacity=".92"/>
+      <circle cx="54" cy="54" r="5" fill="#fff4f5"/>
+    </g>
+    <g fill="#ff7180"><circle cx="10" cy="29" r="1.8"/><circle cx="100" cy="55" r="2"/><circle cx="43" cy="7" r="1.2"/><circle cx="68" cy="103" r="1.5"/></g>
+  </svg>`;
 }
 export function markDataUrl(): string { return `data:image/svg+xml,${encodeURIComponent(markSvg(64))}`; }

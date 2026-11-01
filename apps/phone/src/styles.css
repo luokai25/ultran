@@ -1,4 +1,4 @@
-/* Ultran - gold on obsidian. A conversation console, not a dashboard. */
+/* Ultran - plasma red on obsidian. A conversation console, not a dashboard. */
 
 :root {
   --void: #050505;
@@ -7,17 +7,17 @@
   --graphite: #1b1b21;
   --steel: #24242c;
   --hairline: #2a2a33;
-  --gold: #d4af37;
-  --gold-bright: #f5d76e;
-  --gold-deep: #8a6d1f;
-  --accent: #d4af37;
-  --accent-bright: #f5d76e;
-  --accent-glow: rgba(212, 175, 55, 0.32);
-  --eye: #f5d76e;
+  --gold: #e52d41;
+  --gold-bright: #ff7180;
+  --gold-deep: #7b1424;
+  --accent: #e52d41;
+  --accent-bright: #ff7180;
+  --accent-glow: rgba(229, 45, 65, 0.32);
+  --eye: #ff7180;
   --danger: #e5484d;
   --ok: #3dd68c;
-  --ink: #f1eee4;
-  --ink-soft: #c9c5b8;
+  --ink: #f5f0f1;
+  --ink-soft: #c9c0c4;
   --muted: #8d8778;
   --radius: 18px;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

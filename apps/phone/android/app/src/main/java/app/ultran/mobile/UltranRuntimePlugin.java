@@ -109,13 +109,14 @@ public final class UltranRuntimePlugin extends Plugin {
                 }
             }
             for (String name : names) {
-                if (commandCount++ >= 300) break;
+                if (availableCommands.length() >= 300) break;
                 availableCommands.put(name);
             }
+            commandCount = names.size();
         }
         result.put("availableCommands", availableCommands);
         result.put("availableCommandCount", commandCount);
-        result.put("commandInventoryTruncated", commandCount > 300);
+        result.put("commandInventoryTruncated", commandCount > availableCommands.length());
         result.put("packageManagerEnabled", false);
         result.put("packageManagerNote", "APT repositories are disabled until Ultran publishes packages built for its private prefix.");
         result.put("prefix", prefix().getAbsolutePath());

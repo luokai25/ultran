@@ -74,6 +74,9 @@ export function initConnectors(deps: Deps): void {
   const countEl = need<HTMLElement>("#connectors-count");
   const moreBtn = need<HTMLButtonElement>("#connectors-more");
   const statusEl = need<HTMLElement>("#connectors-status");
+  const permissionOverview = need<HTMLElement>("#permission-overview");
+  const permissionCount = need<HTMLElement>("#permission-count");
+  const permissionDescription = need<HTMLElement>("#permission-description");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
   const approvalPanel = need<HTMLElement>("#composio-approvals");
@@ -86,6 +89,12 @@ export function initConnectors(deps: Deps): void {
   let oauthConnected = new Set<string>();
   let remoteKnown = false;
   let detailReturnFocus: HTMLElement | null = null;
+
+  const setPermissionOverview = (state: "loading" | "empty" | "ready" | "error", count: number | null, description: string): void => {
+    permissionOverview.dataset.state = state;
+    permissionCount.textContent = count === null ? "—" : String(count);
+    permissionDescription.textContent = description;
+  };
 
   const categories = [...new Set(CATALOG.map((c) => c.category))].sort();
 
@@ -181,6 +190,7 @@ export function initConnectors(deps: Deps): void {
 
   async function refreshEnabled(): Promise<void> {
     if (!deps.linked()) {
+      setPermissionOverview("empty", 0, "No permissions are granted. Ultran can browse the local connector catalogue, and asks only when you enable a capability.");
       remoteKnown = false;
       enabled = new Set();
       statusEl.textContent = "Browsing offline. Link your backend in Settings to enable connectors.";
@@ -188,6 +198,7 @@ export function initConnectors(deps: Deps): void {
       render();
       return;
     }
+    setPermissionOverview("loading", null, "Checking granted capabilities. Nothing is assumed while the backend is being checked.");
     try {
       const res = await deps.api("/v1/connectors/enabled/list", {}, 8_000);
       if (!res.ok) throw new Error(String(res.status));
@@ -205,6 +216,8 @@ export function initConnectors(deps: Deps): void {
       remoteKnown = true;
       statusEl.textContent = `${enabled.size} enabled on your backend.`;
       statusEl.dataset.tone = "ok";
+      const capabilityCount = CATALOG.filter((entry) => enabled.has(entry.id)).reduce((sum, entry) => sum + entry.actions.length, 0);
+      setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} actions are available across ${enabled.size} enabled connectors. Write-capable actions still require your approval.` : "No permissions are granted. Your catalogue is ready; enable only the services and actions you need.");
     } catch {
       // Never present a stale "On" badge as current backend state after a failed
       // refresh. The catalog remains browsable, but connection state is unknown.
@@ -212,6 +225,7 @@ export function initConnectors(deps: Deps): void {
       enabled = new Set();
       statusEl.textContent = "Could not reach your backend. Showing the catalog only.";
       statusEl.dataset.tone = "bad";
+      setPermissionOverview("error", null, "Permission state unavailable. Ultran will not display old grants as if they were current.");
     }
     render();
   }

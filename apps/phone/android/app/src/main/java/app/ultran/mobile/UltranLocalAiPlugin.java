@@ -418,7 +418,9 @@ public class UltranLocalAiPlugin extends Plugin {
                 StatFs storage = new StatFs(modelDirectory().getAbsolutePath());
                 final long availableAtStart = storage.getAvailableBytes();
                 URL current = new URL(source);
-                for (int redirects = 0; redirects <= 5; redirects++) {
+                int redirects = 0;
+                int transientRetries = 0;
+                while (redirects <= 5) {
                     connection = (HttpURLConnection) current.openConnection();
                     connection.setConnectTimeout(20000);
                     // Large model hosts can pause for well over 30 seconds on mobile networks.
@@ -432,7 +434,7 @@ public class UltranLocalAiPlugin extends Plugin {
                         String location = connection.getHeaderField("Location");
                         connection.disconnect();
                         connection = null;
-                        if (location == null || redirects == 5) throw new IllegalStateException("Too many or invalid model download redirects.");
+                        if (location == null || redirects >= 5) throw new IllegalStateException("Too many or invalid model download redirects.");
                         URL next = new URL(current, location);
                         String host = next.getHost().toLowerCase(Locale.ROOT);
                         if (!"https".equalsIgnoreCase(next.getProtocol()) ||
@@ -440,11 +442,31 @@ public class UltranLocalAiPlugin extends Plugin {
                             throw new IllegalStateException("Model download redirected to an untrusted host.");
                         }
                         current = next;
+                        redirects++;
                         continue;
                     }
-                    if (code != HttpURLConnection.HTTP_OK) throw new IllegalStateException("Hugging Face download failed with HTTP " + code + ".");
+                    if (code == 429 || (code >= 500 && code <= 599)) {
+                        if (transientRetries >= 3) {
+                            throw new IllegalStateException("Model host is temporarily unavailable (HTTP " + code + ") after 3 retries. Wait a moment and try again.");
+                        }
+                        connection.disconnect();
+                        connection = null;
+                        try {
+                            Thread.sleep(1000L * (1L << transientRetries));
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("Model download was interrupted.", interrupted);
+                        }
+                        transientRetries++;
+                        continue;
+                    }
+                    if (code == 401 || code == 403) {
+                        throw new IllegalStateException("Hugging Face denied this download (HTTP " + code + "). The model may be gated, private, or require accepting its licence while signed in on Hugging Face.");
+                    }
+                    if (code != HttpURLConnection.HTTP_OK) throw new IllegalStateException("Hugging Face download failed with HTTP " + code + ". Check the repository is public and the selected GGUF file still exists.");
                     break;
                 }
+                if (connection == null) throw new IllegalStateException("Could not establish a model download connection.");
                 long total = connection.getContentLengthLong();
                 final long maxBytes = MAX_MODEL_BYTES;
                 if (total > maxBytes || expectedBytes > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 256 GB safety limit.");

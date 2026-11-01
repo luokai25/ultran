@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { buildToolManual, type ConnectorRegistry } from '@ultran/connectors';
+import { buildToolManual, normalizeToolCall, type ConnectorRegistry } from '@ultran/connectors';
 import type { ToolSchema } from '@ultran/connectors';
 import type { BrainRuntime } from '../brain/runtime.js';
 import type { PolicyGate } from '../monetization/policy-gate.js';
@@ -122,12 +122,13 @@ function parsePlan(value: string): PlanStep[] {
 }
 
 function parseToolCall(value: string): PlannedToolCall {
-  const parsed = parseJson(value);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('brain tool selection must be a JSON object');
-  const item = parsed as Record<string, unknown>;
-  if (typeof item.toolId !== 'string' || !item.toolId.trim()) throw new Error('brain selected no tool');
-  if (!item.args || typeof item.args !== 'object' || Array.isArray(item.args)) throw new Error('brain tool arguments must be a JSON object');
-  return { toolId: item.toolId.trim(), args: item.args as Record<string, unknown> };
+  const normalized = normalizeToolCall(value);
+  if (!normalized.ok) {
+    if (normalized.error === 'missing_tool_id') throw new Error('brain selected no tool');
+    if (normalized.error === 'invalid_args') throw new Error('brain tool arguments must be a JSON object');
+    throw new Error(`brain tool selection is invalid: ${normalized.message}`);
+  }
+  return normalized.call;
 }
 
 function validateSchemaValue(schema: Record<string, unknown>, value: unknown, path: string, errors: string[]): void {

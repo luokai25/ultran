@@ -9,6 +9,17 @@ export default defineConfig({
     emptyOutDir: true,
     target: "es2020",
     sourcemap: false,
+    // Keep the 3D avatar engine and native bridge out of the application
+    // entry chunk. This reduces the entry bundle's parse/compile burden and
+    // lets the browser cache these dependency groups independently.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/node_modules/three/")) return "three";
+          if (id.includes("/node_modules/@capacitor/")) return "capacitor";
+        },
+      },
+    },
   },
   server: {
     port: 5173,

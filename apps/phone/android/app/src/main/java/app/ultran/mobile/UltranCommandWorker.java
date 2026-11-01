@@ -206,7 +206,13 @@ public final class UltranCommandWorker extends Worker {
                 .putBoolean(KEY_TIMED_OUT, timedOut)
                 .putBoolean("termuxRuntime", termuxReady)
                 .build();
-            postNotification("Ultran task completed", "Background command finished with exit code " + exitCode + ".", false);
+            String notificationTitle = timedOut ? "Ultran task timed out" : (exitCode == 0 ? "Ultran task completed" : "Ultran command failed");
+            String notificationBody = timedOut
+                ? "The command was stopped after the 9-minute execution limit."
+                : (exitCode == 0
+                    ? "Background command finished successfully."
+                    : "Background command exited with code " + exitCode + ".");
+            postNotification(notificationTitle, notificationBody, false);
             setProgressAsync(new Data.Builder()
                 .putString("phase", "completed")
                 .putString("output", text)

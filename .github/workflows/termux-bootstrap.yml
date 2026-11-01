@@ -11,7 +11,7 @@ on:
       packages:
         description: Comma-separated Termux packages to include in the bootstrap
         required: true
-        default: git,python,proot,proot-distro,wget,openssh
+        default: git,python,proot,proot-distro,wget,curl,openssh,nodejs-lts,clang,make,cmake,pkg-config,coreutils,findutils,grep,sed,gawk,procps,tar,zip,unzip,rsync,jq,nano,vim,openssl,ca-certificates,termux-tools
         type: string
 
 permissions:
@@ -62,7 +62,7 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" \
               --title 'Ultran Termux Runtime' \
-              --notes 'Ultran-specific runtime archives built from pinned official termux/termux-packages source for package app.ultran.mobile and Ultran private storage. Default packages: git, python, proot, proot-distro, wget and openssh. SHA256SUMS is included. APT sources are disabled until Ultran has its own compatible package repository.' \
+              --notes 'Ultran-specific runtime archives built from pinned official termux/termux-packages source for package app.ultran.mobile and Ultran private storage. Default packages: git, Python, Node.js, Clang, build tools, shell utilities, proot-distro, curl/wget, SSH and common developer utilities. SHA256SUMS is included. APT sources are disabled until Ultran has its own compatible package repository.' \
               --prerelease \
               --target "$GITHUB_SHA"
           fi

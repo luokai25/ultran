@@ -7,7 +7,6 @@
  * Nothing is sent anywhere until the user explicitly configures a connection.
  */
 
-import * as THREE from "three";
 import { Browser } from "@capacitor/browser";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
@@ -2039,117 +2038,127 @@ async function submit(raw: string): Promise<void> {
  * Avatar (the hero) - rendered only while it is on screen
  * ------------------------------------------------------------------ */
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-const scene3d = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-camera.position.set(0, 0.1, 4.6);
-
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
-keyLight.position.set(2.4, 3.2, 3.6);
-const rimLight = new THREE.DirectionalLight(THEMES.palace.accent, 1.1);
-rimLight.position.set(-3, 1.2, -2.4);
-scene3d.add(keyLight, rimLight, new THREE.AmbientLight(0x2a2a33, 1.4));
-
-const accent = new THREE.Color(THEMES.palace.accent);
-const head = new THREE.Group();
-scene3d.add(head);
-
-const shell = new THREE.Mesh(
-  new THREE.IcosahedronGeometry(1, 1),
-  new THREE.MeshStandardMaterial({ color: 0x1b1b21, metalness: 0.92, roughness: 0.28, flatShading: true }),
-);
-const wire = new THREE.Mesh(
-  new THREE.IcosahedronGeometry(1.004, 1),
-  new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.16 }),
-);
-const eyeMaterial = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 2.4, metalness: 0.2, roughness: 0.4 });
-const eyeGeometry = new THREE.SphereGeometry(0.115, 20, 20);
-const eyeL = new THREE.Mesh(eyeGeometry, eyeMaterial);
-const eyeR = new THREE.Mesh(eyeGeometry, eyeMaterial);
-eyeL.position.set(-0.3, 0.16, 0.9);
-eyeR.position.set(0.3, 0.16, 0.9);
-const jaw = new THREE.Group();
-jaw.position.set(0, -0.34, 0.72);
-const jawPlate = new THREE.Mesh(
-  new THREE.BoxGeometry(0.62, 0.1, 0.3),
-  new THREE.MeshStandardMaterial({ color: 0x131317, metalness: 0.9, roughness: 0.35, flatShading: true }),
-);
-const jawGlow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.85 }));
-jawGlow.position.set(0, 0.06, 0.16);
-jaw.add(jawPlate, jawGlow);
-head.add(shell, wire, eyeL, eyeR, jaw);
-
 let speaking = false;
 let thinking = false;
-let jawValue = 0;
-let pulse = 0;
-let visible = true;
-let looping = false;
+let avatarTheme: ((theme: Theme) => void) | null = null;
+let avatarResize: (() => void) | null = null;
+let avatarSync: (() => void) | null = null;
+let avatarInit: Promise<void> | null = null;
 
 function applyTheme(id: ThemeId): void {
   const theme = THEMES[id];
   settings.theme = id;
-  accent.setHex(theme.accent);
   const css = document.documentElement.style;
   css.setProperty("--accent", `#${theme.accent.toString(16).padStart(6, "0")}`);
   css.setProperty("--accent-bright", theme.bright);
   css.setProperty("--accent-glow", `#${theme.accent.toString(16).padStart(6, "0")}55`);
   css.setProperty("--eye", theme.bright);
-  (wire.material as THREE.MeshBasicMaterial).color.setHex(theme.accent);
-  eyeMaterial.color.setHex(theme.accent);
-  eyeMaterial.emissive.setHex(theme.accent);
-  (jawGlow.material as THREE.MeshBasicMaterial).color.setHex(theme.accent);
-  rimLight.color.setHex(theme.accent);
+  avatarTheme?.(theme);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#070809");
   for (const button of themesEl.querySelectorAll<HTMLButtonElement>(".theme")) {
     button.setAttribute("aria-pressed", String(button.dataset.theme === id));
   }
 }
 
+async function initializeAvatar(): Promise<void> {
+  if (avatarInit) return avatarInit;
+  avatarInit = (async () => {
+    try {
+      const THREE = await import("three");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      const scene3d = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      camera.position.set(0, 0.1, 4.6);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      keyLight.position.set(2.4, 3.2, 3.6);
+      const rimLight = new THREE.DirectionalLight(THEMES.palace.accent, 1.1);
+      rimLight.position.set(-3, 1.2, -2.4);
+      scene3d.add(keyLight, rimLight, new THREE.AmbientLight(0x2a2a33, 1.4));
+      const accent = new THREE.Color(THEMES.palace.accent);
+      const head = new THREE.Group();
+      scene3d.add(head);
+      const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x1b1b21, metalness: 0.92, roughness: 0.28, flatShading: true }));
+      const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.004, 1), new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.16 }));
+      const eyeMaterial = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 2.4, metalness: 0.2, roughness: 0.4 });
+      const eyeGeometry = new THREE.SphereGeometry(0.115, 20, 20);
+      const eyeL = new THREE.Mesh(eyeGeometry, eyeMaterial);
+      const eyeR = new THREE.Mesh(eyeGeometry, eyeMaterial);
+      eyeL.position.set(-0.3, 0.16, 0.9);
+      eyeR.position.set(0.3, 0.16, 0.9);
+      const jaw = new THREE.Group();
+      jaw.position.set(0, -0.34, 0.72);
+      const jawPlate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.1, 0.3), new THREE.MeshStandardMaterial({ color: 0x131317, metalness: 0.9, roughness: 0.35, flatShading: true }));
+      const jawGlow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.85 }));
+      jawGlow.position.set(0, 0.06, 0.16);
+      jaw.add(jawPlate, jawGlow);
+      head.add(shell, wire, eyeL, eyeR, jaw);
+      let jawValue = 0;
+      let pulse = 0;
+      let visible = true;
+      let looping = false;
+      const clock = new THREE.Clock();
+      const resizeAvatar = (): void => {
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(1, Math.floor(rect.width));
+        const h = Math.max(1, Math.floor(rect.height));
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      };
+      const frame = (): void => {
+        if (!visible) { looping = false; return; }
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const t = clock.elapsedTime;
+        head.position.y = Math.sin(t * 0.9) * 0.045;
+        head.rotation.y = Math.sin(t * (thinking ? 1.3 : 0.42)) * (thinking ? 0.34 : 0.22);
+        head.rotation.x = Math.sin(t * 0.31) * 0.05;
+        const jawTarget = speaking ? 0.34 : 0;
+        jawValue += (jawTarget - jawValue) * Math.min(1, dt * 12);
+        jaw.rotation.x = jawValue + (speaking ? Math.abs(Math.sin(t * 11)) * 0.16 : 0);
+        pulse += dt * (speaking || thinking ? 6.5 : 1.6);
+        eyeMaterial.emissiveIntensity = 1.9 + Math.sin(pulse) * (speaking || thinking ? 0.9 : 0.35);
+        (jawGlow.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = 0.55 + Math.sin(pulse) * 0.3;
+        wire.rotation.y = -t * 0.12;
+        renderer.render(scene3d, camera);
+        requestAnimationFrame(frame);
+      };
+      avatarTheme = (theme) => {
+        accent.setHex(theme.accent);
+        (wire.material as InstanceType<typeof THREE.MeshBasicMaterial>).color.setHex(theme.accent);
+        eyeMaterial.color.setHex(theme.accent);
+        eyeMaterial.emissive.setHex(theme.accent);
+        (jawGlow.material as InstanceType<typeof THREE.MeshBasicMaterial>).color.setHex(theme.accent);
+        rimLight.color.setHex(theme.accent);
+      };
+      avatarResize = resizeAvatar;
+      avatarSync = () => {
+        visible = app.dataset.chatting !== "true" && !document.hidden;
+        if (visible && !looping) { looping = true; clock.getDelta(); requestAnimationFrame(frame); }
+      };
+      new ResizeObserver(resizeAvatar).observe(canvas);
+      resizeAvatar();
+      avatarTheme(THEMES[settings.theme]);
+      avatarSync();
+    } catch (error) {
+      avatarInit = null;
+      console.warn("Ultran avatar could not be initialized", error);
+      canvas.hidden = true;
+    }
+  })();
+  return avatarInit;
+}
+
 function resize(): void {
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width));
-  const h = Math.max(1, Math.floor(rect.height));
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-new ResizeObserver(resize).observe(canvas);
-
-const clock = new THREE.Clock();
-
-function frame(): void {
-  if (!visible) {
-    looping = false;
-    return;
-  }
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
-  head.position.y = Math.sin(t * 0.9) * 0.045;
-  head.rotation.y = Math.sin(t * (thinking ? 1.3 : 0.42)) * (thinking ? 0.34 : 0.22);
-  head.rotation.x = Math.sin(t * 0.31) * 0.05;
-  const jawTarget = speaking ? 0.34 : 0;
-  jawValue += (jawTarget - jawValue) * Math.min(1, dt * 12);
-  jaw.rotation.x = jawValue + (speaking ? Math.abs(Math.sin(t * 11)) * 0.16 : 0);
-  pulse += dt * (speaking || thinking ? 6.5 : 1.6);
-  eyeMaterial.emissiveIntensity = 1.9 + Math.sin(pulse) * (speaking || thinking ? 0.9 : 0.35);
-  (jawGlow.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.sin(pulse) * 0.3;
-  wire.rotation.y = -t * 0.12;
-  renderer.render(scene3d, camera);
-  requestAnimationFrame(frame);
+  avatarResize?.();
 }
 
-/** Run the render loop only while the hero is on screen and the page is foreground. */
+/** Load the 3D engine only when the hero is actually visible. */
 function syncRender(): void {
-  visible = app.dataset.chatting !== "true" && !document.hidden;
+  const shouldShow = app.dataset.chatting !== "true" && !document.hidden;
   haloEl.dataset.active = String(speaking || thinking);
-  if (visible && !looping) {
-    looping = true;
-    clock.getDelta();
-    requestAnimationFrame(frame);
-  }
+  if (shouldShow) void initializeAvatar();
+  avatarSync?.();
 }
 
 function setThinking(next: boolean): void {

@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="./src/styles.css" />
     <link rel="stylesheet" href="./src/workspace.css" />
     <link rel="stylesheet" href="./src/experience.css" />
+    <link rel="stylesheet" href="./src/redline.css" />
   </head>
   <body>
     <div id="app">
@@ -41,22 +42,22 @@
         <div class="chat-model-menu-actions"><button id="chat-model-download" type="button">Find or download models</button><button id="chat-model-settings" type="button">Model settings</button></div>
       </section>
       <main id="thread" class="thread" aria-live="polite">
-        <section id="hero" class="hero">
+        <section id="hero" class="hero" data-state="ready">
           <div class="hero-intro">
-            <div class="hero-kicker"><span class="hero-kicker-line"></span> YOUR PERSONAL AI</div>
-            <div class="stage">
+            <div class="hero-kicker"><span class="hero-kicker-line"></span> ULTRAN · PERSONAL INTELLIGENCE</div>
+            <div class="stage" aria-label="Ultran core">
               <div class="avatar-orbit avatar-orbit-a" aria-hidden="true"></div>
               <div class="avatar-orbit avatar-orbit-b" aria-hidden="true"></div>
-              <canvas id="avatar" aria-label="Ultran assistant avatar"></canvas>
+              <canvas id="avatar" aria-label="Ultran plasma core, animated assistant status"></canvas>
               <span id="hero-mark" class="hero-brand-mark" aria-hidden="true"></span>
               <div class="halo" aria-hidden="true"></div>
             </div>
-            <h1 id="greeting" class="greeting">Good evening.</h1>
-            <p id="subgreeting" class="subgreeting">What shall we do today?</p>
-            <div class="hero-status"><span class="status-pulse"></span><span>LOCAL FIRST</span><span class="status-divider"></span><span>YOUR DEVICE, YOUR RULES</span></div>
+            <h1 id="greeting" class="greeting">Ready when you are.</h1>
+            <p id="subgreeting" class="subgreeting">One place for your local AI, agents, files and connected tools.</p>
+            <div class="hero-status" role="status"><span class="status-pulse"></span><span>LOCAL CORE</span><span class="status-divider"></span><span id="core-status-label">ON DEVICE · PRIVATE BY DEFAULT</span></div>
           </div>
           <div class="quick-start">
-            <div class="quick-start-heading"><div><span class="section-eyebrow">QUICK ACTIONS</span><h2>What can I help with?</h2></div><span class="quick-start-mark">✳</span></div>
+            <div class="quick-start-heading"><div><span class="section-eyebrow">START WITH AN OUTCOME</span><h2>What should Ultran do?</h2></div><span class="quick-start-mark" aria-hidden="true">✳</span></div>
             <div id="suggestions" class="suggestions"></div>
           </div>
         </section>
@@ -90,7 +91,8 @@
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
             </button>
           </div>
-        </form>
+8147        </form>
+        <section id="workspace-tray" class="workspace-tray" aria-label="Workspace tray" hidden><div class="workspace-tray-label"><span class="tray-pulse"></span><span>WORKSPACE TRAY</span><small id="workspace-tray-count">0 items</small></div><div id="workspace-tray-items" class="workspace-tray-items"></div></section>
         <p id="voice-status" class="voice-status" role="status" aria-live="polite" hidden></p>
         <p class="footnote"><span class="footnote-lock">◆</span> Private by design · Review actions before they run.</p>
       </footer>

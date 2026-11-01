@@ -226,7 +226,9 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/out"
           cp "$APK" "$RUNNER_TEMP/ultran-release.apk"
+          cp "$APK" "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
           test -s "$RUNNER_TEMP/ultran-release.apk"
+          test -s "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
           sha256sum "$RUNNER_TEMP/ultran-release.apk"
           echo "apk=$RUNNER_TEMP/ultran-release.apk" >> "$GITHUB_OUTPUT"
           echo "Verified APK copied to runner temp: $RUNNER_TEMP/ultran-release.apk"

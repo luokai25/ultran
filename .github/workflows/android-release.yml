@@ -86,6 +86,9 @@ jobs:
           echo "tag=android-v${VERSION}-b${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "Building $VERSION (code $VERSION_CODE)"
 
+      - name: Build connector SDK
+        run: pnpm --filter @ultran/connectors build
+
       - name: Build web assets
         working-directory: ${{ env.WORKDIR }}
         run: pnpm build

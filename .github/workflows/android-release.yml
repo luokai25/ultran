@@ -242,20 +242,15 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            set -euo pipefail
-            echo "Smoke-test working directory: $(pwd)"
-            echo "Runner temp: $RUNNER_TEMP"
-            find "$GITHUB_WORKSPACE" "$RUNNER_TEMP" -maxdepth 3 -name 'ultran-release.apk' -type f -ls || true
-            APK="${{ runner.temp }}/ultran-release.apk"
-            if [ ! -s "$APK" ]; then
-              echo "::error::APK missing from expected path: $APK"
-              exit 1
-            fi
-            sha256sum "$APK"
-            adb install -r "$APK"
-            adb shell monkey -p app.ultran.mobile 1
-            adb shell dumpsys package app.ultran.mobile | grep -q "versionName=${{ steps.version.outputs.name }}"
+          # The emulator action executes each script line through sh separately.
+          # Keep the smoke test as one shell command so control flow isn't split.
+          script: >-
+            APK="${{ runner.temp }}/ultran-release.apk";
+            test -s "$APK" &&
+            sha256sum "$APK" &&
+            adb install -r "$APK" &&
+            adb shell monkey -p app.ultran.mobile 1 &&
+            adb shell dumpsys package app.ultran.mobile | grep -q "versionName=${{ steps.version.outputs.name }}" &&
             echo "Android PackageManager installed and launched Ultran successfully"
 
       - name: Package Capacitor project

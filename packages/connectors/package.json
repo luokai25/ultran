@@ -12,7 +12,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./manifest.json": "./schema/manifest.schema.json"
+    "./manifest.json": "./schema/manifest.schema.json",
+    "./tool-contract": {
+      "types": "./dist/tool-contract.d.ts",
+      "import": "./dist/tool-contract.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

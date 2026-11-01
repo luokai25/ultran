@@ -24,6 +24,7 @@
           <span class="brand-copy"><span class="wordmark">ULTRAN</span><small>PERSONAL AI SYSTEM</small></span>
         </div>
         <div class="topbar-actions">
+          <button id="chat-model-button" class="chat-model-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-model-menu"><span class="chat-model-indicator"></span><span id="chat-model-label">Choose model</span><span aria-hidden="true">⌄</span></button>
           <span class="topbar-presence"><i></i> LOCAL FIRST</span>
           <button id="new-btn" class="icon-btn new-trigger" aria-label="New conversation">
             <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -31,6 +32,12 @@
         </div>
       </header>
 
+      <section id="chat-model-menu" class="chat-model-menu" role="dialog" aria-label="Choose an AI model" hidden>
+        <div class="chat-model-menu-head"><div><span class="section-eyebrow">ACTIVE BRAIN</span><strong id="chat-model-current">No model selected</strong></div><button id="chat-model-close" class="icon-btn" type="button" aria-label="Close model picker">×</button></div>
+        <p id="chat-model-status" role="status">Choose a model available on this device or configure a connection.</p>
+        <div id="chat-model-options" class="chat-model-options"></div>
+        <div class="chat-model-menu-actions"><button id="chat-model-download" type="button">Find or download models</button><button id="chat-model-settings" type="button">Model settings</button></div>
+      </section>
       <main id="thread" class="thread" aria-live="polite">
         <section id="hero" class="hero">
           <div class="hero-intro">

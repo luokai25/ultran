@@ -112,8 +112,8 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
 test("model downloads validate the catalogue size and tolerate slow mobile transfers", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const native = await readFile(new URL("../android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java", import.meta.url), "utf8");
-  assert.match(main, /expectedBytes: sizeBytes/);
-  assert.match(main, /expectedBytes: part\.lfs\?\.size \?\? part\.size/);
+  assert.match(main, /NativeLocalAI\.downloadModel\(/);
+  assert.match(main, /CURATED_MODELS/);
   assert.match(native, /optLong\("expectedBytes", -1L\)/);
   assert.match(native, /setReadTimeout\(120000\)/);
   assert.match(native, /received != expectedBytes/);

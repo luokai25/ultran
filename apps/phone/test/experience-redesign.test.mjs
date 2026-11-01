@@ -78,6 +78,9 @@ test("reference-inspired five-tab mobile navigation and feature screens are pres
 test("local file requests have a real PDF fallback and artifact card actions", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const kernel = await readFile(new URL("../src/capability-kernel.ts", import.meta.url), "utf8");
+  assert.match(main, /low\.split\(\/\\s\+\/\)/, "artifact intent detection must split on actual whitespace");
+  assert.match(main, /chat-deliverable/, "the final answer should surface a visible deliverable card");
+  assert.match(main, /portable Markdown version preserves the generated content/);
   assert.match(main, /function localPdfBlob\(/);
   assert.match(main, /async function attachRequestedArtifact\(/);
   assert.match(main, /URL\.createObjectURL\(blob\)/);
@@ -89,4 +92,29 @@ test("local file requests have a real PDF fallback and artifact card actions", a
   assert.match(kernel, /pdf\|docx\|pptx/);
   assert.match(kernel, /invisible internal quality-control pass/);
   assert.doesNotMatch(kernel, /You are Ultran.s independent quality reviewer/);
+});
+
+
+test("chat has an in-place model switcher with model discovery shortcuts", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const css = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
+  for (const id of ["chat-model-button", "chat-model-label", "chat-model-menu", "chat-model-current", "chat-model-status", "chat-model-options", "chat-model-download", "chat-model-settings"]) {
+    assert.match(html, new RegExp(`id="${id}"`), `missing model switcher control ${id}`);
+  }
+  assert.match(main, /async function openChatModelMenu\(/);
+  assert.match(main, /NativeLocalAI\.loadModel\(\{ name: model\.name \}\)/);
+  assert.match(main, /NativeLocalAI\.unloadModel\(\)/);
+  assert.match(css, /\.chat-model-menu\[hidden\]\{display:none!important\}/);
+  assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
+});
+
+test("model downloads validate the catalogue size and tolerate slow mobile transfers", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const native = await readFile(new URL("../android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java", import.meta.url), "utf8");
+  assert.match(main, /expectedBytes: sizeBytes/);
+  assert.match(main, /expectedBytes: part\.lfs\?\.size \?\? part\.size/);
+  assert.match(native, /optLong\("expectedBytes", -1L\)/);
+  assert.match(native, /setReadTimeout\(120000\)/);
+  assert.match(native, /received != expectedBytes/);
 });

@@ -213,7 +213,10 @@ public final class UltranCommandWorker extends Worker {
                 .putLong("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
                 .putBoolean("truncated", truncated.get())
                 .build());
-            return Result.success(result);
+            // A completed process is not necessarily a successful command. Keep its
+            // output and exit metadata in WorkManager's output data, but represent
+            // non-zero exits and timeouts as failed jobs so status reflects reality.
+            return timedOut || exitCode != 0 ? Result.failure(result) : Result.success(result);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             if (process != null) stopProcess(process);

@@ -1,4 +1,7 @@
 import { normalizeToolCall } from "@ultran/connectors/tool-contract";
+import { CURATED_MODELS } from "./model-library";
+import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
+import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
 /**
  * Ultran phone client - a conversation console.
  *
@@ -128,6 +131,10 @@ const navSettingsButton = req<HTMLButtonElement>("#nav-settings");
 const navWorldsButton = req<HTMLButtonElement>("#nav-worlds");
 const navLuonixButton = req<HTMLButtonElement>("#nav-luonix");
 const chatModelButton = req<HTMLButtonElement>("#chat-model-button");
+const globalSearchOpen=req<HTMLButtonElement>("#global-search-open");
+const globalSearch=req<HTMLElement>("#global-search");
+const globalSearchInput=req<HTMLInputElement>("#global-search-input");
+const globalSearchResults=req<HTMLElement>("#global-search-results");
 const chatModelLabel = req<HTMLElement>("#chat-model-label");
 const chatModelMenu = req<HTMLElement>("#chat-model-menu");
 const chatModelCurrent = req<HTMLElement>("#chat-model-current");
@@ -152,20 +159,17 @@ const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
 const nativeModelUnloadButton = req<HTMLButtonElement>("#native-model-unload-btn");
 const nativeModelDeleteButton = req<HTMLButtonElement>("#native-model-delete-btn");
 const nativeModelBenchmarkButton = req<HTMLButtonElement>("#native-model-benchmark-btn");
-const modelSearchForm = req<HTMLFormElement>("#model-search-form");
-const modelSearchInput = req<HTMLInputElement>("#model-search");
 const modelLibraryStatus = req<HTMLElement>("#model-library-status");
 const modelLibraryResults = req<HTMLElement>("#model-library-results");
-const modelSizeFilterEl = req<HTMLSelectElement>("#model-size-filter");
 const modelDownloadProgressEl = req<HTMLProgressElement>("#model-download-progress");
 let modelDownloadInProgress = false;
 let hubSearchSequence = 0;
-const localModelEndpointEl = req<HTMLInputElement>("#local-model-endpoint");
-const localModelEl = req<HTMLInputElement>("#local-model");
-const ollamaModelsRefreshButton = req<HTMLButtonElement>("#ollama-models-refresh");
-const ollamaModelPullButton = req<HTMLButtonElement>("#ollama-model-pull");
-const ollamaModelSelect = req<HTMLSelectElement>("#ollama-model-list");
-const ollamaLibraryStatus = req<HTMLElement>("#ollama-library-status");
+const localModelEndpointEl = document.createElement("input");
+const localModelEl = document.createElement("input");
+const ollamaModelsRefreshButton = document.createElement("button");
+const ollamaModelPullButton = document.createElement("button");
+const ollamaModelSelect = document.createElement("select");
+const ollamaLibraryStatus = document.createElement("div");
 const endpointNote = req<HTMLElement>("#endpoint-note");
 const themesEl = req<HTMLElement>("#themes");
 
@@ -304,283 +308,8 @@ async function refreshNativeModels(): Promise<void> {
   }
 }
 
-const HUB_API = "https://huggingface.co/api";
-
-function safeHubText(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value.slice(0, 240) : fallback;
-}
-
-function modelCardNode(model: HubModel): HTMLElement {
-  const card = document.createElement("article");
-  card.className = "hub-model-card";
-  const top = document.createElement("div");
-  top.className = "hub-model-top";
-  const title = document.createElement("strong");
-  title.textContent = safeHubText(model.id, "Unknown model");
-  const badge = document.createElement("span");
-  badge.className = "hub-model-tag";
-  const licenseTag = (model.tags ?? []).find((tag) => tag.toLowerCase().startsWith("license:"));
-  const license = licenseTag?.slice("license:".length).replace(/[-_]/g, " ");
-  badge.textContent = license ? license.slice(0, 24) : "Check license";
-  top.append(title, badge);
-  const meta = document.createElement("p");
-  meta.className = "hub-model-meta";
-  meta.textContent = `${(model.downloads ?? 0).toLocaleString()} downloads · ${(model.likes ?? 0).toLocaleString()} likes`;
-  const actions = document.createElement("div");
-  actions.className = "hub-model-actions";
-  const files = document.createElement("button");
-  files.type = "button";
-  files.className = "ghost";
-  files.textContent = "Choose GGUF file";
-  files.addEventListener("click", () => void showHubFiles(model, card));
-  actions.append(files);
-  card.append(top, meta, actions);
-  return card;
-}
-
-async function searchHubModels(query: string): Promise<void> {
-  const clean = query.trim().slice(0, 120);
-  const sequence = ++hubSearchSequence;
-  modelLibraryStatus.textContent = "Searching Hugging Face model catalog…";
-  modelLibraryResults.setAttribute("aria-busy", "true");
-  modelLibraryResults.replaceChildren();
-  const params = new URLSearchParams({
-    filter: "gguf",
-    sort: "downloads",
-    direction: "-1",
-    limit: "100",
-  });
-  if (clean) params.set("search", clean);
-  try {
-    const response = await fetch(`${HUB_API}/models?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) throw new Error("Hugging Face returned HTTP " + response.status);
-    const payload = await response.json() as HubModel[];
-    if (sequence !== hubSearchSequence) return;
-    if (!Array.isArray(payload)) throw new Error("Unexpected model catalog response");
-    const models = payload.filter((model) => typeof model.id === "string" && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(model.id));
-    if (!models.length) {
-      modelLibraryStatus.textContent = "No GGUF repositories found. Try a model family such as Qwen, Llama, Gemma, or Phi.";
-      return;
-    }
-    modelLibraryStatus.textContent = `Showing up to ${models.length} GGUF repositories from the live catalog. Search to discover more models across Hugging Face.`;
-    modelLibraryResults.replaceChildren(...models.map(modelCardNode));
-  } catch (error) {
-    if (sequence !== hubSearchSequence) return;
-    modelLibraryStatus.textContent = "Model catalog unavailable: " + (error instanceof Error ? error.message : "network error");
-  } finally {
-    if (sequence === hubSearchSequence) modelLibraryResults.setAttribute("aria-busy", "false");
-  }
-}
-
-async function showHubFiles(model: HubModel, card: HTMLElement): Promise<void> {
-  const old = card.querySelector(".hub-file-list");
-  if (old) { old.remove(); return; }
-  const status = document.createElement("p");
-  status.className = "hub-model-meta";
-  status.textContent = "Loading repository files…";
-  card.append(status);
-  try {
-    const response = await fetch(`${HUB_API}/models/${encodeURIComponent(model.id)}?blobs=true`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) throw new Error("Could not read model repository (" + response.status + ")");
-    const details = await response.json() as { siblings?: HubFile[]; sha?: string };
-    const files = (details.siblings ?? []).filter((file) => file.rfilename.toLowerCase().endsWith(".gguf"));
-    status.remove();
-    const list = document.createElement("div");
-    list.className = "hub-file-list";
-    if (!files.length) {
-      list.textContent = "This repository has no GGUF files. Ultran's on-device runtime needs GGUF quantized weights.";
-    } else {
-      const eligible = files.filter((file) => {
-        const size = file.lfs?.size ?? file.size ?? 0;
-        return size > 0 && size <= 256 * 1024 * 1024 * 1024;
-      }).sort((a, b) => (a.lfs?.size ?? a.size ?? Number.MAX_SAFE_INTEGER) - (b.lfs?.size ?? b.size ?? Number.MAX_SAFE_INTEGER));
-      const maxBytes = modelSizeFilterEl.value === "1gb"
-        ? 1024 * 1024 * 1024
-        : modelSizeFilterEl.value === "2gb"
-          ? 2 * 1024 * 1024 * 1024
-          : 256 * 1024 * 1024 * 1024;
-      const filtered = eligible.filter((file) => (file.lfs?.size ?? file.size ?? 0) <= maxBytes);
-      for (const file of filtered.slice(0, 30)) {
-        const size = file.lfs?.size ?? file.size ?? 0;
-        const basename = file.rfilename.split("/").pop() ?? file.rfilename;
-        const shardMatch = basename.match(/^(.*)-(\d{5})-of-(\d{5})\.gguf$/i);
-        if (shardMatch && Number(shardMatch[2]) > 1) continue;
-        const shardCount = shardMatch ? Number(shardMatch[3]) : 1;
-        const fileDirectory = file.rfilename.includes("/") ? file.rfilename.slice(0, file.rfilename.lastIndexOf("/")) : "";
-        const shardFiles = shardMatch && shardCount > 1
-          ? files.filter((candidate) => {
-              const candidateDirectory = candidate.rfilename.includes("/") ? candidate.rfilename.slice(0, candidate.rfilename.lastIndexOf("/")) : "";
-              const candidateName = candidate.rfilename.split("/").pop() ?? candidate.rfilename;
-              const match = candidateName.match(/^(.*)-(\d{5})-of-(\d{5})\.gguf$/i);
-              return candidateDirectory === fileDirectory && !!match && match[1] === shardMatch[1] && Number(match[3]) === shardCount;
-            })
-          : [];
-        const row = document.createElement("div");
-        row.className = "hub-file-row";
-        const info = document.createElement("div");
-        info.className = "hub-file-info";
-        const filename = document.createElement("strong");
-        filename.textContent = file.rfilename;
-        const detailsText = document.createElement("small");
-        if (shardMatch && shardCount > 1) {
-          const setBytes = shardFiles.reduce((sum, part) => sum + (part.lfs?.size ?? part.size ?? 0), 0);
-          detailsText.textContent = formatBytes(setBytes) + " · split model · " + shardFiles.length + "/" + shardCount + " parts";
-        } else {
-          detailsText.textContent = formatBytes(size) + (size <= 2 * 1024 * 1024 * 1024 ? " · phone-friendly candidate" : " · large for many phones");
-        }
-        info.append(filename, detailsText);
-        const download = document.createElement("button");
-        download.type = "button";
-        download.className = "solid";
-        if (shardMatch && shardCount > 1) {
-          download.textContent = shardFiles.length === shardCount ? "Download all parts" : "Incomplete set";
-          download.disabled = shardFiles.length !== shardCount;
-          download.addEventListener("click", () => {
-            void downloadHubModelSet(model, shardFiles, details.sha, shardMatch[1], shardCount);
-          });
-        } else {
-          download.textContent = "Download";
-          download.addEventListener("click", () => void downloadHubModel(model, file, size, details.sha));
-        }
-        row.append(info, download);
-        list.append(row);
-      }
-      if (!eligible.length) list.textContent = "No files with a known size under Ultran's 256 GB safety limit were found.";
-      else if (!filtered.length) list.textContent = "No files match this size filter. Choose All sizes to see larger quantizations.";
-      if (filtered.length > 30) {
-        const note = document.createElement("small");
-        note.className = "model-library-note";
-        note.textContent = `Showing the 30 smallest matching files out of ${filtered.length}. Choose a size filter to narrow the list.`;
-        list.append(note);
-      }
-    }
-    card.append(list);
-  } catch (error) {
-    status.textContent = "Could not load repository files: " + (error instanceof Error ? error.message : "network error");
-  }
-}
-
-async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: number, revision?: string): Promise<void> {
-  if (Capacitor.getPlatform() !== "android") {
-    modelLibraryStatus.textContent = "Direct model downloads require the Android APK. In a web preview, use Import GGUF after downloading a file separately.";
-    return;
-  }
-  const name = file.rfilename.split("/").pop() ?? "";
-  if (!/^[A-Za-z0-9._ -]{1,155}\.gguf$/i.test(name)) {
-    modelLibraryStatus.textContent = "This file has an unsupported filename and cannot be installed.";
-    return;
-  }
-  const rawSha = file.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
-  const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
-  if (sizeBytes > 256 * 1024 * 1024 * 1024) {
-    modelLibraryStatus.textContent = "This file exceeds Ultran's 256 GB safety limit.";
-    return;
-  }
-  let existingModel = false;
-  try {
-    const installed = await NativeLocalAI.listModels();
-    existingModel = installed.models.some((model) => model.name.toLowerCase() === name.toLowerCase());
-  } catch {
-    // The native downloader still validates the file; do not block discovery if listing fails.
-  }
-  const replacementWarning = existingModel ? "\n\nA model with this filename already exists. It will be replaced only after the new download passes validation." : "";
-  const message = `Download ${name} (about ${formatBytes(sizeBytes)}) from Hugging Face into Ultran's private storage? Check the model license before use.${replacementWarning}`;
-  if (!window.confirm(message)) return;
-  modelDownloadInProgress = true;
-  modelDownloadProgressEl.hidden = false;
-  modelDownloadProgressEl.max = 100;
-  modelDownloadProgressEl.value = 0;
-  modelLibraryStatus.textContent = "Preparing secure download…";
-  const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
-  const previousDisabledStates = buttons.map((button) => button.disabled);
-  buttons.forEach((button) => { button.disabled = true; });
-  try {
-    const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
-    const encodedPath = file.rfilename.split("/").map(encodeURIComponent).join("/");
-    const url = `https://huggingface.co/${model.id}/resolve/${revisionPath}/${encodedPath}?download=true`;
-    const result = await NativeLocalAI.downloadModel({ name, url, expectedBytes: sizeBytes, ...(sha ? { sha256: sha } : {}) });
-    await refreshNativeModels();
-    nativeModelSelect.value = result.name;
-    nativeModelStatus.textContent = "Downloaded and verified " + result.name + " · " + formatBytes(result.sizeBytes) + ". Load it to use offline.";
-    modelLibraryStatus.textContent = "Download complete. The model is stored privately on this device and is ready to load.";
-  } catch (error) {
-    modelLibraryStatus.textContent = "Download failed: " + (error instanceof Error ? error.message : "unknown error");
-  } finally {
-    modelDownloadInProgress = false;
-    modelDownloadProgressEl.hidden = true;
-    modelDownloadProgressEl.value = 0;
-    modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index] ?? false; });
-  }
-}
-
-async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revision?: string, prefix?: string, shardCount?: number): Promise<void> {
-  if (Capacitor.getPlatform() !== "android") {
-    modelLibraryStatus.textContent = "Split model downloads require the Android APK.";
-    return;
-  }
-  const parts = [...shardFiles].sort((a, b) => {
-    const aName = a.rfilename.split("/").pop() ?? "";
-    const bName = b.rfilename.split("/").pop() ?? "";
-    const aIndex = Number(aName.match(/-(\d{5})-of-\d{5}\.gguf$/i)?.[1] ?? 0);
-    const bIndex = Number(bName.match(/-(\d{5})-of-\d{5}\.gguf$/i)?.[1] ?? 0);
-    return aIndex - bIndex;
-  });
-  if (!shardCount || parts.length !== shardCount || !prefix) {
-    modelLibraryStatus.textContent = "This split model is incomplete in the repository listing. Ultran will not install a partial set.";
-    return;
-  }
-  const totalBytes = parts.reduce((sum, part) => sum + (part.lfs?.size ?? part.size ?? 0), 0);
-  if (totalBytes <= 0 || totalBytes > 256 * 1024 * 1024 * 1024) {
-    modelLibraryStatus.textContent = "The complete shard set has an unknown or unsupported total size.";
-    return;
-  }
-  if (!window.confirm("Download all " + shardCount + " verified GGUF parts for " + model.id + " (" + formatBytes(totalBytes) + ") into Ultran's private storage? Check the model license before use.")) return;
-  modelDownloadInProgress = true;
-  modelDownloadProgressEl.hidden = false;
-  modelDownloadProgressEl.max = 100;
-  modelDownloadProgressEl.value = 0;
-  modelLibraryStatus.textContent = "Preparing " + shardCount + "-part model download…";
-  const buttons = [...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];
-  const previousDisabledStates = buttons.map((button) => button.disabled);
-  buttons.forEach((button) => { button.disabled = true; });
-  try {
-    const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
-    for (let index = 0; index < parts.length; index++) {
-      const part = parts[index];
-      if (!part) throw new Error("A shard disappeared from the verified set.");
-      const name = part.rfilename.split("/").pop() ?? "";
-      if (!/^[A-Za-z0-9._ -]{1,155}\.gguf$/i.test(name)) throw new Error("Unsupported shard filename: " + name);
-      const rawSha = part.lfs?.oid?.replace(/^sha256:/i, "") ?? "";
-      const sha = /^[a-f0-9]{64}$/i.test(rawSha) ? rawSha : "";
-      const encodedPath = part.rfilename.split("/").map(encodeURIComponent).join("/");
-      const url = "https://huggingface.co/" + model.id + "/resolve/" + revisionPath + "/" + encodedPath + "?download=true";
-      modelLibraryStatus.textContent = "Downloading shard " + (index + 1) + " of " + parts.length + " · " + name;
-      await NativeLocalAI.downloadModel({ name, url, expectedBytes: part.lfs?.size ?? part.size, ...(sha ? { sha256: sha } : {}) });
-    }
-    await refreshNativeModels();
-    const firstPart = parts[0];
-    if (!firstPart) throw new Error("The completed shard set has no first part.");
-    const firstName = firstPart.rfilename.split("/").pop() ?? "";
-    nativeModelSelect.value = firstName;
-    nativeModelStatus.textContent = "Imported complete split model · " + shardCount + " verified shards · " + formatBytes(totalBytes) + ". Load it when ready.";
-    modelLibraryStatus.textContent = "All " + shardCount + " GGUF shards downloaded and individually verified. Ultran now lists them as one model.";
-  } catch (error) {
-    modelLibraryStatus.textContent = "Split model download stopped: " + (error instanceof Error ? error.message : "unknown error") + ". Previously verified shards remain private; retrying the complete set safely replaces each shard only after verification.";
-  } finally {
-    modelDownloadInProgress = false;
-    modelDownloadProgressEl.hidden = true;
-    modelDownloadProgressEl.value = 0;
-    modelDownloadProgressEl.setAttribute("value", "0");
-    buttons.forEach((button, index) => { button.disabled = previousDisabledStates[index] ?? false; });
-  }
-}
+function renderCuratedModels():void{modelLibraryResults.replaceChildren(...CURATED_MODELS.map(model=>{const card=document.createElement("article");card.className="hub-model-card curated-model-card";const heading=document.createElement("div");heading.className="hub-model-top";const title=document.createElement("strong");title.textContent=model.name;const badge=document.createElement("span");badge.className="hub-model-tag";badge.textContent=model.bestFor;heading.append(title,badge);const desc=document.createElement("p");desc.className="hub-model-meta";desc.textContent=model.description;const meta=document.createElement("small");meta.className="model-library-note";meta.textContent=`${model.sizeLabel} · Q4_K_M · ${model.license} · ${model.minRamGb} GB RAM class`;const actions=document.createElement("div");actions.className="hub-model-actions";const download=document.createElement("button");download.className="solid";download.type="button";download.textContent="Download direct GGUF";download.addEventListener("click",()=>void downloadCuratedModel(model));const source=document.createElement("a");source.href=`https://huggingface.co/${model.id}`;source.target="_blank";source.rel="noopener noreferrer";source.textContent="Model card & licence ↗";source.className="model-source-link";actions.append(download,source);card.append(heading,desc,meta,actions);return card;}));modelLibraryStatus.textContent="Hand-picked Hugging Face GGUF models. Every card has a fixed repository and exact file path. No discovery search or guessed filenames.";}
+async function downloadCuratedModel(model:typeof CURATED_MODELS[number]):Promise<void>{if(Capacitor.getPlatform()!=="android"){modelLibraryStatus.textContent="Direct installation is available in the Android APK.";return;}if(!window.confirm(`Download ${model.name} (${model.sizeLabel}) into Ultran? Licence: ${model.license}. Ensure enough free storage.`))return;modelDownloadInProgress=true;modelDownloadProgressEl.hidden=false;modelDownloadProgressEl.max=100;modelDownloadProgressEl.value=0;modelLibraryStatus.textContent=`Downloading ${model.name} from its fixed Hugging Face path…`;const buttons=[...modelLibraryResults.querySelectorAll<HTMLButtonElement>("button")];buttons.forEach(b=>b.disabled=true);try{const result=await NativeLocalAI.downloadModel({name:model.file,url:model.url,});await refreshNativeModels();nativeModelSelect.value=result.name;nativeModelStatus.textContent=`Downloaded and verified ${result.name} · ${formatBytes(result.sizeBytes)}. Load it to use offline.`;modelLibraryStatus.textContent=`${model.name} downloaded and validated.`;}catch(e){modelLibraryStatus.textContent="Download failed: "+(e instanceof Error?e.message:"unknown error");}finally{modelDownloadInProgress=false;modelDownloadProgressEl.hidden=true;modelDownloadProgressEl.value=0;buttons.forEach(b=>b.disabled=false);}}
 
 async function importNativeModel(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") return;
@@ -2067,6 +1796,8 @@ async function submit(raw: string): Promise<void> {
   convo.messages.push(message);
   convo.updatedAt = Date.now();
   saveStore();
+  mindMap=buildMindMap(store.conversations);writeJson(MINDMAP_KEY,mindMap);
+  void organiseSemanticMemory(convo);
 
   reply.body.replaceChildren();
   typewriter(reply.body, result.content, () => {
@@ -2556,7 +2287,7 @@ function openSheet(): void {
   setNote("Optional backend for hosted agents and remote connectors. Native GGUF inference runs directly on this Android device.");
   sheetWrap.hidden = false;
   void refreshNativeModels();
-  if (!modelLibraryResults.childElementCount) void searchHubModels("");
+  if (!modelLibraryResults.childElementCount) renderCuratedModels();
 }
 
 function closeSheet(): void {
@@ -2574,6 +2305,26 @@ function closeSheet(): void {
   sheetWrap.hidden = true;
 }
 
+const MINDMAP_KEY="ultran.mindmap.v1";let mindMap:MindMap=readJson<MindMap>(MINDMAP_KEY,{updatedAt:0,nodes:[]});
+const SEMANTIC_GRAPH_KEY="ultran.semantic-graph.v1";
+let semanticGraph:SemanticGraph=readJson<SemanticGraph>(SEMANTIC_GRAPH_KEY,EMPTY_GRAPH);
+function sharedGraphPrompt(conversationId:string):string{return "\\n\\n"+graphPrompt(semanticGraph,nativeLoadedModelName||"active brain",conversationId);}
+async function organiseSemanticMemory(convo:Conversation):Promise<void>{
+ if(!nativeModelLoaded||Capacitor.getPlatform()!=="android"||!convo.messages.length)return;
+ try{
+  const evidence=convo.messages.slice(-8).map(m=>({role:m.role,content:m.content.slice(0,1400)}));
+  const response=await NativeLocalAI.generate({messages:[
+   {role:"system",content:"You curate Ultran's private semantic memory. Extract durable project facts, decisions, preferences and useful concepts. Return strict JSON only. Never store passwords, tokens, credentials or highly sensitive personal data. If nothing durable exists return {\"nodes\":[],\"edges\":[]}."},
+   {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph proposal."}
+  ],maxTokens:420});
+  const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
+  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);}
+ }catch{/* memory enrichment never blocks chat */}
+}
+function rebuildMindMap():void{mindMap=buildMindMap(store.conversations);writeJson(MINDMAP_KEY,mindMap);renderMindMap(req<SVGSVGElement>("#mindmap-canvas"),mindMap,showMindNode);req<HTMLElement>("#mindmap-empty").hidden=store.conversations.length>0;req<HTMLElement>("#mindmap-stats").textContent=`${store.conversations.length} sessions · ${store.conversations.reduce((n,c)=>n+c.messages.length,0)} messages · ${mindMap.nodes.length-1} knowledge nodes`;req<HTMLElement>("#mindmap-organizer").textContent=`Local index · ${nativeLoadedModelName||"automatic organiser"} · ${new Date(mindMap.updatedAt).toLocaleTimeString()}`;}
+function showMindNode(node:MindNode):void{const detail=req<HTMLElement>("#mindmap-detail");detail.replaceChildren();const title=document.createElement("strong");title.textContent=node.label;const meta=document.createElement("small");meta.textContent=`${node.kind} · ${node.conversationIds.length} linked sessions · ${node.count} references`;const body=document.createElement("p");body.textContent=node.examples.slice(0,3).join(" · ");const open=document.createElement("button");open.className="ghost";open.type="button";open.textContent="Open linked conversation";open.disabled=!node.conversationIds.length;open.addEventListener("click",()=>{const c=store.conversations.find(x=>x.id===node.conversationIds[0]);if(c){store.activeId=c.id;saveStore();renderConversation();showFeatureScreen("chat-screen",navChatButton);}});detail.append(title,meta,body,open);}
+function exportObsidianVault():void{const map=mindMap.nodes.length?mindMap:buildMindMap(store.conversations);const blob=new Blob([exportObsidianMarkdown(store.conversations,map)],{type:"text/markdown;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Ultran-Knowledge-Vault.md";a.click();URL.revokeObjectURL(url);}
+
 /* ------------------------------------------------------------------ *
  * Wiring
  * ------------------------------------------------------------------ */
@@ -2583,7 +2334,7 @@ req<HTMLButtonElement>("#chat-model-settings").addEventListener("click", () => {
 req<HTMLButtonElement>("#chat-model-download").addEventListener("click", () => {
   closeChatModelMenu();
   openSheet();
-  window.setTimeout(() => modelSearchInput.focus(), 180);
+  window.setTimeout(() => modelLibraryResults.scrollIntoView({behavior:"smooth",block:"start"}), 180);
 });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeChatModelMenu(); });
 document.addEventListener("click", (event) => {
@@ -2672,6 +2423,10 @@ function hideFeatureScreens(): void {
   app.dataset.page = "chat";
 }
 
+function closeGlobalSearch():void{globalSearch.hidden=true;globalSearchOpen.setAttribute("aria-expanded","false");}
+function openGlobalSearch():void{globalSearch.hidden=false;globalSearchOpen.setAttribute("aria-expanded","true");globalSearchInput.value="";renderGlobalSearch("");requestAnimationFrame(()=>globalSearchInput.focus());}
+function renderGlobalSearch(query:string):void{const needle=query.trim().toLowerCase();globalSearchResults.replaceChildren();if(!needle){const hint=document.createElement("div");hint.className="search-empty";hint.textContent="Search across your conversations, semantic memory and available tools.";globalSearchResults.append(hint);return;}const rows:Array<{kind:string;title:string;detail:string;run:()=>void}>=[];for(const convo of store.conversations){if(convo.title.toLowerCase().includes(needle))rows.push({kind:"CHAT",title:convo.title,detail:convo.messages.length+" messages",run:()=>{store.activeId=convo.id;saveStore();renderConversation();closeGlobalSearch();navChatButton.click();}});for(const message of convo.messages){if(message.content.toLowerCase().includes(needle)){rows.push({kind:"MESSAGE",title:convo.title,detail:message.content.slice(0,160),run:()=>{store.activeId=convo.id;saveStore();renderConversation();closeGlobalSearch();navChatButton.click();}});if(rows.length>=35)break;}}}for(const node of semanticGraph.nodes){if((node.label+" "+node.summary).toLowerCase().includes(needle))rows.push({kind:"KNOWLEDGE",title:node.label,detail:node.summary,run:()=>{closeGlobalSearch();showFeatureScreen("vault-screen",navMoreButton);rebuildMindMap();}});}for(const model of CURATED_MODELS){if((model.name+" "+model.description).toLowerCase().includes(needle))rows.push({kind:"MODEL",title:model.name,detail:model.description,run:()=>{closeGlobalSearch();showFeatureScreen("more-screen",navMoreButton);}});}const catalogue=(window as unknown as {__ULTRAN_CONNECTOR_CATALOG__?:Array<{name:string;description:string;actions?:string[]}>}).__ULTRAN_CONNECTOR_CATALOG__??[];for(const tool of catalogue){if((tool.name+" "+tool.description+" "+(tool.actions??[]).join(" ")).toLowerCase().includes(needle))rows.push({kind:"TOOL",title:tool.name,detail:tool.description,run:()=>{closeGlobalSearch();navConnectorsButton.click();}});}for(const row of rows.slice(0,40)){const b=document.createElement("button");b.type="button";b.className="global-search-result";const tag=document.createElement("small");tag.textContent=row.kind;const title=document.createElement("strong");title.textContent=row.title;const detail=document.createElement("span");detail.textContent=row.detail;b.append(tag,title,detail);b.addEventListener("click",row.run);globalSearchResults.append(b);}if(!rows.length){const empty=document.createElement("div");empty.className="search-empty";empty.textContent="No matches. Try a different phrase.";globalSearchResults.append(empty);}}
+
 function showFeatureScreen(id: string, active: HTMLButtonElement): void {
   closeWorkspace();
   if (!sheetWrap.hidden) closeSheet();
@@ -2719,6 +2474,7 @@ connectorsButton.addEventListener("click", () => setActiveNavigation(navMoreButt
 connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => setActiveNavigation(navChatButton));
 setActiveNavigation(navChatButton);
+globalSearchOpen.addEventListener("click",openGlobalSearch);req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!globalSearch.hidden)closeGlobalSearch();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
@@ -2729,8 +2485,10 @@ req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeShe
 req<HTMLButtonElement>("#agents-workspace-open").addEventListener("click", () => openWorkspace());
 req<HTMLButtonElement>("#more-connectors-btn").addEventListener("click", () => navConnectorsButton.click());
 req<HTMLButtonElement>("#more-settings-btn").addEventListener("click", () => navSettingsButton.click());
-req<HTMLButtonElement>("#more-vault-btn").addEventListener("click", () => showFeatureScreen("vault-screen", navMoreButton));
+req<HTMLButtonElement>("#more-vault-btn").addEventListener("click", () => { showFeatureScreen("vault-screen", navMoreButton); rebuildMindMap(); });
 req<HTMLButtonElement>("#vault-back").addEventListener("click", () => showFeatureScreen("more-screen", navMoreButton));
+req<HTMLButtonElement>("#mindmap-refresh").addEventListener("click", rebuildMindMap);
+req<HTMLButtonElement>("#mindmap-export").addEventListener("click", exportObsidianVault);
 req<HTMLButtonElement>("#world-lou-open").addEventListener("click", () => { navChatButton.click(); void submit("Help me design Lou World as a god-like sandbox universe with civilizations, worlds, magic, technology, and evolving lore."); });
 for (const tile of document.querySelectorAll<HTMLButtonElement>("[data-world-prompt]")) tile.addEventListener("click", () => { const prompt = tile.dataset.worldPrompt ?? "Help me imagine a new world."; navChatButton.click(); void submit(prompt); });
 for (const filter of document.querySelectorAll<HTMLButtonElement>("[data-agent-filter]")) filter.addEventListener("click", () => { document.querySelectorAll("[data-agent-filter]").forEach((button) => button.classList.toggle("is-selected", button === filter)); document.querySelectorAll<HTMLElement>("[data-agent-kind]").forEach((card) => { card.hidden = filter.dataset.agentFilter !== "all" && !(filter.dataset.agentFilter === "local" ? card.dataset.agentKind === "local" : card.dataset.agentKind === "active"); }); });
@@ -2765,28 +2523,8 @@ req<HTMLButtonElement>("#workspace-team-submit").addEventListener("click", () =>
 req<HTMLButtonElement>("#workspace-synthesize").addEventListener("click", () => void synthesizeSelectedRuns().catch(e => workspaceNotice(e instanceof Error ? e.message : "Synthesis failed")));
 req<HTMLButtonElement>("#save-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLink());
-req<HTMLButtonElement>("#test-local-model-btn").addEventListener("click", () => void testLocalModel());
-ollamaModelsRefreshButton.addEventListener("click", () => void refreshOllamaModels());
-ollamaModelPullButton.addEventListener("click", () => void pullOllamaModel());
-ollamaModelSelect.addEventListener("change", () => {
-  if (ollamaModelSelect.value) localModelEl.value = ollamaModelSelect.value;
-});
 req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () => void importNativeModel());
-modelSearchForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  void searchHubModels(modelSearchInput.value);
-});
-document.querySelectorAll<HTMLButtonElement>("[data-model-query]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const query = button.dataset.modelQuery ?? "";
-    modelSearchInput.value = query;
-    void searchHubModels(query);
-  });
-});
-modelSizeFilterEl.addEventListener("change", () => {
-  modelLibraryResults.querySelectorAll(".hub-file-list").forEach((list) => list.remove());
-  modelLibraryStatus.textContent = "Size filter updated. Choose a model's GGUF files to see matching downloads.";
-});
+renderCuratedModels();
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
 nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());

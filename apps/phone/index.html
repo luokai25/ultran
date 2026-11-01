@@ -189,6 +189,10 @@
           <div class="permission-overview-head"><span>CAPABILITIES GRANTED</span><strong id="permission-count">…</strong></div>
           <p id="permission-description">Checking your backend grants. The local catalogue remains available while we check.</p>
         </section>
+        <div id="composio-health" class="composio-health" data-state="loading" role="status" aria-live="polite">
+          <span>COMPOSIO</span><strong id="composio-health-label">Checking connection</strong>
+          <small id="composio-health-detail">OAuth availability is checked separately from connector permissions.</small>
+        </div>
         <small class="panel-status">Active OAuth connections are available to Ultran Prime. Write, delete, execute and admin actions wait for your approval.</small>
         <section id="composio-approvals" class="approval-panel" hidden aria-label="Pending tool approvals">
           <h3>Agent action approvals</h3>

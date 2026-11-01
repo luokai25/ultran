@@ -659,10 +659,19 @@ function showArtifactPreview(url: string, title: string): void {
 function workspaceNode(tag: string, className: string, text = ""): HTMLElement {
   const node = document.createElement(tag); node.className = className; node.textContent = text; return node;
 }
-function workspaceNotice(message: string): void { workspaceTasks.prepend(workspaceNode("p", "workspace-empty", message)); }
+function workspaceNotice(message: string): void {
+  const notice = workspaceNode("p", "workspace-empty", message);
+  notice.dataset.state = "error";
+  workspaceTasks.prepend(notice);
+  if (workspaceArtifacts.querySelector(".skeleton-state")) {
+    const fileError = workspaceNode("p", "workspace-empty", message);
+    fileError.dataset.state = "error";
+    workspaceArtifacts.replaceChildren(fileError);
+  }
+}
 
 async function refreshWorkspace(): Promise<void> {
-  if (!baseUrl()) { workspaceTasks.replaceChildren(workspaceNode("p", "workspace-empty", "Connect a backend in Settings to view runs.")); return; }
+  if (!baseUrl()) { workspaceTasks.replaceChildren(workspaceNode("p", "workspace-empty", "Connect a backend in Settings to view background runs.")); workspaceArtifacts.replaceChildren(workspaceNode("p", "workspace-empty", "No workspace files yet. Create a file in chat and it will appear in your Workspace Tray.")); return; }
   const [tr, ar] = await Promise.all([api("/v1/tasks?limit=100"), api("/v1/artifacts?limit=100")]);
   if (!tr.ok || !ar.ok) throw new Error(`Workspace unavailable (${tr.status}/${ar.status})`);
   const tasks = await tr.json() as WorkspaceTask[];
@@ -689,7 +698,7 @@ async function refreshWorkspace(): Promise<void> {
   }
   updateSynthesisControls();
   workspaceArtifacts.replaceChildren();
-  if (!artifacts.length) workspaceArtifacts.append(workspaceNode("p", "workspace-empty", "Generated files will appear here."));
+  if (!artifacts.length) workspaceArtifacts.append(workspaceNode("p", "workspace-empty", "No files yet. Ask Ultran to create a PDF, ZIP or document. Your next file will appear here."));
   for (const file of artifacts) {
     const card = workspaceNode("article", "workspace-file"); card.append(workspaceNode("span", "workspace-file-icon", file.format.toUpperCase()));
     const copy = workspaceNode("div", "workspace-file-copy"); copy.append(workspaceNode("strong", "", file.title), workspaceNode("small", "", `${(file.size/1024).toFixed(1)} KB`)); card.append(copy);

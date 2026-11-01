@@ -214,3 +214,5 @@ strong,b,h1,h2,h3,h4,button,.wordmark { font-weight:600; }
 .workspace-empty.skeleton-state::before,.workspace-empty.skeleton-state::after { content:""; display:block; height:10px; border-radius:var(--pill); background:linear-gradient(90deg,var(--surface-2),#292930,var(--surface-2)); background-size:200% 100%; animation:permission-shimmer 1.25s ease-in-out infinite; }
 .workspace-empty.skeleton-state::before { width:54%; }
 .workspace-empty.skeleton-state::after { width:82%; opacity:.7; }
+
+.workspace-empty[data-state="error"] { border-color:rgba(255,89,104,.35); background:rgba(255,89,104,.055); color:var(--danger); }

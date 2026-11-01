@@ -227,6 +227,13 @@ function formatBytes(bytes: number): string {
   return value.toFixed(unit > 1 ? 1 : 0) + " " + units[unit];
 }
 
+function nativeFailureMessage(action: string, error: unknown): string {
+  const detail = error instanceof Error ? error.message : "unknown error";
+  if (/permission|denied|EACCES/i.test(detail)) return "Permission denied. Review the requested Android permission in system settings, then retry.";
+  if (/no space|storage|ENOSPC|quota|insufficient space/i.test(detail)) return "Not enough device storage. Free up space and retry; Ultran has not replaced your existing model.";
+  return action + ": " + detail;
+}
+
 function renderDeviceProfile(profile: { deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }): void {
   const ramGb = profile.totalRamBytes / (1024 ** 3);
   const recommendation = ramGb <= 4
@@ -323,7 +330,8 @@ async function importNativeModel(): Promise<void> {
     nativeModelLoadButton.disabled = !nativeModelSelect.value;
     nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;
   } catch (error) {
-    nativeModelStatus.textContent = "Model import failed: " + (error instanceof Error ? error.message : "unknown error");
+    nativeModelStatus.dataset.tone = "bad";
+    nativeModelStatus.textContent = nativeFailureMessage("Model import failed", error);
   }
 }
 
@@ -342,7 +350,8 @@ async function loadNativeModel(): Promise<void> {
     await refreshNativeModels();
   } catch (error) {
     nativeModelLoaded = false;
-    nativeModelStatus.textContent = "Could not load model: " + (error instanceof Error ? error.message : "unknown error");
+    nativeModelStatus.dataset.tone = "bad";
+    nativeModelStatus.textContent = nativeFailureMessage("Could not load model", error);
     await refreshNativeModels();
   }
 }

@@ -814,6 +814,8 @@ function requestedArtifactFormat(task: string): string | null {
   if (low.includes("excel") || low.includes("xlsx") || low.includes("spreadsheet")) return "xlsx";
   if (low.includes("markdown file") || low.includes(".md")) return "md";
   if (low.includes("text file") || low.includes(".txt")) return "txt";
+  // A generic explicit file request should still end with a downloadable artifact.
+  if (low.includes("file") || low.includes("attachment") || low.includes("downloadable")) return "md";
   return null;
 }
 
@@ -1132,8 +1134,15 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   }
   const type = String(event.type ?? "event");
   if (type === "completed" || type === "final") return;
+  const tool = String(event.tool ?? event.source ?? "");
+  const action = String(event.action ?? "");
+  const toolKey = `${tool}.${action}`;
   const isThinking = type === "thinking";
+  const isToolFinish = type === "tool_completed" || type === "tool_failed";
   let line = isThinking ? panel.querySelector<HTMLElement>(".live-run-current") : null;
+  if (!line && isToolFinish && toolKey !== ".") {
+    line = [...panel.querySelectorAll<HTMLElement>(".live-run-event[data-tool-key]")].find((candidate) => candidate.dataset.toolKey === toolKey) ?? null;
+  }
   if (!line) {
     line = document.createElement("div");
     line.className = isThinking ? "live-run-event live-run-current" : "live-run-event";
@@ -1147,8 +1156,6 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   const dot = document.createElement("i");
   dot.dataset.state = type === "tool_failed" ? "failed" : type === "tool_completed" && event.approval_required ? "active" : type === "tool_completed" || type === "artifact_created" ? "done" : "active";
   const label = document.createElement("span");
-  const tool = String(event.tool ?? event.source ?? "");
-  const action = String(event.action ?? "");
   const detail = String(event.label ?? event.detail ?? "");
   if (type === "thinking") label.textContent = detail || "Planning the task";
   else if (type === "tool_discovery") label.textContent = detail || `Searching ${tool} tools`;
@@ -1160,6 +1167,7 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
     label.textContent = artifact ? `Prepared ${artifact.title} (${artifact.format.toUpperCase()})` : "Prepared your file";
   } else label.textContent = detail || type.replace(/_/g, " ");
   line.replaceChildren(...(isThinking ? [line.querySelector<HTMLElement>(".live-run-progress") ?? document.createElement("span"), dot, label] : [dot, label]));
+  if (type === "tool_started" && toolKey !== ".") line.dataset.toolKey = toolKey;
   if (!line.isConnected) panel.appendChild(line);
   if (isThinking) {
     const heading = panel.querySelector<HTMLElement>(".live-run-heading");

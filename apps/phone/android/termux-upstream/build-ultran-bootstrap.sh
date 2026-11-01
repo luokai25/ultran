@@ -12,7 +12,7 @@ readonly ULTRAN_ROOTFS_SUBDIR="files/ultran-runtime"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 readonly OUTPUT_DIR="${ULTRAN_BOOTSTRAP_OUTPUT_DIR:-$REPO_ROOT/dist/termux-bootstrap}"
-readonly EXTRA_PACKAGES="${ULTRAN_BOOTSTRAP_PACKAGES:-git,python,proot,proot-distro,wget,openssh}"
+readonly EXTRA_PACKAGES="${ULTRAN_BOOTSTRAP_PACKAGES:-git,python,proot,proot-distro,wget,curl,openssh,nodejs-lts,clang,make,cmake,pkg-config,coreutils,findutils,grep,sed,gawk,procps,tar,zip,unzip,rsync,jq,nano,vim,openssl,ca-certificates,termux-tools}"
 
 for command_name in git python3 docker; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -78,7 +78,9 @@ Built upstream Termux bootstrap archives for:
   Extra packages:  ${EXTRA_PACKAGES:-none}
 Output directory: $OUTPUT_DIR
 
-These archives are build outputs, not yet bundled into the APK. Ultran's native
-installer and package-manager/repository configuration must be completed before
-shipping or executing the bootstrap in the app.
+These archives are build outputs, not bundled into the APK. Ultran installs them
+into its private app prefix and runs commands headlessly without root or a terminal
+UI. APT sources remain disabled until a prefix-compatible Ultran package repository
+is available. The included proot-distro can create a separate Linux userland with
+its own package manager for packages that are not in this bootstrap.
 INFO

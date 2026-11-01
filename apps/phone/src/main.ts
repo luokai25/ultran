@@ -1948,7 +1948,7 @@ async function initializeAvatar(): Promise<void> {
 
       const threads = new THREE.Group();
       const threadMaterial = new THREE.LineBasicMaterial({ color: 0xf21d3b, transparent: true, opacity: 0.42 });
-      const addThread = (points: THREE.Vector3[]): void => {
+      const addThread = (points: InstanceType<typeof THREE.Vector3>[]): void => {
         threads.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), threadMaterial));
       };
       for (const latitude of [-1.05, -0.68, -0.32, 0, 0.32, 0.68, 1.05]) {

@@ -174,8 +174,8 @@ const endpointNote = req<HTMLElement>("#endpoint-note");
 const themesEl = req<HTMLElement>("#themes");
 
 req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
-req<HTMLElement>("#hero-mark").innerHTML = markSvg(116);
 req<HTMLElement>("#drawer-mark").innerHTML = markSvg(20);
+req<HTMLElement>(".agent-avatar-ultran").innerHTML = markSvg(38);
 const favicon = document.createElement("link");
 favicon.rel = "icon";
 favicon.href = markDataUrl();
@@ -2486,6 +2486,7 @@ function exportObsidianVault():void{const map=mindMap.nodes.length?mindMap:build
  * Wiring
  * ------------------------------------------------------------------ */
 chatModelButton.addEventListener("click", () => void openChatModelMenu());
+req<HTMLButtonElement>("#chat-model-import").addEventListener("click", () => { closeChatModelMenu(); void importNativeModel(); });
 req<HTMLButtonElement>("#chat-model-close").addEventListener("click", closeChatModelMenu);
 req<HTMLButtonElement>("#chat-model-settings").addEventListener("click", () => { closeChatModelMenu(); openSheet(); });
 req<HTMLButtonElement>("#chat-model-download").addEventListener("click", () => {

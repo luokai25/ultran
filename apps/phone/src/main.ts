@@ -933,7 +933,8 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   }
   const type = String(event.type ?? "event");
   if (type === "completed" || type === "final") return;
-  if (type === "artifact_created" && event.artifact) pushWorkspaceArtifact(event.artifact as ArtifactCard);
+  if (type === "artifact_created" && event.artifact) { pushWorkspaceArtifact(event.artifact as ArtifactCard); app.dataset.health = "ready"; }
+  if (type === "tool_failed") app.dataset.health = "broken";
   const tool = String(event.tool ?? event.source ?? "");
   const action = String(event.action ?? "");
   const toolKey = `${tool}.${action}`;
@@ -1166,6 +1167,7 @@ type LinkState = "offline" | "online" | "error";
 function setLink(state: LinkState, label?: string): void {
   linkPill.dataset.state = state;
   linkPill.textContent = label ?? (state === "online" ? "linked" : state === "error" ? "unreachable" : "local");
+  app.dataset.health = state === "online" ? "ready" : "broken";
 }
 
 function baseUrl(): string {

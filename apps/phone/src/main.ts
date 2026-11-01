@@ -2550,10 +2550,10 @@ function setActiveNavigation(active: HTMLButtonElement): void {
     button.classList.toggle("is-active", selected);
     if (selected) {
       button.setAttribute("aria-current", "page");
-      button.style.color = "#f0d58a";
-      button.style.backgroundColor = "rgba(205,169,77,.085)";
-      button.style.borderColor = "rgba(205,169,77,.13)";
-      button.style.boxShadow = "inset 0 2px 0 rgba(205,169,77,.8)";
+      button.style.color = "#ff3345";
+      button.style.backgroundColor = "rgba(225,29,46,.12)";
+      button.style.borderColor = "rgba(225,29,46,.22)";
+      button.style.boxShadow = "inset 0 2px 0 rgba(225,29,46,.8)";
     } else {
       button.removeAttribute("aria-current");
       button.style.removeProperty("color");

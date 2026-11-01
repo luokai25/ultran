@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="./src/styles.css" />
     <link rel="stylesheet" href="./src/workspace.css" />
     <link rel="stylesheet" href="./src/experience.css" />
-    <link rel="stylesheet" href="./src/redline.css" />
   </head>
   <body>
     <div id="app">
@@ -39,7 +38,7 @@
         <div class="chat-model-menu-head"><div><span class="section-eyebrow">ACTIVE BRAIN</span><strong id="chat-model-current">No model selected</strong></div><button id="chat-model-close" class="icon-btn" type="button" aria-label="Close model picker">×</button></div>
         <p id="chat-model-status" role="status">Choose a model available on this device or configure a connection.</p>
         <div id="chat-model-options" class="chat-model-options"></div>
-        <div class="chat-model-menu-actions"><button id="chat-model-download" type="button">Find or download models</button><button id="chat-model-settings" type="button">Model settings</button></div>
+        <div class="chat-model-menu-actions"><button id="chat-model-import" type="button">Import model</button><button id="chat-model-download" type="button">Find or download models</button><button id="chat-model-settings" type="button">Model settings</button></div>
       </section>
       <main id="thread" class="thread" aria-live="polite">
         <section id="hero" class="hero" data-state="ready">
@@ -49,7 +48,6 @@
               <div class="avatar-orbit avatar-orbit-a" aria-hidden="true"></div>
               <div class="avatar-orbit avatar-orbit-b" aria-hidden="true"></div>
               <canvas id="avatar" aria-label="Ultran plasma core, animated assistant status"></canvas>
-              <span id="hero-mark" class="hero-brand-mark" aria-hidden="true"></span>
               <div class="halo" aria-hidden="true"></div>
             </div>
             <h1 id="greeting" class="greeting">Ready when you are.</h1>
@@ -100,7 +98,7 @@
         <header class="feature-head"><div><span class="feature-eyebrow">YOUR AI TEAM</span><h1>Agents</h1><p>Your agents, ready to work.</p></div><button id="agents-workspace-open" class="gold-button" type="button">Open workspace <span aria-hidden="true">↗</span></button></header>
         <div class="feature-filters" role="group" aria-label="Agent filter"><button class="filter-chip is-selected" type="button" data-agent-filter="all">All</button><button class="filter-chip" type="button" data-agent-filter="active">Active</button><button class="filter-chip" type="button" data-agent-filter="local">Local-first</button></div>
         <div class="agent-cards">
-          <article class="agent-card" data-agent-kind="local"><div class="agent-avatar agent-avatar-ultran"><span>U</span></div><div class="agent-card-copy"><h2>Ultran Assistant</h2><span class="agent-status"><i></i> Ready</span><p>Your personal AI assistant</p></div><span class="card-chevron">›</span></article>
+          <article class="agent-card" data-agent-kind="local"><div class="agent-avatar agent-avatar-ultran" aria-label="Ultran orb"></div><div class="agent-card-copy"><h2>Ultran Assistant</h2><span class="agent-status"><i></i> Ready</span><p>Your personal AI assistant</p></div><span class="card-chevron">›</span></article>
           <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-code"><span>&lt;/&gt;</span></div><div class="agent-card-copy"><h2>Code Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Help plan, review and debug code</p></div><span class="card-chevron">›</span></article>
           <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-web"><span>◎</span></div><div class="agent-card-copy"><h2>Research Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Research and organize information</p></div><span class="card-chevron">›</span></article>
         </div>

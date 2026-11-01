@@ -198,13 +198,16 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           echo "Using build-tools: $BT"
 
-          if [ "${{ steps.keystore.outputs.signed }}" = "true" ]; then
-            "$BT/apksigner" verify --print-certs "$APK"
-            echo "::notice::APK signature verified"
-          else
-            echo "::warning::APK is unsigned (no keystore secret configured)"
+          if [ "${{ steps.keystore.outputs.signed }}" != "true" ]; then
+            echo "::error::Refusing to publish an unsigned Android release"
+            exit 1
           fi
+          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          echo "::notice::APK signature verified"
 
+          # Android's package installer expects a correctly aligned, intact APK.
+          "$BT/zipalign" -c -v 4 "$APK"
+          unzip -t "$APK" >/dev/null
           "$BT/aapt2" dump badging "$APK" | head -20
 
           # Fail the release if Gradle silently omits the native inference
@@ -224,6 +227,26 @@ jobs:
           mkdir -p "$RUNNER_TEMP/out"
           cp "$APK" "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
           echo "apk=$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk" >> "$GITHUB_OUTPUT"
+
+      # A successful Gradle build and signature check do not prove that
+      # PackageManager can parse/install the APK. Test the exact release file
+      # on an Android 12 emulator before publishing it.
+      - name: Android 12 install and launch smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            APK="${{ runner.temp }}/out/ultran-${{ steps.version.outputs.name }}.apk"
+            test -s "$APK"
+            adb install -r "$APK"
+            adb shell monkey -p app.ultran.mobile 1
+            adb shell dumpsys package app.ultran.mobile | grep -q "versionName=${{ steps.version.outputs.name }}"
+            echo "Android PackageManager installed and launched Ultran successfully"
 
       - name: Package Capacitor project
         run: |

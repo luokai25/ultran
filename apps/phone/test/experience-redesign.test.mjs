@@ -144,19 +144,20 @@ test("the plasma-red identity is unified and mobile content stays within the vie
   assert.match(experience, /#app\{width:100%;max-width:760px;min-width:0/);
 });
 
-\ntest("version 3 keeps one red theme and retains native capability entry points", async () => {
+
+test("version 3 keeps one red theme and retains native capability entry points", async () => {
   const [pkg, main, html, mark] = await Promise.all([
     read("package.json"), read("src/main.ts"), read("index.html"), read("src/mark.ts"),
   ]);
-  assert.match(pkg, /"version": "3\\.0\\.0"/);
-  assert.match(main, /type ThemeId = "ultran"/);
-  assert.match(main, /accent: 0xe52d41/);
-  assert.match(main, /importNativeModel\\(\\)/);
-  assert.match(main, /initConnectors\\(/);
-  assert.match(main, /NativeRuntime/);
-  assert.match(main, /NativeCompanion/);
-  assert.match(html, /id="chat-model-import"/);
-  assert.match(html, /id="ultran-runtime-download"/);
-  assert.match(mark, /ultran-core/);
-  assert.match(mark, /#ff304b/);
+  assert.ok(pkg.includes('"version": "3.0.0"'));
+  assert.ok(main.includes('type ThemeId = "ultran"'));
+  assert.ok(main.includes("accent: 0xe52d41"));
+  assert.ok(main.includes("importNativeModel()"));
+  assert.ok(main.includes("initConnectors("));
+  assert.ok(main.includes("NativeRuntime"));
+  assert.ok(main.includes("NativeCompanion"));
+  assert.ok(html.includes('id="chat-model-import"'));
+  assert.ok(html.includes('id="ultran-runtime-download"'));
+  assert.ok(mark.includes("ultran-core"));
+  assert.ok(mark.includes("#ff304b"));
 });

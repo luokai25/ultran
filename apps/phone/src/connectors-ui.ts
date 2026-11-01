@@ -77,6 +77,9 @@ export function initConnectors(deps: Deps): void {
   const permissionOverview = need<HTMLElement>("#permission-overview");
   const permissionCount = need<HTMLElement>("#permission-count");
   const permissionDescription = need<HTMLElement>("#permission-description");
+  const composioHealth = need<HTMLElement>("#composio-health");
+  const composioHealthLabel = need<HTMLElement>("#composio-health-label");
+  const composioHealthDetail = need<HTMLElement>("#composio-health-detail");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
   const approvalPanel = need<HTMLElement>("#composio-approvals");
@@ -232,24 +235,40 @@ export function initConnectors(deps: Deps): void {
 
   async function refreshOAuthConnections(): Promise<void> {
     oauthConnected = new Set();
-    if (!deps.linked()) return;
+    if (!deps.linked()) {
+      composioHealth.dataset.state = "disconnected";
+      composioHealthLabel.textContent = "Backend not linked";
+      composioHealthDetail.textContent = "Connect a private Ultran backend in Settings to check Composio.";
+      return;
+    }
+    composioHealth.dataset.state = "loading";
+    composioHealthLabel.textContent = "Checking connection";
+    composioHealthDetail.textContent = "Verifying backend configuration and active OAuth accounts.";
     try {
       const status = await deps.api("/v1/connectors/composio/status", {}, 8_000);
-      if (!status.ok) return;
+      if (!status.ok) throw new Error("Composio status endpoint returned " + status.status);
       const configured = (await status.json()) as { configured?: boolean };
       if (configured.configured !== true) {
+        composioHealth.dataset.state = "disconnected";
+        composioHealthLabel.textContent = "Not configured";
+        composioHealthDetail.textContent = "Composio is not configured on this backend. Add its key to the private server environment, never to the APK.";
         statusEl.textContent = "Composio is not configured on the backend. Set ULTRAN_COMPOSIO_API_KEY in the private server .env, then restart the API. Never add this key to the APK.";
         statusEl.dataset.tone = "warn";
         return;
       }
       const response = await deps.api("/v1/connectors/composio/connections", {}, 12_000);
-      if (!response.ok) return;
+      if (!response.ok) throw new Error("Composio connections endpoint returned " + response.status);
       const body = (await response.json()) as { connections?: Array<{ toolkit?: string; status?: string }> };
       for (const account of body.connections ?? []) {
         if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
       }
+      composioHealth.dataset.state = "ready";
+      composioHealthLabel.textContent = "Connected";
+      composioHealthDetail.textContent = oauthConnected.size + (oauthConnected.size === 1 ? " active account" : " active accounts") + " available. Write actions remain approval-gated.";
     } catch {
-      // A disconnected Composio service must not break the offline catalogue.
+      composioHealth.dataset.state = "error";
+      composioHealthLabel.textContent = "Disconnected";
+      composioHealthDetail.textContent = "Composio could not be reached. Existing connections are not shown as active until the service responds.";
     }
   }
 

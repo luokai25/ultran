@@ -871,9 +871,23 @@ function pushWorkspaceArtifact(artifact: ArtifactCard): void {
   share.className = "workspace-tray-share";
   share.textContent = "Share";
   share.setAttribute("aria-label", "Share " + artifact.title);
-  share.addEventListener("click", () => {
+  share.addEventListener("click", async () => {
     const filename = artifact.title + "." + artifact.format.toLowerCase();
-    downloadArtifact(artifact.download_url || artifact.preview_url, filename);
+    const url = artifactPreviewUrl(artifact.download_url || artifact.preview_url);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("File download failed");
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ files: [file], title: artifact.title });
+      } else {
+        downloadArtifact(artifact.download_url || artifact.preview_url, filename);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      downloadArtifact(artifact.download_url || artifact.preview_url, filename);
+    }
   });
   const dismiss = document.createElement("button");
   dismiss.type = "button";

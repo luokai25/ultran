@@ -384,10 +384,15 @@ public class UltranLocalAiPlugin extends Plugin {
         final String name;
         final String source;
         final String expectedSha256;
+        final long expectedBytes;
         try {
             name = safeModelName(call.getString("name"));
             source = call.getString("url");
             expectedSha256 = call.getString("sha256", "").trim().toLowerCase(Locale.ROOT);
+            expectedBytes = call.getData().optLong("expectedBytes", -1L);
+            if (expectedBytes == 0 || expectedBytes < -1 || expectedBytes > MAX_MODEL_BYTES) {
+                throw new IllegalArgumentException("Invalid expected model size.");
+            }
             if (source == null || source.length() > 4096) throw new IllegalArgumentException("A Hugging Face model URL is required.");
             URL parsed = new URL(source);
             if (!"https".equalsIgnoreCase(parsed.getProtocol()) || !"huggingface.co".equalsIgnoreCase(parsed.getHost())) {
@@ -415,10 +420,13 @@ public class UltranLocalAiPlugin extends Plugin {
                 URL current = new URL(source);
                 for (int redirects = 0; redirects <= 5; redirects++) {
                     connection = (HttpURLConnection) current.openConnection();
-                    connection.setConnectTimeout(15000);
-                    connection.setReadTimeout(30000);
+                    connection.setConnectTimeout(20000);
+                    // Large model hosts can pause for well over 30 seconds on mobile networks.
+                    // A longer idle timeout prevents ordinary slow links being misreported as failure.
+                    connection.setReadTimeout(120000);
                     connection.setInstanceFollowRedirects(false);
-                    connection.setRequestProperty("User-Agent", "Ultran-Android/0.1");
+                    connection.setRequestProperty("User-Agent", "Ultran-Android/0.2");
+                    connection.setRequestProperty("Accept", "application/octet-stream");
                     int code = connection.getResponseCode();
                     if (code >= 300 && code < 400) {
                         String location = connection.getHeaderField("Location");
@@ -439,8 +447,10 @@ public class UltranLocalAiPlugin extends Plugin {
                 }
                 long total = connection.getContentLengthLong();
                 final long maxBytes = MAX_MODEL_BYTES;
-                if (total > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 256 GB safety limit.");
-                if (total > 0 && total > availableAtStart) throw new IllegalStateException("Not enough free device storage for this model.");
+                if (total > maxBytes || expectedBytes > maxBytes) throw new IllegalStateException("This model exceeds Ultran's 256 GB safety limit.");
+                if (expectedBytes > 0 && total > 0 && expectedBytes != total) throw new IllegalStateException("The model host reported a size different from the catalogue. Download rejected before writing.");
+                long requiredBytes = expectedBytes > 0 ? expectedBytes : total;
+                if (requiredBytes > 0 && requiredBytes > availableAtStart) throw new IllegalStateException("Not enough free device storage. Need about " + (requiredBytes / (1024L * 1024L)) + " MiB, with " + (availableAtStart / (1024L * 1024L)) + " MiB available.");
                 partial = new File(modelDirectory(), name + ".partial");
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 long received = 0;
@@ -460,7 +470,8 @@ public class UltranLocalAiPlugin extends Plugin {
                     }
                     output.getFD().sync();
                 }
-                if (total > 0 && received != total) throw new IllegalStateException("Model download was incomplete.");
+                if (total > 0 && received != total) throw new IllegalStateException("Model download was incomplete: received " + received + " of " + total + " bytes. Retry on a stable connection.");
+                if (expectedBytes > 0 && received != expectedBytes) throw new IllegalStateException("Model download size did not match the catalogue: received " + received + " of " + expectedBytes + " bytes. The partial file was rejected.");
                 if (received < 1024L * 1024L) throw new IllegalStateException("Downloaded file is too small to be a GGUF model.");
                 if (!expectedSha256.isEmpty()) {
                     StringBuilder actual = new StringBuilder();

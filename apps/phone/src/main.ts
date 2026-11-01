@@ -1,3 +1,4 @@
+import { normalizeToolCall } from "@ultran/connectors/tool-contract";
 /**
  * Ultran phone client - a conversation console.
  *
@@ -46,7 +47,7 @@ type NativeLocalAIPlugin = {
   runBenchmark(): Promise<{ model: string; output: string; contextTokens: number; largeModelMode: boolean; promptTokens: number; generatedTokens: number; promptMs: number; generationMs: number; tokensPerSecond: number; processPssKb: number; processPrivateDirtyKb: number }>;
   unloadModel(): Promise<{ loaded: boolean }>;
   deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
-  downloadModel(options: { name: string; url: string; sha256?: string }): Promise<{ downloaded: boolean; name: string; sizeBytes: number }>;
+  downloadModel(options: { name: string; url: string; sha256?: string; expectedBytes?: number }): Promise<{ downloaded: boolean; name: string; sizeBytes: number }>;
   addListener(eventName: "modelImportProgress", listener: (event: { name: string; copiedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltranLocalAI");
@@ -126,6 +127,12 @@ const navConnectorsButton = req<HTMLButtonElement>("#nav-connectors");
 const navSettingsButton = req<HTMLButtonElement>("#nav-settings");
 const navWorldsButton = req<HTMLButtonElement>("#nav-worlds");
 const navLuonixButton = req<HTMLButtonElement>("#nav-luonix");
+const chatModelButton = req<HTMLButtonElement>("#chat-model-button");
+const chatModelLabel = req<HTMLElement>("#chat-model-label");
+const chatModelMenu = req<HTMLElement>("#chat-model-menu");
+const chatModelCurrent = req<HTMLElement>("#chat-model-current");
+const chatModelStatus = req<HTMLElement>("#chat-model-status");
+const chatModelOptions = req<HTMLElement>("#chat-model-options");
 const navMoreButton = req<HTMLButtonElement>("#nav-more");
 const featureScreens = Array.from(document.querySelectorAll<HTMLElement>(".feature-screen"));
 const connectorsButton = req<HTMLButtonElement>("#connectors-btn");
@@ -497,7 +504,7 @@ async function downloadHubModel(model: HubModel, file: HubFile, sizeBytes: numbe
     const revisionPath = revision && /^[a-f0-9]{7,64}$/i.test(revision) ? revision : "main";
     const encodedPath = file.rfilename.split("/").map(encodeURIComponent).join("/");
     const url = `https://huggingface.co/${model.id}/resolve/${revisionPath}/${encodedPath}?download=true`;
-    const result = await NativeLocalAI.downloadModel({ name, url, ...(sha ? { sha256: sha } : {}) });
+    const result = await NativeLocalAI.downloadModel({ name, url, expectedBytes: sizeBytes, ...(sha ? { sha256: sha } : {}) });
     await refreshNativeModels();
     nativeModelSelect.value = result.name;
     nativeModelStatus.textContent = "Downloaded and verified " + result.name + " · " + formatBytes(result.sizeBytes) + ". Load it to use offline.";
@@ -555,7 +562,7 @@ async function downloadHubModelSet(model: HubModel, shardFiles: HubFile[], revis
       const encodedPath = part.rfilename.split("/").map(encodeURIComponent).join("/");
       const url = "https://huggingface.co/" + model.id + "/resolve/" + revisionPath + "/" + encodedPath + "?download=true";
       modelLibraryStatus.textContent = "Downloading shard " + (index + 1) + " of " + parts.length + " · " + name;
-      await NativeLocalAI.downloadModel({ name, url, ...(sha ? { sha256: sha } : {}) });
+      await NativeLocalAI.downloadModel({ name, url, expectedBytes: part.lfs?.size ?? part.size, ...(sha ? { sha256: sha } : {}) });
     }
     await refreshNativeModels();
     const firstPart = parts[0];
@@ -789,7 +796,7 @@ function messageNode(message: Message): { root: HTMLElement; body: HTMLElement }
 
 function requestedArtifactFormat(task: string): string | null {
   const low = task.toLowerCase();
-  if (!["create","generate","make","export","save","build","produce","write","draft","package","zip"].some(word => low.split(/\\s+/).includes(word))) return null;
+  if (!["create","generate","make","export","save","build","produce","write","draft","package","zip"].some(word => low.split(/\s+/).includes(word))) return null;
   if (low.includes("zip") || low.includes("archive") || low.includes("compressed folder")) return "zip";
   for (const extension of ["py","js","ts","tsx","jsx","java","kt","go","rs","cpp","hpp","c","h","sh","bash","sql","xml","yaml","yml","toml","ini","css","scss","vue","svelte","mdx","rst","log","env"]) {
     if (low.includes("." + extension) || low.includes(extension + " file") || low.includes(extension + " script") || low.includes(extension + " source")) return extension;
@@ -854,15 +861,20 @@ async function attachRequestedArtifact(task: string, content: string, body: HTML
       return [{ connector: "artifacts", action: `create_${format}`, ok: true, detail: `Created ${title}.${format}`, artifact }];
     }
   } catch { /* A local PDF fallback keeps offline document creation useful. */ }
-  if (format === "pdf") {
-    const blob = localPdfBlob(title, content);
-    const url = URL.createObjectURL(blob);
-    const artifact: ArtifactCard = { id: `local_${uid()}`, title, format, size: blob.size, preview_url: url, download_url: url };
-    renderLiveEvent(body, { type: "artifact_created", artifact });
-    return [{ connector: "local-files", action: "create_pdf", ok: true, detail: "Created on this device; not uploaded", artifact }];
-  }
-  renderLiveEvent(body, { type: "tool_failed", tool: "artifacts", action: `create_${format}`, detail: "The file service is unavailable" });
-  return [{ connector: "artifacts", action: `create_${format}`, ok: false, detail: "The file service is unavailable; connect Ultran's local control plane and retry." }];
+  // Keep file delivery useful offline. Text/source formats are real files, not
+  // just code blocks in chat. If a binary office format needs the unavailable
+  // artifact service, deliver a truthful Markdown fallback rather than a fake
+  // .docx/.xlsx that cannot be opened.
+  const textFormats = new Set(["txt", "md", "json", "csv", "py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "xml", "yaml", "yml", "toml", "ini", "css", "scss", "html", "svg", "vue", "svelte", "mdx", "rst", "log", "env"]);
+  const localFormat = format === "pdf" || textFormats.has(format) ? format : "md";
+  const localContent = localFormat === format ? content : `# ${title}\n\nUltran could not create the requested ${format.toUpperCase()} binary because its artifact service is unavailable. This portable Markdown version preserves the generated content.\n\n${content}`;
+  const blob = localFormat === "pdf"
+    ? localPdfBlob(title, content)
+    : new Blob([localContent], { type: localFormat === "json" ? "application/json;charset=utf-8" : localFormat === "html" ? "text/html;charset=utf-8" : localFormat === "csv" ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const artifact: ArtifactCard = { id: `local_${uid()}`, title, format: localFormat, size: blob.size, preview_url: url, download_url: url };
+  renderLiveEvent(body, { type: "artifact_created", artifact });
+  return [{ connector: "local-files", action: `create_${localFormat}`, ok: true, detail: localFormat === format ? "Created on this device; not uploaded" : `Artifact service unavailable; delivered a portable .${localFormat} fallback instead of pretending to create ${format.toUpperCase()}`, artifact }];
 }
 
 function artifactPreviewUrl(url: string): string {
@@ -1120,8 +1132,18 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   }
   const type = String(event.type ?? "event");
   if (type === "completed" || type === "final") return;
-  const line = document.createElement("div");
-  line.className = "live-run-event";
+  const isThinking = type === "thinking";
+  let line = isThinking ? panel.querySelector<HTMLElement>(".live-run-current") : null;
+  if (!line) {
+    line = document.createElement("div");
+    line.className = isThinking ? "live-run-event live-run-current" : "live-run-event";
+    if (isThinking) {
+      const progress = document.createElement("span");
+      progress.className = "live-run-progress";
+      progress.setAttribute("aria-hidden", "true");
+      line.appendChild(progress);
+    }
+  }
   const dot = document.createElement("i");
   dot.dataset.state = type === "tool_failed" ? "failed" : type === "tool_completed" && event.approval_required ? "active" : type === "tool_completed" || type === "artifact_created" ? "done" : "active";
   const label = document.createElement("span");
@@ -1137,23 +1159,28 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
     const artifact = event.artifact as ArtifactCard | undefined;
     label.textContent = artifact ? `Prepared ${artifact.title} (${artifact.format.toUpperCase()})` : "Prepared your file";
   } else label.textContent = detail || type.replace(/_/g, " ");
-  line.append(dot, label);
-  panel.appendChild(line);
+  line.replaceChildren(...(isThinking ? [line.querySelector<HTMLElement>(".live-run-progress") ?? document.createElement("span"), dot, label] : [dot, label]));
+  if (!line.isConnected) panel.appendChild(line);
+  if (isThinking) {
+    const heading = panel.querySelector<HTMLElement>(".live-run-heading");
+    if (heading) heading.textContent = "Working on your request";
+  }
   threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
 }
 
 function finishAssistantNode(root: HTMLElement, message: Message): void {
   if (message.tools?.length) {
-    const tools = document.createElement("div");
-    tools.className = "tools";
-    const timelineTitle = document.createElement("div");
+    const tools = document.createElement("details");
+    tools.className = "tools tool-activity-details";
+    const timelineTitle = document.createElement("summary");
     timelineTitle.className = "tool-timeline-title";
-    timelineTitle.textContent = "Tool activity";
+    timelineTitle.textContent = `Work details · ${message.tools.length} action${message.tools.length === 1 ? "" : "s"}`;
     tools.appendChild(timelineTitle);
+    const deliverables: HTMLElement[] = [];
     message.tools.forEach((call, index) => {
       if (call.artifact) {
         const card = document.createElement("section");
-        card.className = "artifact-card";
+        card.className = "artifact-card chat-deliverable";
         const heading = document.createElement("strong");
         heading.textContent = call.artifact.title;
         const meta = document.createElement("small");
@@ -1166,8 +1193,15 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
         download.type = "button";
         download.textContent = "Download";
         download.addEventListener("click", () => downloadArtifact(call.artifact!.download_url, `${call.artifact!.title}.${call.artifact!.format}`));
-        card.append(heading, meta, preview, download);
-        tools.appendChild(card);
+        const fileIcon = document.createElement("span");
+        fileIcon.className = "artifact-file-icon";
+        fileIcon.textContent = call.artifact.format.toUpperCase().slice(0, 4);
+        card.prepend(fileIcon);
+        const fileCopy = document.createElement("div");
+        fileCopy.className = "artifact-file-copy";
+        fileCopy.append(heading, meta);
+        card.replaceChildren(fileIcon, fileCopy, preview, download);
+        deliverables.push(card);
       } else {
         const step = document.createElement("div");
         step.className = "tool-step";
@@ -1191,6 +1225,12 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
         tools.appendChild(step);
       }
     });
+    if (deliverables.length) {
+      const deliveryHeading = document.createElement("div");
+      deliveryHeading.className = "deliverables-heading";
+      deliveryHeading.textContent = deliverables.length === 1 ? "Your file is ready" : "Your files are ready";
+      root.append(deliveryHeading, ...deliverables);
+    }
     root.appendChild(tools);
   }
 
@@ -1643,11 +1683,10 @@ type LocalToolRequest =
 type LocalToolFollowup = { request: string; result: string };
 
 function parseLocalToolRequest(content: string): LocalToolRequest | null {
-  const prefix = "ULTRAN_TOOL_CALL:";
-  const trimmed = content.trim();
-  if (!trimmed.startsWith(prefix)) return null;
+  const normalized = normalizeToolCall(content);
+  if (!normalized.ok) return null;
   try {
-    const parsed = JSON.parse(trimmed.slice(prefix.length)) as Record<string, unknown>;
+    const parsed = { tool: normalized.call.toolId, ...normalized.call.args } as Record<string, unknown>;
     if (parsed.tool === "runtime.exec" && typeof parsed.command === "string") {
       const command = parsed.command.trim();
       if (!command || command.length > 4096 || command.includes("\0")) return null;
@@ -2403,6 +2442,104 @@ async function refreshAndroidAccessStatus(): Promise<void> {
   }
 }
 
+function activeModelLabel(): string {
+  if (nativeModelLoaded && nativeLoadedModelName) return nativeLoadedModelName.replace(/\.gguf$/i, "");
+  if (settings.localModelEndpoint.trim() && settings.localModel.trim()) return settings.localModel.trim();
+  if (settings.endpoint.trim()) return "Ultran connected brain";
+  return "Choose model";
+}
+
+function syncChatModelLabel(): void {
+  const label = activeModelLabel();
+  chatModelLabel.textContent = label.length > 22 ? label.slice(0, 21) + "…" : label;
+  chatModelCurrent.textContent = label === "Choose model" ? "No active model" : label;
+  chatModelButton.dataset.ready = String(label !== "Choose model");
+}
+
+function closeChatModelMenu(): void {
+  chatModelMenu.hidden = true;
+  chatModelButton.setAttribute("aria-expanded", "false");
+}
+
+function addModelChoice(label: string, detail: string, action: () => void | Promise<void>, selected = false): void {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chat-model-option";
+  button.setAttribute("aria-current", selected ? "true" : "false");
+  const name = document.createElement("strong");
+  name.textContent = label;
+  const description = document.createElement("small");
+  description.textContent = detail;
+  const marker = document.createElement("span");
+  marker.className = "chat-model-option-marker";
+  marker.textContent = selected ? "✓" : "›";
+  button.append(name, description, marker);
+  button.addEventListener("click", () => { closeChatModelMenu(); void action(); });
+  chatModelOptions.appendChild(button);
+}
+
+async function openChatModelMenu(): Promise<void> {
+  const opening = chatModelMenu.hidden;
+  closeChatModelMenu();
+  if (!opening) return;
+  chatModelMenu.hidden = false;
+  chatModelButton.setAttribute("aria-expanded", "true");
+  chatModelOptions.replaceChildren();
+  chatModelStatus.textContent = "Checking installed models and connections…";
+  syncChatModelLabel();
+  try {
+    if (Capacitor.getPlatform() === "android") {
+      const [status, listed] = await Promise.all([NativeLocalAI.getStatus(), NativeLocalAI.listModels()]);
+      nativeModelLoaded = status.loaded;
+      nativeLoadedModelName = status.loadedModel;
+      for (const model of listed.models) {
+        addModelChoice(model.name.replace(/\.gguf$/i, ""), `${formatBytes(model.sizeBytes)} · on this device${model.loaded ? " · loaded" : ""}`, async () => {
+          if (model.loaded) return;
+          nativeModelStatus.textContent = `Loading ${model.name}…`;
+          chatModelStatus.textContent = `Loading ${model.name} into memory…`;
+          try {
+            const result = await NativeLocalAI.loadModel({ name: model.name });
+            nativeModelLoaded = result.loaded;
+            nativeLoadedModelName = result.name;
+            nativeModelSelect.value = result.name;
+            nativeModelStatus.textContent = `Ready: ${result.name} · ${result.contextTokens} context tokens · CPU inference`;
+            syncChatModelLabel();
+            chatModelStatus.textContent = `${result.name} is now active for chat.`;
+          } catch (error) {
+            nativeModelStatus.textContent = "Could not load model: " + (error instanceof Error ? error.message : "unknown error");
+            chatModelStatus.textContent = nativeModelStatus.textContent;
+          }
+        }, model.loaded);
+      }
+    }
+    if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
+      addModelChoice(settings.localModel.trim(), "Ollama-compatible connection · configured", async () => {
+        try {
+          if (nativeModelLoaded) await NativeLocalAI.unloadModel();
+          nativeModelLoaded = false;
+          nativeLoadedModelName = "";
+          saveSettings();
+          await refreshNativeModels();
+          syncChatModelLabel();
+          chatModelStatus.textContent = `Chat will use ${settings.localModel.trim()} through the configured local endpoint.`;
+        } catch (error) {
+          chatModelStatus.textContent = "Could not switch models: " + (error instanceof Error ? error.message : "unknown error");
+        }
+      }, !nativeModelLoaded && activeModelLabel() === settings.localModel.trim());
+    }
+    if (!chatModelOptions.childElementCount) {
+      const empty = document.createElement("p");
+      empty.className = "chat-model-empty";
+      empty.textContent = Capacitor.getPlatform() === "android" ? "No GGUF models installed yet. Download a small model or import one in Model settings." : "Install the Android app for on-device GGUF models, or configure an Ollama endpoint in Model settings.";
+      chatModelOptions.appendChild(empty);
+    }
+    chatModelStatus.textContent = "Switch models without leaving your conversation. Model weights stay in Ultran's private storage.";
+    syncChatModelLabel();
+  } catch (error) {
+    chatModelStatus.textContent = "Could not list models: " + (error instanceof Error ? error.message : "unknown error");
+  }
+}
+
 function openSheet(): void {
   closeDrawer();
   endpointEl.value = settings.endpoint;
@@ -2432,6 +2569,18 @@ function closeSheet(): void {
 /* ------------------------------------------------------------------ *
  * Wiring
  * ------------------------------------------------------------------ */
+chatModelButton.addEventListener("click", () => void openChatModelMenu());
+req<HTMLButtonElement>("#chat-model-close").addEventListener("click", closeChatModelMenu);
+req<HTMLButtonElement>("#chat-model-settings").addEventListener("click", () => { closeChatModelMenu(); openSheet(); });
+req<HTMLButtonElement>("#chat-model-download").addEventListener("click", () => {
+  closeChatModelMenu();
+  openSheet();
+  window.setTimeout(() => modelSearchInput.focus(), 180);
+});
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeChatModelMenu(); });
+document.addEventListener("click", (event) => {
+  if (!chatModelMenu.hidden && !chatModelMenu.contains(event.target as Node) && !chatModelButton.contains(event.target as Node)) closeChatModelMenu();
+});
 
 for (const [label, prompt] of SUGGESTIONS) {
   const card = document.createElement("button");

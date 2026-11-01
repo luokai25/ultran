@@ -1757,7 +1757,10 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
         return "Local background job result (" + status + "; " + runtimeLabel + "):\n" + ((job.output ?? "").slice(0, 6 * 1024) || "[no output]");
       }
       if (job.status === "failed" || job.status === "cancelled") {
-        return "Local background job " + job.status + ": " + (job.error ?? job.output ?? "No additional details.");
+        const details = job.error ?? (job.output ?? "").trim() || "No additional details.";
+        const exit = job.exitCode == null ? "" : " (exit code " + job.exitCode + ")";
+        const timeout = job.timedOut ? " (execution time limit reached)" : "";
+        return "Local background job " + job.status + exit + timeout + ": " + details;
       }
       await new Promise((resolve) => window.setTimeout(resolve, 1200));
     }

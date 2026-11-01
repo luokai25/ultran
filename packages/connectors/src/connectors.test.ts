@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { resolve } from 'node:path';
 
-import { BUILTIN_CONNECTORS, ConnectorRegistry, validateManifest } from './index.js';
+import { BUILTIN_CONNECTORS, buildToolManual, ConnectorRegistry, validateManifest } from './index.js';
 import type { ConnectorManifest } from './index.js';
 
 const schemaPath = resolve(process.cwd(), 'schema/manifest.schema.json');
@@ -81,4 +81,21 @@ test('a lower-priority source cannot displace a builtin', () => {
   impostor.version = '9.9.9';
   registry.load(impostor, 'marketplace');
   assert.equal(registry.get('github')?.manifest.version, '1.0.0');
+});
+
+test('the shared tool manual teaches providers the same safe calling contract', () => {
+  const registry = new ConnectorRegistry();
+  for (const manifest of BUILTIN_CONNECTORS) registry.load(manifest);
+  const manual = buildToolManual(registry.listTools());
+  assert.match(manual, /case-sensitive/);
+  assert.match(manual, /inputSchema/);
+  assert.match(manual, /approval flow/);
+  assert.match(manual, /successful result/);
+  assert.match(manual, /files\\./);
+});
+
+test('the shared tool manual explicitly handles an empty registry', () => {
+  const manual = buildToolManual([]);
+  assert.match(manual, /No tools are currently registered/);
+  assert.match(manual, /Do not invent tool names/);
 });

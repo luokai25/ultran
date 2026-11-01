@@ -94,6 +94,28 @@ public final class UltranRuntimePlugin extends Plugin {
         result.put("wgetAvailable", installed && wget.isFile() && wget.canExecute());
         result.put("sshAvailable", installed && ssh.isFile() && ssh.canExecute());
         result.put("aptAvailable", installed && apt.isFile() && apt.canExecute());
+        JSArray availableCommands = new JSArray();
+        int commandCount = 0;
+        if (shellReady) {
+            File[] commandDirectories = {new File(prefix(), "bin"), new File(prefix(), "libexec")};
+            java.util.TreeSet<String> names = new java.util.TreeSet<>();
+            for (File directory : commandDirectories) {
+                File[] entries = directory.listFiles();
+                if (entries == null) continue;
+                for (File entry : entries) {
+                    if (entry.isFile() && entry.canExecute() && entry.getName().matches("[A-Za-z0-9._+-]{1,80}")) {
+                        names.add(entry.getName());
+                    }
+                }
+            }
+            for (String name : names) {
+                if (commandCount++ >= 300) break;
+                availableCommands.put(name);
+            }
+        }
+        result.put("availableCommands", availableCommands);
+        result.put("availableCommandCount", commandCount);
+        result.put("commandInventoryTruncated", commandCount > 300);
         result.put("packageManagerEnabled", false);
         result.put("packageManagerNote", "APT repositories are disabled until Ultran publishes packages built for its private prefix.");
         result.put("prefix", prefix().getAbsolutePath());

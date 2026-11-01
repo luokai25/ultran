@@ -848,6 +848,53 @@ async function openTaskTimeline(taskId: string, prompt: string): Promise<void> {
   scrollToEnd();
 }
 
+function pushWorkspaceArtifact(artifact: ArtifactCard): void {
+  const tray = document.getElementById("workspace-tray");
+  const items = document.getElementById("workspace-tray-items");
+  const count = document.getElementById("workspace-tray-count");
+  if (!tray || !items || !count) return;
+  const item = document.createElement("article");
+  item.className = "workspace-tray-item";
+  const type = document.createElement("span");
+  type.className = "workspace-tray-type";
+  type.dataset.format = artifact.format.toLowerCase();
+  type.textContent = artifact.format.toUpperCase();
+  const copy = document.createElement("div");
+  copy.className = "workspace-tray-copy";
+  const title = document.createElement("strong");
+  title.textContent = artifact.title;
+  const meta = document.createElement("small");
+  meta.textContent = artifact.id.startsWith("local_") ? "Created locally · not uploaded" : "Saved to your Ultran workspace";
+  copy.append(title, meta);
+  const share = document.createElement("button");
+  share.type = "button";
+  share.className = "workspace-tray-share";
+  share.textContent = "Share";
+  share.setAttribute("aria-label", "Share " + artifact.title);
+  share.addEventListener("click", () => {
+    const filename = artifact.title + "." + artifact.format.toLowerCase();
+    downloadArtifact(artifact.download_url || artifact.preview_url, filename);
+  });
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "workspace-tray-dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Remove " + artifact.title + " from tray");
+  dismiss.addEventListener("click", () => {
+    item.remove();
+    const remaining = items.children.length;
+    count.textContent = remaining + (remaining === 1 ? " item" : " items");
+    tray.hidden = remaining === 0;
+  });
+  item.append(type, copy, share, dismiss);
+  items.prepend(item);
+  while (items.children.length > 4) items.lastElementChild?.remove();
+  const total = items.children.length;
+  count.textContent = total + (total === 1 ? " item" : " items");
+  tray.hidden = false;
+  if ("vibrate" in navigator) navigator.vibrate(12);
+}
+
 function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): void {
   let panel = body.querySelector<HTMLElement>(".live-run");
   if (!panel) {
@@ -863,6 +910,7 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   }
   const type = String(event.type ?? "event");
   if (type === "completed" || type === "final") return;
+  if (type === "artifact_created" && event.artifact) pushWorkspaceArtifact(event.artifact as ArtifactCard);
   const tool = String(event.tool ?? event.source ?? "");
   const action = String(event.action ?? "");
   const toolKey = `${tool}.${action}`;

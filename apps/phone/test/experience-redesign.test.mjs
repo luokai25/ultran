@@ -118,3 +118,11 @@ test("model downloads validate the catalogue size and tolerate slow mobile trans
   assert.match(native, /setReadTimeout\(120000\)/);
   assert.match(native, /received != expectedBytes/);
 });
+
+
+test("generic file requests produce a deliverable and live tool events update in place", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  assert.match(main, /low.includes\("file"\) \|\| low.includes\("attachment"\)/);
+  assert.match(main, /data-tool-key/);
+  assert.match(main, /candidate.dataset.toolKey === toolKey/);
+});

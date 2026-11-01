@@ -65,6 +65,7 @@ function need<T extends Element>(selector: string): T {
 }
 
 export function initConnectors(deps: Deps): void {
+  (window as unknown as {__ULTRAN_CONNECTOR_CATALOG__?:CatalogEntry[]}).__ULTRAN_CONNECTOR_CATALOG__=CATALOG;
   const panel = need<HTMLElement>("#connectors-panel");
   const listEl = need<HTMLElement>("#connectors-list");
   const searchEl = need<HTMLInputElement>("#connectors-search");

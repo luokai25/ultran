@@ -8,6 +8,13 @@
   --line: #303037;
   --line-soft: rgba(255,255,255,.075);
   --red: #e11d2e;
+  --gold: #e11d2e !important;
+  --gold-bright: #ff3345 !important;
+  --gold-deep: #8f1020 !important;
+  --accent: #e11d2e !important;
+  --accent-bright: #ff3345 !important;
+  --accent-glow: rgba(225,29,46,.18) !important;
+  --eye: #ff3345 !important;
   --red-hot: #ff3345;
   --red-deep: #8f1020;
   --red-wash: rgba(225,29,46,.12);
@@ -161,3 +168,18 @@ input,textarea,select { color:var(--text); }
 .workspace-tray-share { min-width:56px; min-height:44px; padding:0 10px; border:0; border-radius:var(--r1); background:var(--red); color:white; font:600 var(--t1) var(--font); }
 .workspace-tray-dismiss { width:32px; min-height:44px; border:0; background:transparent; color:var(--muted); font-size:20px; }
 @media (max-width:360px) { .workspace-tray-item { grid-template-columns:42px minmax(0,1fr) auto 28px; gap:7px; } .workspace-tray-type { min-width:42px; } }
+
+.permission-overview { display:grid; gap:8px; margin:12px 0 4px; padding:16px; border:1px solid var(--line); border-radius:var(--r1); background:var(--surface); }
+.permission-overview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--text-2); font:700 var(--t1) var(--font); letter-spacing:.08em; }
+.permission-overview-head strong { color:var(--text); font:600 var(--t4)/1 var(--font); letter-spacing:-.04em; }
+.permission-overview p { margin:0; max-width:48ch; color:var(--text-2); font:400 var(--t2)/1.5 var(--font); }
+.permission-overview[data-state="empty"] { border-color:rgba(255,255,255,.1); }
+.permission-overview[data-state="ready"] { border-color:rgba(101,201,149,.28); }
+.permission-overview[data-state="ready"] .permission-overview-head strong { color:var(--ok); }
+.permission-overview[data-state="error"] { border-color:rgba(255,89,104,.42); background:rgba(255,89,104,.055); }
+.permission-overview[data-state="error"] .permission-overview-head strong { color:var(--danger); }
+.permission-overview[data-state="loading"] .permission-overview-head strong { width:42px; height:28px; overflow:hidden; border-radius:6px; color:transparent; background:linear-gradient(90deg,var(--surface-3),#34343c,var(--surface-3)); background-size:200% 100%; animation:permission-shimmer 1.25s ease-in-out infinite; }
+@keyframes permission-shimmer { to { background-position:-200% 0; } }
+.panel-count { padding:7px 10px; border-radius:var(--pill); background:var(--surface-2); color:var(--text-2); font:600 var(--t1) var(--font); }
+.panel-status[data-tone="bad"],.panel-status[data-tone="warn"] { color:var(--danger); }
+.panel-status[data-tone="ok"] { color:var(--ok); }

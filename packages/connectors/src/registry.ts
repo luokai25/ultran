@@ -105,7 +105,7 @@ export function buildToolManual(tools: ToolSchema[]): string {
       'TOOL AVAILABILITY: No tools are currently registered.',
       'Do not invent tool names or claim to have performed external actions.',
       'Answer from available context or explain which capability is missing.',
-    ].join('\\n');
+    ].join('\n');
   }
 
   const catalogue = tools.map((tool) => ({
@@ -130,6 +130,6 @@ export function buildToolManual(tools: ToolSchema[]): string {
     'RETRIES: Do not repeat a write after an ambiguous timeout unless an idempotency check or read-only verification proves it did not happen.',
     'CATALOGUE JSON:',
     JSON.stringify(catalogue),
-  ].join('\\n\\n');
+  ].join('\n\n');
 }
 

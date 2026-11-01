@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { ConnectorRegistry } from '@ultran/connectors';
+import { buildToolManual, type ConnectorRegistry } from '@ultran/connectors';
 import type { ToolSchema } from '@ultran/connectors';
 import type { BrainRuntime } from '../brain/runtime.js';
 import type { PolicyGate } from '../monetization/policy-gate.js';
@@ -390,8 +390,7 @@ export class Orchestrator {
       'Return only JSON matching {"steps":[{"id":"step-1","candidates":["connector.tool"],"dependsOn":[],"description":"..."}]}.',
       'Each step must have at least one candidate from the exact tool allow-list. Do not invent tool IDs.',
       'Use only tools that materially help. Read-only discovery may precede a write, but do not infer approval.',
-      'Available tools (id, capability, description, input schema):',
-      JSON.stringify(tools.map((tool) => ({ id: tool.id, capability: tool.capability, description: tool.description, inputSchema: tool.inputSchema }))),
+      buildToolManual(tools),
       'Goal: ' + goal,
     ].join('\n\n');
     let lastError: unknown;
@@ -427,7 +426,7 @@ export class Orchestrator {
       'Goal: ' + state.goal,
       'Current step: ' + step.description,
       'Completed or attempted step outcomes: ' + JSON.stringify(previous).slice(0, 12000),
-      'Allowed tools: ' + JSON.stringify(tools.map((tool) => ({ id: tool.id, capability: tool.capability, description: tool.description, inputSchema: tool.inputSchema }))),
+      buildToolManual(tools),
     ].join('\n\n');
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {

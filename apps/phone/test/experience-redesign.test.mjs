@@ -42,20 +42,21 @@ test("fixed navigation cannot sit above the drawer, connector panel, or settings
   assert.match(workspace, /\.workspace-panel\{position:fixed;z-index:60;/);
 });
 
-test("new orbital U mark stays aligned across web, Android generator, and adaptive icon", async () => {
+test("plasma orb identity stays aligned across web, Android generator, and adaptive icon", async () => {
   const [mark, generator, vector, background] = await Promise.all([
     read("src/mark.ts"),
     read("android/tools/generate_assets.py"),
     read("android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml"),
     read("android/app/src/main/res/drawable/ic_launcher_background.xml"),
   ]);
-  assert.match(mark, /<circle cx="54" cy="54" r="37"/);
-  assert.match(mark, /M34 34v21c0 27 40 27 40 0V34/);
+  assert.match(mark, /<ellipse cx="54" cy="54" rx="47" ry="17"/);
+  assert.match(mark, /<circle cx="54" cy="54" r="11"/);
   assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
-  assert.ok(generator.includes("ORBIT_RADIUS = 37.0"));
-  assert.ok(generator.includes("U_CURVE = ((34.0, 82.0), (74.0, 82.0), (74.0, 55.0))"));
-  assert.match(vector, /android:strokeColor="#CDA94D" android:strokeWidth="5"/);
-  assert.match(vector, /android:strokeColor="#F0D58A" android:strokeWidth="9"/);
+  assert.ok(generator.includes("Two orbital ellipses and a luminous nucleus"));
+  assert.doesNotMatch(generator, /U_START|U_CURVE|U_STROKE|CREST/);
+  assert.match(vector, /android:strokeColor="#CDA94D" android:strokeWidth="2.5"/);
+  assert.match(vector, /android:strokeColor="#F0D58A" android:strokeWidth="2.4"/);
+  assert.doesNotMatch(mark, /M34 34v21/);
   assert.match(background, /#0B0D0F/);
   assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
 });
@@ -125,4 +126,20 @@ test("generic file requests produce a deliverable and live tool events update in
   assert.match(main, /low.includes\("file"\) \|\| low.includes\("attachment"\)/);
   assert.match(main, /data-tool-key/);
   assert.match(main, /candidate.dataset.toolKey === toolKey/);
+});
+
+
+test("model import is directly reachable from the model picker", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  assert.match(html, /id=\"chat-model-import\"/);
+  assert.match(main, /#chat-model-import[\s\S]*?importNativeModel\(\)/);
+});
+
+test("the gold identity is a single stylesheet layer and mobile content stays within the viewport", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const experience = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /redline\.css/);
+  assert.match(experience, /html,body\{width:100%;max-width:100%;overflow-x:hidden\}/);
+  assert.match(experience, /#app\{width:100%;max-width:760px;min-width:0/);
 });

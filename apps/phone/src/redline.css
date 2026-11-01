@@ -24,11 +24,14 @@
   --ok: #65c995;
   --warn: #e5b65b;
   --danger: #ff5968;
-  --font: Inter, Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
-  --t1: 12px;
-  --t2: 14px;
-  --t3: 18px;
-  --t4: 28px;
+  --font: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font) !important;
+  --font-serif: var(--font) !important;
+  --font-mono: var(--font) !important;
+  --t1: .75rem;
+  --t2: .875rem;
+  --t3: 1.125rem;
+  --t4: 1.75rem;
   --s1: 8px;
   --s2: 16px;
   --s3: 24px;
@@ -195,3 +198,14 @@ input,textarea,select { color:var(--text); }
 .composio-health[data-state="error"] { border-color:rgba(255,89,104,.4); }
 .composio-health[data-state="error"] strong { color:var(--danger); }
 .composio-health[data-state="loading"] strong { color:var(--muted); }
+
+/* Keep elevation, corners, type and spacing on the same small system. */
+#app *,#drawer *,#connectors-panel *,#workspace-panel *,#sheet-wrap *,#connector-detail-wrap * { box-shadow:none!important; }
+#drawer,#connectors-panel,#workspace-panel,.sheet,.drawer,.global-search-card,.chat-model-menu { box-shadow:var(--shadow)!important; }
+.conn-card,.conn-empty,.approval-card,.field input,.field textarea,.field select,.panel-tools input,.sheet,.sheet-head,.model-card,.native-model-manager,.native-model-status,.mindmap-detail,.workspace-task,.workspace-file { border-radius:var(--r1)!important; }
+button:not(.nav-item):not(.tool):not(.filter-chip):not(.chip),input,textarea,select { border-radius:var(--r1); }
+html { font-size:100%; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body { font-weight:400; }
+strong,b,h1,h2,h3,h4,button,.wordmark { font-weight:600; }
+.native-model-status[data-tone="bad"] { border-color:rgba(255,89,104,.4); color:var(--danger); background:rgba(255,89,104,.06); }
+.native-model-status[data-tone="ok"] { border-color:rgba(101,201,149,.3); color:var(--ok); }

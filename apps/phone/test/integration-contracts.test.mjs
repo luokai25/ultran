@@ -34,14 +34,13 @@ test("every required phone UI selector exists exactly once", () => {
   assert.deepEqual([...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id), []);
 });
 
-test("Hugging Face model hub controls are connected to native download and progress", () => {
-  for (const id of ["model-search-form", "model-size-filter", "model-download-progress", "model-library-results"]) {
+test("curated Hugging Face model catalogue is connected to native download", () => {
+  for (const id of ["model-download-progress", "model-library-results"]) {
     assert.ok(html.includes(`id="${id}"`), `missing model hub control: ${id}`);
   }
-  assert.match(main, /modelSearchForm\.addEventListener\("submit"/);
   assert.match(main, /NativeLocalAI\.downloadModel\(/);
-  assert.match(main, /hubSearchSequence/);
-  assert.match(main, /modelDownloadProgressEl\.value = percent/);
+  assert.match(main, /CURATED_MODELS\.map/);
+  assert.match(main, /Download direct GGUF/);
 });
 
 test("native GGUF downloads enforce trusted URLs, size limits, digest and file signature", () => {
@@ -70,10 +69,10 @@ test("Termux runtime download verifies the published checksum before installatio
   assert.match(runtime, /notifyListeners\("runtimeDownloadProgress", progress\)/);
 });
 
-test("brain-independent capability policy is applied to native and Ollama brains", () => {
+test("brain-independent capability policy is applied to native and connected brains", () => {
   assert.match(main, /from "\.\/capability-kernel"/);
   assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp"\)/);
-  assert.match(main, /buildCapabilityPrompt\(task, "Ollama-compatible local model"\)/);
+  assert.match(main, /buildCapabilityPrompt\(task,/);
   assert.match(main, /shouldVerifyDraft\(text\)/);
   assert.match(main, /shouldVerifyDraft\(task\)/);
   assert.match(main, /reviewLocalDraft\(task, content\)/);

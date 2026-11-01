@@ -51,7 +51,7 @@ if (ksFile.exists() && !canSign) {
 // expression straight into `versionCode (...)` is parsed as a method call and
 // fails with "Value is null" rather than a useful message.
 def appVersionCode = (System.getenv('ULTRAN_VERSION_CODE') ?: '1').toInteger()
-def appVersionName = System.getenv('ULTRAN_VERSION_NAME') ?: '0.3.0'
+def appVersionName = System.getenv('ULTRAN_VERSION_NAME') ?: '0.2.0'
 
 android {
     namespace "app.ultran.mobile"

@@ -1,6 +1,6 @@
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1
 pydantic>=2.8,<3
-airllm>=2.11
-transformers>=4.44
+airllm>=4.0,<5
+transformers>=4.49,<6
 safetensors>=0.4

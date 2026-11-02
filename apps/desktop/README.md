@@ -72,3 +72,12 @@ command tool and no project write tool. Planner output is parsed as JSON and
 unknown tools fail closed. Agent progress is sent to the renderer as events;
 cancellation aborts the active planner request. The agent loop is local-only
 and accepts only the loopback AirLLM endpoint.
+
+
+Agent mode can also create or replace supported text/source files inside an
+imported project. Every write requires a separate native Windows confirmation
+showing the destination and a content preview. Existing targets are copied to
+a sibling `.ultran-backup` file before replacement; temporary writes are
+renamed into place. Paths are confined to the imported project, symlinks and
+non-regular targets are rejected, and file size is capped. There is still no
+shell, arbitrary process execution, or unrestricted filesystem access.

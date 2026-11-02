@@ -125,3 +125,38 @@ test('cancellation during local model planning is reported as cancelled', async 
   assert.equal(result.status, 'cancelled');
   assert.equal(result.reason, 'aborted');
 });
+
+test('records effect outcomes as verified only when the tool supplies verification evidence', async () => {
+  const events = [];
+  let step = 0;
+  const runtime = createAgentRuntime({
+    tools: {
+      'test.write_unverified': { capability: 'write', execute: async () => ({ saved: true }) },
+      'test.write_verified': { capability: 'write', execute: async () => ({ saved: true, verified: true }) }
+    },
+    approve: async () => true,
+    planner: async () => {
+      step++;
+      if (step === 1) return { type: 'tool', name: 'test.write_unverified', args: {} };
+      if (step === 2) return { type: 'tool', name: 'test.write_verified', args: {} };
+      return { type: 'final', answer: 'Finished.' };
+    },
+    onEvent: async event => events.push(event)
+  });
+  const result = await runtime.run({ goal: 'Write two files' });
+  assert.equal(result.effects[0].state, 'acknowledged_unverified');
+  assert.equal(result.effects[1].state, 'verified');
+  assert.equal(events.filter(event => event.type === 'effect_outcome').length, 2);
+});
+
+test('records failed side effects as uncertain rather than silently successful', async () => {
+  const runtime = createAgentRuntime({
+    tools: { 'test.write': { capability: 'write', execute: async () => { throw new Error('disk failure'); } } },
+    approve: async () => true,
+    planner: async ({ round }) => round === 1
+      ? { type: 'tool', name: 'test.write', args: {} }
+      : { type: 'final', answer: 'Unable to complete.' }
+  });
+  const result = await runtime.run({ goal: 'Write a file' });
+  assert.equal(result.effects[0].state, 'failed_or_uncertain');
+});

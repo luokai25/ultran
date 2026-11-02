@@ -75,3 +75,14 @@ test('does not overwrite a valid backup with a corrupt primary during recovery s
   await fs.writeFile(file, '{broken again');
   assert.deepEqual((await store.load()).messages, good);
 });
+
+
+test('clear removes primary history and its recovery backup', async t => {
+  const { file, store } = await fixture(t);
+  await store.save([{ role: 'user', content: 'first' }]);
+  await store.save([{ role: 'user', content: 'second' }]);
+  await store.clear();
+  assert.deepEqual((await store.load()).messages, []);
+  await assert.rejects(fs.access(file));
+  await assert.rejects(fs.access(file + '.bak'));
+});

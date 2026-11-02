@@ -11,7 +11,7 @@ function createAgentTaskStore({ getFilePath }) {
   async function readFile(file) {
     const parsed = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.tasks)) throw new Error('Invalid agent task store.');
-    return parsed.tasks.map(task => { const events = Array.isArray(task.events) ? task.events : []; const hasLegacyActions = events.some(event => ['tool_started', 'tool_denied', 'tool_skipped'].includes(event.type)); const hasFingerprintHistory = Array.isArray(task.fingerprints); return { ...task, events, fingerprints: hasFingerprintHistory ? task.fingerprints : [], fingerprintsTruncated: task.fingerprintsTruncated === true || (!hasFingerprintHistory && hasLegacyActions) }; });
+    return parsed.tasks.map(task => { const events = Array.isArray(task.events) ? task.events : []; const hasLegacyActions = events.some(event => ['tool_started', 'tool_denied', 'tool_skipped'].includes(event.type)); const hasFingerprintHistory = Array.isArray(task.fingerprints); const effectLedger = Array.isArray(task.effectLedger) ? task.effectLedger : migrateEffectLedger(events); return { ...task, events, effectLedger, fingerprints: hasFingerprintHistory ? task.fingerprints : [], fingerprintsTruncated: task.fingerprintsTruncated === true || (!hasFingerprintHistory && hasLegacyActions) }; });
   }
 
   async function load() {
@@ -73,7 +73,7 @@ function createAgentTaskStore({ getFilePath }) {
     return mutate(tasks => {
       if (tasks.some(task => task.id === id)) throw new Error('Duplicate agent task ID.');
       const now = new Date().toISOString();
-      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), authorityGrants: [...new Set(authorityGrants)], status: 'running', createdAt: now, updatedAt: now, events: [], fingerprints: [], fingerprintsTruncated: false, result: null });
+      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), authorityGrants: [...new Set(authorityGrants)], status: 'running', createdAt: now, updatedAt: now, events: [], effectLedger: [], fingerprints: [], fingerprintsTruncated: false, result: null });
       return { created: true, id };
     });
   }
@@ -87,7 +87,15 @@ function createAgentTaskStore({ getFilePath }) {
     return mutate(tasks => {
       const task = tasks.find(item => item.id === id);
       if (!task) return { saved: false };
-      task.events.push({ at: new Date().toISOString(), ...safe });
+      const eventRecord = { at: new Date().toISOString(), ...safe };
+      task.events.push(eventRecord);
+      if (safe.type === 'tool_started' && safe.effect && ['write', 'external'].includes(safe.effect.capability) && typeof safe.fingerprint === 'string') {
+        task.effectLedger = Array.isArray(task.effectLedger) ? task.effectLedger : [];
+        task.effectLedger = task.effectLedger.filter(item => item.fingerprint !== safe.fingerprint);
+        task.effectLedger.push({ fingerprint: safe.fingerprint, name: safe.name, capability: safe.effect.capability, startedAt: eventRecord.at });
+      }
+      if (safe.type === 'effect_outcome' && typeof safe.id === 'string') task.effectLedger = (task.effectLedger || []).filter(item => item.fingerprint !== safe.id);
+      if (safe.type === 'tool_finished' && safe.ok === false && typeof safe.fingerprint === 'string') task.effectLedger = (task.effectLedger || []).filter(item => item.fingerprint !== safe.fingerprint);
       task.events = task.events.slice(-250);
       if (["tool_started", "tool_denied", "tool_skipped"].includes(safe.type) && typeof safe.fingerprint === "string" && !task.fingerprints.includes(safe.fingerprint)) {
         if (task.fingerprints.length < 1000) task.fingerprints.push(safe.fingerprint);
@@ -98,17 +106,17 @@ function createAgentTaskStore({ getFilePath }) {
     });
   }
 
-  function unresolvedEffects(task) {
-    const started = new Map();
-    for (const event of task.events || []) {
-      if (event.type === 'tool_started' && event.effect && ['write', 'external'].includes(event.effect.capability) && typeof event.fingerprint === 'string') {
-        started.set(event.fingerprint, { fingerprint: event.fingerprint, name: event.name, capability: event.effect.capability, startedAt: event.at });
-      }
-      if (event.type === 'effect_outcome' && typeof event.id === 'string') started.delete(event.id);
-      if (event.type === 'tool_finished' && event.ok === false && typeof event.fingerprint === 'string') started.delete(event.fingerprint);
+  function migrateEffectLedger(events) {
+    const ledger = new Map();
+    for (const event of events || []) {
+      if (event.type === 'tool_started' && event.effect && ['write', 'external'].includes(event.effect.capability) && typeof event.fingerprint === 'string') ledger.set(event.fingerprint, { fingerprint: event.fingerprint, name: event.name, capability: event.effect.capability, startedAt: event.at });
+      if (event.type === 'effect_outcome' && typeof event.id === 'string') ledger.delete(event.id);
+      if (event.type === 'tool_finished' && event.ok === false && typeof event.fingerprint === 'string') ledger.delete(event.fingerprint);
     }
-    return [...started.values()];
+    return [...ledger.values()];
   }
+
+  function unresolvedEffects(task) { return Array.isArray(task.effectLedger) ? task.effectLedger : migrateEffectLedger(task.events); }
 
   async function resume(id) {
     return mutate(tasks => {

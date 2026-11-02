@@ -136,3 +136,18 @@ test('allows resuming after a durable effect outcome has been recorded', async (
     assert.equal((await store.get('resolved-task')).status, 'running');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('keeps unresolved side effects in a durable ledger after event history rolls over', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-ledger-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'ledger-task', goal: 'Perform an approved action', model: 'local-model' });
+    await store.append('ledger-task', { type: 'tool_started', name: 'workspace.write_file', fingerprint: 'ledger-effect', effect: { capability: 'write' } });
+    for (let i = 0; i < 270; i++) await store.append('ledger-task', { type: 'round', round: i });
+    await store.finish('ledger-task', { status: 'failed', answer: 'Stopped.' });
+    assert.equal((await store.list())[0].resumable, false);
+    assert.equal((await store.get('ledger-task')).effectLedger.length, 1);
+    await assert.rejects(() => store.resume('ledger-task'), /uncertain outcome/);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

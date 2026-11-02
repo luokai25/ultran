@@ -8,12 +8,17 @@ const {createConversationStore}=require("./conversation-store.cjs");
 const {createToolEngine}=require("./tool-engine.cjs");
 const {createAgentHost,createRequestAuthority}=require("./agent-host.cjs");
 const {createAgentTaskStore}=require("./agent-task-store.cjs");
+const {createSkillLibrary}=require("./skill-library.cjs");
 let mainWindow,runtimeProcess=null,runtimeLog=null,runtimeSetupProcess=null,agentReadPolicy="allow";const activeChatRequests=new Map();
 const runtimeRoot=()=>path.join(app.getPath("appData"),"Ultran","airllm");
 const resourceRoot=()=>app.isPackaged?path.join(process.resourcesPath,"airllm"):path.resolve(__dirname,"../../../tools/airllm-windows");
 const historyPath=()=>path.join(app.getPath("userData"),"conversation.json");
 const agentTasksPath=()=>path.join(app.getPath("userData"),"agent-tasks.json");
 const workspaceRoot=()=>path.join(app.getPath("userData"),"workspaces");
+const skillConfigPath=()=>path.join(app.getPath("userData"),"skill-library-source.json");
+let skillSourcePath=null;
+try{const saved=JSON.parse(fsSync.readFileSync(skillConfigPath(),"utf8"));if(typeof saved.sourcePath==="string")skillSourcePath=saved.sourcePath;}catch{}
+const skillLibrary=createSkillLibrary({getSourcePath:()=>skillSourcePath,getInstalledPath:()=>path.join(app.getPath("userData"),"skills")});
 function validMessages(messages){if(!Array.isArray(messages)||messages.length>100)throw new Error("Invalid conversation history.");return messages.map(m=>{const limit=m?.role==="system"?25000:30000;if(!m||!["user","assistant","system"].includes(m.role)||typeof m.content!=="string"||m.content.length>limit)throw new Error("Invalid message.");return {role:m.role,content:m.content};});}
 const conversationStore=createConversationStore({getFilePath:historyPath,validateMessages:validMessages});
 const agentTaskStore=createAgentTaskStore({getFilePath:agentTasksPath});
@@ -41,7 +46,8 @@ async function executeAgentTask({goal,model,endpoint,requestId,context=[],priorF
  const timeout=setTimeout(()=>controller.abort(),30*60*1000);const pending=[];let result;
  try{
   if(resume)await agentTaskStore.resume(requestId);else { const initialAuthority=createRequestAuthority(goal); authorityGrants=initialAuthority.grants; await agentTaskStore.create({id:requestId,goal,model,authorityGrants}); }
-  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,authorityGrants,onEvent:async event=>{
+  const skillContext=await skillLibrary.contextFor(goal,3);
+  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,authorityGrants,skillContext,onEvent:async event=>{
    const save=agentTaskStore.append(requestId,event);pending.push(save);await save;
    if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("ultran:agent-event",{requestId,...event});
   }});
@@ -77,6 +83,11 @@ ipcMain.handle("ultran:clear-agent-tasks",async()=>{
  if(choice.response!==1)return {cleared:false};
  return agentTaskStore.clear();
 });
+ipcMain.handle("ultran:choose-skill-library",async()=>{const picked=await dialog.showOpenDialog(mainWindow,{title:"Choose your AI Agent Skills repository",properties:["openDirectory"]});if(picked.canceled||!picked.filePaths[0])return {cancelled:true};const selected=path.resolve(picked.filePaths[0]);const stat=await fs.stat(selected);if(!stat.isDirectory())throw new Error("Choose a repository folder.");skillSourcePath=selected;await fs.mkdir(path.dirname(skillConfigPath()),{recursive:true});await fs.writeFile(skillConfigPath(),JSON.stringify({sourcePath:selected,updatedAt:new Date().toISOString()}),"utf8");const skills=await skillLibrary.index(true);return {configured:true,totalIndexed:skills.length,sourcePath:selected};});
+ipcMain.handle("ultran:search-skills",(_event,query)=>skillLibrary.search(query,40));
+ipcMain.handle("ultran:install-skill",(_event,id)=>skillLibrary.install(id));
+ipcMain.handle("ultran:list-skills",()=>skillLibrary.listInstalled());
+ipcMain.handle("ultran:set-skill-enabled",(_event,id,enabled)=>skillLibrary.setEnabled(id,enabled));
 ipcMain.handle("ultran:list-agent-tasks",()=>agentTaskStore.list());
 ipcMain.handle("ultran:get-agent-task",(_event,id)=>{if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");return agentTaskStore.get(id);});
 ipcMain.handle("ultran:cancel-agent",async(_event,requestId)=>{const controller=activeAgentRequests.get(requestId);if(!controller)return {cancelled:false};controller.abort();return {cancelled:true};});

@@ -157,3 +157,34 @@ documented, justified non-applicability decision. It does not mean copying all
 1,584+ upstream test files or importing the entire Odysseus web server. A
 subsystem is not complete merely because a file was copied; behavior, security,
 failure modes, platform behavior, and tests must be validated.
+
+## Luo Kai AI Agent Skills integration
+
+Ultran now includes a local skill-library manager for the public MIT-licensed
+`luokai25/ai-agent-skills-by-luo-kai` collection. The current repository
+snapshot contains thousands of skill documents; the indexer discovers valid
+`SKILL.md` files from a user-selected local clone rather than bundling a
+multi-gigabyte registry into the desktop installer. A live validation against
+the cloned repository indexed 9,579 documents with usable frontmatter.
+
+The desktop Skills Library page supports selecting the repository folder,
+refreshing/searching its catalog, installing individual skill packages, and
+enabling/disabling installed skills. Installation copies the skill's bounded
+supporting files while rejecting symlinks and hidden folders; it never executes
+scripts or hooks. Skill packages are limited to 200 files and 10 MB each, and
+individual `SKILL.md` files are limited to 64 KB when indexed/read.
+
+For agent tasks, Ultran selects up to three enabled skills by relevance and
+passes their text as untrusted reference guidance. Skill text cannot grant
+capabilities, override the user goal, bypass native approvals, or authorize
+scripts. The existing request-authority and tool-approval layers remain the
+only source of execution permission. The collection is MIT licensed; the
+upstream repository and its source registries remain attributed to their
+respective authors. Ultran does not redistribute the entire collection in its
+installer.
+
+Focused validation for the skill manager and agent/task subsystems: 47 tests
+passed. A live index of the cloned skills repository returned 9,579 valid
+entries and ranked Python-related skills as expected. Actual Windows UI use and
+real local-model skill-guided inference remain unverified until exercised on
+the user's PC.

@@ -88,6 +88,7 @@ shell, arbitrary process execution, or unrestricted filesystem access.
 Agent tasks are journaled locally in the app user-data directory. The journal
 records task goals, status, bounded progress events, and the final result. It
 uses versioned JSON, serialized atomic replacement, and a backup recovery path.
-The Tasks page can reopen a task journal after restarting Ultran. The read-access preference is enforced in the main process: Allow skips per-read prompts, while Ask requires a native approval for each read action. Write actions always require a separate native confirmation. Interrupted tasks can be explicitly resumed from the Tasks page. Ultran restores recorded tool results, marks any action that started without a recorded outcome as uncertain, and uses persisted action fingerprints to prevent replaying prior side effects. If replay-guard history is incomplete, resume is disabled. Resume is not automatic. Tool output snippets may be retained in this local
-journal, so users should avoid asking Ultran to inspect secrets they do not
-want stored in task history.
+The Tasks page can reopen a task journal after restarting Ultran. The read-access preference is enforced in the main process: Allow skips per-read prompts, while Ask requires a native approval for each read action. Write actions always require a separate native confirmation. Interrupted tasks can be explicitly resumed from the Tasks page. Ultran restores recorded tool results, marks any action that started without a recorded outcome as uncertain, and uses persisted action fingerprints to prevent replaying prior side effects. If replay-guard history is incomplete, resume is disabled. Resume is not automatic. Task goals and bounded tool-output snippets may be retained in this local
+journal. The Tasks page provides a Delete all task history action with native
+confirmation; it removes both the journal and its recovery backup. This does not
+delete project files or conversation history.

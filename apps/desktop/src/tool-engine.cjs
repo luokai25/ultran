@@ -25,8 +25,9 @@ function createToolEngine({ confirm, launch, platform = process.platform }) {
       detail: 'This action starts a Windows application. No other commands or arguments will be executed.',
     });
     if (approved !== true) return { approved: false, executed: false, reason: 'denied' };
-    await launch(app.executable);
-    return { approved: true, executed: true, tool: toolName, appId: rawArgs.appId };
+    const launched = await launch(app.executable);
+    const pid = Number.isInteger(launched?.pid) && launched.pid > 0 ? launched.pid : null;
+    return { approved: true, executed: true, verified: launched?.spawned === true, verification: launched?.spawned === true ? 'windows_process_spawn_event' : 'launcher_acknowledgement', pid, tool: toolName, appId: rawArgs.appId };
   }
 
   return Object.freeze({ execute });

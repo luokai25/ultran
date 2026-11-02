@@ -1,7 +1,9 @@
 """Local OpenAI-compatible API for AirLLM on Windows. Loopback-only by default."""
 import os, re, time, uuid, threading
 from typing import Any
-from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import StreamingResponse\nimport json
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 DEFAULT_MODEL=os.environ.get("ULTRAN_AIRLLM_MODEL","Qwen/Qwen2.5-1.5B-Instruct")
@@ -20,6 +22,7 @@ class Message(BaseModel):
     content:str
 class ChatRequest(BaseModel):
     model:str|None=None
+    request_id:str|None=None
     messages:list[Message]=Field(min_length=1,max_length=80)
     max_tokens:int|None=Field(default=None,ge=1,le=2048)
     temperature:float|None=Field(default=0.2,ge=0,le=2)
@@ -53,7 +56,7 @@ def models():
 _cancel_events:dict[str,threading.Event]={}
 _cancel_lock=threading.Lock()
 def sse(payload:dict[str,Any])->str:
-    return "data: "+json.dumps(payload,ensure_ascii=False)+"\\n\\n"
+    return "data: "+json.dumps(payload,ensure_ascii=False)+"\n\n"
 @app.post("/v1/chat/completions")
 def chat_completions(request:ChatRequest):
     global _load_error
@@ -80,7 +83,7 @@ def chat_completions(request:ChatRequest):
                     return
                 load_model(requested_model)
                 messages=[{"role":m.role,"content":m.content} for m in request.messages]
-                prompt=_tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True) if hasattr(_tokenizer,"apply_chat_template") else "\\n".join("{}: {}".format(m["role"],m["content"]) for m in messages)+"\\nassistant:"
+                prompt=_tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True) if hasattr(_tokenizer,"apply_chat_template") else "\n".join("{}: {}".format(m["role"],m["content"]) for m in messages)+"\nassistant:"
                 encoded=_tokenizer(prompt,return_tensors="pt")
                 input_ids=encoded["input_ids"]
                 if cuda_available(): input_ids=input_ids.cuda()

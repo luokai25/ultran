@@ -35,7 +35,41 @@ const agentListProjectFiles=async projectPath=>{const root=safeWorkspacePath(pro
 const agentReadProjectFile=async(projectPath,relativePath)=>{const root=safeWorkspacePath(projectPath),file=path.resolve(root,relativePath);if(file!==root&&!file.startsWith(root+path.sep))throw new Error("File path is outside the selected project.");const realRoot=await fs.realpath(root),realFile=await fs.realpath(file);if(realFile!==realRoot&&!realFile.startsWith(realRoot+path.sep))throw new Error("Resolved file path is outside the selected project.");const stat=await fs.stat(realFile);if(!stat.isFile()||stat.size>32000)throw new Error("Choose a text file smaller than 32 KB.");return {name:path.basename(file),relativePath,content:(await fs.readFile(realFile,"utf8")).slice(0,24000)};};
 const agentHost=createAgentHost({dialog,getMainWindow:()=>mainWindow,getReadPolicy:()=>agentReadPolicy,toolEngine,workspaceRoot,safeWorkspacePath,listProjectFiles:agentListProjectFiles,readProjectFile:agentReadProjectFile,systemInfo:()=>({platform:process.platform,arch:process.arch,cpuCount:os.cpus().length,totalMemory:os.totalmem(),freeMemory:os.freemem()})});
 const activeAgentRequests=new Map();
-ipcMain.handle("ultran:agent-run",async(_event,args)=>{const {goal,model,endpoint,requestId}=args||{};if(typeof requestId!=="string"||!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)||activeAgentRequests.has(requestId))throw new Error("Invalid or duplicate agent request.");const controller=new AbortController();activeAgentRequests.set(requestId,controller);const timeout=setTimeout(()=>controller.abort(),30*60*1000);const pending=[];let result;try{await agentTaskStore.create({id:requestId,goal,model});result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,onEvent:event=>{pending.push(agentTaskStore.append(requestId,event));if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("ultran:agent-event",{requestId,...event});}});await Promise.allSettled(pending);await agentTaskStore.finish(requestId,result);return {...result,taskId:requestId};}catch(error){await Promise.allSettled(pending);await agentTaskStore.finish(requestId,{status:controller.signal.aborted?"cancelled":"failed",reason:error.message}).catch(()=>{});throw error;}finally{clearTimeout(timeout);activeAgentRequests.delete(requestId);}});
+async function executeAgentTask({goal,model,endpoint,requestId,context=[],priorFingerprints=[],resume=false}){
+ if(typeof requestId!=="string"||!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)||activeAgentRequests.has(requestId))throw new Error("Invalid or duplicate agent request.");
+ const controller=new AbortController();activeAgentRequests.set(requestId,controller);
+ const timeout=setTimeout(()=>controller.abort(),30*60*1000);const pending=[];let result;
+ try{
+  if(resume)await agentTaskStore.resume(requestId);else await agentTaskStore.create({id:requestId,goal,model});
+  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,onEvent:event=>{
+   pending.push(agentTaskStore.append(requestId,event));
+   if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("ultran:agent-event",{requestId,...event});
+  }});
+  await Promise.allSettled(pending);await agentTaskStore.finish(requestId,result);
+  return {...result,taskId:requestId};
+ }catch(error){
+  await Promise.allSettled(pending);
+  await agentTaskStore.finish(requestId,{status:controller.signal.aborted?"cancelled":"failed",reason:error.message}).catch(()=>{});
+  throw error;
+ }finally{clearTimeout(timeout);activeAgentRequests.delete(requestId);}
+}
+ipcMain.handle("ultran:agent-run",(_event,args)=>executeAgentTask(args||{}));
+ipcMain.handle("ultran:resume-agent-task",async(_event,id)=>{
+ if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");
+ const task=await agentTaskStore.get(id);
+ if(!task)throw new Error("Agent task was not found.");
+ const fingerprints=(task.events||[]).filter(event=>event.type==="tool_started"&&typeof event.fingerprint==="string").map(event=>event.fingerprint);
+ const finished=new Set((task.events||[]).filter(event=>event.type==="tool_finished"&&typeof event.fingerprint==="string").map(event=>event.fingerprint));
+ const history=[];
+ for(const event of task.events||[]){
+  if(event.type==="tool_finished")history.push({role:"tool",name:event.name,ok:event.ok===true,output:event.ok?String(event.output||"").slice(0,2500):undefined,error:event.ok?undefined:String(event.error||"Action failed.")});
+  else if(event.type==="tool_denied")history.push({role:"tool",name:event.name,ok:false,error:"User denied this action previously. Do not repeat it."});
+  else if(event.type==="tool_rejected")history.push({role:"tool",name:event.name,ok:false,error:"Tool was unavailable previously."});
+  else if(event.type==="tool_skipped")history.push({role:"tool",name:event.name,ok:false,error:"Repeated action was skipped previously."});
+  else if(event.type==="tool_started"&&!finished.has(event.fingerprint))history.push({role:"tool",name:event.name,ok:false,error:"This action was started before Ultran stopped, but its completion was not recorded. Its outcome is unknown. Inspect the current state before deciding what to do next."});
+ }
+ return executeAgentTask({goal:task.goal,model:task.model,endpoint:"http://127.0.0.1:11435",requestId:id,context:history.slice(-20),priorFingerprints:fingerprints,resume:true});
+});
 ipcMain.handle("ultran:list-agent-tasks",()=>agentTaskStore.list());
 ipcMain.handle("ultran:get-agent-task",(_event,id)=>{if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");return agentTaskStore.get(id);});
 ipcMain.handle("ultran:cancel-agent",async(_event,requestId)=>{const controller=activeAgentRequests.get(requestId);if(!controller)return {cancelled:false};controller.abort();return {cancelled:true};});
@@ -46,6 +80,6 @@ ipcMain.handle("ultran:load-history",async()=>{const result=await conversationSt
 ipcMain.handle("ultran:save-history",async(_event,messages)=>conversationStore.save(messages));
 ipcMain.handle("ultran:clear-history",async()=>conversationStore.clear());
 ipcMain.handle("ultran:open-external",async(_event,url)=>{if(typeof url!=="string"||!(url.startsWith("https://github.com/")||url.startsWith("https://huggingface.co/")))return false;await shell.openExternal(url);return true;});
-app.whenReady().then(()=>{createWindow();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});});
+app.whenReady().then(async()=>{await agentTaskStore.markInterrupted();createWindow();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});});
 app.on("before-quit",()=>{if(runtimeProcess)runtimeProcess.kill();if(runtimeLog)runtimeLog.end();});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit();});

@@ -109,6 +109,9 @@ def chat_completions(request:ChatRequest):
                     yield sse({"type":"cancelled","request_id":request_id})
                     return
                 load_model(requested_model)
+                if cancel_event.is_set():
+                    yield sse({"type":"cancelled","request_id":request_id,"elapsed_seconds":round(time.time()-started,2)})
+                    return
                 messages=[{"role":m.role,"content":m.content} for m in request.messages]
                 prompt=_tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True) if hasattr(_tokenizer,"apply_chat_template") else "\n".join("{}: {}".format(m["role"],m["content"]) for m in messages)+"\nassistant:"
                 encoded=_tokenizer(prompt,return_tensors="pt")

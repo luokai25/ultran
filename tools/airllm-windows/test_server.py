@@ -160,6 +160,40 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(server.health()["status"], "ready")
         self.assertIsNone(server.health()["loading_model"])
 
+    def test_cancellation_during_model_load_skips_generation(self):
+        load_started = threading.Event()
+        finish_load = threading.Event()
+
+        def delayed_load(model_id):
+            server._loading_model_id = model_id
+            load_started.set()
+            finish_load.wait(timeout=2)
+            server._tokenizer = self.tokenizer
+            server._model = self.model
+            server._model_id = model_id
+            server._loading_model_id = None
+
+        response = server.chat_completions(self.request("load-cancel-test"))
+
+        async def run():
+            with patch.object(server, "load_model", side_effect=delayed_load):
+                task = asyncio.create_task(self.consume(response))
+                for _ in range(200):
+                    if load_started.is_set():
+                        break
+                    await asyncio.sleep(0.005)
+                self.assertTrue(load_started.is_set(), "model loading did not begin")
+                result = server.cancel_generation("load-cancel-test")
+                finish_load.set()
+                chunks = await task
+                return result, chunks
+
+        result, chunks = asyncio.run(run())
+        payload = b"".join(chunks).decode("utf-8")
+        self.assertTrue(result["cancelled"])
+        self.assertIn('"type": "cancelled"', payload)
+        self.assertFalse(self.model.generate_called)
+
     def test_mid_generation_cancellation_reaches_stopping_criteria(self):
         self.model.wait_for_cancel = True
         response = server.chat_completions(self.request("cancel-test"))

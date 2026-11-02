@@ -117,7 +117,8 @@ class BridgeTests(unittest.TestCase):
 
     @staticmethod
     async def consume(response):
-        return [chunk async for chunk in response.body_iterator]
+        chunks = [chunk async for chunk in response.body_iterator]
+        return [chunk.encode("utf-8") if isinstance(chunk, str) else chunk for chunk in chunks]
 
     def request(self, request_id):
         return server.ChatRequest(
@@ -148,6 +149,8 @@ class BridgeTests(unittest.TestCase):
             return first, result, rest
 
         first, result, rest = asyncio.run(run())
+        first = first.encode("utf-8") if isinstance(first, str) else first
+        rest = [chunk.encode("utf-8") if isinstance(chunk, str) else chunk for chunk in rest]
         payload = (first + b"".join(rest)).decode("utf-8")
         self.assertTrue(result["cancelled"])
         self.assertIn('"type": "token"', payload)

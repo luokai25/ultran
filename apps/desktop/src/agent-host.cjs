@@ -2,6 +2,13 @@
 
 const { createAgentRuntime } = require('./agent-runtime.cjs');
 
+function requireExactKeys(args, keys) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('Tool arguments must be an object.');
+  const actual = Object.keys(args).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) throw new Error('Unexpected tool arguments.');
+}
+
 function extractJson(text) {
   const source = String(text || '').trim();
   try { return JSON.parse(source); } catch {}
@@ -199,7 +206,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
     'system.get_info': {
       capability: 'read',
       description: 'Read basic local device information',
-      execute: async () => systemInfo()
+      execute: async args => { requireExactKeys(args, []); return systemInfo(); }
     }
   };
 

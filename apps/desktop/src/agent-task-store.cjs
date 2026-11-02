@@ -98,10 +98,23 @@ function createAgentTaskStore({ getFilePath }) {
     });
   }
 
+  function unresolvedEffects(task) {
+    const started = new Map();
+    for (const event of task.events || []) {
+      if (event.type === 'tool_started' && event.effect && ['write', 'external'].includes(event.effect.capability) && typeof event.fingerprint === 'string') {
+        started.set(event.fingerprint, { fingerprint: event.fingerprint, name: event.name, capability: event.effect.capability, startedAt: event.at });
+      }
+      if (event.type === 'effect_outcome' && typeof event.id === 'string') started.delete(event.id);
+      if (event.type === 'tool_finished' && event.ok === false && typeof event.fingerprint === 'string') started.delete(event.fingerprint);
+    }
+    return [...started.values()];
+  }
+
   async function resume(id) {
     return mutate(tasks => {
       const task = tasks.find(item => item.id === id);
       if (!task || !['interrupted', 'failed', 'cancelled', 'limit_reached'].includes(task.status)) throw new Error('This task cannot be resumed.');
+      if (unresolvedEffects(task).length) throw new Error('This task has an action with an uncertain outcome. Review the affected resource before resuming.');
       task.status = 'running';
       task.updatedAt = new Date().toISOString();
       task.events.push({ at: task.updatedAt, type: 'resumed' });
@@ -145,7 +158,7 @@ function createAgentTaskStore({ getFilePath }) {
     return result.tasks.slice(0, 50).map(task => ({
       id: task.id, goal: task.goal, model: task.model, status: task.status,
       createdAt: task.createdAt, updatedAt: task.updatedAt, result: task.result,
-      eventCount: Array.isArray(task.events) ? task.events.length : 0, resumable: ['interrupted', 'failed', 'cancelled', 'limit_reached'].includes(task.status) && task.fingerprintsTruncated !== true
+      eventCount: Array.isArray(task.events) ? task.events.length : 0, unresolvedEffects: unresolvedEffects(task), resumable: ['interrupted', 'failed', 'cancelled', 'limit_reached'].includes(task.status) && task.fingerprintsTruncated !== true && unresolvedEffects(task).length === 0
     }));
   }
 
@@ -163,7 +176,7 @@ function createAgentTaskStore({ getFilePath }) {
     return result.tasks.find(task => task.id === id) || null;
   }
 
-  return Object.freeze({ create, append, resume, markInterrupted, finish, list, get, clear });
+  return Object.freeze({ create, append, resume, markInterrupted, finish, list, get, clear, unresolvedEffects });
 }
 
 module.exports = { createAgentTaskStore };

@@ -14,7 +14,7 @@ function createRequestAuthority(goal) {
   const text = goal.normalize('NFKC').toLowerCase();
   const read = /(^|[^a-z])(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)(?=$|[^a-z])/.test(text);
   const write = /(^|[^a-z])(create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)(?=$|[^a-z])/.test(text);
-  const external = /(^|[^a-z])(open|launch|start)(?=$|[^a-z]).{0,48}\\b(app|application|program|explorer|notepad|calculator|task manager)(?=$|[^a-z])/.test(text);
+  const external = /(open|launch|start).{0,48}(app|application|program|explorer|notepad|calculator|task manager)/.test(text);
   const grants = [];
   if (read) grants.push('read');
   if (write) grants.push('write');

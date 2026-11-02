@@ -41,9 +41,12 @@ function parseIndex(value: unknown): SkillIndex | null {
     typeof item.c === "string" && item.c.length <= 120
   ).slice(0, 12_000);
   if (!skills.length) return null;
-  const cats = isRecord(value.cats)
-    ? Object.fromEntries(Object.entries(value.cats).filter(([, v]) => typeof v === "string").slice(0, 300))
-    : {};
+  const cats: Record<string, string> = {};
+  if (isRecord(value.cats)) {
+    for (const [key, label] of Object.entries(value.cats).slice(0, 300)) {
+      if (typeof label === "string") cats[key] = label;
+    }
+  }
   return { total: Number.isFinite(Number(value.total)) ? Number(value.total) : skills.length, skills, cats };
 }
 
@@ -140,7 +143,10 @@ export async function loadRelevantSkillContext(query: string, limit = 2): Promis
       return null;
     });
   }
-  const index = await indexPromise;
+  const index = await Promise.race([
+    indexPromise,
+    new Promise<null>((resolve) => { window.setTimeout(() => resolve(null), 5_000); }),
+  ]);
   if (!index) return { context: "", names: [] };
   const matches = findMatches(index, text, limit);
   if (!matches.length) return { context: "", names: [] };

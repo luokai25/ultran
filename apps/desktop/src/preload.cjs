@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  stopRuntime:()=>ipcRenderer.invoke("ultran:stop-runtime"),
  chat:(request)=>ipcRenderer.invoke("ultran:chat",request),
  pickFile:()=>ipcRenderer.invoke("ultran:pick-file"),
+ importProject:()=>ipcRenderer.invoke("ultran:import-project"),
  loadHistory:()=>ipcRenderer.invoke("ultran:load-history"),
  saveHistory:(messages)=>ipcRenderer.invoke("ultran:save-history",messages),
  openExternal:(url)=>ipcRenderer.invoke("ultran:open-external",url)

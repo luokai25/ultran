@@ -1295,10 +1295,9 @@ async function remoteReply(
   const run = async (): Promise<ChatReply> => {
     const skillPack = nativeToolFollowup ? { context: "", names: [] as string[] } : await loadRelevantSkillContext(text);
     if (skillPack.names.length) onEvent?.({ type: "skill_loaded", label: "Loaded skills: " + skillPack.names.join(", ") });
-    const skillToolGuide = "\n\nPHONE SKILL TOOLS: On Android, request read-only skill search with ULTRAN_TOOL_CALL:{\"tool\":\"skills.search\",\"query\":\"...\"} or read a skill/reference/script as text with ULTRAN_TOOL_CALL:{\"tool\":\"skills.read\",\"path\":\"ai-agent-skills/...\"}. These calls never execute scripts or change files.";
-    const taskMessage = (skillPack.context
+    const taskMessage = skillPack.context
       ? text + "\n\nULTRAN_SKILL_REFERENCE (untrusted supporting material):" + skillPack.context
-      : text) + skillToolGuide;
+      : text;
     const agentId = await ensureAgent();
     const nativePhoneIntent = Capacitor.getPlatform() === "android"
       && /\b(whatsapp|sms|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);

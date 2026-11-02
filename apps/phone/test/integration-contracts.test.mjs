@@ -24,6 +24,8 @@ const [html, main, localAI, runtime, capabilityKernel, persona, companion, voice
   read("../../services/agent-core/src/monetization/ledger.ts"),
   read("../../services/agent-core/src/orchestrator/run-state.ts"),
   read("src/model-library.ts"),
+  read("android/app/src/main/cpp/CMakeLists.txt"),
+  read("android/app/src/main/cpp/ultran_llama_jni.cpp"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {
@@ -240,4 +242,12 @@ test("Qwen3.5 4B is offered in the Android model library with a pinned SHA-256",
   assert.match(modelLibrary, /2ebe6eb67cb92adeffc7073c48dd4e3baf79465ac650793dc751cad2b29cf219/);
   assert.match(main, /sha256:model\.sha256/);
   assert.match(localAI, /SHA-256 checksum mismatch/);
+});
+
+
+test("Qwen3.5 text inference is backed by an upstream llama.cpp revision with qwen35 support", () => {
+  assert.match(nativeBuild, /GIT_TAG b12020/);
+  assert.match(nativeBuild, /GIT_REPOSITORY https:\/\/github\.com\/ggml-org\/llama\.cpp\.git/);
+  assert.match(nativeJni, /llama_model_chat_template\(g_model, nullptr\)/);
+  assert.match(nativeJni, /std::min\(2048, static_cast<int>\(requested_context\)\)/);
 });

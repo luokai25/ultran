@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  startRuntime:(model)=>ipcRenderer.invoke("ultran:start-runtime",model),
  stopRuntime:()=>ipcRenderer.invoke("ultran:stop-runtime"),
  chat:(request)=>ipcRenderer.invoke("ultran:chat",request),
+ listProjectFiles:(projectPath)=>ipcRenderer.invoke("ultran:list-project-files",projectPath),
+ readProjectFile:(projectPath,relativePath)=>ipcRenderer.invoke("ultran:read-project-file",projectPath,relativePath),
  pickFile:()=>ipcRenderer.invoke("ultran:pick-file"),
  importProject:()=>ipcRenderer.invoke("ultran:import-project"),
  loadHistory:()=>ipcRenderer.invoke("ultran:load-history"),

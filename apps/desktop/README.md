@@ -1,9 +1,14 @@
 # Ultran Windows desktop companion
 
-First desktop client for the Ultran monorepo. It provides a responsive chat UI
-connected only to the local AirLLM API at 127.0.0.1:11435. It does not yet share
-chat history with Android or expose Windows file/command tools; these require a
-permissioned device-sync and tool-approval layer.
+First Windows desktop client for the Ultran monorepo. It provides a responsive
+chat UI connected only to the local AirLLM API at 127.0.0.1:11435. Conversations
+are saved to this Windows user's Electron app-data folder. Chat history does not
+yet sync with Android. Windows command execution is not enabled.
+
+The user can explicitly select a text/source file through the native Windows
+file picker. Only approved text-like extensions up to 128 KB are accepted; the
+selected text is added as context for local model requests. File contents are
+treated as untrusted data, not as instructions.
 
 ## Requirements
 - Windows 10 x64
@@ -21,19 +26,20 @@ In another PowerShell window:
 Set-ExecutionPolicy -Scope Process Bypass
 .\tools\airllm-windows\start-ultran-airllm.ps1
 ```
-First run installs Python dependencies; the model downloads on first inference.
-Model weights are not bundled into the desktop app.
+First run installs Python dependencies; model weights download on first
+inference. Model weights are not bundled into the desktop app.
 
 ## Build a portable Windows executable
 ```powershell
 pnpm install
 pnpm --filter @ultran/desktop dist:win
 ```
-Output is under apps/desktop/dist. This is not yet self-contained: Python and
-the model runtime must be installed separately.
+Output is under apps/desktop/dist. This is not self-contained: Python and the
+model runtime must be installed separately.
 
 ## Security
 Electron uses context isolation, sandboxing and no renderer Node integration.
-The renderer cannot make arbitrary network requests. Its preload bridge permits
-only status/chat calls to the hard-coded loopback endpoint. No LAN API, remote
-device sync, or Windows command/file automation is included in this build.
+The renderer cannot make arbitrary network requests. The preload bridge only
+exposes status/chat calls to the fixed loopback endpoint, a native file picker,
+and bounded local history persistence. No LAN API, remote device sync, or
+Windows command execution is included in this build.

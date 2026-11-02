@@ -56,10 +56,12 @@ function createConversationStore({ getFilePath, validateMessages }) {
           await handle.close();
         }
         try {
+          // Never replace a known-good backup with a damaged primary file.
+          await readCandidate(file);
           await fs.copyFile(file, backupTemporary);
           await fs.rename(backupTemporary, file + '.bak');
         } catch (error) {
-          if (error.code !== 'ENOENT') throw error;
+          if (error.code !== 'ENOENT' && !(error instanceof SyntaxError) && !/Unsupported conversation history format|Invalid conversation history|Invalid message/.test(error.message)) throw error;
         }
         await fs.rename(temporary, file);
         return { saved: true, count: messages.length };

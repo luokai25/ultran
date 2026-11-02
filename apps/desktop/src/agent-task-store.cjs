@@ -67,7 +67,7 @@ function createAgentTaskStore({ getFilePath }) {
     return mutate(tasks => {
       if (tasks.some(task => task.id === id)) throw new Error('Duplicate agent task ID.');
       const now = new Date().toISOString();
-      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), status: 'running', createdAt: now, updatedAt: now, events: [], result: null });
+      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), status: 'running', createdAt: now, updatedAt: now, events: [], fingerprints: [], fingerprintsTruncated: false, result: null });
       return { created: true, id };
     });
   }
@@ -135,7 +135,7 @@ function createAgentTaskStore({ getFilePath }) {
     return result.tasks.slice(0, 50).map(task => ({
       id: task.id, goal: task.goal, model: task.model, status: task.status,
       createdAt: task.createdAt, updatedAt: task.updatedAt, result: task.result,
-      eventCount: Array.isArray(task.events) ? task.events.length : 0
+      eventCount: Array.isArray(task.events) ? task.events.length : 0, resumable: ['interrupted', 'failed', 'cancelled', 'limit_reached'].includes(task.status) && task.fingerprintsTruncated !== true
     }));
   }
 

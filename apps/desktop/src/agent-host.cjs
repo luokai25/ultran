@@ -12,9 +12,17 @@ const OPERATION_RULES = Object.freeze({
 function createRequestAuthority(goal, inheritedGrants = null) {
   if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid request authority input.');
   const text = goal.normalize('NFKC').toLowerCase();
-  const read = /(^|[^a-z])(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)(?=$|[^a-z])/.test(text);
-  const write = /(^|[^a-z])(create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)(?=$|[^a-z])/.test(text);
-  const external = /(open|launch|start).{0,48}(app|application|program|explorer|notepad|calculator|task manager)/.test(text);
+  const hasIntent = pattern => {
+    const expression = new RegExp('(^|[^a-z])(' + pattern + ')(?=$|[^a-z])', 'g');
+    for (const match of text.matchAll(expression)) {
+      const prefix = text.slice(Math.max(0, match.index - 24), match.index);
+      if (!/(?:do not|don't|never|not|without)\\s*$/.test(prefix)) return true;
+    }
+    return false;
+  };
+  const read = hasIntent('inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos');
+  const write = hasIntent('create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate');
+  const external = hasIntent('open|launch|start') && /(app|application|program|explorer|notepad|calculator|task manager)/.test(text);
   const grants = [];
   if (read) grants.push('read');
   if (write) grants.push('write');

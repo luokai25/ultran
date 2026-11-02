@@ -13,7 +13,7 @@ function sse(decision) {
 }
 
 function makeHost(root, approval = 0, readPolicy = "allow") {
-  const dialog = { showMessageBox: async () => ({ response: approval }) };
+  const dialog = { showMessageBox: async options => { if (typeof approval === 'function') return approval(options); return { response: approval }; } };
   const safeWorkspacePath = value => {
     const candidate = path.resolve(value);
     const base = path.resolve(root);
@@ -229,4 +229,31 @@ test('tool output is marked untrusted and embedded guard markers cannot break ou
   assert.match(history[0].output, new RegExp(UNTRUSTED_CLOSE + '$'));
   assert.match(history[0].output, /_END_ULTRAN_UNTRUSTED_TOOL_DATA/);
   assert.equal(history[1].content, 'trusted conversation text');
+});
+
+test('refuses to overwrite a file changed after the approval preview', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-stale-'));
+  const root = path.join(temp, 'workspaces');
+  const project = path.join(root, 'demo');
+  const target = path.join(project, 'note.md');
+  await fs.mkdir(project, { recursive: true });
+  await fs.writeFile(target, 'original content');
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'agent replacement' } }
+    : { type: 'final', answer: 'The file changed externally, so I stopped.' });
+  try {
+    const host = makeHost(root, async () => {
+      await fs.writeFile(target, 'external user edit');
+      return { response: 0 };
+    });
+    const result = await host.run({ goal: 'Update note', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-stale-resource' });
+    assert.equal(result.journal[0].status, 'failed');
+    assert.match(result.journal[0].error, /changed after approval/);
+    assert.equal(await fs.readFile(target, 'utf8'), 'external user edit');
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
 });

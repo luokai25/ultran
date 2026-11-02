@@ -102,7 +102,9 @@ function createAgentHost({ app, dialog, mainWindow, toolEngine, workspaceRoot, s
       description: 'Launch one approved Windows application',
       execute: async args => {
         if (!args || typeof args.appId !== 'string') throw new Error('Invalid app identifier.');
-        return toolEngine.execute('windows.launch_app', { appId: args.appId });
+        const result = await toolEngine.execute('windows.launch_app', { appId: args.appId });
+        if (!result?.executed) throw new Error('The Windows action was not approved or did not start.');
+        return { verified: true, appId: args.appId, launched: true };
       }
     },
     'system.get_info': {

@@ -5,7 +5,7 @@
  * fetched only for the two best matches. Skills are reference material, never
  * authority to bypass Ultran's system policy, tool grants, or user approvals.
  */
-export type SkillIndexEntry = { n: string; p: string; c: string };
+export type SkillIndexEntry = { n: string; p: string; c: string; d?: string };
 type SkillIndex = { total: number; skills: SkillIndexEntry[]; cats: Record<string, string> };
 export type LoadedSkillContext = { context: string; names: string[] };
 
@@ -38,8 +38,9 @@ function parseIndex(value: unknown): SkillIndex | null {
     isRecord(item) &&
     typeof item.n === "string" && item.n.length > 0 && item.n.length <= 160 &&
     typeof item.p === "string" && item.p.length <= 900 && validSkillPath(item.p) &&
-    typeof item.c === "string" && item.c.length <= 120
-  ).slice(0, 12_000);
+    typeof item.c === "string" && item.c.length <= 120 &&
+    (item.d === undefined || typeof item.d === "string")
+  ).map((item) => ({ ...item, d: typeof item.d === "string" ? item.d.slice(0, 1_200) : "" })).slice(0, 12_000);
   if (!skills.length) return null;
   const cats: Record<string, string> = {};
   if (isRecord(value.cats)) {
@@ -96,11 +97,13 @@ function findMatches(index: SkillIndex, query: string, limit: number): SkillInde
     const name = skill.n.toLowerCase().replace(/[-_]+/g, " ");
     const category = (index.cats[skill.c] ?? skill.c).toLowerCase();
     const path = skill.p.toLowerCase().replace(/[-_()/]+/g, " ");
+    const description = (skill.d ?? "").toLowerCase();
     let score = 0;
     for (const token of tokens) {
       if (name === token) score += 18;
       else if (name.includes(token)) score += 10;
       if (category.includes(token)) score += 5;
+      if (description.includes(token)) score += 4;
       if (path.includes(token)) score += 2;
     }
     if (name.includes(query.toLowerCase().trim())) score += 12;
@@ -131,7 +134,7 @@ async function loadSkillDocument(entry: SkillIndexEntry): Promise<string | null>
   }
 }
 
-/** Search the 8,900+ entry catalog and load only the best matching procedures. */
+/** Search the 5,000+ entry machine-readable catalog and load only the best matching procedures. */
 export async function loadRelevantSkillContext(query: string, limit = 2): Promise<LoadedSkillContext> {
   const text = query.trim();
   if (text.length < 4 || /\b(without|don't|do not|disable|skip)\s+(using\s+)?skills?\b/i.test(text)) {

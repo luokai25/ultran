@@ -23,13 +23,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function validSkillPath(value: string): boolean {
+function validSkillResourcePath(value: string): boolean {
   let decoded = value;
   try { decoded = decodeURIComponent(value); } catch { return false; }
   const parts = decoded.replace(/\\/g, "/").split("/");
   return decoded.startsWith("ai-agent-skills/") &&
-    decoded.endsWith("/SKILL.md") &&
-    !parts.some((part) => part === "." || part === ".." || part.length === 0);
+    !parts.some((part) => part === "." || part === ".." || part.length === 0) &&
+    /\.(?:md|mdx|txt|json|ya?ml|py|sh|js|ts|tsx|jsx|html|css|xml|svg|toml|ini)$/i.test(decoded);
+}
+
+function validSkillPath(value: string): boolean {
+  return validSkillResourcePath(value) && decodeURIComponent(value).endsWith("/SKILL.md");
 }
 
 function parseIndex(value: unknown): SkillIndex | null {
@@ -121,17 +125,46 @@ function encodeSkillPath(path: string): string {
   }).join("/");
 }
 
-async function loadSkillDocument(entry: SkillIndexEntry): Promise<string | null> {
-  if (!validSkillPath(entry.p)) return null;
-  const cached = documentCache.get(entry.p);
+export async function loadSkillResource(path: string): Promise<string | null> {
+  if (!validSkillResourcePath(path)) return null;
+  const cached = documentCache.get(path);
   if (cached) return cached;
   try {
-    const document = await fetchText(RAW_BASE + encodeSkillPath(entry.p), 20_000, MAX_SKILL_CHARS);
-    documentCache.set(entry.p, document);
+    const document = await fetchText(RAW_BASE + encodeSkillPath(path), 20_000, MAX_SKILL_CHARS);
+    documentCache.set(path, document);
     return document;
   } catch {
     return null;
   }
+}
+
+async function loadSkillDocument(entry: SkillIndexEntry): Promise<string | null> {
+  if (!validSkillPath(entry.p)) return null;
+  return loadSkillResource(entry.p);
+}
+
+async function getSkillIndex(): Promise<SkillIndex | null> {
+  if (!indexPromise) {
+    indexPromise = loadIndex().catch(() => {
+      indexPromise = null;
+      return null;
+    });
+  }
+  return Promise.race([
+    indexPromise,
+    new Promise<null>((resolve) => { window.setTimeout(() => resolve(null), 5_000); }),
+  ]);
+}
+
+export async function searchSkillCatalog(query: string, limit = 5): Promise<Array<{ name: string; category: string; path: string; description: string }>> {
+  const index = await getSkillIndex();
+  if (!index) return [];
+  return findMatches(index, query, Math.max(1, Math.min(10, limit))).map((entry) => ({
+    name: entry.n,
+    category: index.cats[entry.c] ?? entry.c,
+    path: entry.p,
+    description: entry.d ?? "",
+  }));
 }
 
 /** Search the 5,000+ entry machine-readable catalog and load only the best matching procedures. */
@@ -140,16 +173,7 @@ export async function loadRelevantSkillContext(query: string, limit = 2): Promis
   if (text.length < 4 || /\b(without|don't|do not|disable|skip)\s+(using\s+)?skills?\b/i.test(text)) {
     return { context: "", names: [] };
   }
-  if (!indexPromise) {
-    indexPromise = loadIndex().catch(() => {
-      indexPromise = null;
-      return null;
-    });
-  }
-  const index = await Promise.race([
-    indexPromise,
-    new Promise<null>((resolve) => { window.setTimeout(() => resolve(null), 5_000); }),
-  ]);
+  const index = await getSkillIndex();
   if (!index) return { context: "", names: [] };
   const matches = findMatches(index, text, limit);
   if (!matches.length) return { context: "", names: [] };

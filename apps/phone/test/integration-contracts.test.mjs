@@ -276,3 +276,15 @@ test("public skill catalog is searched on demand and loaded procedures cannot by
   assert.match(main, /loadRelevantSkillContext\(task\)/);
   assert.match(main, /type === "skill_loaded"/);
 });
+
+
+test("skills engine exposes bounded read-only search and resource reads for references", () => {
+  assert.match(skillsEngine, /export async function searchSkillCatalog/);
+  assert.match(skillsEngine, /export async function loadSkillResource/);
+  assert.match(skillsEngine, /validSkillResourcePath/);
+  assert.match(skillsEngine, /ai-agent-skills\//);
+  assert.match(main, /tool === "skills.search"/);
+  assert.match(main, /tool === "skills.read"/);
+  assert.match(main, /Read-only public skill resource/);
+  assert.match(main, /never execute scripts/);
+});

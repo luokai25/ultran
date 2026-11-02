@@ -83,7 +83,16 @@ security examples. The relevant architecture is grouped into these domains:
   cannot widen permissions after a restart.
 - Added prompt-injection guard markers around tool history returned to the local
   planner, with embedded marker breakout neutralization and regression coverage.
-- The desktop agent host tests and related runtime/task-store tests pass (38
+- Added an explicit tool preflight phase. File-write approvals are now bound to
+  the resolved target path, device/inode identity, size, modification time, and
+  SHA-256 content digest. The identity and digest are checked again immediately
+  before replacement, and a stale approval fails closed without overwriting an
+  intervening user edit.
+- Added side-effect lifecycle events that distinguish verified outcomes,
+  acknowledged-but-unverified outcomes, and failed/uncertain outcomes. The task
+  journal persists these events; the runtime does not infer verification from
+  a success-shaped message.
+- The desktop agent host tests and related runtime/task-store tests pass (41
   tests at this checkpoint).
 
 ### Remaining parity gaps (not yet implemented)

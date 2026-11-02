@@ -63,7 +63,7 @@ and model weights are installed separately and are not bundled in the EXE.
 The chat toolbar includes an explicit Agent mode. When enabled, the local model
 returns one structured action at a time. Ultran runs a bounded loop (8 planning
 rounds, 12 tool calls) and returns tool results to the local planner. Available
-tools are imported-project listing, bounded text-file listing and reading,
+tools are imported-project listing, bounded text-file listing, literal code search and reading,
 basic system information, and a fixed Windows app launcher. The launcher uses
 the existing native Windows approval dialog. Read-only workspace tools are
 restricted to imported workspace folders, skip symlinks and dependency/build

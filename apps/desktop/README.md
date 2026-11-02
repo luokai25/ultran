@@ -2,8 +2,9 @@
 
 First Windows desktop client for the Ultran monorepo. It provides a responsive
 chat UI connected only to the local AirLLM API at 127.0.0.1:11435. Conversations
-are saved to this Windows user's Electron app-data folder. Chat history does not
-yet sync with Android. Windows command execution is not enabled.
+are saved to this Windows user's Electron app-data folder using versioned,
+crash-safe writes with a recovery backup. Clearing history also removes its
+backup. Chat history does not yet sync with Android.
 
 The user can explicitly select a text/source file through the native Windows
 file picker. Only approved text-like extensions up to 128 KB are accepted; the
@@ -39,7 +40,12 @@ model runtime must be installed separately.
 
 ## Security
 Electron uses context isolation, sandboxing and no renderer Node integration.
-The renderer cannot make arbitrary network requests. The preload bridge only
-exposes status/chat calls to the fixed loopback endpoint, a native file picker,
-and bounded local history persistence. No LAN API, remote device sync, or
-Windows command execution is included in this build.
+The renderer cannot make arbitrary network requests. The preload bridge exposes
+only fixed local APIs. Built-in app launching is limited to File Explorer,
+Notepad, Calculator and Task Manager; the main process validates the app ID and
+shows a native Windows confirmation before starting it. No shell, arbitrary
+commands, LAN API, or remote device sync is enabled.
+
+Model repositories requiring custom remote Python code are rejected before
+AirLLM loads them. The bridge is loopback-only by default. Runtime dependencies
+and model weights are installed separately and are not bundled in the EXE.

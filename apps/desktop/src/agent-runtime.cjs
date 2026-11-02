@@ -37,7 +37,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       await emit('round', { round, maxRounds: config.maxRounds });
       let decision;
       try { decision = await planner({ goal, history: history.slice(), journal: journal.slice(), round, signal, metadata }); }
-      catch (error) { return finish('failed', '', 'planner_error: ' + String(error?.message || error).slice(0, 300)); }
+      catch (error) { if (signal?.aborted) return finish('cancelled', '', 'aborted'); return finish('failed', '', 'planner_error: ' + String(error?.message || error).slice(0, 300)); }
       if (signal?.aborted) return finish('cancelled', '', 'aborted');
       if (!decision || typeof decision !== 'object' || Array.isArray(decision)) return finish('failed', '', 'invalid_planner_response');
       if (decision.type === 'final') {

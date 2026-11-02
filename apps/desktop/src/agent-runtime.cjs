@@ -24,7 +24,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
   async function run({ goal, context = [], priorFingerprints = [], signal, metadata = {} }) {
     if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid agent goal.');
     const history = Array.isArray(context) ? context.slice(-20) : [];
-    const seen = new Set(Array.isArray(priorFingerprints) ? priorFingerprints.filter(value => typeof value === "string").slice(-100) : []);
+    const seen = new Set(Array.isArray(priorFingerprints) ? priorFingerprints.filter(value => typeof value === "string").slice(-1000) : []);
     const journal = [];
     let calls = 0;
     let rounds = 0;

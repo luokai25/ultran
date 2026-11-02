@@ -65,6 +65,20 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build portable Windows executable
         run: pnpm --filter @ultran/desktop dist:win
+      - name: Smoke-test packaged desktop startup
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "apps/desktop/dist/*.exe" | Select-Object -First 1
+          if (!$exe) { throw "Portable executable was not produced." }
+          $launcher = Start-Process -FilePath $exe.FullName -PassThru
+          Start-Sleep -Seconds 8
+          $app = Get-Process -Name "Ultran" -ErrorAction SilentlyContinue
+          if (!$app) {
+            if (!$launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
+            throw "Packaged Ultran process did not remain running after launch."
+          }
+          $app | Stop-Process -Force
+          if (!$launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:

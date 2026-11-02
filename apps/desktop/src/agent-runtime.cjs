@@ -17,10 +17,12 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
     const seen = new Set();
     const journal = [];
     let calls = 0;
+    let rounds = 0;
     const emit = (type, data = {}) => { try { onEvent({ type, ...data }); } catch {} };
-    const finish = (status, answer = '', reason = null) => ({ status, answer, reason, calls, rounds: journal.length, journal });
+    const finish = (status, answer = '', reason = null) => ({ status, answer, reason, calls, rounds, journal });
 
     for (let round = 1; round <= config.maxRounds; round++) {
+      rounds = round;
       if (signal?.aborted) return finish('cancelled', '', 'aborted');
       emit('round', { round, maxRounds: config.maxRounds });
       let decision;

@@ -25,9 +25,7 @@ realistic interactive target.
 4. The bridge binds to loopback at http://127.0.0.1:11435.
 5. Check /health and /v1/models in the browser.
 
-The first run downloads model weights and layer shards. Keep ample free disk
-space; budget at least twice the checkpoint size where possible. The first
-request can be extremely slow, especially on CPU.
+Runtime setup now imports and verifies PyTorch, Transformers, AirLLM, FastAPI, and Uvicorn before it reports success. The first chat request downloads model weights and AirLLM layer shards. Keep ample free disk space; budget at least twice the checkpoint size where possible. Hugging Face's cache handles resumable file downloads, but an interrupted first load may need to be retried. The first request can be extremely slow, especially on CPU.
 
 Set ULTRAN_AIRLLM_MODEL before launching to select another compatible Hugging
 Face model. Some repositories require authentication or license acceptance. Do

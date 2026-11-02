@@ -26,8 +26,15 @@ if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
 # This laptop has AMD Radeon graphics, so install CPU PyTorch rather than CUDA.
 & $Py -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 if ($LASTEXITCODE -ne 0) { throw "CPU PyTorch install failed." }
-& $Py -m pip install -r (Join-Path $PSScriptRoot "requirements.txt")
+& $Py -m pip install --disable-pip-version-check -r (Join-Path $PSScriptRoot "requirements.txt")
 if ($LASTEXITCODE -ne 0) { throw "AirLLM dependency installation failed." }
+# Verify the imports Ultran actually needs before reporting a successful setup.
+# This catches broken wheels and dependency conflicts before the first chat request.
+$Verification = & $Py -c "import sys, torch, transformers, airllm, fastapi, uvicorn; print('Python: {}'.format(sys.version.split()[0])); print('PyTorch: {}'.format(torch.__version__)); print('Transformers: {}'.format(transformers.__version__)); print('AirLLM: {}'.format(getattr(airllm, '__version__', 'installed'))); print('FastAPI: {}'.format(fastapi.__version__)); print('CUDA available: {}'.format(torch.cuda.is_available()))"
+if ($LASTEXITCODE -ne 0) { throw "Runtime packages were installed but the AirLLM import verification failed. Review pip output and retry runtime setup." }
 Write-Host ""
-Write-Host "Ultran's local model runtime is installed." -ForegroundColor Green
+Write-Host "Runtime dependency verification:" -ForegroundColor Cyan
+$Verification | ForEach-Object { Write-Host $_ }
+Write-Host ""
+Write-Host "Ultran's local model runtime is installed and verified." -ForegroundColor Green
 Write-Host "Return to Ultran and click Start local brain." -ForegroundColor Green

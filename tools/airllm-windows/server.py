@@ -1,6 +1,6 @@
 """Local OpenAI-compatible API for AirLLM on Windows. Loopback-only by default."""
 import os, re, time, uuid, threading
-from typing import Any
+from typing import Any, Literal
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 import json
@@ -18,11 +18,11 @@ _model_id=None
 _load_error=None
 _model_lock=threading.Lock()
 class Message(BaseModel):
-    role:str="user"
-    content:str
+    role:Literal["system","user","assistant","tool"]="user"
+    content:str=Field(max_length=50000)
 class ChatRequest(BaseModel):
-    model:str|None=None
-    request_id:str|None=None
+    model:str|None=Field(default=None,max_length=180)
+    request_id:str|None=Field(default=None,max_length=100)
     messages:list[Message]=Field(min_length=1,max_length=80)
     max_tokens:int|None=Field(default=None,ge=1,le=2048)
     temperature:float|None=Field(default=0.2,ge=0,le=2)
@@ -66,6 +66,8 @@ def sse(payload:dict[str,Any])->str:
 @app.post("/v1/chat/completions")
 def chat_completions(request:ChatRequest):
     global _load_error
+    if sum(len(message.content) for message in request.messages)>250000:
+        raise HTTPException(status_code=413,detail="Combined message content exceeds the local bridge limit.")
     request_id=request.request_id or uuid.uuid4().hex
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}",request_id):
         raise HTTPException(status_code=400,detail="Invalid request ID.")

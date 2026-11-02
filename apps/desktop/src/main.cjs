@@ -71,6 +71,12 @@ ipcMain.handle("ultran:resume-agent-task",async(_event,id)=>{
  }
  return executeAgentTask({goal:task.goal,model:task.model,endpoint:"http://127.0.0.1:11435",requestId:id,context:history.slice(-20),priorFingerprints:fingerprints,resume:true});
 });
+ipcMain.handle("ultran:clear-agent-tasks",async()=>{
+ if(activeAgentRequests.size)throw new Error("Stop active agent tasks before clearing task history.");
+ const choice=await dialog.showMessageBox(mainWindow,{type:"warning",buttons:["Cancel","Delete task history"],defaultId:0,cancelId:0,noLink:true,title:"Delete local agent task history",message:"Delete all saved agent task history?",detail:"This permanently removes task goals, progress events, tool-output snippets, results, and the recovery backup from this PC. It does not delete project files."});
+ if(choice.response!==1)return {cleared:false};
+ return agentTaskStore.clear();
+});
 ipcMain.handle("ultran:list-agent-tasks",()=>agentTaskStore.list());
 ipcMain.handle("ultran:get-agent-task",(_event,id)=>{if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");return agentTaskStore.get(id);});
 ipcMain.handle("ultran:cancel-agent",async(_event,requestId)=>{const controller=activeAgentRequests.get(requestId);if(!controller)return {cancelled:false};controller.abort();return {cancelled:true};});

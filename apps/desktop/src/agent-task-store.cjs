@@ -88,6 +88,31 @@ function createAgentTaskStore({ getFilePath }) {
     });
   }
 
+  async function resume(id) {
+    return mutate(tasks => {
+      const task = tasks.find(item => item.id === id);
+      if (!task || !['interrupted', 'failed', 'cancelled', 'limit_reached'].includes(task.status)) throw new Error('This task cannot be resumed.');
+      task.status = 'running';
+      task.updatedAt = new Date().toISOString();
+      task.events.push({ at: task.updatedAt, type: 'resumed' });
+      return { resumed: true, id };
+    });
+  }
+
+  async function markInterrupted() {
+    return mutate(tasks => {
+      let count = 0;
+      for (const task of tasks) if (task.status === 'running') {
+        task.status = 'interrupted';
+        task.updatedAt = new Date().toISOString();
+        task.events.push({ at: task.updatedAt, type: 'interrupted', reason: 'Ultran closed before the task completed.' });
+        task.events = task.events.slice(-250);
+        count++;
+      }
+      return { interrupted: count };
+    });
+  }
+
   async function finish(id, result) {
     return mutate(tasks => {
       const task = tasks.find(item => item.id === id);
@@ -120,7 +145,7 @@ function createAgentTaskStore({ getFilePath }) {
     return result.tasks.find(task => task.id === id) || null;
   }
 
-  return Object.freeze({ create, append, finish, list, get });
+  return Object.freeze({ create, append, resume, markInterrupted, finish, list, get });
 }
 
 module.exports = { createAgentTaskStore };

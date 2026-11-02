@@ -67,13 +67,13 @@ function createAgentTaskStore({ getFilePath }) {
     return operation;
   }
 
-  async function create({ id, goal, model }) {
+  async function create({ id, goal, model, authorityGrants = [] }) {
     if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(id) || typeof goal !== 'string' || !goal.trim() || goal.length > 12000 ||
-        typeof model !== 'string' || !model.trim() || model.length > 200) throw new Error('Invalid agent task record.');
+        typeof model !== 'string' || !model.trim() || model.length > 200 || !Array.isArray(authorityGrants) || authorityGrants.some(value => !['read', 'write', 'external'].includes(value))) throw new Error('Invalid agent task record.');
     return mutate(tasks => {
       if (tasks.some(task => task.id === id)) throw new Error('Duplicate agent task ID.');
       const now = new Date().toISOString();
-      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), status: 'running', createdAt: now, updatedAt: now, events: [], fingerprints: [], fingerprintsTruncated: false, result: null });
+      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), authorityGrants: [...new Set(authorityGrants)], status: 'running', createdAt: now, updatedAt: now, events: [], fingerprints: [], fingerprintsTruncated: false, result: null });
       return { created: true, id };
     });
   }

@@ -224,18 +224,6 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
         if (parent !== realRoot && !parent.startsWith(realRoot + path.sep)) throw new Error('File parent escapes the selected project.');
         const existing = await fs.lstat(target).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
         if (existing?.isSymbolicLink() || (existing && !existing.isFile())) throw new Error('Target must be a regular file, not a link or directory.');
-        if (!prepared || prepared.target !== target) throw new Error('Approved resource identity is missing or does not match this target.');
-        if (!existing && prepared.exists) throw new Error('Target changed after approval. Review the file again.');
-        if (existing && !prepared.exists) throw new Error('A new target appeared after approval. Review the file again.');
-        if (existing) {
-          const currentReal = await fs.realpath(target);
-          const [currentStat, currentBytes] = await Promise.all([fs.stat(currentReal), fs.readFile(currentReal)]);
-          const currentDigest = require('node:crypto').createHash('sha256').update(currentBytes).digest('hex');
-          if (currentStat.dev !== prepared.dev || currentStat.ino !== prepared.ino || currentStat.size !== prepared.size ||
-              currentStat.mtimeMs !== prepared.mtimeMs || currentDigest !== prepared.digest) {
-            throw new Error('Target changed after approval. No file was replaced; review the updated file and approve again.');
-          }
-        }
         if (!existing) return { target, exists: false, dev: null, ino: null, size: null, mtimeMs: null, digest: null };
         const realTarget = await fs.realpath(target);
         if (!realTarget.startsWith(realRoot + path.sep)) throw new Error('Resolved target escapes the selected project.');
@@ -259,6 +247,18 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
         const parent = await fs.realpath(path.dirname(target));
         if (parent !== realRoot && !parent.startsWith(realRoot + path.sep)) throw new Error('File parent escapes the selected project.');
         const existing = await fs.lstat(target).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+        if (!prepared || prepared.target !== target) throw new Error('Approved resource identity is missing or does not match this target.');
+        if (!existing && prepared.exists) throw new Error('Target changed after approval. Review the file again.');
+        if (existing && !prepared.exists) throw new Error('A new target appeared after approval. Review the file again.');
+        if (existing) {
+          const currentReal = await fs.realpath(target);
+          const [currentStat, currentBytes] = await Promise.all([fs.stat(currentReal), fs.readFile(currentReal)]);
+          const currentDigest = require('node:crypto').createHash('sha256').update(currentBytes).digest('hex');
+          if (currentStat.dev !== prepared.dev || currentStat.ino !== prepared.ino || currentStat.size !== prepared.size ||
+              currentStat.mtimeMs !== prepared.mtimeMs || currentDigest !== prepared.digest) {
+            throw new Error('Target changed after approval. No file was replaced; review the updated file and approve again.');
+          }
+        }
         if (existing?.isSymbolicLink() || (existing && !existing.isFile())) throw new Error('Target must be a regular file, not a link or directory.');
         let backupPath = null;
         if (existing) {

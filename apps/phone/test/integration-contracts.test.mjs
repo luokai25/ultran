@@ -23,6 +23,7 @@ const [html, main, localAI, runtime, capabilityKernel, persona, companion, voice
   read("../../services/agent-core/src/monetization/policy-gate.ts"),
   read("../../services/agent-core/src/monetization/ledger.ts"),
   read("../../services/agent-core/src/orchestrator/run-state.ts"),
+  read("src/model-library.ts"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {

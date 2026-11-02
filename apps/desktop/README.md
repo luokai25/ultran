@@ -56,3 +56,19 @@ text generation and only the launcher is exposed as an actionable desktop tool.
 Model repositories requiring custom remote Python code are rejected before
 AirLLM loads them. The bridge is loopback-only by default. Runtime dependencies
 and model weights are installed separately and are not bundled in the EXE.
+
+
+## Agent mode
+
+The chat toolbar includes an explicit Agent mode. When enabled, the local model
+returns one structured action at a time. Ultran runs a bounded loop (8 planning
+rounds, 12 tool calls) and returns tool results to the local planner. Available
+tools are imported-project listing, bounded text-file listing and reading,
+basic system information, and a fixed Windows app launcher. The launcher uses
+the existing native Windows approval dialog. Read-only workspace tools are
+restricted to imported workspace folders, skip symlinks and dependency/build
+folders, and cap file reads at 32 KB. The agent has no shell or arbitrary
+command tool and no project write tool. Planner output is parsed as JSON and
+unknown tools fail closed. Agent progress is sent to the renderer as events;
+cancellation aborts the active planner request. The agent loop is local-only
+and accepts only the loopback AirLLM endpoint.

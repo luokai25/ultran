@@ -175,9 +175,11 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
           if (!realTarget.startsWith(realRoot + path.sep)) throw new Error('Resolved target escapes the selected project.');
           const stat = await fs.stat(realTarget);
           if (stat.size > 50000) throw new Error('Existing file is too large to safely replace.');
-          backupPath = target + '.ultran-backup';
+          const backupBase = target + '.ultran-backup';
+          backupPath = backupBase;
           const backupStat = await fs.lstat(backupPath).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
           if (backupStat?.isSymbolicLink() || (backupStat && !backupStat.isFile())) throw new Error('Existing backup path is not a regular file.');
+          if (backupStat) backupPath = backupBase + '.' + Date.now() + '-' + require('node:crypto').randomUUID().slice(0, 8);
           const backupTemp = backupPath + '.' + require('node:crypto').randomUUID() + '.tmp';
           try {
             await fs.copyFile(realTarget, backupTemp, require('node:fs').constants.COPYFILE_EXCL);

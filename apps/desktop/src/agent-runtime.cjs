@@ -84,7 +84,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
         const message = String(error?.message || error).slice(0, 500);
         journal.push({ name: decision.name, status: 'failed', capability, error: message });
         history.push({ role: 'tool', name: decision.name, ok: false, error: message });
-        emit('tool_finished', { name: decision.name, fingerprint, ok: false, error: message });
+        await emit('tool_finished', { name: decision.name, fingerprint, ok: false, error: message });
       }
     }
     return finish('limit_reached', '', 'round_budget_exhausted');

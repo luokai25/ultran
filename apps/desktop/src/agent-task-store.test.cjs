@@ -95,3 +95,14 @@ test('legacy task journals without action fingerprints cannot be resumed safely'
     assert.equal((await store.get('legacy-task')).fingerprintsTruncated, true);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('task creation persists the original capability authority snapshot', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-authority-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'authority-task', goal: 'Review project', model: 'local-model', authorityGrants: ['read'] });
+    const task = await store.get('authority-task');
+    assert.deepEqual(task.authorityGrants, ['read']);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

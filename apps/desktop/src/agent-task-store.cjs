@@ -11,7 +11,7 @@ function createAgentTaskStore({ getFilePath }) {
   async function readFile(file) {
     const parsed = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.tasks)) throw new Error('Invalid agent task store.');
-    return parsed.tasks;
+    return parsed.tasks.map(task => ({ ...task, events: Array.isArray(task.events) ? task.events : [], fingerprints: Array.isArray(task.fingerprints) ? task.fingerprints : [], fingerprintsTruncated: task.fingerprintsTruncated === true }));
   }
 
   async function load() {

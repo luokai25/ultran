@@ -4,6 +4,14 @@ const crypto = require('node:crypto');
 
 const DEFAULT_LIMITS = Object.freeze({ maxRounds: 8, maxCalls: 16, maxOutputChars: 12000 });
 
+function stableStringify(value) {
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + stableStringify(value[key])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
 function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limits = {} }) {
   if (!tools || typeof tools !== 'object' || typeof planner !== 'function' || typeof approve !== 'function') {
     throw new TypeError('Agent runtime requires tools, planner, and approval adapters.');
@@ -49,7 +57,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
         continue;
       }
       let argsText;
-      try { argsText = JSON.stringify(decision.args); } catch { return finish('failed', '', 'invalid_tool_arguments'); }
+      try { argsText = stableStringify(decision.args); } catch { return finish('failed', '', 'invalid_tool_arguments'); }
       const fingerprint = crypto.createHash('sha256').update(decision.name + ':' + argsText).digest('hex');
       if (seen.has(fingerprint)) {
         journal.push({ name: decision.name, status: 'skipped', reason: 'repeated_exact_call' });

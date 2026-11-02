@@ -106,3 +106,33 @@ test('task creation persists the original capability authority snapshot', async 
     assert.deepEqual(task.authorityGrants, ['read']);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('blocks resuming a task with an unresolved external side effect', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-uncertain-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'uncertain-task', goal: 'Edit project', model: 'local-model' });
+    await store.append('uncertain-task', { type: 'tool_started', name: 'workspace.write_file', fingerprint: 'effect-1', effect: { id: 'effect-1', capability: 'write' } });
+    await store.finish('uncertain-task', { status: 'failed', answer: 'Interrupted.' });
+    const listed = (await store.list())[0];
+    assert.equal(listed.resumable, false);
+    assert.equal(listed.unresolvedEffects.length, 1);
+    await assert.rejects(() => store.resume('uncertain-task'), /uncertain outcome/);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+test('allows resuming after a durable effect outcome has been recorded', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-resolved-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'resolved-task', goal: 'Edit project', model: 'local-model' });
+    await store.append('resolved-task', { type: 'tool_started', name: 'workspace.write_file', fingerprint: 'effect-2', effect: { id: 'effect-2', capability: 'write' } });
+    await store.append('resolved-task', { type: 'effect_outcome', id: 'effect-2', state: 'verified' });
+    await store.finish('resolved-task', { status: 'failed', answer: 'Stopped.' });
+    assert.equal((await store.list())[0].resumable, true);
+    await store.resume('resolved-task');
+    assert.equal((await store.get('resolved-task')).status, 'running');
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

@@ -43,10 +43,16 @@ function createAgentTaskStore({ getFilePath }) {
       const temp = file + '.tmp.' + crypto.randomUUID();
       const backupTemp = file + '.bak.tmp.' + crypto.randomUUID();
       try {
-        await fs.writeFile(temp, JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), tasks: tasks.slice(0, 50) }), { encoding: 'utf8', flag: 'wx' });
+        const handle = await fs.open(temp, 'wx');
+        try {
+          await handle.writeFile(JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), tasks: tasks.slice(0, 50) }), 'utf8');
+          await handle.sync();
+        } finally { await handle.close(); }
         try {
           await readFile(file);
           await fs.copyFile(file, backupTemp);
+          const backupHandle = await fs.open(backupTemp, 'r+');
+          try { await backupHandle.sync(); } finally { await backupHandle.close(); }
           await fs.rename(backupTemp, file + '.bak');
         } catch (error) {
           if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;

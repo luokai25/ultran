@@ -100,8 +100,19 @@ security examples. The relevant architecture is grouped into these domains:
   claim only after Electron observes the child process `spawn` event. The task
   effect is verified as process creation, not as proof the application remains
   open or completed a later task.
+- Task recovery now derives unresolved side effects from durable `tool_started`
+  and `effect_outcome` journal entries. Interrupted tasks with an uncertain
+  write or external action are marked non-resumable and the store rejects direct
+  resume attempts until the resource/action is reviewed. This prevents a crash
+  between dispatch and outcome persistence from silently replaying or skipping
+  an action whose real-world result is unknown.
 - The desktop agent host tests and related runtime/task-store The latest focused agent/runtime/task-store/tool-engine set passes 34/34 tests.
-  Full repository tests and Windows CI remain pending for this checkpoint.
+  Focused task/runtime tests pass 19/19. A broad `node --test` sweep found 69
+  passing tests and 3 test-file loading failures because the validation checkout
+  had not built the TypeScript connector/agent-core package outputs (`index.js`,
+  `runtime.js`, and the `@ultran/connectors` package). These are environment/build
+  prerequisites, not failing assertions; run the repository's package build
+  pipeline before treating the full suite as green. Windows CI remains pending.
 
 ### Remaining parity gaps (not yet implemented)
 

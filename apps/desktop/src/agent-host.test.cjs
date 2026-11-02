@@ -12,7 +12,7 @@ function sse(decision) {
   return new Response(payload, { headers: { 'Content-Type': 'text/event-stream' } });
 }
 
-function makeHost(root, approval = 0) {
+function makeHost(root, approval = 0, readPolicy = "allow") {
   const dialog = { showMessageBox: async () => ({ response: approval }) };
   const safeWorkspacePath = value => {
     const candidate = path.resolve(value);
@@ -21,7 +21,7 @@ function makeHost(root, approval = 0) {
     return candidate;
   };
   return createAgentHost({
-    dialog, getMainWindow: () => ({}), toolEngine: { execute: async () => ({ executed: true }) },
+    dialog, getMainWindow: () => ({}), getReadPolicy: () => readPolicy, toolEngine: { execute: async () => ({ executed: true }) },
     workspaceRoot: () => root, safeWorkspacePath,
     listProjectFiles: async project => ({ files: await fs.readdir(project) }),
     readProjectFile: async (project, relative) => ({ content: await fs.readFile(path.join(project, relative), 'utf8') }),
@@ -103,6 +103,25 @@ test('planner receives prior tool results on the next round', async () => {
     assert.equal(prompts.length, 2);
     assert.match(prompts[1], /demo/);
     assert.match(prompts[1], /workspace\.list_projects/);
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('read policy ask requires a native approval and denial blocks the read', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-read-policy-'));
+  const root = path.join(temp, 'workspaces');
+  await fs.mkdir(path.join(root, 'demo'), { recursive: true });
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.list_projects', args: {} }
+    : { type: 'final', answer: 'The read was denied.' });
+  try {
+    const result = await makeHost(root, 1, 'ask').run({ goal: 'List projects', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-read-denied' });
+    assert.equal(result.status, 'completed');
+    assert.equal(result.journal[0].status, 'denied');
   } finally {
     global.fetch = originalFetch;
     await fs.rm(temp, { recursive: true, force: true });

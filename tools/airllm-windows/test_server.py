@@ -86,6 +86,7 @@ class BridgeTests(unittest.TestCase):
         server._tokenizer = None
         server._model_id = None
         server._load_error = None
+        server._loading_model_id = None
         self.model = FakeModel()
         self.tokenizer = FakeTokenizer()
         self.auto_map = None
@@ -128,6 +129,18 @@ class BridgeTests(unittest.TestCase):
             max_tokens=8,
         )
 
+    def test_health_exposes_model_loading_state(self):
+        server._loading_model_id = "example/model"
+        status = server.health()
+        self.assertEqual(status["status"], "loading")
+        self.assertEqual(status["loading_model"], "example/model")
+
+    def test_health_exposes_model_load_error_state(self):
+        server._load_error = "RuntimeError: test failure"
+        status = server.health()
+        self.assertEqual(status["status"], "error")
+        self.assertEqual(status["error"], "RuntimeError: test failure")
+
     def test_streams_tokens_and_finishes(self):
         response = server.chat_completions(self.request("stream-test"))
         chunks = asyncio.run(self.consume(response))
@@ -136,6 +149,8 @@ class BridgeTests(unittest.TestCase):
         self.assertIn('"token": "hello"', payload)
         self.assertIn('"type": "done"', payload)
         self.assertTrue(self.model.generate_called)
+        self.assertEqual(server.health()["status"], "ready")
+        self.assertIsNone(server.health()["loading_model"])
 
     def test_mid_generation_cancellation_reaches_stopping_criteria(self):
         self.model.wait_for_cancel = True
@@ -162,6 +177,8 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "blocks remote model code"):
             server.load_model("example/model")
         self.assertIsNone(server._model)
+        self.assertIsNone(server._loading_model_id)
+        self.assertEqual(server.health()["status"], "error")
 
     def test_rejects_path_like_request_ids(self):
         with self.assertRaises(server.HTTPException):

@@ -33,7 +33,7 @@ not put access tokens in source code or commit them.
 
 ## API
 
-- GET /health
+- GET /health (reports not_loaded, loading, ready, or error, plus the model currently loading)
 - GET /v1/models
 - POST /v1/chat/completions
 

@@ -16,6 +16,7 @@ _model=None
 _tokenizer=None
 _model_id=None
 _load_error=None
+_loading_model_id=None
 _model_lock=threading.Lock()
 class Message(BaseModel):
     role:Literal["system","user","assistant","tool"]="user"
@@ -33,11 +34,13 @@ def cuda_available():
     except Exception:
         return False
 def load_model(model_id:str):
-    global _model,_tokenizer,_model_id,_load_error
+    global _model,_tokenizer,_model_id,_load_error,_loading_model_id
     if not model_id or len(model_id)>180 or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",model_id):
         raise ValueError("Model must be a Hugging Face repository ID, for example Qwen/Qwen2.5-1.5B-Instruct.")
     if _model is not None and _model_id==model_id:
         return
+    _loading_model_id=model_id
+    _load_error=None
     try:
         from airllm import AutoModel
         from transformers import AutoConfig, AutoTokenizer
@@ -53,9 +56,12 @@ def load_model(model_id:str):
     except Exception as exc:
         _load_error="{}: {}".format(type(exc).__name__,exc)
         raise
+    finally:
+        _loading_model_id=None
 @app.get("/health")
 def health()->dict[str,Any]:
-    return {"status":"ready" if _model is not None else ("error" if _load_error else "not_loaded"),"model":_model_id or DEFAULT_MODEL,"host":HOST,"port":PORT,"error":_load_error,"device":"cuda" if cuda_available() else "cpu"}
+    status="loading" if _loading_model_id else ("error" if _load_error else ("ready" if _model is not None else "not_loaded"))
+    return {"status":status,"model":_model_id or DEFAULT_MODEL,"loading_model":_loading_model_id,"host":HOST,"port":PORT,"error":_load_error,"device":"cuda" if cuda_available() else "cpu"}
 @app.get("/v1/models")
 def models():
     return {"object":"list","data":[{"id":_model_id or DEFAULT_MODEL,"object":"model","owned_by":"local"}]}

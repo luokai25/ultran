@@ -12,9 +12,9 @@ const OPERATION_RULES = Object.freeze({
 function createRequestAuthority(goal) {
   if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid request authority input.');
   const text = goal.normalize('NFKC').toLowerCase();
-  const read = /\\b(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)\\b/.test(text);
-  const write = /\\b(create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)\\b/.test(text);
-  const external = /\\b(open|launch|start)\\b.{0,48}\\b(app|application|program|explorer|notepad|calculator|task manager)\\b/.test(text);
+  const read = /(^|[^a-z])(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)(?=$|[^a-z])/.test(text);
+  const write = /(^|[^a-z])(create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)(?=$|[^a-z])/.test(text);
+  const external = /(^|[^a-z])(open|launch|start)(?=$|[^a-z]).{0,48}\\b(app|application|program|explorer|notepad|calculator|task manager)(?=$|[^a-z])/.test(text);
   const grants = [];
   if (read) grants.push('read');
   if (write) grants.push('write');

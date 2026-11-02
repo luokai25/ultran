@@ -78,7 +78,7 @@ async function readModelDecision({ endpoint, model, goal, state, requestId, sign
   return extractJson(output);
 }
 
-function createAgentHost({ dialog, getMainWindow, toolEngine, workspaceRoot, safeWorkspacePath, listProjectFiles, readProjectFile, systemInfo }) {
+function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow", toolEngine, workspaceRoot, safeWorkspacePath, listProjectFiles, readProjectFile, systemInfo }) {
   const tools = {
     'workspace.list_projects': {
       capability: 'read',
@@ -211,7 +211,11 @@ function createAgentHost({ dialog, getMainWindow, toolEngine, workspaceRoot, saf
       limits: { maxRounds: 8, maxCalls: 12, maxOutputChars: 9000 },
       onEvent,
       approve: async request => {
-        if (request.capability === 'read') return true;
+        if (request.capability === 'read') {
+          if (getReadPolicy() !== "ask") return true;
+          const result = await dialog.showMessageBox(getMainWindow(), { type: "question", buttons: ["Allow read", "Deny"], defaultId: 1, cancelId: 1, title: "Ultran requests project access", message: request.name, detail: "Ultran wants to inspect local project information. This approval applies to this action only." });
+          return result.response === 0;
+        }
         if (request.name === 'windows.launch_app') return true; // toolEngine shows the native confirmation.
         if (request.name === 'workspace.write_file') {
           const args = request.args;

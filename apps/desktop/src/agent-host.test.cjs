@@ -127,3 +127,23 @@ test('read policy ask requires a native approval and denial blocks the read', as
     await fs.rm(temp, { recursive: true, force: true });
   }
 });
+
+test('agent tools reject unexpected argument fields', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-schema-'));
+  const root = path.join(temp, 'workspaces');
+  await fs.mkdir(root, { recursive: true });
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.list_projects', args: { unexpected: true } }
+    : { type: 'final', answer: 'The invalid tool request was rejected.' });
+  try {
+    const result = await makeHost(root).run({ goal: 'List projects', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-schema-1' });
+    assert.equal(result.status, 'completed');
+    assert.equal(result.journal[0].status, 'failed');
+    assert.match(result.journal[0].error, /Unexpected tool arguments/);
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});

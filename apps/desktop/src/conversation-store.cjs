@@ -73,7 +73,25 @@ function createConversationStore({ getFilePath, validateMessages }) {
     return operation;
   }
 
-  return Object.freeze({ load, save });
+  async function clear() {
+    const operation = writeQueue.then(async () => {
+      const file = getFilePath();
+      await Promise.all([file, file + '.bak'].map(item => fs.rm(item, { force: true })));
+      const directory = path.dirname(file);
+      const prefix = path.basename(file);
+      try {
+        const names = await fs.readdir(directory);
+        await Promise.all(names.filter(name => name.startsWith(prefix + '.tmp.') || name.startsWith(prefix + '.bak.tmp.')).map(name => fs.rm(path.join(directory, name), { force: true })));
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      return { cleared: true };
+    });
+    writeQueue = operation.catch(() => {});
+    return operation;
+  }
+
+  return Object.freeze({ load, save, clear });
 }
 
 module.exports = { createConversationStore };

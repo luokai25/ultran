@@ -18,7 +18,8 @@ test('persists task lifecycle and bounded events across store instances', async 
     const reloaded = createAgentTaskStore({ getFilePath: () => file });
     const task = await reloaded.get('task-1');
     assert.equal(task.status, 'completed');
-    assert.equal(task.events.length, 2);\n    assert.deepEqual(task.fingerprints, ['stable-hash']);
+    assert.equal(task.events.length, 2);
+    assert.deepEqual(task.fingerprints, ['stable-hash']);
     assert.equal(task.result.answer, 'Found demo.');
     assert.equal((await reloaded.list())[0].id, 'task-1');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }

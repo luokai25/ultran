@@ -73,3 +73,24 @@ test('cancellation after approval prevents tool dispatch', async () => {
   assert.equal(result.status, 'cancelled');
   assert.equal(executed, false);
 });
+
+test('prior action fingerprints prevent replay after task resumption', async () => {
+  let executed = false;
+  const runtime = createAgentRuntime({
+    tools: { 'test.write': { capability: 'write', execute: async () => { executed = true; } } },
+    approve: async () => true,
+    planner: async ({ history }) => history.length
+      ? { type: 'final', answer: 'The prior action was not repeated.' }
+      : { type: 'tool', name: 'test.write', args: { file: 'note.md' } }
+  });
+  const crypto = require('node:crypto');
+  const fingerprint = crypto.createHash('sha256').update('test.write:' + JSON.stringify({ file: 'note.md' })).digest('hex');
+  const result = await runtime.run({
+    goal: 'Resume safely',
+    context: [{ role: 'tool', name: 'test.write', ok: false, error: 'Prior attempt outcome unknown.' }],
+    priorFingerprints: [fingerprint]
+  });
+  assert.equal(executed, false);
+  assert.equal(result.status, 'completed');
+  assert.ok(result.journal.some(item => item.reason === 'repeated_exact_call'));
+});

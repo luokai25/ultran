@@ -44,15 +44,16 @@ async function readModelDecision({ endpoint, model, goal, state, requestId, sign
     signal?.removeEventListener('abort', cancelRequest);
     throw error;
   }
-  signal?.removeEventListener('abort', cancelRequest);
   if (!response.ok) {
+    signal?.removeEventListener('abort', cancelRequest);
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.detail || 'Local planner request failed (' + response.status + ').');
   }
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('Planner stream is unavailable.');
+  if (!reader) { signal?.removeEventListener('abort', cancelRequest); throw new Error('Planner stream is unavailable.'); }
   const decoder = new TextDecoder();
   let buffer = '', output = '', terminal = null;
+  try {
   while (true) {
     if (signal?.aborted) throw new Error('Agent cancelled.');
     const { value, done } = await reader.read();
@@ -68,6 +69,9 @@ async function readModelDecision({ endpoint, model, goal, state, requestId, sign
       if (event.type === 'token') output += event.token || '';
       if (['done', 'error', 'cancelled'].includes(event.type)) terminal = event;
     }
+  }
+  } finally {
+    signal?.removeEventListener('abort', cancelRequest);
   }
   if (terminal?.type === 'error') throw new Error(terminal.error || 'Planner failed.');
   if (terminal?.type === 'cancelled') throw new Error('Agent cancelled.');

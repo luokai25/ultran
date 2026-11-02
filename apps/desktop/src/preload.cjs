@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require("electron");
 contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  system:()=>ipcRenderer.invoke("ultran:system"),
+ setAgentPolicy:(policy)=>ipcRenderer.invoke("ultran:set-agent-policy",policy),
  launchApp:(appId)=>ipcRenderer.invoke("ultran:launch-app",appId),
  health:(endpoint)=>ipcRenderer.invoke("ultran:health",endpoint),
  setupRuntime:()=>ipcRenderer.invoke("ultran:setup-runtime"),

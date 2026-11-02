@@ -46,3 +46,17 @@ test('rejects invalid task IDs and oversized goals', async () => {
     await assert.rejects(store.create({ id: 'valid', goal: 'x'.repeat(12001), model: 'm' }));
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('marks running tasks interrupted and allows explicit resumption', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-resume-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'task-resume', goal: 'Continue safely', model: 'local-model' });
+    const recovered = await store.markInterrupted();
+    assert.equal(recovered.interrupted, 1);
+    assert.equal((await store.get('task-resume')).status, 'interrupted');
+    await store.resume('task-resume');
+    assert.equal((await store.get('task-resume')).status, 'running');
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

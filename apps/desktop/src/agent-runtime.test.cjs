@@ -79,9 +79,7 @@ test('prior action fingerprints prevent replay after task resumption', async () 
   const runtime = createAgentRuntime({
     tools: { 'test.write': { capability: 'write', execute: async () => { executed = true; } } },
     approve: async () => true,
-    planner: async ({ history }) => history.length
-      ? { type: 'final', answer: 'The prior action was not repeated.' }
-      : { type: 'tool', name: 'test.write', args: { file: 'note.md' } }
+    planner: async () => ({ type: 'tool', name: 'test.write', args: { file: 'note.md' } })
   });
   const crypto = require('node:crypto');
   const fingerprint = crypto.createHash('sha256').update('test.write:' + JSON.stringify({ file: 'note.md' })).digest('hex');

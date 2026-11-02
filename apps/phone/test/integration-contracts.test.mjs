@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState] = await Promise.all([
+const [html, main, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
@@ -230,4 +230,13 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.ok(composerMarkup.indexOf('id="send-btn"') > composerMarkup.indexOf('id="link-pill"'), "send must remain outside the horizontally scrolling tool strip");
   const conversationRenderer = main.slice(main.indexOf("function renderConversation"), main.indexOf("function renderHistory"));
   assert.doesNotMatch(conversationRenderer, /promptEl\.focus\(/, "the initial phone screen must not force-open the keyboard");
+});
+
+
+test("Qwen3.5 4B is offered in the Android model library with a pinned SHA-256", () => {
+  assert.match(modelLibrary, /SoAIHQ\/Qwen3\.5-4B-GGUF/);
+  assert.match(modelLibrary, /Qwen3\.5-4B-Q4_K_M\.gguf/);
+  assert.match(modelLibrary, /2ebe6eb67cb92adeffc7073c48dd4e3baf79465ac650793dc751cad2b29cf219/);
+  assert.match(main, /sha256:model\.sha256/);
+  assert.match(localAI, /SHA-256 checksum mismatch/);
 });

@@ -26,10 +26,11 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
     const history = Array.isArray(context) ? context.slice(-20) : [];
     const seen = new Set(Array.isArray(priorFingerprints) ? priorFingerprints.filter(value => typeof value === "string").slice(-1000) : []);
     const journal = [];
+    const effects = [];
     let calls = 0;
     let rounds = 0;
     const emit = async (type, data = {}) => { await onEvent({ type, ...data }); };
-    const finish = (status, answer = '', reason = null) => ({ status, answer, reason, calls, rounds, journal });
+    const finish = (status, answer = '', reason = null) => ({ status, answer, reason, calls, rounds, journal, effects });
 
     for (let round = 1; round <= config.maxRounds; round++) {
       rounds = round;
@@ -79,17 +80,22 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       }
       if (signal?.aborted) return finish('cancelled', '', 'aborted');
       calls++;
-      await emit('tool_started', { name: decision.name, fingerprint, call: calls, maxCalls: config.maxCalls });
+      const effect = { id: fingerprint, name: decision.name, capability, state: 'dispatching', startedAt: new Date().toISOString() };
+      if (capability === 'write' || capability === 'external') effects.push(effect);
+      await emit('tool_started', { name: decision.name, fingerprint, call: calls, maxCalls: config.maxCalls, effect: capability === 'write' || capability === 'external' ? { ...effect } : null });
       try {
         const result = await tool.execute(decision.args, { signal, metadata });
         let output;
         try { output = JSON.stringify(result); } catch { output = String(result); }
         output = String(output ?? 'null').slice(0, config.maxOutputChars);
-        journal.push({ name: decision.name, status: 'succeeded', capability, output });
+        const explicitlyVerified = result && typeof result === 'object' && result.verified === true;
+        if (effect) { effect.state = explicitlyVerified ? 'verified' : 'acknowledged_unverified'; effect.finishedAt = new Date().toISOString(); effect.evidence = explicitlyVerified ? 'tool_asserted_readback_or_native_launch' : 'tool_returned_without_independent_verification'; await emit('effect_outcome', { ...effect }); }
+        journal.push({ name: decision.name, status: 'succeeded', capability, verified: explicitlyVerified, output });
         history.push({ role: 'tool', name: decision.name, ok: true, output });
         await emit('tool_finished', { name: decision.name, fingerprint, ok: true, output });
       } catch (error) {
         const message = String(error?.message || error).slice(0, 500);
+        if (effect) { effect.state = 'failed_or_uncertain'; effect.finishedAt = new Date().toISOString(); effect.error = message; await emit('effect_outcome', { ...effect }); }
         journal.push({ name: decision.name, status: 'failed', capability, error: message });
         history.push({ role: 'tool', name: decision.name, ok: false, error: message });
         await emit('tool_finished', { name: decision.name, fingerprint, ok: false, error: message });

@@ -62,3 +62,20 @@ test('marks running tasks interrupted and allows explicit resumption', async () 
     assert.equal((await store.get('task-resume')).status, 'running');
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('clear removes task history and its recovery backup', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-clear-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    await store.create({ id: 'task-clear', goal: 'Private task', model: 'local-model' });
+    await store.append('task-clear', { type: 'note', output: 'sensitive snippet' });
+    await store.finish('task-clear', { status: 'completed', answer: 'done' });
+    assert.equal(await fs.access(file).then(() => true, () => false), true);
+    assert.equal(await fs.access(file + '.bak').then(() => true, () => false), true);
+    await store.clear();
+    assert.deepEqual(await store.list(), []);
+    assert.equal(await fs.access(file).then(() => true, () => false), false);
+    assert.equal(await fs.access(file + '.bak').then(() => true, () => false), false);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

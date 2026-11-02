@@ -11,10 +11,10 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
     if (!Number.isInteger(value) || value < 1) throw new TypeError('Invalid agent limit: ' + key);
   }
 
-  async function run({ goal, context = [], signal, metadata = {} }) {
+  async function run({ goal, context = [], priorFingerprints = [], signal, metadata = {} }) {
     if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid agent goal.');
     const history = Array.isArray(context) ? context.slice(-20) : [];
-    const seen = new Set();
+    const seen = new Set(Array.isArray(priorFingerprints) ? priorFingerprints.filter(value => typeof value === "string").slice(-100) : []);
     const journal = [];
     let calls = 0;
     let rounds = 0;
@@ -48,7 +48,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       }
       let argsText;
       try { argsText = JSON.stringify(decision.args); } catch { return finish('failed', '', 'invalid_tool_arguments'); }
-      const fingerprint = decision.name + ':' + argsText;
+      const fingerprint = crypto.createHash('sha256').update(decision.name + ':' + argsText).digest('hex');
       if (seen.has(fingerprint)) {
         journal.push({ name: decision.name, status: 'skipped', reason: 'repeated_exact_call' });
         history.push({ role: 'tool', name: decision.name, ok: false, error: 'Repeated identical call skipped.' });
@@ -69,7 +69,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       }
       if (signal?.aborted) return finish('cancelled', '', 'aborted');
       calls++;
-      emit('tool_started', { name: decision.name, call: calls, maxCalls: config.maxCalls });
+      emit('tool_started', { name: decision.name, fingerprint, call: calls, maxCalls: config.maxCalls });
       try {
         const result = await tool.execute(decision.args, { signal, metadata });
         let output;

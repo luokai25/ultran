@@ -92,8 +92,16 @@ security examples. The relevant architecture is grouped into these domains:
   acknowledged-but-unverified outcomes, and failed/uncertain outcomes. The task
   journal persists these events; the runtime does not infer verification from
   a success-shaped message.
-- The desktop agent host tests and related runtime/task-store tests pass (41
-  tests at this checkpoint).
+- Fixed a resume-path authority propagation gap: interrupted tasks now pass the
+  originally persisted capability grants back into the host. Missing legacy
+  grants fail closed to an empty set rather than being re-derived as broader
+  permissions.
+- Windows app launches now return a PID and a narrowly scoped verification
+  claim only after Electron observes the child process `spawn` event. The task
+  effect is verified as process creation, not as proof the application remains
+  open or completed a later task.
+- The desktop agent host tests and related runtime/task-store The latest focused agent/runtime/task-store/tool-engine set passes 34/34 tests.
+  Full repository tests and Windows CI remain pending for this checkpoint.
 
 ### Remaining parity gaps (not yet implemented)
 

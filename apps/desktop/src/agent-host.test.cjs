@@ -1,22 +1,84 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { extractJson } = require('./agent-host.cjs');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { createAgentHost, extractJson } = require('./agent-host.cjs');
 
-test('parses a strict planner JSON object', () => {
-  assert.deepEqual(extractJson('{"type":"final","answer":"done"}'), { type: 'final', answer: 'done' });
-});
+function sse(decision) {
+  const payload = 'data: ' + JSON.stringify({ type: 'token', token: JSON.stringify(decision) }) + '\n\n' +
+    'data: ' + JSON.stringify({ type: 'done' }) + '\n\n';
+  return new Response(payload, { headers: { 'Content-Type': 'text/event-stream' } });
+}
 
-test('extracts a JSON object from surrounding model chatter', () => {
-  assert.deepEqual(extractJson('Here is the next step:\n{"type":"tool","name":"workspace.list_projects","args":{}}'), {
-    type: 'tool', name: 'workspace.list_projects', args: {}
+function makeHost(root, approval = 0) {
+  const dialog = { showMessageBox: async () => ({ response: approval }) };
+  const safeWorkspacePath = value => {
+    const candidate = path.resolve(value);
+    const base = path.resolve(root);
+    if (candidate === base || !candidate.startsWith(base + path.sep)) throw new Error('outside workspace');
+    return candidate;
+  };
+  return createAgentHost({
+    dialog, getMainWindow: () => ({}), toolEngine: { execute: async () => ({ executed: true }) },
+    workspaceRoot: () => root, safeWorkspacePath,
+    listProjectFiles: async project => ({ files: await fs.readdir(project) }),
+    readProjectFile: async (project, relative) => ({ content: await fs.readFile(path.join(project, relative), 'utf8') }),
+    systemInfo: () => ({ platform: 'win32' })
   });
+}
+
+test('parses strict and wrapped planner JSON', () => {
+  assert.deepEqual(extractJson('{"type":"final","answer":"done"}'), { type: 'final', answer: 'done' });
+  assert.deepEqual(extractJson('next:\n{"type":"tool","name":"workspace.list_projects","args":{}}'), { type: 'tool', name: 'workspace.list_projects', args: {} });
 });
 
-test('rejects planner output without a JSON object', () => {
-  assert.throws(() => extractJson('I will inspect the files now.'), /JSON action/);
+test('rejects malformed planner output', () => {
+  assert.throws(() => extractJson('not JSON'), /JSON action/);
+  assert.throws(() => extractJson('{"type":tool}'));
 });
 
-test('rejects malformed planner JSON', () => {
-  assert.throws(() => extractJson('prefix {"type": tool} suffix'));
+test('approved project edit writes and preserves a backup', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-'));
+  const root = path.join(temp, 'workspaces');
+  const project = path.join(root, 'demo');
+  await fs.mkdir(project, { recursive: true });
+  await fs.writeFile(path.join(project, 'note.md'), 'old content');
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'new content' } }
+    : { type: 'final', answer: 'Updated the note.' });
+  try {
+    const result = await makeHost(root, 0).run({ goal: 'Update note', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-write-1' });
+    assert.equal(result.status, 'completed');
+    assert.equal(await fs.readFile(path.join(project, 'note.md'), 'utf8'), 'new content');
+    assert.equal(await fs.readFile(path.join(project, 'note.md.ultran-backup'), 'utf8'), 'old content');
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('denied project edit leaves original untouched', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-deny-'));
+  const root = path.join(temp, 'workspaces');
+  const project = path.join(root, 'demo');
+  await fs.mkdir(project, { recursive: true });
+  await fs.writeFile(path.join(project, 'note.md'), 'old content');
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'should not write' } }
+    : { type: 'final', answer: 'No changes made.' });
+  try {
+    const result = await makeHost(root, 1).run({ goal: 'Update note', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-write-2' });
+    assert.equal(result.status, 'completed');
+    assert.equal(await fs.readFile(path.join(project, 'note.md'), 'utf8'), 'old content');
+    await assert.rejects(fs.stat(path.join(project, 'note.md.ultran-backup')));
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
 });

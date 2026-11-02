@@ -3,14 +3,20 @@ on:
   pull_request:
     paths:
       - "tools/airllm-windows/**"
+      - "apps/desktop/**"
       - "docs/windows-airllm.md"
       - ".github/workflows/windows-airllm-check.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   push:
     branches: [main]
     paths:
       - "tools/airllm-windows/**"
+      - "apps/desktop/**"
       - "docs/windows-airllm.md"
       - ".github/workflows/windows-airllm-check.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
 jobs:
   syntax:
     runs-on: windows-latest
@@ -26,3 +32,25 @@ jobs:
         run: |
           if (!(Test-Path "tools/airllm-windows/start-ultran-airllm.ps1")) { throw "Launcher missing" }
           if (!(Test-Path "tools/airllm-windows/requirements.txt")) { throw "Requirements missing" }
+  desktop-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile
+      - name: Build portable Windows executable
+        run: pnpm --filter @ultran/desktop dist:win
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultran-windows-desktop
+          path: apps/desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

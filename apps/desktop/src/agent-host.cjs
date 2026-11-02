@@ -9,7 +9,7 @@ const OPERATION_RULES = Object.freeze({
   'windows.launch_app': 'external'
 });
 
-function createRequestAuthority(goal) {
+function createRequestAuthority(goal, inheritedGrants = null) {
   if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid request authority input.');
   const text = goal.normalize('NFKC').toLowerCase();
   const read = /(^|[^a-z])(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)(?=$|[^a-z])/.test(text);
@@ -19,9 +19,10 @@ function createRequestAuthority(goal) {
   if (read) grants.push('read');
   if (write) grants.push('write');
   if (external) grants.push('external');
+  const effectiveGrants = inheritedGrants === null ? grants : grants.filter(grant => Array.isArray(inheritedGrants) && inheritedGrants.includes(grant));
   return Object.freeze({
     requestId: require('node:crypto').randomUUID(),
-    grants: Object.freeze(grants),
+    grants: Object.freeze(effectiveGrants),
     allows(toolName) { const capability = OPERATION_RULES[toolName]; return Boolean(capability && grants.includes(capability)); }
   });
 }
@@ -269,10 +270,10 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
     }
   };
 
-  async function run({ goal, model, endpoint, requestId, signal, onEvent = () => {}, context = [], priorFingerprints = [] }) {
+  async function run({ goal, model, endpoint, requestId, signal, onEvent = () => {}, context = [], priorFingerprints = [], authorityGrants = null }) {
     if (endpoint !== 'http://127.0.0.1:11435') throw new Error('Only the local Ultran runtime is allowed.');
     if (typeof model !== 'string' || !model.trim() || model.length > 200) throw new Error('Invalid model ID.');
-    const authority = createRequestAuthority(goal);
+    const authority = createRequestAuthority(goal, authorityGrants);
     const runtime = createAgentRuntime({
       tools,
       limits: { maxRounds: 8, maxCalls: 12, maxOutputChars: 9000 },

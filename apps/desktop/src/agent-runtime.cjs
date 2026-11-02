@@ -20,7 +20,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
     const journal = [];
     let calls = 0;
     let rounds = 0;
-    const emit = async (type, data = {}) => { try { await onEvent({ type, ...data }); } catch {} };
+    const emit = async (type, data = {}) => { await onEvent({ type, ...data }); };
     const finish = (status, answer = '', reason = null) => ({ status, answer, reason, calls, rounds, journal });
 
     for (let round = 1; round <= config.maxRounds; round++) {

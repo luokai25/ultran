@@ -149,13 +149,21 @@ function createAgentTaskStore({ getFilePath }) {
     }));
   }
 
+  async function clear() {
+    await queue;
+    const file = getFilePath();
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await Promise.all([file, file + '.bak'].map(item => fs.rm(item, { force: true })));
+    return { cleared: true };
+  }
+
   async function get(id) {
     await queue;
     const result = await load();
     return result.tasks.find(task => task.id === id) || null;
   }
 
-  return Object.freeze({ create, append, resume, markInterrupted, finish, list, get });
+  return Object.freeze({ create, append, resume, markInterrupted, finish, list, get, clear });
 }
 
 module.exports = { createAgentTaskStore };

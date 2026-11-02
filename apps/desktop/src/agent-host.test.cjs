@@ -186,6 +186,8 @@ test('request authority grants only explicitly requested capability classes', ()
   const edit = createRequestAuthority('Fix and update the project source files.');
   assert.equal(edit.allows('workspace.write_file'), true);
   assert.equal(edit.allows('windows.launch_app'), false);
+  const negative = createRequestAuthority('Review the project but do not edit or change any files.');
+  assert.equal(negative.allows('workspace.write_file'), false);
   const narrowed = createRequestAuthority('Fix and update the project.', ['read']);
   assert.equal(narrowed.allows('workspace.write_file'), false);
   const launch = createRequestAuthority('Open the calculator application.');

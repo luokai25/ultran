@@ -81,3 +81,15 @@ a sibling `.ultran-backup` file before replacement; temporary writes are
 renamed into place. Paths are confined to the imported project, symlinks and
 non-regular targets are rejected, and file size is capped. There is still no
 shell, arbitrary process execution, or unrestricted filesystem access.
+
+
+## Durable agent task history
+
+Agent tasks are journaled locally in the app user-data directory. The journal
+records task goals, status, bounded progress events, and the final result. It
+uses versioned JSON, serialized atomic replacement, and a backup recovery path.
+The Tasks page can reopen a task journal after restarting Ultran. This is a
+history and audit feature; it does not yet resume an interrupted model
+generation automatically. Tool output snippets may be retained in this local
+journal, so users should avoid asking Ultran to inspect secrets they do not
+want stored in task history.

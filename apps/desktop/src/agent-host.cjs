@@ -2,6 +2,30 @@
 
 const { createAgentRuntime } = require('./agent-runtime.cjs');
 
+const OPERATION_RULES = Object.freeze({
+  'workspace.list_projects': 'read', 'workspace.list_files': 'read',
+  'workspace.read_file': 'read', 'workspace.search_files': 'read',
+  'system.get_info': 'read', 'workspace.write_file': 'write',
+  'windows.launch_app': 'external'
+});
+
+function createRequestAuthority(goal) {
+  if (typeof goal !== 'string' || !goal.trim() || goal.length > 12000) throw new Error('Invalid request authority input.');
+  const text = goal.normalize('NFKC').toLowerCase();
+  const read = /\\b(inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos)\\b/.test(text);
+  const write = /\\b(create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)\\b/.test(text);
+  const external = /\\b(open|launch|start)\\b.{0,48}\\b(app|application|program|explorer|notepad|calculator|task manager)\\b/.test(text);
+  const grants = [];
+  if (read) grants.push('read');
+  if (write) grants.push('write');
+  if (external) grants.push('external');
+  return Object.freeze({
+    requestId: require('node:crypto').randomUUID(),
+    grants: Object.freeze(grants),
+    allows(toolName) { const capability = OPERATION_RULES[toolName]; return Boolean(capability && grants.includes(capability)); }
+  });
+}
+
 function requireExactKeys(args, keys) {
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('Tool arguments must be an object.');
   const actual = Object.keys(args).sort();
@@ -226,11 +250,13 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
   async function run({ goal, model, endpoint, requestId, signal, onEvent = () => {}, context = [], priorFingerprints = [] }) {
     if (endpoint !== 'http://127.0.0.1:11435') throw new Error('Only the local Ultran runtime is allowed.');
     if (typeof model !== 'string' || !model.trim() || model.length > 200) throw new Error('Invalid model ID.');
+    const authority = createRequestAuthority(goal);
     const runtime = createAgentRuntime({
       tools,
       limits: { maxRounds: 8, maxCalls: 12, maxOutputChars: 9000 },
       onEvent,
       approve: async request => {
+        if (!authority.allows(request.name)) return false;
         if (request.capability === 'read') {
           if (getReadPolicy() !== "ask") return true;
           const result = await dialog.showMessageBox(getMainWindow(), { type: "question", buttons: ["Allow read", "Deny"], defaultId: 1, cancelId: 1, title: "Ultran requests project access", message: request.name, detail: "Ultran wants to inspect local project information. This approval applies to this action only." });
@@ -257,10 +283,10 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
         endpoint, model, goal: task, state: { round, history: history.slice(-16), journal: journal.slice(-12) }, requestId: requestId + '_' + round, signal
       })
     });
-    return runtime.run({ goal, signal, context, priorFingerprints });
+    return runtime.run({ goal, signal, context, priorFingerprints, metadata: { authorityRequestId: authority.requestId, authorityGrants: authority.grants } });
   }
 
   return Object.freeze({ run });
 }
 
-module.exports = { createAgentHost, extractJson };
+module.exports = { createAgentHost, createRequestAuthority, extractJson };

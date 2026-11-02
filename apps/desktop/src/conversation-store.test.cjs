@@ -61,3 +61,17 @@ test('rejects invalid history without replacing the last good file', async t => 
   await assert.rejects(store.save([{ role: 'root', content: 'bad' }]));
   assert.deepEqual((await store.load()).messages, [{ role: 'user', content: 'safe' }]);
 });
+
+
+test('does not overwrite a valid backup with a corrupt primary during recovery save', async t => {
+  const { file, store } = await fixture(t);
+  const good = [{ role: 'user', content: 'last known good' }];
+  await store.save(good);
+  await store.save([{ role: 'user', content: 'newer save' }]);
+  await fs.writeFile(file, '{broken primary');
+  const recovered = await store.load();
+  assert.deepEqual(recovered.messages, good);
+  await store.save(recovered.messages);
+  await fs.writeFile(file, '{broken again');
+  assert.deepEqual((await store.load()).messages, good);
+});

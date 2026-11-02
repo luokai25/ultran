@@ -90,7 +90,8 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
     'workspace.list_projects': {
       capability: 'read',
       description: 'List projects imported into the Ultran workspace',
-      execute: async () => {
+      execute: async args => {
+        requireExactKeys(args, []);
         const fs = require('node:fs/promises');
         const path = require('node:path');
         await fs.mkdir(workspaceRoot(), { recursive: true });
@@ -102,6 +103,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
       capability: 'read',
       description: 'List supported text files in an imported project',
       execute: async args => {
+        requireExactKeys(args, ['project']);
         if (typeof args.project !== 'string' || args.project.length > 100) throw new Error('Invalid project name.');
         const path = require('node:path');
         const projectPath = safeWorkspacePath(path.join(workspaceRoot(), args.project));
@@ -112,6 +114,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
       capability: 'read',
       description: 'Read a small text file from an imported project',
       execute: async args => {
+        requireExactKeys(args, ['project', 'path']);
         if (typeof args.project !== 'string' || typeof args.path !== 'string' || args.project.length > 100 || args.path.length > 300) throw new Error('Invalid file request.');
         const path = require('node:path');
         const projectPath = safeWorkspacePath(path.join(workspaceRoot(), args.project));
@@ -122,6 +125,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
       capability: 'read',
       description: 'Search text in a bounded set of imported project files',
       execute: async args => {
+        requireExactKeys(args, ['project', 'query']);
         if (!args || typeof args.project !== 'string' || typeof args.query !== 'string' ||
             args.project.length > 100 || !args.query.trim() || args.query.length > 160) throw new Error('Invalid project search.');
         const path = require('node:path');
@@ -150,6 +154,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
       capability: 'write',
       description: 'Create or replace a text file in an imported project after explicit approval',
       execute: async args => {
+        requireExactKeys(args, ['project', 'path', 'content']);
         if (!args || typeof args.project !== 'string' || typeof args.path !== 'string' || typeof args.content !== 'string' ||
             args.project.length > 100 || args.path.length > 300 || args.content.length > 50000) throw new Error('Invalid or oversized file change.');
         const fs = require('node:fs/promises');
@@ -197,6 +202,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
       capability: 'external',
       description: 'Launch one approved Windows application',
       execute: async args => {
+        requireExactKeys(args, ['appId']);
         if (!args || typeof args.appId !== 'string') throw new Error('Invalid app identifier.');
         const result = await toolEngine.execute('windows.launch_app', { appId: args.appId });
         if (!result?.executed) throw new Error('The Windows action was not approved or did not start.');

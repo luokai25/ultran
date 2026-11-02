@@ -168,5 +168,24 @@ class BridgeTests(unittest.TestCase):
             server.chat_completions(self.request("bad/request/id"))
 
 
+    def test_rejects_oversized_combined_message_content(self):
+        request = server.ChatRequest(
+            model="example/model",
+            request_id="oversized-test",
+            messages=[server.Message(role="user", content="x" * 50000) for _ in range(6)],
+            max_tokens=8,
+        )
+        with self.assertRaises(server.HTTPException) as error:
+            server.chat_completions(request)
+        self.assertEqual(error.exception.status_code, 413)
+
+    def test_message_roles_are_restricted(self):
+        with self.assertRaises(Exception):
+            server.Message(role="system-admin", content="test")
+
+    def test_message_content_has_a_per_message_limit(self):
+        with self.assertRaises(Exception):
+            server.Message(role="user", content="x" * 50001)
+
 if __name__ == "__main__":
     unittest.main()

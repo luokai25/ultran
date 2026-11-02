@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createAgentHost, extractJson } = require('./agent-host.cjs');
+const { createAgentHost, createRequestAuthority, extractJson } = require('./agent-host.cjs');
 
 function sse(decision) {
   const payload = 'data: ' + JSON.stringify({ type: 'token', token: JSON.stringify(decision) }) + '\n\n' +
@@ -172,6 +172,44 @@ test('repeated approved edits preserve every prior backup', async () => {
     const backups = (await fs.readdir(project)).filter(name => name.startsWith('note.md.ultran-backup.'));
     assert.equal(backups.length, 1);
     assert.equal(await fs.readFile(path.join(project, backups[0]), 'utf8'), 'version one');
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('request authority grants only explicitly requested capability classes', () => {
+  const inspect = createRequestAuthority('Inspect and review my project files.');
+  assert.equal(inspect.allows('workspace.list_projects'), true);
+  assert.equal(inspect.allows('workspace.write_file'), false);
+  assert.equal(inspect.allows('windows.launch_app'), false);
+  const edit = createRequestAuthority('Fix and update the project source files.');
+  assert.equal(edit.allows('workspace.write_file'), true);
+  assert.equal(edit.allows('windows.launch_app'), false);
+  const launch = createRequestAuthority('Open the calculator application.');
+  assert.equal(launch.allows('windows.launch_app'), true);
+  assert.equal(launch.allows('workspace.write_file'), false);
+  assert.equal(Object.isFrozen(inspect), true);
+  assert.equal(Object.isFrozen(inspect.grants), true);
+});
+
+test('model cannot write when the trusted user request only asks for inspection', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-authority-deny-'));
+  const root = path.join(temp, 'workspaces');
+  const project = path.join(root, 'demo');
+  await fs.mkdir(project, { recursive: true });
+  const target = path.join(project, 'note.md');
+  await fs.writeFile(target, 'original');
+  const originalFetch = global.fetch;
+  let round = 0;
+  global.fetch = async () => sse(round++ === 0
+    ? { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'unauthorized' } }
+    : { type: 'final', answer: 'Inspection complete.' });
+  try {
+    const result = await makeHost(root).run({ goal: 'Inspect the project files', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'authority-inspect-only' });
+    assert.equal(result.status, 'completed');
+    assert.equal(result.journal[0].status, 'denied');
+    assert.equal(await fs.readFile(target, 'utf8'), 'original');
   } finally {
     global.fetch = originalFetch;
     await fs.rm(temp, { recursive: true, force: true });

@@ -68,8 +68,13 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       }
       seen.add(fingerprint);
       const capability = ['read', 'write', 'external', 'unknown'].includes(tool.capability) ? tool.capability : 'unknown';
-      const request = { name: decision.name, description: String(tool.description || decision.name).slice(0, 300), capability, args: decision.args };
-      await emit('approval_required', { name: request.name, capability, description: request.description });
+      let prepared = null;
+      if (typeof tool.prepare === 'function') {
+        try { prepared = await tool.prepare(decision.args, { signal, metadata }); }
+        catch (error) { journal.push({ name: decision.name, status: 'preflight_failed', reason: String(error?.message || error).slice(0, 300) }); history.push({ role: 'tool', name: decision.name, ok: false, error: 'Preflight failed. No action was executed.' }); await emit('tool_rejected', { name: decision.name, reason: 'preflight_failed' }); continue; }
+      }
+      const request = { name: decision.name, description: String(tool.description || decision.name).slice(0, 300), capability, args: decision.args, prepared };
+      await emit('approval_required', { name: request.name, capability, description: request.description, prepared });
       let allowed = false;
       try { allowed = await approve(request) === true; } catch {}
       if (!allowed) {
@@ -84,7 +89,7 @@ function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limit
       if (capability === 'write' || capability === 'external') effects.push(effect);
       await emit('tool_started', { name: decision.name, fingerprint, call: calls, maxCalls: config.maxCalls, effect: capability === 'write' || capability === 'external' ? { ...effect } : null });
       try {
-        const result = await tool.execute(decision.args, { signal, metadata });
+        const result = await tool.execute(decision.args, { signal, metadata, prepared });
         let output;
         try { output = JSON.stringify(result); } catch { output = String(result); }
         output = String(output ?? 'null').slice(0, config.maxOutputChars);

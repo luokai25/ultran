@@ -22,7 +22,7 @@ function createRequestAuthority(goal, inheritedGrants = null) {
   };
   const read = hasIntent('inspect|review|analy[sz]e|read|list|search|find|show|summari[sz]e|explain|check|diagnos');
   const writeVerbs = 'create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate';
-  const writeIntentText = text.replace(new RegExp('(?:do not|don\\'t|never|not)\\\\s+(?:' + writeVerbs + ')(?:\\\\s+(?:or|and)\\\\s+(?:' + writeVerbs + '))*', 'g'), ' ');
+  const writeIntentText = text.replace(new RegExp("(?:do not|don't|never|not)\\s+(?:" + writeVerbs + ")(?:\\s+(?:or|and)\\s+(?:" + writeVerbs + "))*", "g"), " ");
   const write = /(^|[^a-z])(?:create|write|edit|modify|update|change|replace|rewrite|fix|repair|implement|refactor|delete|remove|rename|save|build|generate)(?=$|[^a-z])/.test(writeIntentText);
   const external = hasIntent('open|launch|start') && /(app|application|program|explorer|notepad|calculator|task manager)/.test(text);
   const grants = [];

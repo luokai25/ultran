@@ -23,7 +23,7 @@ function createRequestAuthority(goal, inheritedGrants = null) {
   return Object.freeze({
     requestId: require('node:crypto').randomUUID(),
     grants: Object.freeze(effectiveGrants),
-    allows(toolName) { const capability = OPERATION_RULES[toolName]; return Boolean(capability && grants.includes(capability)); }
+    allows(toolName) { const capability = OPERATION_RULES[toolName]; return Boolean(capability && effectiveGrants.includes(capability)); }
   });
 }
 

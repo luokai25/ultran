@@ -78,7 +78,9 @@ security examples. The relevant architecture is grouped into these domains:
   semantic turn contract or inherited authority system.
 - Added regression tests proving an inspection-only request cannot cause a
   model-proposed project write.
-- The desktop agent host tests and related runtime/task-store tests pass (36
+- Added prompt-injection guard markers around tool history returned to the local
+  planner, with embedded marker breakout neutralization and regression coverage.
+- The desktop agent host tests and related runtime/task-store tests pass (37
   tests at this checkpoint).
 
 ### Remaining parity gaps (not yet implemented)

@@ -1,7 +1,7 @@
 """Local OpenAI-compatible API for AirLLM on Windows. Loopback-only by default."""
 import os, re, time, uuid, threading
 from typing import Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException\nfrom fastapi.responses import StreamingResponse\nimport json
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 DEFAULT_MODEL=os.environ.get("ULTRAN_AIRLLM_MODEL","Qwen/Qwen2.5-1.5B-Instruct")
@@ -50,34 +50,77 @@ def health()->dict[str,Any]:
 @app.get("/v1/models")
 def models():
     return {"object":"list","data":[{"id":_model_id or DEFAULT_MODEL,"object":"model","owned_by":"local"}]}
+_cancel_events:dict[str,threading.Event]={}
+_cancel_lock=threading.Lock()
+def sse(payload:dict[str,Any])->str:
+    return "data: "+json.dumps(payload,ensure_ascii=False)+"\\n\\n"
 @app.post("/v1/chat/completions")
 def chat_completions(request:ChatRequest):
     global _load_error
-    requested_model=request.model or _model_id or DEFAULT_MODEL
-    try:
-        with _model_lock:
-            load_model(requested_model)
+    request_id=request.request_id or uuid.uuid4().hex
+    if len(request_id)>100:
+        raise HTTPException(status_code=400,detail="Invalid request ID.")
+    cancel_event=threading.Event()
+    with _cancel_lock:
+        if request_id in _cancel_events:
+            raise HTTPException(status_code=409,detail="Duplicate request ID.")
+        _cancel_events[request_id]=cancel_event
+    def generate_stream():
+        started=time.time()
+        try:
+            from transformers import TextIteratorStreamer,StoppingCriteria,StoppingCriteriaList
             import torch
-            messages=[{"role":m.role,"content":m.content} for m in request.messages]
-            if hasattr(_tokenizer,"apply_chat_template"):
-                prompt=_tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True)
-            else:
-                prompt="\n".join("{}: {}".format(m["role"],m["content"]) for m in messages)+"\nassistant:"
-            encoded=_tokenizer(prompt,return_tensors="pt")
-            input_ids=encoded["input_ids"]
-            if cuda_available():
-                input_ids=input_ids.cuda()
-            token_limit=min(request.max_tokens or MAX_NEW_TOKENS,2048)
-            started=time.time()
-            with torch.inference_mode():
-                result=_model.generate(input_ids,max_new_tokens=token_limit,use_cache=True,return_dict_in_generate=True)
-            sequences=result.sequences if hasattr(result,"sequences") else result
-            generated=sequences[0][input_ids.shape[-1]:]
-            answer=_tokenizer.decode(generated,skip_special_tokens=True)
-            return {"id":"chatcmpl-"+uuid.uuid4().hex,"object":"chat.completion","created":int(time.time()),"model":_model_id,"choices":[{"index":0,"message":{"role":"assistant","content":answer},"finish_reason":"stop"}],"usage":{"prompt_tokens":int(input_ids.shape[-1]),"completion_tokens":int(generated.shape[-1]),"total_tokens":int(sequences.shape[-1])},"x_ultran_elapsed_seconds":round(time.time()-started,2)}
-    except Exception as exc:
-        _load_error="{}: {}".format(type(exc).__name__,exc)
-        raise HTTPException(status_code=503,detail="AirLLM request failed: {}".format(_load_error)) from exc
+            class StopOnCancel(StoppingCriteria):
+                def __call__(self,input_ids,scores,**kwargs):
+                    return cancel_event.is_set()
+            requested_model=request.model or _model_id or DEFAULT_MODEL
+            with _model_lock:
+                if cancel_event.is_set():
+                    yield sse({"type":"cancelled","request_id":request_id})
+                    return
+                load_model(requested_model)
+                messages=[{"role":m.role,"content":m.content} for m in request.messages]
+                prompt=_tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True) if hasattr(_tokenizer,"apply_chat_template") else "\\n".join("{}: {}".format(m["role"],m["content"]) for m in messages)+"\\nassistant:"
+                encoded=_tokenizer(prompt,return_tensors="pt")
+                input_ids=encoded["input_ids"]
+                if cuda_available(): input_ids=input_ids.cuda()
+                streamer=TextIteratorStreamer(_tokenizer,skip_prompt=True,skip_special_tokens=True,timeout=1.0)
+                token_limit=min(request.max_tokens or MAX_NEW_TOKENS,2048)
+                generation_error=[]
+                def run_generation():
+                    try:
+                        with torch.inference_mode():
+                            _model.generate(input_ids,max_new_tokens=token_limit,use_cache=True,streamer=streamer,stopping_criteria=StoppingCriteriaList([StopOnCancel()]))
+                    except Exception as exc:
+                        generation_error.append(exc)
+                        try: streamer.end()
+                        except Exception: pass
+                worker=threading.Thread(target=run_generation,daemon=True)
+                worker.start()
+                for chunk in streamer:
+                    if chunk:
+                        yield sse({"type":"token","request_id":request_id,"token":chunk})
+                    if cancel_event.is_set() and not worker.is_alive(): break
+                worker.join(timeout=2)
+                if generation_error:
+                    raise generation_error[0]
+                if cancel_event.is_set():
+                    yield sse({"type":"cancelled","request_id":request_id,"elapsed_seconds":round(time.time()-started,2)})
+                else:
+                    yield sse({"type":"done","request_id":request_id,"model":_model_id,"elapsed_seconds":round(time.time()-started,2)})
+        except Exception as exc:
+            _load_error="{}: {}".format(type(exc).__name__,exc)
+            yield sse({"type":"error","request_id":request_id,"error":"AirLLM streaming failed: "+_load_error})
+        finally:
+            with _cancel_lock: _cancel_events.pop(request_id,None)
+    return StreamingResponse(generate_stream(),media_type="text/event-stream",headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
+@app.post("/v1/chat/cancel/{request_id}")
+def cancel_generation(request_id:str):
+    with _cancel_lock:
+        event=_cancel_events.get(request_id)
+        if event is None: return {"cancelled":False,"request_id":request_id}
+        event.set()
+        return {"cancelled":True,"request_id":request_id}
 if __name__=="__main__":
     import uvicorn
     uvicorn.run(app,host=HOST,port=PORT,log_level="info")

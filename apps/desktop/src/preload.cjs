@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  chat:(request)=>ipcRenderer.invoke("ultran:chat",request),
  agentRun:(request)=>ipcRenderer.invoke("ultran:agent-run",request),
  listAgentTasks:()=>ipcRenderer.invoke("ultran:list-agent-tasks"),
+ clearAgentTasks:()=>ipcRenderer.invoke("ultran:clear-agent-tasks"),
  getAgentTask:(id)=>ipcRenderer.invoke("ultran:get-agent-task",id),
  cancelAgent:(requestId)=>ipcRenderer.invoke("ultran:cancel-agent",requestId),
  resumeAgentTask:(id)=>ipcRenderer.invoke("ultran:resume-agent-task",id),

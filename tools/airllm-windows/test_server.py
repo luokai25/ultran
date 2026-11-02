@@ -141,6 +141,14 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(status["status"], "error")
         self.assertEqual(status["error"], "RuntimeError: test failure")
 
+    def test_health_includes_runtime_and_disk_diagnostics(self):
+        status = server.health()
+        self.assertTrue(status["python_version"])
+        self.assertGreaterEqual(status["cpu_count"], 1)
+        self.assertTrue(status["cache_path"])
+        self.assertGreater(status["free_disk_bytes"], 0)
+        self.assertGreater(status["total_disk_bytes"], 0)
+
     def test_streams_tokens_and_finishes(self):
         response = server.chat_completions(self.request("stream-test"))
         chunks = asyncio.run(self.consume(response))

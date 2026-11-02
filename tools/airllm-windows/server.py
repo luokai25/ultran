@@ -1,5 +1,5 @@
 """Local OpenAI-compatible API for AirLLM on Windows. Loopback-only by default."""
-import os, re, time, uuid, threading
+import os, re, time, uuid, threading, sys, shutil
 from typing import Any, Literal
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -61,7 +61,20 @@ def load_model(model_id:str):
 @app.get("/health")
 def health()->dict[str,Any]:
     status="loading" if _loading_model_id else ("error" if _load_error else ("ready" if _model is not None else "not_loaded"))
-    return {"status":status,"model":_model_id or DEFAULT_MODEL,"loading_model":_loading_model_id,"host":HOST,"port":PORT,"error":_load_error,"device":"cuda" if cuda_available() else "cpu"}
+    cache_root=os.environ.get("HF_HOME") or os.environ.get("HUGGINGFACE_HUB_CACHE") or os.path.join(os.path.expanduser("~"),".cache","huggingface")
+    probe=cache_root
+    while probe and not os.path.exists(probe):
+        parent=os.path.dirname(probe)
+        if parent==probe: break
+        probe=parent
+    try:
+        disk=shutil.disk_usage(probe or os.path.expanduser("~"))
+        free_disk_bytes=disk.free
+        total_disk_bytes=disk.total
+    except OSError:
+        free_disk_bytes=None
+        total_disk_bytes=None
+    return {"status":status,"model":_model_id or DEFAULT_MODEL,"loading_model":_loading_model_id,"host":HOST,"port":PORT,"error":_load_error,"device":"cuda" if cuda_available() else "cpu","python_version":sys.version.split()[0],"cpu_count":os.cpu_count(),"cache_path":cache_root,"free_disk_bytes":free_disk_bytes,"total_disk_bytes":total_disk_bytes}
 @app.get("/v1/models")
 def models():
     return {"object":"list","data":[{"id":_model_id or DEFAULT_MODEL,"object":"model","owned_by":"local"}]}

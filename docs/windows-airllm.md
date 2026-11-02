@@ -52,7 +52,7 @@ task approval and logging.
 
 ## Troubleshooting
 
-Check /health for the load error, Python version, model support, and free disk.
+Check /health for the load error, Python version, CPU count, cache path, and free disk diagnostics.
 CPU-only is expected on this AMD laptop. If generation is too slow, use a
 smaller model or run inference on stronger hardware and connect only over a
 trusted private network with authentication. Do not expose this unauthenticated

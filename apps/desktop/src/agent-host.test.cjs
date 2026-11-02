@@ -82,3 +82,29 @@ test('denied project edit leaves original untouched', async () => {
     await fs.rm(temp, { recursive: true, force: true });
   }
 });
+
+test('planner receives prior tool results on the next round', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-feedback-'));
+  const root = path.join(temp, 'workspaces');
+  await fs.mkdir(path.join(root, 'demo'), { recursive: true });
+  const originalFetch = global.fetch;
+  let round = 0;
+  const prompts = [];
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    prompts.push(body.messages[1].content);
+    return sse(round++ === 0
+      ? { type: 'tool', name: 'workspace.list_projects', args: {} }
+      : { type: 'final', answer: 'I inspected the project list.' });
+  };
+  try {
+    const result = await makeHost(root).run({ goal: 'Inspect projects', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'test-feedback-1' });
+    assert.equal(result.status, 'completed');
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1], /demo/);
+    assert.match(prompts[1], /workspace\.list_projects/);
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});

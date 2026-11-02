@@ -1,5 +1,6 @@
 name: Windows AirLLM bridge check
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "tools/airllm-windows/**"

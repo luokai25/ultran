@@ -6,7 +6,7 @@ const os=require("node:os");
 const {spawn}=require("node:child_process");
 const {createConversationStore}=require("./conversation-store.cjs");
 const {createToolEngine}=require("./tool-engine.cjs");
-const {createAgentHost}=require("./agent-host.cjs");
+const {createAgentHost,createRequestAuthority}=require("./agent-host.cjs");
 const {createAgentTaskStore}=require("./agent-task-store.cjs");
 let mainWindow,runtimeProcess=null,runtimeLog=null,runtimeSetupProcess=null,agentReadPolicy="allow";const activeChatRequests=new Map();
 const runtimeRoot=()=>path.join(app.getPath("appData"),"Ultran","airllm");
@@ -35,13 +35,13 @@ const agentListProjectFiles=async projectPath=>{const root=safeWorkspacePath(pro
 const agentReadProjectFile=async(projectPath,relativePath)=>{const root=safeWorkspacePath(projectPath),file=path.resolve(root,relativePath);if(file!==root&&!file.startsWith(root+path.sep))throw new Error("File path is outside the selected project.");const realRoot=await fs.realpath(root),realFile=await fs.realpath(file);if(realFile!==realRoot&&!realFile.startsWith(realRoot+path.sep))throw new Error("Resolved file path is outside the selected project.");const stat=await fs.stat(realFile);if(!stat.isFile()||stat.size>32000)throw new Error("Choose a text file smaller than 32 KB.");return {name:path.basename(file),relativePath,content:(await fs.readFile(realFile,"utf8")).slice(0,24000)};};
 const agentHost=createAgentHost({dialog,getMainWindow:()=>mainWindow,getReadPolicy:()=>agentReadPolicy,toolEngine,workspaceRoot,safeWorkspacePath,listProjectFiles:agentListProjectFiles,readProjectFile:agentReadProjectFile,systemInfo:()=>({platform:process.platform,arch:process.arch,cpuCount:os.cpus().length,totalMemory:os.totalmem(),freeMemory:os.freemem()})});
 const activeAgentRequests=new Map();
-async function executeAgentTask({goal,model,endpoint,requestId,context=[],priorFingerprints=[],resume=false}){
+async function executeAgentTask({goal,model,endpoint,requestId,context=[],priorFingerprints=[],resume=false,authorityGrants=null}){
  if(typeof requestId!=="string"||!/^[A-Za-z0-9_-]{1,100}$/.test(requestId)||activeAgentRequests.has(requestId))throw new Error("Invalid or duplicate agent request.");
  const controller=new AbortController();activeAgentRequests.set(requestId,controller);
  const timeout=setTimeout(()=>controller.abort(),30*60*1000);const pending=[];let result;
  try{
-  if(resume)await agentTaskStore.resume(requestId);else await agentTaskStore.create({id:requestId,goal,model});
-  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,onEvent:async event=>{
+  if(resume)await agentTaskStore.resume(requestId);else { const initialAuthority=createRequestAuthority(goal); authorityGrants=initialAuthority.grants; await agentTaskStore.create({id:requestId,goal,model,authorityGrants}); }
+  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,authorityGrants,onEvent:async event=>{
    const save=agentTaskStore.append(requestId,event);pending.push(save);await save;
    if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("ultran:agent-event",{requestId,...event});
   }});

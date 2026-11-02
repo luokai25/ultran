@@ -83,6 +83,10 @@ function createAgentTaskStore({ getFilePath }) {
       if (!task) return { saved: false };
       task.events.push({ at: new Date().toISOString(), ...safe });
       task.events = task.events.slice(-250);
+      if (["tool_started", "tool_denied", "tool_skipped"].includes(safe.type) && typeof safe.fingerprint === "string" && !task.fingerprints.includes(safe.fingerprint)) {
+        if (task.fingerprints.length < 1000) task.fingerprints.push(safe.fingerprint);
+        else task.fingerprintsTruncated = true;
+      }
       task.updatedAt = new Date().toISOString();
       return { saved: true };
     });

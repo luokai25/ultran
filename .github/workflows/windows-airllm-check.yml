@@ -68,16 +68,20 @@ jobs:
       - name: Smoke-test packaged desktop startup
         shell: pwsh
         run: |
-          $exe = Get-ChildItem "apps/desktop/dist/*.exe" | Select-Object -First 1
-          if (!$exe) { throw "Portable executable was not produced." }
-          $launcher = Start-Process -FilePath $exe.FullName -PassThru
-          Start-Sleep -Seconds 8
-          $app = Get-Process -Name "Ultran" -ErrorAction SilentlyContinue
+          $exe = Resolve-Path "apps/desktop/dist/win-unpacked/Ultran.exe"
+          $log = Join-Path $env:RUNNER_TEMP "ultran-electron-startup.log"
+          $launcher = Start-Process -FilePath $exe -ArgumentList @("--enable-logging", "--log-file=$log") -PassThru
+          Start-Sleep -Seconds 12
+          $app = Get-CimInstance Win32_Process | Where-Object {
+            $_.Name -eq "Ultran.exe" -and $_.ExecutablePath -eq $exe.Path
+          } | Select-Object -First 1
           if (!$app) {
-            if (!$launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
-            throw "Packaged Ultran process did not remain running after launch."
+            if (Test-Path $log) { Get-Content $log }
+            if ($launcher.HasExited) { Write-Host "Ultran.exe exited with code $($launcher.ExitCode)" }
+            else { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
+            throw "Packaged Ultran application failed its startup smoke test."
           }
-          $app | Stop-Process -Force
+          Stop-Process -Id $app.ProcessId -Force -ErrorAction SilentlyContinue
           if (!$launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4

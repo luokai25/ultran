@@ -87,7 +87,7 @@ def chat_completions(request:ChatRequest):
                 encoded=_tokenizer(prompt,return_tensors="pt")
                 input_ids=encoded["input_ids"]
                 if cuda_available(): input_ids=input_ids.cuda()
-                streamer=TextIteratorStreamer(_tokenizer,skip_prompt=True,skip_special_tokens=True,timeout=1.0)
+                streamer=TextIteratorStreamer(_tokenizer,skip_prompt=True,skip_special_tokens=True,timeout=None)
                 token_limit=min(request.max_tokens or MAX_NEW_TOKENS,2048)
                 generation_error=[]
                 def run_generation():

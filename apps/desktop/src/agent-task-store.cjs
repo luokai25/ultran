@@ -1,0 +1,126 @@
+'use strict';
+
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+
+function createAgentTaskStore({ getFilePath }) {
+  if (typeof getFilePath !== 'function') throw new TypeError('Agent task store requires a path provider.');
+  let queue = Promise.resolve();
+
+  async function readFile(file) {
+    const parsed = JSON.parse(await fs.readFile(file, 'utf8'));
+    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.tasks)) throw new Error('Invalid agent task store.');
+    return parsed.tasks;
+  }
+
+  async function load() {
+    const file = getFilePath();
+    try { return { tasks: await readFile(file), recovered: false }; }
+    catch (error) {
+      if (error.code === 'ENOENT') {
+        try { return { tasks: await readFile(file + '.bak'), recovered: true }; }
+        catch (backupError) { if (backupError.code === 'ENOENT') return { tasks: [], recovered: false }; throw backupError; }
+      }
+      try { return { tasks: await readFile(file + '.bak'), recovered: true }; }
+      catch (backupError) { throw new Error('Agent task history is damaged and no valid backup is available: ' + backupError.message); }
+    }
+  }
+
+  async function mutate(fn) {
+    const operation = queue.then(async () => {
+      const file = getFilePath();
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      let tasks = [];
+      try { tasks = await readFile(file); }
+      catch (error) {
+        if (error.code !== 'ENOENT') {
+          try { tasks = await readFile(file + '.bak'); }
+          catch (backupError) { if (backupError.code !== 'ENOENT') throw backupError; }
+        }
+      }
+      const result = await fn(tasks);
+      const temp = file + '.tmp.' + crypto.randomUUID();
+      const backupTemp = file + '.bak.tmp.' + crypto.randomUUID();
+      try {
+        await fs.writeFile(temp, JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), tasks: tasks.slice(0, 50) }), { encoding: 'utf8', flag: 'wx' });
+        try {
+          await readFile(file);
+          await fs.copyFile(file, backupTemp);
+          await fs.rename(backupTemp, file + '.bak');
+        } catch (error) {
+          if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
+        }
+        await fs.rename(temp, file);
+      } finally {
+        await Promise.all([temp, backupTemp].map(item => fs.rm(item, { force: true }).catch(() => {})));
+      }
+      return result;
+    });
+    queue = operation.catch(() => {});
+    return operation;
+  }
+
+  async function create({ id, goal, model }) {
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(id) || typeof goal !== 'string' || !goal.trim() || goal.length > 12000 ||
+        typeof model !== 'string' || !model.trim() || model.length > 200) throw new Error('Invalid agent task record.');
+    return mutate(tasks => {
+      if (tasks.some(task => task.id === id)) throw new Error('Duplicate agent task ID.');
+      const now = new Date().toISOString();
+      tasks.unshift({ id, goal: goal.slice(0, 12000), model: model.slice(0, 200), status: 'running', createdAt: now, updatedAt: now, events: [], result: null });
+      return { created: true, id };
+    });
+  }
+
+  async function append(id, event) {
+    if (!event || typeof event.type !== 'string') return { saved: false };
+    const safe = JSON.parse(JSON.stringify(event));
+    if (typeof safe.output === 'string') safe.output = safe.output.slice(0, 2500);
+    if (typeof safe.answer === 'string') safe.answer = safe.answer.slice(0, 2500);
+    if (typeof safe.error === 'string') safe.error = safe.error.slice(0, 500);
+    return mutate(tasks => {
+      const task = tasks.find(item => item.id === id);
+      if (!task) return { saved: false };
+      task.events.push({ at: new Date().toISOString(), ...safe });
+      task.events = task.events.slice(-250);
+      task.updatedAt = new Date().toISOString();
+      return { saved: true };
+    });
+  }
+
+  async function finish(id, result) {
+    return mutate(tasks => {
+      const task = tasks.find(item => item.id === id);
+      if (!task) return { saved: false };
+      task.status = ['completed', 'cancelled', 'failed', 'limit_reached'].includes(result?.status) ? result.status : 'failed';
+      task.result = {
+        answer: typeof result?.answer === 'string' ? result.answer.slice(0, 6000) : '',
+        reason: typeof result?.reason === 'string' ? result.reason.slice(0, 500) : null,
+        calls: Number.isInteger(result?.calls) ? result.calls : 0,
+        rounds: Number.isInteger(result?.rounds) ? result.rounds : 0
+      };
+      task.updatedAt = new Date().toISOString();
+      return { saved: true };
+    });
+  }
+
+  async function list() {
+    await queue;
+    const result = await load();
+    return result.tasks.slice(0, 50).map(task => ({
+      id: task.id, goal: task.goal, model: task.model, status: task.status,
+      createdAt: task.createdAt, updatedAt: task.updatedAt, result: task.result,
+      eventCount: Array.isArray(task.events) ? task.events.length : 0
+    }));
+  }
+
+  async function get(id) {
+    await queue;
+    const result = await load();
+    return result.tasks.find(task => task.id === id) || null;
+  }
+
+  return Object.freeze({ create, append, finish, list, get });
+}
+
+module.exports = { createAgentTaskStore };

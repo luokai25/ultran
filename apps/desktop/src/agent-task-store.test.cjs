@@ -79,3 +79,19 @@ test('clear removes task history and its recovery backup', async () => {
     assert.equal(await fs.access(file + '.bak').then(() => true, () => false), false);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('legacy task journals without action fingerprints cannot be resumed safely', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-task-legacy-'));
+  const file = path.join(dir, 'agent-tasks.json');
+  try {
+    await fs.writeFile(file, JSON.stringify({ version: 1, tasks: [{
+      id: 'legacy-task', goal: 'Old task', model: 'local-model', status: 'interrupted',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      events: [{ at: new Date().toISOString(), type: 'tool_started', name: 'workspace.write_file' }]
+    }] }));
+    const store = createAgentTaskStore({ getFilePath: () => file });
+    const listed = await store.list();
+    assert.equal(listed[0].resumable, false);
+    assert.equal((await store.get('legacy-task')).fingerprintsTruncated, true);
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

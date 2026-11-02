@@ -94,3 +94,23 @@ test('prior action fingerprints prevent replay after task resumption', async () 
   assert.equal(result.status, 'completed');
   assert.ok(result.journal.some(item => item.reason === 'repeated_exact_call'));
 });
+
+test('waits for durable started-event recording before executing a side effect', async () => {
+  let journalSaved = false;
+  let executed = false;
+  const runtime = createAgentRuntime({
+    tools: { 'test.write': { capability: 'write', execute: async () => { assert.equal(journalSaved, true); executed = true; } } },
+    approve: async () => true,
+    planner: async () => ({ type: 'tool', name: 'test.write', args: { value: 1 } }),
+    limits: { maxRounds: 1, maxCalls: 1 },
+    onEvent: async event => {
+      if (event.type === 'tool_started') {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        journalSaved = true;
+      }
+    }
+  });
+  const result = await runtime.run({ goal: 'Write safely' });
+  assert.equal(executed, true);
+  assert.equal(result.status, 'limit_reached');
+});

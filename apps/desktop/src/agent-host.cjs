@@ -203,7 +203,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
     }
   };
 
-  async function run({ goal, model, endpoint, requestId, signal, onEvent = () => {} }) {
+  async function run({ goal, model, endpoint, requestId, signal, onEvent = () => {}, context = [], priorFingerprints = [] }) {
     if (endpoint !== 'http://127.0.0.1:11435') throw new Error('Only the local Ultran runtime is allowed.');
     if (typeof model !== 'string' || !model.trim() || model.length > 200) throw new Error('Invalid model ID.');
     const runtime = createAgentRuntime({
@@ -237,7 +237,7 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
         endpoint, model, goal: task, state: { round, history: history.slice(-16), journal: journal.slice(-12) }, requestId: requestId + '_' + round, signal
       })
     });
-    return runtime.run({ goal, signal });
+    return runtime.run({ goal, signal, context, priorFingerprints });
   }
 
   return Object.freeze({ run });

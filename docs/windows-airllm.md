@@ -25,7 +25,14 @@ realistic interactive target.
 4. The bridge binds to loopback at http://127.0.0.1:11435.
 5. Check /health and /v1/models in the browser.
 
-Runtime setup now imports and verifies PyTorch, Transformers, AirLLM, FastAPI, and Uvicorn before it reports success. The first chat request downloads model weights and AirLLM layer shards. Keep ample free disk space; budget at least twice the checkpoint size where possible. Hugging Face's cache handles resumable file downloads, but an interrupted first load may need to be retried. The first request can be extremely slow, especially on CPU.
+Runtime setup now imports and verifies PyTorch, Transformers, AirLLM, FastAPI, and Uvicorn before it reports success. To verify real inference (not only the fake-model CI tests), open PowerShell in the repository and run:
+
+~~~powershell
+$env:ULTRAN_AIRLLM_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+& "$env:APPDATA\Ultran\airllm\.venv\Scripts\python.exe" .\tools\airllm-windows\smoke_test.py
+~~~
+
+The smoke test sends a real request through Ultran's streaming endpoint and must print PASS. The first run downloads model weights and AirLLM layer shards. Keep ample free disk space; budget at least twice the checkpoint size where possible. Hugging Face's cache handles resumable file downloads, but an interrupted first load may need to be retried. The first request can be extremely slow, especially on CPU.
 
 Set ULTRAN_AIRLLM_MODEL before launching to select another compatible Hugging
 Face model. Some repositories require authentication or license acceptance. Do

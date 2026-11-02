@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 20
       - name: Compile bridge syntax
-        run: python -m py_compile tools/airllm-windows/server.py tools/airllm-windows/test_server.py
+        run: python -m py_compile tools/airllm-windows/server.py tools/airllm-windows/test_server.py tools/airllm-windows/smoke_test.py
       - name: Validate PowerShell runtime installer syntax
         shell: pwsh
         run: |

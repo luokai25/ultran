@@ -7,7 +7,7 @@ function engine({ approved = false, platform = 'win32' } = {}) {
   const instance = createToolEngine({
     platform,
     confirm: async request => { prompts.push(request); return approved; },
-    launch: async executable => { launches.push(executable); },
+    launch: async executable => { launches.push(executable); return { pid: 4321, spawned: true }; },
   });
   return { instance, prompts, launches };
 }
@@ -39,6 +39,8 @@ test('approval launches only the fixed executable with no user-controlled comman
   const e = engine({ approved: true });
   const result = await e.instance.execute('windows.launch_app', { appId: 'notepad' });
   assert.equal(result.executed, true);
+  assert.equal(result.verified, true);
+  assert.equal(result.pid, 4321);
   assert.deepEqual(e.launches, ['notepad.exe']);
   assert.equal(e.prompts[0].tool, 'windows.launch_app');
 });

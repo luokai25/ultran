@@ -69,7 +69,7 @@ ipcMain.handle("ultran:resume-agent-task",async(_event,id)=>{
   else if(event.type==="tool_skipped")history.push({role:"tool",name:event.name,ok:false,error:"Repeated action was skipped previously."});
   else if(event.type==="tool_started"&&!finished.has(event.fingerprint))history.push({role:"tool",name:event.name,ok:false,error:"This action was started before Ultran stopped, but its completion was not recorded. Its outcome is unknown. Inspect the current state before deciding what to do next."});
  }
- return executeAgentTask({goal:task.goal,model:task.model,endpoint:"http://127.0.0.1:11435",requestId:id,context:history.slice(-20),priorFingerprints:fingerprints,resume:true});
+ return executeAgentTask({goal:task.goal,model:task.model,endpoint:"http://127.0.0.1:11435",requestId:id,context:history.slice(-20),priorFingerprints:fingerprints,authorityGrants:Array.isArray(task.authorityGrants)?task.authorityGrants:[],resume:true});
 });
 ipcMain.handle("ultran:clear-agent-tasks",async()=>{
  if(activeAgentRequests.size)throw new Error("Stop active agent tasks before clearing task history.");

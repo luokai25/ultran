@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('node:crypto');
+
 const DEFAULT_LIMITS = Object.freeze({ maxRounds: 8, maxCalls: 16, maxOutputChars: 12000 });
 
 function createAgentRuntime({ tools, planner, approve, onEvent = () => {}, limits = {} }) {

@@ -147,3 +147,33 @@ test('agent tools reject unexpected argument fields', async () => {
     await fs.rm(temp, { recursive: true, force: true });
   }
 });
+
+test('repeated approved edits preserve every prior backup', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ultran-agent-backups-'));
+  const root = path.join(temp, 'workspaces');
+  const project = path.join(root, 'demo');
+  await fs.mkdir(project, { recursive: true });
+  const target = path.join(project, 'note.md');
+  await fs.writeFile(target, 'version zero');
+  const originalFetch = global.fetch;
+  const decisions = [
+    { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'version one' } },
+    { type: 'final', answer: 'First edit complete.' },
+    { type: 'tool', name: 'workspace.write_file', args: { project: 'demo', path: 'note.md', content: 'version two' } },
+    { type: 'final', answer: 'Second edit complete.' }
+  ];
+  global.fetch = async () => sse(decisions.shift());
+  try {
+    const host = makeHost(root);
+    await host.run({ goal: 'First edit', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'backup-run-1' });
+    await host.run({ goal: 'Second edit', model: 'test-model', endpoint: 'http://127.0.0.1:11435', requestId: 'backup-run-2' });
+    assert.equal(await fs.readFile(target, 'utf8'), 'version two');
+    assert.equal(await fs.readFile(target + '.ultran-backup', 'utf8'), 'version zero');
+    const backups = (await fs.readdir(project)).filter(name => name.startsWith('note.md.ultran-backup.'));
+    assert.equal(backups.length, 1);
+    assert.equal(await fs.readFile(path.join(project, backups[0]), 'utf8'), 'version one');
+  } finally {
+    global.fetch = originalFetch;
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+});

@@ -40,7 +40,13 @@ def load_model(model_id:str):
         return
     try:
         from airllm import AutoModel
-        from transformers import AutoTokenizer
+        from transformers import AutoConfig, AutoTokenizer
+        # AirLLM currently resolves architectures with trust_remote_code=True.
+        # Preflight the repository with remote code disabled and reject custom
+        # code mappings before allowing AirLLM to load the same cached config.
+        config=AutoConfig.from_pretrained(model_id,trust_remote_code=False)
+        if getattr(config,"auto_map",None):
+            raise ValueError("This model requires custom repository code. Ultran blocks remote model code for safety.")
         tokenizer=AutoTokenizer.from_pretrained(model_id,trust_remote_code=False)
         model=AutoModel.from_pretrained(model_id,compression=None)
         _tokenizer,_model,_model_id,_load_error=tokenizer,model,model_id,None
@@ -61,7 +67,7 @@ def sse(payload:dict[str,Any])->str:
 def chat_completions(request:ChatRequest):
     global _load_error
     request_id=request.request_id or uuid.uuid4().hex
-    if len(request_id)>100:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}",request_id):
         raise HTTPException(status_code=400,detail="Invalid request ID.")
     cancel_event=threading.Event()
     with _cancel_lock:

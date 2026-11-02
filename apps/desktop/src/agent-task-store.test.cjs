@@ -12,7 +12,8 @@ test('persists task lifecycle and bounded events across store instances', async 
   try {
     const store = createAgentTaskStore({ getFilePath: () => file });
     await store.create({ id: 'task-1', goal: 'Inspect project', model: 'local-model' });
-    await store.append('task-1', { type: 'tool_started', name: 'workspace.write_file', fingerprint: 'stable-hash' });\n    await store.append('task-1', { type: 'tool_finished', name: 'workspace.list_projects', fingerprint: 'stable-hash', output: 'demo' });
+    await store.append('task-1', { type: 'tool_started', name: 'workspace.write_file', fingerprint: 'stable-hash' });
+    await store.append('task-1', { type: 'tool_finished', name: 'workspace.list_projects', fingerprint: 'stable-hash', output: 'demo' });
     await store.finish('task-1', { status: 'completed', answer: 'Found demo.', calls: 1, rounds: 2 });
     const reloaded = createAgentTaskStore({ getFilePath: () => file });
     const task = await reloaded.get('task-1');

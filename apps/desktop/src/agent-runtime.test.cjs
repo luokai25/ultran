@@ -114,3 +114,14 @@ test('waits for durable started-event recording before executing a side effect',
   assert.equal(executed, true);
   assert.equal(result.status, 'limit_reached');
 });
+
+test('cancellation during local model planning is reported as cancelled', async () => {
+  const controller = new AbortController();
+  const runtime = createAgentRuntime({
+    tools: {}, approve: async () => false,
+    planner: async () => { controller.abort(); throw new Error('fetch aborted'); }
+  });
+  const result = await runtime.run({ goal: 'Cancel planning', signal: controller.signal });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.reason, 'aborted');
+});

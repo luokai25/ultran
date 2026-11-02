@@ -81,6 +81,6 @@ ipcMain.handle("ultran:load-history",async()=>{const result=await conversationSt
 ipcMain.handle("ultran:save-history",async(_event,messages)=>conversationStore.save(messages));
 ipcMain.handle("ultran:clear-history",async()=>conversationStore.clear());
 ipcMain.handle("ultran:open-external",async(_event,url)=>{if(typeof url!=="string"||!(url.startsWith("https://github.com/")||url.startsWith("https://huggingface.co/")))return false;await shell.openExternal(url);return true;});
-app.whenReady().then(async()=>{await agentTaskStore.markInterrupted();createWindow();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});});
+app.whenReady().then(async()=>{try{await agentTaskStore.markInterrupted();}catch(error){console.error("Agent task recovery failed:",error);}createWindow();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});});
 app.on("before-quit",()=>{if(runtimeProcess)runtimeProcess.kill();if(runtimeLog)runtimeLog.end();});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit();});

@@ -40,10 +40,11 @@ jobs:
         run: |
           node --check apps/desktop/src/main.cjs
           node --check apps/desktop/src/agent-host.cjs
+          node --check apps/desktop/src/agent-task-store.cjs
           node --check apps/desktop/src/preload.cjs
           node --check apps/desktop/src/renderer.js
       - name: Run conversation storage regression tests
-        run: node --test apps/desktop/src/conversation-store.test.cjs apps/desktop/src/tool-engine.test.cjs apps/desktop/src/agent-runtime.test.cjs apps/desktop/src/agent-host.test.cjs
+        run: node --test apps/desktop/src/conversation-store.test.cjs apps/desktop/src/tool-engine.test.cjs apps/desktop/src/agent-runtime.test.cjs apps/desktop/src/agent-host.test.cjs apps/desktop/src/agent-task-store.test.cjs
       - name: Check launcher and dependency files exist
         shell: pwsh
         run: |

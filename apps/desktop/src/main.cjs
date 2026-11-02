@@ -41,8 +41,8 @@ async function executeAgentTask({goal,model,endpoint,requestId,context=[],priorF
  const timeout=setTimeout(()=>controller.abort(),30*60*1000);const pending=[];let result;
  try{
   if(resume)await agentTaskStore.resume(requestId);else await agentTaskStore.create({id:requestId,goal,model});
-  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,onEvent:event=>{
-   pending.push(agentTaskStore.append(requestId,event));
+  result=await agentHost.run({goal,model,endpoint,requestId,signal:controller.signal,context,priorFingerprints,onEvent:async event=>{
+   const save=agentTaskStore.append(requestId,event);pending.push(save);await save;
    if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("ultran:agent-event",{requestId,...event});
   }});
   await Promise.allSettled(pending);await agentTaskStore.finish(requestId,result);

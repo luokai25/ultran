@@ -136,7 +136,16 @@ function createAgentHost({ dialog, getMainWindow, toolEngine, workspaceRoot, saf
           const stat = await fs.stat(realTarget);
           if (stat.size > 50000) throw new Error('Existing file is too large to safely replace.');
           backupPath = target + '.ultran-backup';
-          await fs.copyFile(realTarget, backupPath);
+          const backupStat = await fs.lstat(backupPath).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+          if (backupStat?.isSymbolicLink() || (backupStat && !backupStat.isFile())) throw new Error('Existing backup path is not a regular file.');
+          const backupTemp = backupPath + '.' + require('node:crypto').randomUUID() + '.tmp';
+          try {
+            await fs.copyFile(realTarget, backupTemp, require('node:fs').constants.COPYFILE_EXCL);
+            await fs.rename(backupTemp, backupPath);
+          } catch (error) {
+            await fs.rm(backupTemp, { force: true }).catch(() => {});
+            throw error;
+          }
         }
         const temp = target + '.ultran-' + require('node:crypto').randomUUID() + '.tmp';
         try {

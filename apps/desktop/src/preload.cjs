@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  listAgentTasks:()=>ipcRenderer.invoke("ultran:list-agent-tasks"),
  getAgentTask:(id)=>ipcRenderer.invoke("ultran:get-agent-task",id),
  cancelAgent:(requestId)=>ipcRenderer.invoke("ultran:cancel-agent",requestId),
+ resumeAgentTask:(id)=>ipcRenderer.invoke("ultran:resume-agent-task",id),
  onAgentEvent:(callback)=>{if(typeof callback!=="function")return ()=>{};const listener=(_event,payload)=>callback(payload);ipcRenderer.on("ultran:agent-event",listener);return ()=>ipcRenderer.removeListener("ultran:agent-event",listener);},
  onChatStream:(callback)=>{if(typeof callback!=="function")return ()=>{};const listener=(_event,payload)=>callback(payload);ipcRenderer.on("ultran:chat-stream",listener);return ()=>ipcRenderer.removeListener("ultran:chat-stream",listener);},
  cancelChat:(requestId)=>ipcRenderer.invoke("ultran:cancel-chat",requestId),

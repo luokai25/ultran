@@ -7,7 +7,7 @@ const historyPath=()=>path.join(app.getPath("userData"),"conversation.json");
 function validMessages(messages){
   if(!Array.isArray(messages)||messages.length>100)throw new Error("Invalid conversation history.");
   return messages.map(m=>{
-    const limit=m?.role==="system"?100000:30000;
+    const limit=m?.role==="system"?25000:30000;
     if(!m||!["user","assistant","system"].includes(m.role)||typeof m.content!=="string"||m.content.length>limit)throw new Error("Invalid message.");
     return {role:m.role,content:m.content};
   });
@@ -34,10 +34,10 @@ app.whenReady().then(()=>{
     const result=await dialog.showOpenDialog(mainWindow,{title:"Choose a file to share with Ultran",properties:["openFile"],filters:[{name:"Text and source files",extensions:["txt","md","json","csv","py","js","ts","tsx","jsx","html","css","xml","yaml","yml","log","ini","toml"]}]});
     if(result.canceled||!result.filePaths[0])return {cancelled:true};
     const selected=result.filePaths[0],stat=await fs.stat(selected);
-    if(!stat.isFile()||stat.size>128000)throw new Error("Choose a text file smaller than 128 KB to protect local model memory.");
+    if(!stat.isFile()||stat.size>32000)throw new Error("Choose a text file smaller than 32 KB to protect local model memory.");
     const ext=path.extname(selected).toLowerCase();
     if(![".txt",".md",".json",".csv",".py",".js",".ts",".tsx",".jsx",".html",".css",".xml",".yaml",".yml",".log",".ini",".toml"].includes(ext))throw new Error("Unsupported file type.");
-    return {cancelled:false,name:path.basename(selected),content:(await fs.readFile(selected,"utf8")).slice(0,100000)};
+    return {cancelled:false,name:path.basename(selected),content:(await fs.readFile(selected,"utf8")).slice(0,24000)};
   });
   ipcMain.handle("ultran:load-history",async()=>{try{return validMessages(JSON.parse(await fs.readFile(historyPath(),"utf8")));}catch(e){if(e.code==="ENOENT")return [];return [];}});
   ipcMain.handle("ultran:save-history",async(_event,messages)=>{const safe=validMessages(messages);await fs.mkdir(app.getPath("userData"),{recursive:true});await fs.writeFile(historyPath(),JSON.stringify(safe),"utf8");return {saved:true,count:safe.length};});

@@ -58,7 +58,8 @@ ipcMain.handle("ultran:resume-agent-task",async(_event,id)=>{
  if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");
  const task=await agentTaskStore.get(id);
  if(!task)throw new Error("Agent task was not found.");
- if(task.fingerprintsTruncated)throw new Error("This task has too many historical actions to resume safely. Start a new task instead.");\n const fingerprints=Array.isArray(task.fingerprints)?task.fingerprints:[];
+ if(task.fingerprintsTruncated)throw new Error("This task has too many historical actions to resume safely. Start a new task instead.");
+ const fingerprints=Array.isArray(task.fingerprints)?task.fingerprints:[];
  const finished=new Set((task.events||[]).filter(event=>event.type==="tool_finished"&&typeof event.fingerprint==="string").map(event=>event.fingerprint));
  const history=[];
  for(const event of task.events||[]){

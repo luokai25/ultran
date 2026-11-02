@@ -37,7 +37,9 @@ jobs:
           node --check apps/desktop/src/main.cjs
           node --check apps/desktop/src/preload.cjs
           node --check apps/desktop/src/renderer.js
-      - name: Parse PowerShell runtime scripts\n        shell: pwsh\n        run: |\n          $files = @("tools/airllm-windows/setup-airllm-runtime.ps1", "tools/airllm-windows/start-ultran-airllm.ps1")\n          foreach ($file in $files) {\n            $tokens = $null\n            $errors = $null\n            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null\n            if ($errors.Count -gt 0) { throw ($file + ": " + ($errors -join "; ")) }\n          }\n      - name: Check launcher and dependency files exist
+      - name: Run conversation storage regression tests
+        run: node --test apps/desktop/src/conversation-store.test.cjs
+      - name: Check launcher and dependency files exist
         shell: pwsh
         run: |
           if (!(Test-Path "tools/airllm-windows/start-ultran-airllm.ps1")) { throw "Launcher missing" }

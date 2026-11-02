@@ -127,7 +127,7 @@ function createAgentHost({ dialog, getMainWindow, toolEngine, workspaceRoot, saf
           if (matches.length >= 30) break;
           try {
             const file = await readProjectFile(projectPath, relativePath);
-            const lines = String(file.content || '').split(/\\r?\\n/);
+            const lines = String(file.content || '').split(/\r?\n/);
             for (let index = 0; index < lines.length; index++) {
               if (lines[index].toLowerCase().includes(needle)) {
                 matches.push({ path: relativePath, line: index + 1, snippet: lines[index].slice(0, 260) });
@@ -229,8 +229,8 @@ function createAgentHost({ dialog, getMainWindow, toolEngine, workspaceRoot, saf
         }
         return false;
       },
-      planner: async ({ goal: task, journal, round }) => readModelDecision({
-        endpoint, model, goal: task, state: { round, journal }, requestId: requestId + '_' + round, signal
+      planner: async ({ goal: task, history, journal, round }) => readModelDecision({
+        endpoint, model, goal: task, state: { round, history: history.slice(-16), journal: journal.slice(-12) }, requestId: requestId + '_' + round, signal
       })
     });
     return runtime.run({ goal, signal });

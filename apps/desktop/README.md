@@ -46,6 +46,13 @@ Notepad, Calculator and Task Manager; the main process validates the app ID and
 shows a native Windows confirmation before starting it. No shell, arbitrary
 commands, LAN API, or remote device sync is enabled.
 
+The agent orchestration core in `src/agent-runtime.cjs` provides bounded
+multi-round planning, explicit per-action approval, capability-aware event
+traces, exact-call loop suppression, cancellation checks, output limits, and
+fail-closed handling of unknown tools. It is an execution framework, not yet a
+fully wired model-driven tool loop; the current chat path still performs local
+text generation and only the launcher is exposed as an actionable desktop tool.
+
 Model repositories requiring custom remote Python code are rejected before
 AirLLM loads them. The bridge is loopback-only by default. Runtime dependencies
 and model weights are installed separately and are not bundled in the EXE.

@@ -58,7 +58,7 @@ ipcMain.handle("ultran:resume-agent-task",async(_event,id)=>{
  if(typeof id!=="string"||id.length>100)throw new Error("Invalid task ID.");
  const task=await agentTaskStore.get(id);
  if(!task)throw new Error("Agent task was not found.");
- const fingerprints=(task.events||[]).filter(event=>event.type==="tool_started"&&typeof event.fingerprint==="string").map(event=>event.fingerprint);
+ const fingerprints=(task.events||[]).filter(event=>["tool_started","tool_denied","tool_skipped"].includes(event.type)&&typeof event.fingerprint==="string").map(event=>event.fingerprint);
  const finished=new Set((task.events||[]).filter(event=>event.type==="tool_finished"&&typeof event.fingerprint==="string").map(event=>event.fingerprint));
  const history=[];
  for(const event of task.events||[]){

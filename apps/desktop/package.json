@@ -1,10 +1,10 @@
 {
-  "name": "@ultran/desktop",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Ultran Windows desktop companion with local AirLLM inference",
-  "main": "src/main.cjs",
-  "scripts": {"start":"electron .","dist:win":"electron-builder --win portable","dist:dir":"electron-builder --dir"},
-  "devDependencies": {"electron":"^33.2.1","electron-builder":"^25.1.8"},
-  "build": {"appId":"app.ultran.desktop","productName":"Ultran","directories":{"output":"dist"},"files":["src/**/*","package.json"],"win":{"target":["portable"],"artifactName":"Ultran-Setup-\u0024{version}.\u0024{ext}"},"portable":{"artifactName":"Ultran-Windows-\u0024{version}.\u0024{ext}"}}
+  "name":"@ultran/desktop",
+  "version":"0.1.1",
+  "private":true,
+  "description":"Ultran Windows desktop companion with local AirLLM inference",
+  "main":"src/main.cjs",
+  "scripts":{"start":"electron .","dist:win":"electron-builder --win portable","dist:dir":"electron-builder --dir"},
+  "devDependencies":{"electron":"^33.2.1","electron-builder":"^25.1.8"},
+  "build":{"appId":"app.ultran.desktop","productName":"Ultran","directories":{"output":"dist"},"files":["src/**/*","package.json"],"win":{"target":["portable"],"artifactName":"Ultran-Setup-${version}.${ext}"},"portable":{"artifactName":"Ultran-Windows-${version}.${ext}"}}
 }

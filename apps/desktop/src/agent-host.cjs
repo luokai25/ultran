@@ -183,6 +183,8 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
           const backupTemp = backupPath + '.' + require('node:crypto').randomUUID() + '.tmp';
           try {
             await fs.copyFile(realTarget, backupTemp, require('node:fs').constants.COPYFILE_EXCL);
+            const backupHandle = await fs.open(backupTemp, 'r+');
+            try { await backupHandle.sync(); } finally { await backupHandle.close(); }
             await fs.rename(backupTemp, backupPath);
           } catch (error) {
             await fs.rm(backupTemp, { force: true }).catch(() => {});
@@ -191,12 +193,15 @@ function createAgentHost({ dialog, getMainWindow, getReadPolicy = () => "allow",
         }
         const temp = target + '.ultran-' + require('node:crypto').randomUUID() + '.tmp';
         try {
-          await fs.writeFile(temp, args.content, { encoding: 'utf8', flag: 'wx' });
+          const handle = await fs.open(temp, 'wx');
+          try { await handle.writeFile(args.content, 'utf8'); await handle.sync(); } finally { await handle.close(); }
           await fs.rename(temp, target);
         } catch (error) {
           await fs.rm(temp, { force: true }).catch(() => {});
           throw error;
         }
+        const savedContent = await fs.readFile(target, 'utf8');
+        if (savedContent !== args.content) throw new Error('Post-write verification failed. The file contents do not match the approved content.');
         return { verified: true, written: true, project: args.project, path: args.path, bytes: Buffer.byteLength(args.content), backupPath: backupPath ? path.basename(backupPath) : null };
       }
     },

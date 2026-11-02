@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require("electron");
 contextBridge.exposeInMainWorld("ultranDesktop",Object.freeze({
  system:()=>ipcRenderer.invoke("ultran:system"),
+ launchApp:(appId)=>ipcRenderer.invoke("ultran:launch-app",appId),
  health:(endpoint)=>ipcRenderer.invoke("ultran:health",endpoint),
  setupRuntime:()=>ipcRenderer.invoke("ultran:setup-runtime"),
  onSetupEvent:(callback)=>{if(typeof callback!=="function")return ()=>{};const listener=(_event,payload)=>callback(payload);ipcRenderer.on("ultran:setup-event",listener);return ()=>ipcRenderer.removeListener("ultran:setup-event",listener);},

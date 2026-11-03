@@ -285,3 +285,15 @@ test("skills engine exposes bounded read-only search and resource reads for refe
   assert.match(main, /Read-only public skill resource/);
   assert.match(main, /never execute scripts/);
 });
+
+
+test("ordinary conversation is the default and native Stop interrupts llama.cpp decoding", () => {
+  assert.match(main, /DEFAULT TO NORMAL CONVERSATION/);
+  assert.match(main, /Never emit a tool call for a greeting or ordinary informational question/);
+  assert.match(capabilityKernel, /DEFAULT TO DIRECT CONVERSATION/);
+  assert.match(main, /NativeLocalAI\.cancelGeneration\(\)/);
+  assert.match(localAI, /public void cancelGeneration\(PluginCall call\)/);
+  assert.match(nativeJni, /std::atomic<bool> g_cancel_requested/);
+  assert.match(nativeJni, /Java_app_ultran_mobile_NativeLlama_nativeCancelGeneration/);
+  assert.match(nativeJni, /g_cancel_requested\.load\(std::memory_order_acquire\)/);
+});

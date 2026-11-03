@@ -194,7 +194,7 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);
   assert.match(main, /runApprovedLocalTool/);
   assert.match(main, /Only one local tool call may run per turn/);
-  assert.ok(html.includes('id="proactive-btn"'));
+  assert.doesNotMatch(html, /id="proactive-btn"|id="sms-btn"|id="voice-btn"|id="mic-btn"|id="background-btn/);
 });
 
 test("WhatsApp handoff never sends or taps automatically", () => {

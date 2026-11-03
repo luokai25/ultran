@@ -747,8 +747,6 @@ async function enableProactiveUpdates(): Promise<void> {
     if (proactivePoll) clearInterval(proactivePoll);
     proactivePoll = undefined;
   }
-  proactiveBtn.setAttribute("aria-pressed", String(Boolean(settings.proactiveUpdates)));
-  proactiveBtn.dataset.active = String(Boolean(settings.proactiveUpdates));
   saveSettings();
   if (settings.proactiveUpdates) {
     taskStatusSnapshot.clear();
@@ -1262,7 +1260,7 @@ async function remoteReply(
       const request = parseLocalToolRequest(final.content);
       if (request) {
         const toolResult = await runApprovedLocalTool(request);
-        if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
+        if (signal?.aborted) throw new DOMException("Generation stopped", "AbortError");
         if (final.session_id) convo.sessionId = final.session_id;
         const followup = await remoteReply(
           convo,
@@ -2566,13 +2564,6 @@ promptEl.addEventListener("keydown", (event) => {
     void submit(promptEl.value);
   }
 });
-backgroundBtn.addEventListener("click", () => {
-  backgroundMode = !backgroundMode;
-  backgroundBtn.setAttribute("aria-pressed", String(backgroundMode));
-  backgroundBtn.dataset.active = String(backgroundMode);
-  backgroundBtn.setAttribute("aria-label", backgroundMode ? "Run as a background task" : "Run in foreground");
-});
-
 sendBtn.addEventListener("click", (event) => {
   if (!busy) return;
   event.preventDefault();
@@ -2786,9 +2777,6 @@ function voiceStatus(message: string, isError = false): void {
 
 function stopListening(): void {
   listening = false;
-  micBtn.setAttribute("aria-pressed", "false");
-  micBtn.dataset.active = "false";
-  micBtn.setAttribute("aria-label", "Dictate a message");
   try { recognition?.stop(); } catch { /* already stopped */ }
 }
 
@@ -2821,17 +2809,11 @@ function startListening(): void {
     };
     recognition.onend = () => {
       listening = false;
-      micBtn.setAttribute("aria-pressed", "false");
-      micBtn.dataset.active = "false";
-      micBtn.setAttribute("aria-label", "Dictate a message");
       if (!voiceStatusEl.hidden && voiceStatusEl.textContent?.startsWith("Listening")) {
         voiceStatus("Dictation ready. Review the text before sending.");
       }
     };
     listening = true;
-    micBtn.setAttribute("aria-pressed", "true");
-    micBtn.dataset.active = "true";
-    micBtn.setAttribute("aria-label", "Stop dictation");
     voiceStatus("Listening. Speech recognition is handled by your device/browser and may use its network service.");
     recognition.start();
   } catch (error) {

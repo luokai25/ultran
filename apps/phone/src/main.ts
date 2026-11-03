@@ -1546,10 +1546,11 @@ async function remoteBackgroundReply(
 ): Promise<ChatReply> {
   const agentId = await ensureAgent();
   const taskMessage = text;
+  const allowTools = backgroundRequestNeedsTools(taskMessage);
   const response = await api("/v1/tasks", {
     method: "POST",
     body: JSON.stringify({ agent_id: agentId, message: taskMessage, session_id: convo.sessionId ?? null,
-      allow_tools: true, max_tool_calls: 8 }),
+      allow_tools: allowTools, max_tool_calls: allowTools ? 8 : 0 }),
   });
   if (!response.ok) throw new Error(`could not queue background task (${response.status})`);
   const task = await response.json() as { id: string };

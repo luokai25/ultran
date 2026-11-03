@@ -178,6 +178,18 @@ def test_session_history_is_bounded():
 # -------------------------------------------------------------------- chat
 
 
+def test_chat_accepts_image_attachments_and_echo_does_not_fake_vision():
+    svc = service(connectors=())
+    agent = svc.create(name="Image reader")
+    result = svc.chat(
+        agent.id,
+        "Describe this image",
+        attachments=[{"name": "sample.png", "data_url": "data:image/png;base64,YQ=="}],
+    )
+    assert "text-only" in result["content"]
+    assert "cannot inspect" in result["content"]
+
+
 def test_chat_returns_content_and_tokens():
     svc = service()
     a = svc.create(name="One")

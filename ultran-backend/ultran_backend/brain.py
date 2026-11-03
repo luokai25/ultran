@@ -115,6 +115,15 @@ class EchoBackend:
     ) -> BrainReply:
         if not messages:
             raise ValidationFailed("messages must not be empty")
+        if any(message.images for message in messages):
+            content = "The active Echo brain is text-only and cannot inspect image attachments. Connect a vision-capable Ollama or OpenAI-compatible model to analyze this image."
+            return BrainReply(
+                content=content,
+                tokens_in=sum(estimate_tokens(message.content) for message in messages),
+                tokens_out=estimate_tokens(content),
+                model=model,
+                backend=self.name,
+            )
         last = next((m.content for m in reversed(messages) if m.role == "user"), "")
         system = next((m.content for m in messages if m.role == "system"), "")
         intent = self._classify(last)

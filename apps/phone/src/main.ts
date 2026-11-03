@@ -609,7 +609,7 @@ async function readChatAttachment(file: File): Promise<ChatAttachment> {
     if (file.size > 512 * 1024) throw new Error(`${file.name} is larger than the 512 KB text attachment limit.`);
     attachment.text = (await file.text()).slice(0, 60_000);
   } else if (attachment.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.name.toLowerCase().endsWith(".docx")) {
-    if (file.size > 12 * 1024 * 1024) throw new Error(`${file.name} is larger than the 12 MB DOCX limit.`);
+    if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than the 5 MB DOCX limit.`);
     const mammoth = await import("mammoth");
     const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     attachment.text = result.value.slice(0, 60_000);
@@ -631,13 +631,20 @@ async function readChatAttachment(file: File): Promise<ChatAttachment> {
     ]);
     pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
     const document = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-    if (document.numPages > 30) throw new Error(`${file.name} has ${document.numPages} pages. Attach a PDF with 30 pages or fewer.`);
+    if (document.numPages > 30) {
+      await document.destroy();
+      throw new Error(`${file.name} has ${document.numPages} pages. Attach a PDF with 30 pages or fewer.`);
+    }
     const pages: string[] = [];
-    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-      const page = await document.getPage(pageNumber);
-      const text = await page.getTextContent();
-      pages.push(text.items.map((item) => "str" in item ? item.str : "").filter(Boolean).join(" "));
-      if (pages.join("\n").length > 60_000) break;
+    try {
+      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+        const page = await document.getPage(pageNumber);
+        const text = await page.getTextContent();
+        pages.push(text.items.map((item) => "str" in item ? item.str : "").filter(Boolean).join(" "));
+        if (pages.join("\n").length > 60_000) break;
+      }
+    } finally {
+      await document.destroy();
     }
     attachment.text = pages.join("\n\n").slice(0, 60_000);
     if (!attachment.text.trim()) throw new Error(`${file.name} contains no extractable text. Scanned PDFs need OCR, which this build does not provide.`);

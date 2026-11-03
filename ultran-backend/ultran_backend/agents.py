@@ -563,6 +563,7 @@ class AgentService:
                 )[:profile.memory_chars]
             )
         artifact_format = _requested_artifact_format(message)
+        image_data = [item["data_url"] for item in (attachments or []) if item.get("data_url")]
         system_message = (
             agent.system_message()
             + "\n\n"
@@ -598,7 +599,6 @@ class AgentService:
             BrainMessage("system", system_message),
             *_budget_history(session.messages, max_messages=profile.history_messages, max_chars=profile.context_chars),
         ]
-        image_data = [item["data_url"] for item in (attachments or []) if item.get("data_url")]
         if image_data:
             for index in range(len(messages) - 1, 0, -1):
                 if messages[index].role == "user":

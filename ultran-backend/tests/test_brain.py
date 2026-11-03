@@ -205,6 +205,16 @@ def test_brain_runtime_forwards_streamed_tokens_from_provider():
     assert reply.content == "ok"
 
 
+def test_echo_brain_never_claims_to_inspect_images():
+    reply = EchoBackend().complete(
+        [BrainMessage("user", "What is in this picture?", images=["data:image/png;base64,YQ=="])],
+        model="echo",
+        temperature=0.2,
+    )
+    assert "text-only" in reply.content
+    assert "cannot inspect" in reply.content
+
+
 def test_ollama_forwards_image_payloads_to_vision_models():
     client = _StubClient(_StubResponse(200, {"message": {"content": "A cat"}}))
     image = "data:image/png;base64,Y2F0"

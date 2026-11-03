@@ -1699,9 +1699,10 @@ function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: strin
   switch (request.tool) {
     case "skills.search":
     case "skills.read":
-      return matches(/\b(skill|skills|procedure|procedures|playbook|playbooks|reference guide|agent instruction)\b/i);
+      return matches(/\b(search|find|look up|read|open|load)\b/i)
+        && matches(/\b(skill|skills|procedure|procedures|playbook|playbooks|reference guide|agent instruction)\b/i);
     case "runtime.exec":
-      return matches(/\b(run|execute|install|download|build|compile|test|debug|fix|command|script|terminal|shell|continue|proceed|carry on|keep working|go ahead)\b/i)
+      return matches(/\b(run|execute|install|download|build|compile|test|debug|fix|continue|proceed|carry on|keep working|go ahead)\b/i)
         || matches(/\b(i need you to|please)\s+(run|execute|install|download|build|compile|test|debug|fix)\b/i);
     case "runtime.jobs":
     case "runtime.status":
@@ -1712,10 +1713,10 @@ function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: strin
         && matches(/\b(job|task|command|process|run|execution)\b/i);
     case "whatsapp.compose":
       return matches(/\b(send|write|compose|prepare|draft)\b/i)
-        && matches(/\b(whatsapp|message|text)\b/i);
+        && matches(/\bwhatsapp\b/i);
     case "telegram.compose":
       return matches(/\b(send|write|compose|prepare|draft)\b/i)
-        && matches(/\b(telegram|message)\b/i);
+        && matches(/\btelegram\b/i);
     case "app.open":
       return matches(/\b(open|launch|start)\b/i)
         && matches(new RegExp("\\b" + request.app.replace(/[-]/g, "[- ]?") + "\\b", "i"));

@@ -243,6 +243,20 @@ jobs:
           sdkmanager --install "emulator" "system-images;android-31;google_apis;x86_64"
           yes | sdkmanager --licenses > /dev/null || true
 
+      # GitHub-hosted Linux runners expose /dev/kvm but may leave it owned by
+      # the kvm group without granting the runner user membership. The Android
+      # x86_64 emulator requires KVM; grant access explicitly before launching it.
+      - name: Enable KVM access for Android emulator
+        run: |
+          set -euo pipefail
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::This runner does not expose /dev/kvm; an x86_64 emulator cannot run here"
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          ls -l /dev/kvm
+
       # Run the emulator directly instead of delegating its lifecycle to a
       # composite action. Explicit boot and command timeouts ensure a stalled
       # emulator cannot leave the release job waiting indefinitely.

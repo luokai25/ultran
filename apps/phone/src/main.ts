@@ -1266,6 +1266,7 @@ async function remoteReply(
       const request = parseLocalToolRequest(final.content);
       if (request) {
         const toolResult = await runApprovedLocalTool(request);
+        if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
         if (final.session_id) convo.sessionId = final.session_id;
         const followup = await remoteReply(
           convo,
@@ -1719,6 +1720,8 @@ let busy = false;
 let backgroundMode = false;
 let activeTurnController: AbortController | null = null;
 let activeTypewriterCancel: (() => void) | null = null;
+let activeReplyBody: HTMLElement | null = null;
+let activeAssistantMessage: Message | null = null;
 
 function syncSendButton(): void {
   if (busy) {
@@ -1781,7 +1784,8 @@ async function submit(raw: string): Promise<void> {
 
   promptEl.value = "";
   busy = true;
-  activeTurnController = new AbortController();
+  const turnController = new AbortController();
+  activeTurnController = turnController;
   syncSendButton();
   autosize();
   app.dataset.chatting = "true";
@@ -1796,6 +1800,7 @@ async function submit(raw: string): Promise<void> {
   dots.innerHTML = "<i></i><i></i><i></i>";
   reply.body.appendChild(dots);
   messagesEl.appendChild(reply.root);
+  activeReplyBody = reply.body;
   scrollToEnd();
   syncRender();
   setThinking(true);
@@ -1812,6 +1817,7 @@ async function submit(raw: string): Promise<void> {
       renderLiveEvent(reply.body, { type: "thinking", stage: "planning", label: "Planning your request" });
       renderLiveEvent(reply.body, { type: "thinking", stage: "drafting", label: requestedArtifactFormat(text) ? "Drafting the requested document" : "Working on your request" });
       const response = await NativeLocalAI.generate({ messages, maxTokens: Math.min(profile.maxTokens, 384) });
+      if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       const request = parseLocalToolRequest(response.content);
       if (request) {
         const toolResult = await runApprovedLocalTool(request);
@@ -1823,6 +1829,7 @@ async function submit(raw: string): Promise<void> {
           ],
           maxTokens: Math.min(profile.maxTokens, 384),
         });
+        if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
         let finalFollowup = followup.content;
         if (parseLocalToolRequest(followup.content)) {
           finalFollowup = "Ultran allows one local tool action per turn. I received a second tool request and did not execute it. Please split the task into another step.";
@@ -1866,7 +1873,9 @@ async function submit(raw: string): Promise<void> {
       setLink("online", "on-device AI");
     } catch (error) {
       setLink("error", "local inference failed");
-      result = { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
+      result = turnController.signal.aborted
+        ? { content: "Stopped.", session_id: "" }
+        : { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
     }
   } else if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
@@ -1875,33 +1884,39 @@ async function submit(raw: string): Promise<void> {
       // Native actions must stay foreground so the user can approve them in real time.
       result = backgroundMode && !nativePhoneIntent
         ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))
-        : await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event), false, activeTurnController?.signal);
+        : await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event), false, turnController.signal);
       if (result.session_id) convo.sessionId = result.session_id;
       setLink("online");
     } catch (error) {
       setLink("error");
       const why = error instanceof Error ? error.message : "unknown error";
-      result = {
-        content: `I could not reach the brain at \`${baseUrl()}\` (${why}). Check that the backend is running and on the same network, then try again.`,
-        session_id: "",
-      };
+      result = turnController.signal.aborted
+        ? { content: "Stopped.", session_id: "" }
+        : {
+            content: `I could not reach the brain at \`${baseUrl()}\` (${why}). Check that the backend is running and on the same network, then try again.`,
+            session_id: "",
+          };
     }
   } else if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
     try {
-      result = await localModelReply(convo, undefined, reply.body, activeTurnController?.signal);
+      result = await localModelReply(convo, undefined, reply.body, turnController.signal);
       setLink("online", "local model");
     } catch (error) {
       setLink("error", "model unavailable");
       const why = error instanceof Error ? error.message : "unknown error";
-      result = { content: "I could not reach your local model (" + why + "). Your conversation remains saved on this device.", session_id: "" };
+      result = turnController.signal.aborted
+        ? { content: "Stopped.", session_id: "" }
+        : { content: "I could not reach your local model (" + why + "). Your conversation remains saved on this device.", session_id: "" };
     }
   } else {
     await new Promise((resolve) => window.setTimeout(resolve, 180));
     result = localReply(text);
   }
+  if (turnController.signal.aborted) result = { content: "Stopped.", session_id: "" };
   setThinking(false);
 
   const message: Message = { role: "assistant", content: result.content };
+  activeAssistantMessage = message;
   if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));
   convo.messages.push(message);
   convo.updatedAt = Date.now();
@@ -1909,13 +1924,14 @@ async function submit(raw: string): Promise<void> {
   mindMap=buildMindMap(store.conversations);writeJson(MINDMAP_KEY,mindMap);
   void organiseSemanticMemory(convo);
 
-  if (activeTurnController?.signal.aborted) result = { content: "Stopped.", session_id: "" };
   reply.body.replaceChildren();
   activeTypewriterCancel = typewriter(reply.body, result.content, () => {
     finishAssistantNode(reply.root, message);
     busy = false;
     activeTurnController = null;
     activeTypewriterCancel = null;
+    activeReplyBody = null;
+    activeAssistantMessage = null;
     syncSendButton();
     autosize();
     if (nearBottom()) scrollToEnd();
@@ -2565,15 +2581,26 @@ sendBtn.addEventListener("click", (event) => {
   if (!busy) return;
   event.preventDefault();
   activeTurnController?.abort();
-  activeTypewriterCancel?.();
-  const current = messagesEl.querySelector<HTMLElement>(".message.assistant:last-child .message-body");
-  if (current) current.textContent = "Stopped.";
-  busy = false;
-  activeTurnController = null;
-  activeTypewriterCancel = null;
-  setThinking(false);
-  syncSendButton();
-  autosize();
+  if (activeTypewriterCancel && activeReplyBody) {
+    activeTypewriterCancel();
+    activeReplyBody.textContent = "Stopped.";
+    if (activeAssistantMessage) {
+      activeAssistantMessage.content = "Stopped.";
+      saveStore();
+    }
+    busy = false;
+    activeTurnController = null;
+    activeTypewriterCancel = null;
+    activeReplyBody = null;
+    activeAssistantMessage = null;
+    setThinking(false);
+    syncSendButton();
+    autosize();
+  } else {
+    sendBtn.disabled = true;
+    sendBtn.setAttribute("aria-label", "Stopping");
+    sendBtn.title = "Stopping…";
+  }
 });
 composer.addEventListener("submit", (event) => {
   event.preventDefault();

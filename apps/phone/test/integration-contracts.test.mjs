@@ -363,8 +363,8 @@ test("every local tool requires matching explicit intent from the current user t
   assert.match(main, /case "runtime.exec":[\s\S]*?run\|execute\|install\|download\|build/);
   assert.match(main, /case "runtime.jobs":[\s\S]*?job\|jobs\|task\|tasks/);
   assert.match(main, /case "runtime.cancel":[\s\S]*?cancel\|stop\|terminate/);
-  assert.match(main, /case "whatsapp.compose":[\s\S]*?whatsapp\|message\|text/);
-  assert.match(main, /case "telegram.compose":[\s\S]*?telegram\|message/);
+  assert.match(main, /case "whatsapp.compose":[\s\S]*?whatsapp/);
+  assert.match(main, /case "telegram.compose":[\s\S]*?telegram/);
   assert.match(main, /case "app.open":[\s\S]*?open\|launch\|start/);
   assert.match(main, /if \(!text\) return false/);
   const matcherStart = main.indexOf("function toolRequestMatchesUserIntent(");

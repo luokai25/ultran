@@ -336,10 +336,19 @@ test("skills engine exposes bounded read-only search and resource reads for refe
 test("ordinary conversation is the default and native Stop interrupts llama.cpp decoding", () => {
   assert.match(main, /DEFAULT TO NORMAL CONVERSATION/);
   assert.match(main, /Never emit a tool call for a greeting or ordinary informational question/);
+  assert.match(main, /function toolRequestMatchesUserIntent/);
+  assert.match(main, /Skill lookup is optional reference research, never a default preamble to conversation/);
+  assert.match(main, /toolRequestMatchesUserIntent\(request, text\)/);
+  assert.match(main, /toolRequestMatchesUserIntent\(request, task\)/);
   assert.match(capabilityKernel, /DEFAULT TO DIRECT CONVERSATION/);
   assert.match(main, /NativeLocalAI\.cancelGeneration\(\)/);
   assert.match(localAI, /public void cancelGeneration\(PluginCall call\)/);
   assert.match(nativeJni, /std::atomic<bool> g_cancel_requested/);
   assert.match(nativeJni, /Java_app_ultran_mobile_NativeLlama_nativeCancelGeneration/);
   assert.match(nativeJni, /g_cancel_requested\.load\(std::memory_order_acquire\)/);
+  assert.match(nativeJni, /nativeResetGenerationCancellation/);
+  const nativeGenerateBody = nativeJni.slice(nativeJni.indexOf("Java_app_ultran_mobile_NativeLlama_nativeGenerate"), nativeJni.indexOf("Java_app_ultran_mobile_NativeLlama_nativeResetGenerationCancellation"));
+  assert.doesNotMatch(nativeGenerateBody, /g_cancel_requested\.store\(false/);
+  assert.match(nativeLlamaJava, /nativeResetGenerationCancellation/);
+  assert.match(nativePluginJava, /NativeLlama\.nativeResetGenerationCancellation\(\)/);
 });

@@ -203,7 +203,6 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens, jobject callback) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_cancel_requested.store(false, std::memory_order_release);
     if (!g_model || !g_context) return env->NewStringUTF("No native model is loaded.");
     using Clock = std::chrono::steady_clock;
     g_last_prompt_tokens = 0;
@@ -300,6 +299,12 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     const auto inference_end = Clock::now();
     g_last_generation_ms = std::chrono::duration<double, std::milli>(inference_end - generation_start).count();
     return to_java_string(env, output);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_app_ultran_mobile_NativeLlama_nativeResetGenerationCancellation(JNIEnv *, jclass) {
+    // Reset before work is queued so a Stop tap while it waits for the executor is not lost.
+    g_cancel_requested.store(false, std::memory_order_release);
 }
 
 extern "C" JNIEXPORT void JNICALL

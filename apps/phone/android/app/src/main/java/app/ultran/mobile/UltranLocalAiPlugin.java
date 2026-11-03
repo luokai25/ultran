@@ -635,6 +635,7 @@ public class UltranLocalAiPlugin extends Plugin {
             call.reject("Load a local GGUF model before running the benchmark.");
             return;
         }
+        NativeLlama.nativeResetGenerationCancellation();
         inferenceExecutor.execute(() -> {
             try {
                 if (loadedModelPath == null) {
@@ -695,6 +696,7 @@ public class UltranLocalAiPlugin extends Plugin {
         final String[] roleArray = roles.toArray(new String[0]);
         final String[] contentArray = contents.toArray(new String[0]);
         final int maxTokens = Math.max(32, Math.min(512, call.getInt("maxTokens", 256)));
+        NativeLlama.nativeResetGenerationCancellation();
         inferenceExecutor.execute(() -> {
             try {
                 if (loadedModelPath == null) {

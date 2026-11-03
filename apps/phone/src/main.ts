@@ -1436,7 +1436,7 @@ async function remoteReply(
   const handleNativeTool = async (final: ChatReply): Promise<ChatReply> => {
     if (!nativeToolFollowup && Capacitor.getPlatform() === "android") {
       const request = parseLocalToolRequest(final.content);
-      if (request) {
+      if (request && toolRequestMatchesUserIntent(request, text)) {
         const toolResult = await runApprovedLocalTool(request);
         if (signal?.aborted) throw new DOMException("Generation stopped", "AbortError");
         if (final.session_id) convo.sessionId = final.session_id;
@@ -1673,6 +1673,15 @@ type LocalToolRequest =
   | { tool: "app.open"; app: "whatsapp" | "whatsapp-business" | "telegram" | "messages" | "gmail" | "phone" | "calendar" };
 type LocalToolFollowup = { request: string; result: string };
 
+function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: string): boolean {
+  // Skill lookup is optional reference research, never a default preamble to conversation.
+  // Only run it when the user actually asks about skills, procedures, playbooks, or references.
+  if (request.tool === "skills.search" || request.tool === "skills.read") {
+    return /\b(skill|skills|procedure|procedures|playbook|playbooks|reference guide|agent instruction)\b/i.test(userText);
+  }
+  return true;
+}
+
 function parseLocalToolRequest(content: string): LocalToolRequest | null {
   const normalized = normalizeToolCall(content);
   if (!normalized.ok) return null;
@@ -1884,7 +1893,7 @@ async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFoll
     if (!content) throw new Error("The local model returned an empty response.");
     if (!toolFollowup) {
       const request = parseLocalToolRequest(content);
-      if (request) {
+      if (request && toolRequestMatchesUserIntent(request, task)) {
         const toolResult = await runApprovedLocalTool(request);
         onToken?.(null);
         return localModelReply(convo, { request: content, result: boundToolResult(toolResult, 3000) }, progressBody, externalSignal);
@@ -2061,7 +2070,7 @@ async function submit(raw: string): Promise<void> {
       });
       if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       const request = parseLocalToolRequest(response.content);
-      if (request) {
+      if (request && toolRequestMatchesUserIntent(request, text)) {
         streamedText = "";
         reply.body.replaceChildren();
         const toolResult = await runApprovedLocalTool(request);

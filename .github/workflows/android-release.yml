@@ -261,9 +261,10 @@ jobs:
           echo "no" | avdmanager create avd --force --name "$AVD_NAME" \
             --package "system-images;android-31;google_apis;x86_64" --device "pixel_6"
 
+          adb start-server
           "$EMULATOR" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim \
-            -gpu swiftshader_indirect -no-snapshot -wipe-data \
-            > "$RUNNER_TEMP/ultran-emulator.log" 2>&1 &
+            -gpu swiftshader_indirect -no-snapshot-load -no-snapshot-save -wipe-data \
+            -verbose > "$RUNNER_TEMP/ultran-emulator.log" 2>&1 &
           EMULATOR_PID=$!
           cleanup() {
             adb emu kill >/dev/null 2>&1 || true
@@ -271,7 +272,16 @@ jobs:
           }
           trap cleanup EXIT
 
-          timeout 600 adb wait-for-device
+          if ! timeout 600 adb wait-for-device; then
+            echo "::error::Android emulator did not expose an adb device within 10 minutes"
+            echo "Emulator process:"
+            ps -fp "$EMULATOR_PID" || true
+            echo "ADB devices:"
+            adb devices -l || true
+            echo "Emulator log (last 250 lines):"
+            tail -250 "$RUNNER_TEMP/ultran-emulator.log" || true
+            exit 1
+          fi
           BOOTED=false
           for attempt in $(seq 1 120); do
             if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then

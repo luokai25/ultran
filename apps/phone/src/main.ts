@@ -1685,12 +1685,35 @@ type LocalToolRequest =
 type LocalToolFollowup = { request: string; result: string };
 
 function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: string): boolean {
-  // Skill lookup is optional reference research, never a default preamble to conversation.
-  // Only run it when the user actually asks about skills, procedures, playbooks, or references.
-  if (request.tool === "skills.search" || request.tool === "skills.read") {
-    return /\b(skill|skills|procedure|procedures|playbook|playbooks|reference guide|agent instruction)\b/i.test(userText);
+  // A model proposing a tool is not user authorization. Require a matching,
+  // explicit action in the current turn before any local capability can run.
+  const text = userText.trim();
+  if (!text) return false;
+  const matches = (pattern: RegExp): boolean => pattern.test(text);
+  switch (request.tool) {
+    case "skills.search":
+    case "skills.read":
+      return matches(/\b(skill|skills|procedure|procedures|playbook|playbooks|reference guide|agent instruction)\b/i);
+    case "runtime.exec":
+      return matches(/\b(run|execute|install|download|build|compile|test|debug|fix|command|script|terminal|shell)\b/i)
+        || matches(/\b(i need you to|please)\s+(run|execute|install|download|build|compile|test|debug|fix)\b/i);
+    case "runtime.jobs":
+    case "runtime.status":
+      return matches(/\b(show|list|check|inspect|status|progress|running|queued|completed|failed)\b/i)
+        && matches(/\b(job|jobs|task|tasks|command|commands|process|processes)\b/i);
+    case "runtime.cancel":
+      return matches(/\b(cancel|stop|terminate)\b/i)
+        && matches(/\b(job|task|command|process|run|execution)\b/i);
+    case "whatsapp.compose":
+      return matches(/\b(send|write|compose|prepare|draft)\b/i)
+        && matches(/\b(whatsapp|message|text)\b/i);
+    case "telegram.compose":
+      return matches(/\b(send|write|compose|prepare|draft)\b/i)
+        && matches(/\b(telegram|message)\b/i);
+    case "app.open":
+      return matches(/\b(open|launch|start)\b/i)
+        && matches(new RegExp("\\b" + request.app.replace(/[-]/g, "[- ]?") + "\\b", "i"));
   }
-  return true;
 }
 
 function parseLocalToolRequest(content: string): LocalToolRequest | null {

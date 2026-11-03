@@ -341,6 +341,17 @@ test("background mode only enables tools for explicit action requests", () => {
   assert.match(main, /create|build|write|edit|send|open|download|run|execute|search|deploy|commit|push/);
 });
 
+test("every local tool requires matching explicit intent from the current user turn", () => {
+  assert.match(main, /A model proposing a tool is not user authorization/);
+  assert.match(main, /case "runtime.exec":[\s\S]*?run\|execute\|install\|download\|build/);
+  assert.match(main, /case "runtime.jobs":[\s\S]*?job\|jobs\|task\|tasks/);
+  assert.match(main, /case "runtime.cancel":[\s\S]*?cancel\|stop\|terminate/);
+  assert.match(main, /case "whatsapp.compose":[\s\S]*?whatsapp\|message\|text/);
+  assert.match(main, /case "telegram.compose":[\s\S]*?telegram\|message/);
+  assert.match(main, /case "app.open":[\s\S]*?open\|launch\|start/);
+  assert.match(main, /if \(!text\) return false/);
+});
+
 test("ordinary conversation is the default and native Stop interrupts llama.cpp decoding", () => {
   assert.match(main, /DEFAULT TO NORMAL CONVERSATION/);
   assert.match(main, /Never emit a tool call for a greeting or ordinary informational question/);

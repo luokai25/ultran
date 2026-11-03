@@ -228,8 +228,12 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));
-  assert.match(composerMarkup, /class="tool-strip"/);
-  assert.ok(composerMarkup.indexOf('id="send-btn"') > composerMarkup.indexOf('id="link-pill"'), "send must remain outside the horizontally scrolling tool strip");
+  assert.equal((composerMarkup.match(/<button\b/g) ?? []).length, 1, "text-only composer exposes only the adaptive Send/Stop action");
+  assert.ok(composerMarkup.indexOf('id="send-btn"') > composerMarkup.indexOf('id="link-pill"'));
+  assert.doesNotMatch(composerMarkup, /sms-btn|voice-btn|mic-btn|proactive-btn|background-btn|tool-strip/);
+  assert.match(main, /const taskMessage = text;/, "remote model receives the user's request before any skill is loaded");
+  assert.doesNotMatch(main, /loadRelevantSkillContext/, "skills are not auto-loaded before model intent selection");
+  assert.match(main, /activeTurnController\?\.abort\(\)/, "Stop cancels the active request");
   const conversationRenderer = main.slice(main.indexOf("function renderConversation"), main.indexOf("function renderHistory"));
   assert.doesNotMatch(conversationRenderer, /promptEl\.focus\(/, "the initial phone screen must not force-open the keyboard");
 });

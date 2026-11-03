@@ -166,6 +166,24 @@ def test_task_event_timeline_persists_and_is_encrypted(tmp_path):
     restored.close()
 
 
+def test_task_worker_forwards_tool_permissions_and_budget(tmp_path):
+    received = {}
+    def execute(agent, message, **kwargs):
+        received.update(kwargs)
+        return {"ok": True}
+    service = AgentTaskService(tmp_path / "tasks.sqlite3", execute)
+    task = service.submit(
+        "agent-1", "workspace-a", "ordinary conversation",
+        allow_tools=False, max_tool_calls=0,
+    )
+    completed = wait_for(service, task.id, {"succeeded"})
+    assert completed.allow_tools is False
+    assert completed.max_tool_calls == 0
+    assert received["allow_tools"] is False
+    assert received["max_tool_calls"] == 0
+    service.close()
+
+
 def test_task_execute_receives_session_and_event_callback(tmp_path):
     received = {}
     def execute(agent, message, **kwargs):

@@ -254,12 +254,21 @@ jobs:
           APK="$RUNNER_TEMP/ultran-release.apk"
           AVD_NAME="ultran-api31"
           EMULATOR="$ANDROID_HOME/emulator/emulator"
+          # setup-android may export an alternate AVD home. Pin both the
+          # creator and emulator to the same standard directory.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           test -s "$APK"
           echo "Testing APK SHA-256:"
           sha256sum "$APK"
 
           echo "no" | avdmanager create avd --force --name "$AVD_NAME" \
             --package "system-images;android-31;google_apis;x86_64" --device "pixel_6"
+          echo "Created AVD definitions:"
+          avdmanager list avd
+          echo "Emulator-visible AVDs:"
+          "$EMULATOR" -list-avds
+          test -s "$ANDROID_AVD_HOME/$AVD_NAME.ini"
 
           adb start-server
           "$EMULATOR" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim \

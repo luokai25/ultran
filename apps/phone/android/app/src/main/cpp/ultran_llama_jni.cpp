@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <chrono>
 #include <iomanip>
@@ -13,6 +14,7 @@
 
 namespace {
 std::mutex g_mutex;
+std::atomic<bool> g_cancel_requested{false};
 llama_model *g_model = nullptr;
 llama_context *g_context = nullptr;
 bool g_backend_initialized = false;
@@ -200,6 +202,7 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
 extern "C" JNIEXPORT jstring JNICALL
 Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens) {
+    g_cancel_requested.store(false, std::memory_order_release);
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_model || !g_context) return env->NewStringUTF("No native model is loaded.");
     using Clock = std::chrono::steady_clock;
@@ -244,6 +247,7 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     llama_memory_clear(llama_get_memory(g_context), true);
     const auto prompt_start = Clock::now();
     for (size_t offset = 0; offset < tokens.size(); offset += 64) {
+        if (g_cancel_requested.load(std::memory_order_acquire)) return env->NewStringUTF("");
         const size_t count = std::min<size_t>(64, tokens.size() - offset);
         llama_batch prompt_batch = llama_batch_get_one(tokens.data() + offset, static_cast<int32_t>(count));
         if (llama_decode(g_context, prompt_batch) != 0) {
@@ -264,6 +268,7 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     const llama_vocab *vocab = llama_model_get_vocab(g_model);
     std::string output;
     for (int i = 0; i < limit; ++i) {
+        if (g_cancel_requested.load(std::memory_order_acquire)) break;
         const llama_token token = llama_sampler_sample(sampler, g_context, -1);
         llama_sampler_accept(sampler, token);
         if (llama_vocab_is_eog(vocab, token)) break;
@@ -281,6 +286,12 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     const auto inference_end = Clock::now();
     g_last_generation_ms = std::chrono::duration<double, std::milli>(inference_end - generation_start).count();
     return to_java_string(env, output);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_app_ultran_mobile_NativeLlama_nativeCancelGeneration(JNIEnv *, jclass) {
+    // Lock-free because nativeGenerate holds g_mutex throughout decoding.
+    g_cancel_requested.store(true, std::memory_order_release);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

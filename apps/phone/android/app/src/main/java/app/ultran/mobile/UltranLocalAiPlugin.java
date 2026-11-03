@@ -715,6 +715,13 @@ public class UltranLocalAiPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void cancelGeneration(PluginCall call) {
+        // Never enqueue this on inferenceExecutor: the active JNI call owns that queue.
+        NativeLlama.nativeCancelGeneration();
+        call.resolve(new JSObject().put("cancelled", true));
+    }
+
+    @PluginMethod
     public void unloadModel(PluginCall call) {
         inferenceExecutor.execute(() -> {
             NativeLlama.nativeUnloadModel();

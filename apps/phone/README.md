@@ -28,7 +28,7 @@ apps/phone/
 ├── src/main.ts           # chat client, local store, brain link, avatar, voice
 ├── src/ultran-persona.ts  # stable assistant identity, motto, speech cleanup, voice signature
 ├── src/mark.ts           # the Ultran helm mark (same geometry as the launcher icon)
-├── src/styles.css        # the gold-on-obsidian design system
+├── src/styles.css        # the plasma-red design system
 ├── capacitor.config.ts   # appId app.ultran.mobile, webDir dist
 └── android/              # the generated Capacitor Android project (committed)
 ```
@@ -104,7 +104,7 @@ cd apps/phone/android && ./gradlew assembleRelease
 
 ## Proactive companion actions
 
-- The Android companion bridge can post task notifications, open the installed SMS app with a recipient and message prefilled, and speak a short update through a foreground Android text-to-speech service.
+- The Android companion bridge can post task notifications, open approved messaging apps through explicit handoff, and speak a short update through a foreground Android text-to-speech service.
 - SMS is deliberately a handoff: Ultran shows a review dialog, opens the messaging app, and the user presses Send. The app does not request the dangerous `SEND_SMS` permission or silently send messages.
 - Enable **Updates** in the composer to watch the configured backend task list while the app's JavaScript runtime is active. Completion and failure transitions create Android notifications; if spoken replies are enabled, the foreground voice service reads the update aloud.
 - Android 13+ notification permission is required. If the first permission request is still pending, tap Updates again after granting it.
@@ -117,6 +117,6 @@ cd apps/phone/android && ./gradlew assembleRelease
 
 Ultran prepares WhatsApp messages through an explicit handoff. The agent's tool request is reviewed in Ultran, then Android opens WhatsApp with the chosen recipient and message prepared. The user must review the recipient and content and press Send inside WhatsApp. Ultran does not inspect another app's screen or automate taps.
 
-SMS uses the Android messaging composer, where the user also presses Send. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultran's cache. Notifications are optional and requested only for task updates.
+SMS composition and sending are not supported. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultran's cache. Notifications are optional and requested only for task updates.
 
 These choices reduce sensitive access and improve Play policy compatibility, but they do not guarantee Play approval. The Play listing, privacy policy, Data safety answers, foreground-service declarations, and review materials must still accurately describe the app's behavior.

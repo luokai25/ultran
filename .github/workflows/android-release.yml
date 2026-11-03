@@ -24,8 +24,9 @@ on:
         type: string
 
 concurrency:
+  # Only the newest main build should publish; stale emulator smoke tests must not block fixes.
   group: android-release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write

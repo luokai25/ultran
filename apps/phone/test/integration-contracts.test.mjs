@@ -356,7 +356,7 @@ test("ordinary conversation is the default and native Stop interrupts llama.cpp 
   assert.match(main, /DEFAULT TO NORMAL CONVERSATION/);
   assert.match(main, /Never emit a tool call for a greeting or ordinary informational question/);
   assert.match(main, /function toolRequestMatchesUserIntent/);
-  assert.match(main, /Skill lookup is optional reference research, never a default preamble to conversation/);
+  assert.match(main, /A model proposing a tool is not user authorization/);
   assert.match(main, /toolRequestMatchesUserIntent\(request, text\)/);
   assert.match(main, /toolRequestMatchesUserIntent\(request, task\)/);
   assert.match(capabilityKernel, /DEFAULT TO DIRECT CONVERSATION/);

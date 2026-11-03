@@ -238,8 +238,10 @@ jobs:
       # PackageManager can parse/install the APK. Test the exact release file
       # on an Android 12 emulator before publishing it.
       - name: Android 12 install and launch smoke test
+        timeout-minutes: 15
         uses: reactivecircus/android-emulator-runner@v2
         with:
+          emulator-boot-timeout: 600
           api-level: 31
           target: google_apis
           arch: x86_64

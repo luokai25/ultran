@@ -235,6 +235,21 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
 });
 
 
+
+test("chat supports editing and resending user turns, regenerating assistant turns, and real attachment payloads", () => {
+  assert.ok(html.includes('id="chat-file-input"'));
+  assert.ok(html.includes('id="chat-attach-btn"'));
+  assert.match(main, /readChatAttachment\(file: File\)/);
+  assert.match(main, /file\.text\(\)/);
+  assert.match(main, /const images = item\.attachments\.filter/);
+  assert.match(main, /attachmentContext/);
+  assert.match(main, /Edit & resend/);
+  assert.match(main, /Regenerate/);
+  assert.match(main, /convo\.messages\.splice\(messageIndex\)/);
+  assert.match(main, /convo\.messages\.splice\(previousUser\)/);
+  assert.match(main, /assistant_stream_delta/);
+});
+
 test("Qwen3.5 4B is offered in the Android model library with a pinned SHA-256", () => {
   assert.match(modelLibrary, /SoAIHQ\/Qwen3\.5-4B-GGUF/);
   assert.match(modelLibrary, /Qwen3\.5-4B-Q4_K_M\.gguf/);

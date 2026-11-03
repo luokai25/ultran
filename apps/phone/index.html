@@ -70,7 +70,10 @@
         </button>
         <form id="composer" class="composer">
           <textarea id="prompt" rows="1" autocomplete="off" autocapitalize="sentences" placeholder="Message Ultran…" aria-label="Message"></textarea>
+          <div id="attachment-preview" class="attachment-preview" aria-live="polite" hidden></div>
           <div class="composer-row">
+            <input id="chat-file-input" type="file" multiple hidden accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.html,.css,.js,.ts,.py,.java,.kt,.sh,.sql,.yaml,.yml,.toml" />
+            <label id="chat-attach-btn" class="tool" for="chat-file-input" role="button" tabindex="0" aria-label="Attach files">＋ Attach</label>
             <span id="link-pill" class="link-pill" data-state="offline">local</span>
             <button type="submit" id="send-btn" class="send" aria-label="Send" disabled>
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>

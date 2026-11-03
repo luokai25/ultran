@@ -28,7 +28,8 @@ type ArtifactCard = { id: string; title: string; format: string; size: number; p
 type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; team_id?: string; error?: string; result?: { content?: string }; created_at: string; updated_at: string };
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
-type Message = { role: Role; content: string; tools?: ToolCall[] };
+type ChatAttachment = { id: string; name: string; type: string; size: number; text?: string; dataUrl?: string };
+type Message = { role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[] };
 type Conversation = {
   id: string;
   title: string;
@@ -103,6 +104,10 @@ const haloEl = req<HTMLElement>(".halo");
 const composer = req<HTMLFormElement>("#composer");
 const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
+const chatFileInput = req<HTMLInputElement>("#chat-file-input");
+const chatAttachButton = req<HTMLElement>("#chat-attach-btn");
+const attachmentPreview = req<HTMLElement>("#attachment-preview");
+let pendingAttachments: ChatAttachment[] = [];
 const voiceStatusEl = req<HTMLElement>("#voice-status");
 const workspacePanel = req<HTMLElement>("#workspace-panel");
 const workspaceTasks = req<HTMLElement>("#workspace-tasks");
@@ -512,6 +517,7 @@ function scrollToEnd(smooth = true): void {
 function messageNode(message: Message): { root: HTMLElement; body: HTMLElement } {
   const root = document.createElement("article");
   root.className = `msg ${message.role}`;
+  root.dataset.messageRole = message.role;
   const body = document.createElement("div");
   body.className = "body";
 
@@ -524,6 +530,63 @@ function messageNode(message: Message): { root: HTMLElement; body: HTMLElement }
   }
   root.appendChild(body);
   return { root, body };
+}
+
+
+function renderMessageAttachments(body: HTMLElement, attachments: ChatAttachment[]): void {
+  if (!attachments.length) return;
+  const tray = document.createElement("div");
+  tray.className = "message-attachments";
+  for (const attachment of attachments) {
+    const chip = document.createElement("span");
+    chip.className = "message-attachment";
+    chip.textContent = `${attachment.type.startsWith("image/") ? "Image" : attachment.type === "application/pdf" ? "PDF" : "File"} · ${attachment.name}`;
+    tray.appendChild(chip);
+  }
+  body.appendChild(tray);
+}
+
+function renderPendingAttachments(): void {
+  attachmentPreview.replaceChildren();
+  attachmentPreview.hidden = pendingAttachments.length === 0;
+  for (const attachment of pendingAttachments) {
+    const chip = document.createElement("span");
+    chip.className = "attachment-chip";
+    const label = document.createElement("span");
+    label.textContent = `${attachment.name} · ${formatBytes(attachment.size)}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${attachment.name}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      pendingAttachments = pendingAttachments.filter((item) => item.id !== attachment.id);
+      renderPendingAttachments();
+      syncSendButton();
+    });
+    chip.append(label, remove);
+    attachmentPreview.appendChild(chip);
+  }
+}
+
+async function readChatAttachment(file: File): Promise<ChatAttachment> {
+  const attachment: ChatAttachment = { id: uid(), name: file.name, type: file.type || "application/octet-stream", size: file.size };
+  const textTypes = /^(text\/|application\/(json|xml|javascript|sql))/i;
+  const textExtensions = /\.(txt|md|csv|json|xml|html|css|js|ts|py|java|kt|sh|sql|ya?ml|toml)$/i;
+  if (textTypes.test(attachment.type) || textExtensions.test(file.name)) {
+    if (file.size > 512 * 1024) throw new Error(`${file.name} is larger than the 512 KB text attachment limit.`);
+    attachment.text = (await file.text()).slice(0, 60_000);
+  } else if (attachment.type.startsWith("image/")) {
+    if (file.size > 768 * 1024) throw new Error(`${file.name} is larger than the 768 KB image limit. Compress it before attaching to keep local conversation storage reliable.`);
+    attachment.dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read image"));
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+      reader.readAsDataURL(file);
+    });
+  } else if (attachment.type === "application/pdf" && file.size > 768 * 1024) {
+    throw new Error(`${file.name} is larger than the 768 KB PDF metadata limit. PDF text extraction is not available yet.`);
+  }
+  return attachment;
 }
 
 function requestedArtifactFormat(task: string): string | null {
@@ -1043,6 +1106,45 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
   say.textContent = "Listen";
   say.addEventListener("click", () => speak(message.content));
   actions.append(copy, say);
+  const convo = store.conversations.find((item) => item.messages.includes(message));
+  const messageIndex = convo?.messages.indexOf(message) ?? -1;
+  if (convo && messageIndex >= 0 && message.role === "user") {
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "Edit & resend";
+    edit.addEventListener("click", () => {
+      const text = message.content;
+      pendingAttachments = (message.attachments ?? []).slice();
+      renderPendingAttachments();
+      convo.messages.splice(messageIndex);
+      convo.updatedAt = Date.now();
+      saveStore();
+      promptEl.value = text;
+      autosize();
+      renderConversation();
+      promptEl.focus();
+    });
+    actions.appendChild(edit);
+  } else if (convo && messageIndex >= 0 && message.role === "assistant") {
+    const regenerate = document.createElement("button");
+    regenerate.type = "button";
+    regenerate.textContent = "Regenerate";
+    regenerate.addEventListener("click", () => {
+      let previousUser = -1;
+      for (let i = messageIndex - 1; i >= 0; i -= 1) { if (convo.messages[i]?.role === "user") { previousUser = i; break; } }
+      if (previousUser < 0 || busy) return;
+      const previousMessage = convo.messages[previousUser]!;
+      const text = previousMessage.content;
+      pendingAttachments = (previousMessage.attachments ?? []).slice();
+      renderPendingAttachments();
+      convo.messages.splice(previousUser);
+      convo.updatedAt = Date.now();
+      saveStore();
+      renderConversation();
+      void submit(text);
+    });
+    actions.appendChild(regenerate);
+  }
   root.appendChild(actions);
 }
 
@@ -1054,8 +1156,10 @@ function renderConversation(): void {
   if (convo) {
     for (const message of convo.messages) {
       const { root, body } = messageNode(message);
-      if (message.role === "user") body.textContent = message.content;
-      else {
+      if (message.role === "user") {
+        body.textContent = message.content;
+        renderMessageAttachments(body, message.attachments ?? []);
+      } else {
         renderMarkdown(message.content, body);
         finishAssistantNode(root, message);
       }
@@ -1314,7 +1418,9 @@ async function remoteReply(
       const data = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
       if (!data) return;
       const event = JSON.parse(data) as Record<string, unknown>;
-      onEvent?.(event);
+      if ((event.type === "token" || event.type === "delta" || event.type === "content_delta") && typeof (event.delta ?? event.content ?? event.token) === "string") {
+        onEvent?.({ type: "assistant_stream_delta", delta: String(event.delta ?? event.content ?? event.token) });
+      } else onEvent?.(event);
       if (event.type === "error") {
         const error = event.error as { code?: string; message?: string } | undefined;
         if (error?.code === "not_found" || /agent not found|session not found/i.test(error?.message ?? "")) throw new Error("stale");
@@ -1638,7 +1744,12 @@ async function localModelReply(convo: Conversation, toolFollowup?: LocalToolFoll
     const task = convo.messages[convo.messages.length - 1]?.content ?? "";
     const profile = profileTask(task);
     const historyBudget = toolFollowup ? Math.max(1800, profile.contextTokens * 2 - 3500) : profile.contextTokens * 2;
-    const messages = budgetConversation(convo.messages, profile.contextMessages, historyBudget, profile.contextChars);
+    const messages = budgetConversation(convo.messages, profile.contextMessages, historyBudget, profile.contextChars).map((item) => {
+      if (item.role !== "user" || !item.attachments?.length) return item;
+      const extracted = item.attachments.filter((attachment) => attachment.text).map((attachment) => `\n\n[Attached file: ${attachment.name}]\n${attachment.text}`).join("");
+      const images = item.attachments.filter((attachment) => attachment.dataUrl).map((attachment) => attachment.dataUrl!.split(",", 2)[1] ?? "");
+      return { ...item, content: item.content + extracted, ...(images.length ? { images } : {}) } as typeof item & { images?: string[] };
+    });
     renderLiveEvent(progressBody, { type: "thinking", stage: "planning", label: "Planning the requested work" });
     renderLiveEvent(progressBody, { type: "thinking", stage: "drafting", label: "Drafting the document with your local model" });
     const response = await fetch(endpoint + "/api/chat", {
@@ -1728,7 +1839,7 @@ function syncSendButton(): void {
     sendBtn.setAttribute("aria-label", "Send");
     sendBtn.title = "Send";
     sendBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
-    sendBtn.disabled = promptEl.value.trim().length === 0;
+    sendBtn.disabled = promptEl.value.trim().length === 0 && pendingAttachments.length === 0;
   }
 }
 
@@ -1763,7 +1874,7 @@ function typewriter(target: HTMLElement, text: string, onDone: () => void): () =
 
 async function submit(raw: string): Promise<void> {
   const text = raw.trim();
-  if (!text || busy) return;
+  if ((!text && pendingAttachments.length === 0) || busy) return;
 
   let convo = active();
   if (!convo) {
@@ -1771,9 +1882,20 @@ async function submit(raw: string): Promise<void> {
     store.conversations.push(convo);
     store.activeId = convo.id;
   }
-  if (convo.messages.length === 0) convo.title = text.length > 44 ? `${text.slice(0, 43)}…` : text;
+  if (convo.messages.length === 0) { const title = text || pendingAttachments.map((item) => item.name).join(", "); convo.title = title.length > 44 ? `${title.slice(0, 43)}…` : title; }
 
-  convo.messages.push({ role: "user", content: text });
+  const turnAttachments = pendingAttachments.slice();
+  const attachmentContext = turnAttachments.map((item) => item.text
+    ? `\n\n[Attached file: ${item.name}]\n${item.text}`
+    : item.type.startsWith("image/")
+      ? `\n\n[Image attached: ${item.name}. This image is included for Ollama-compatible vision models; text-only local models cannot inspect it.]`
+      : item.type === "application/pdf"
+        ? `\n\n[PDF attached: ${item.name}. PDF text extraction is not available in this build, so its contents have not been sent to the model.]`
+        : `\n\n[File attached: ${item.name}. This file type is attached for reference but its contents were not extracted.]`).join("");
+  const requestText = text + attachmentContext;
+  convo.messages.push({ role: "user", content: text, ...(turnAttachments.length ? { attachments: turnAttachments } : {}) });
+  pendingAttachments = [];
+  renderPendingAttachments();
   convo.updatedAt = Date.now();
   saveStore();
 
@@ -1787,6 +1909,7 @@ async function submit(raw: string): Promise<void> {
 
   const userNode = messageNode({ role: "user", content: text });
   userNode.body.textContent = text;
+  renderMessageAttachments(userNode.body, turnAttachments);
   messagesEl.appendChild(userNode.root);
 
   const reply = messageNode({ role: "assistant", content: "" });
@@ -1801,14 +1924,16 @@ async function submit(raw: string): Promise<void> {
   setThinking(true);
 
   let result: ChatReply;
+  let streamedText = "";
   if (nativeModelLoaded && Capacitor.getPlatform() === "android") {
     try {
-      const profile = profileTask(text);
+      const profile = profileTask(requestText);
       const runtimeInventory = await localRuntimeInventoryPrompt();
       const messages = [
         { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT + sharedGraphPrompt(convo.id) + runtimeInventory },
         ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200),
       ];
+      if (messages.length > 1 && messages[messages.length - 1]?.role === "user") messages[messages.length - 1]!.content = requestText;
       renderLiveEvent(reply.body, { type: "thinking", stage: "planning", label: "Planning your request" });
       renderLiveEvent(reply.body, { type: "thinking", stage: "drafting", label: requestedArtifactFormat(text) ? "Drafting the requested document" : "Working on your request" });
       const response = await NativeLocalAI.generate({ messages, maxTokens: Math.min(profile.maxTokens, 384) });
@@ -1878,8 +2003,14 @@ async function submit(raw: string): Promise<void> {
         && /\b(whatsapp|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
       // Native actions must stay foreground so the user can approve them in real time.
       result = backgroundMode && !nativePhoneIntent
-        ? await remoteBackgroundReply(convo, text, (event) => renderLiveEvent(reply.body, event))
-        : await remoteReply(convo, text, (event) => renderLiveEvent(reply.body, event), false, turnController.signal);
+        ? await remoteBackgroundReply(convo, requestText, (event) => renderLiveEvent(reply.body, event))
+        : await remoteReply(convo, requestText, (event) => {
+          if (event.type === "assistant_stream_delta" && typeof event.delta === "string") {
+            streamedText += event.delta;
+            renderMarkdown(streamedText, reply.body);
+            if (nearBottom()) scrollToEnd(false);
+          } else renderLiveEvent(reply.body, event);
+        }, false, turnController.signal);
       if (result.session_id) convo.sessionId = result.session_id;
       setLink("online");
     } catch (error) {
@@ -1894,7 +2025,7 @@ async function submit(raw: string): Promise<void> {
     }
   } else if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
     try {
-      result = await localModelReply(convo, undefined, reply.body, turnController.signal);
+      result = await localModelReply({ ...convo, messages: convo.messages.map((item, index) => index === convo!.messages.length - 1 ? { ...item, content: requestText } : item) }, undefined, reply.body, turnController.signal);
       setLink("online", "local model");
     } catch (error) {
       setLink("error", "model unavailable");
@@ -1905,7 +2036,7 @@ async function submit(raw: string): Promise<void> {
     }
   } else {
     await new Promise((resolve) => window.setTimeout(resolve, 180));
-    result = localReply(text);
+    result = localReply(requestText);
   }
   if (turnController.signal.aborted) result = { content: "Stopped.", session_id: "" };
   setThinking(false);
@@ -1920,7 +2051,9 @@ async function submit(raw: string): Promise<void> {
   void organiseSemanticMemory(convo);
 
   reply.body.replaceChildren();
-  activeTypewriterCancel = typewriter(reply.body, result.content, () => {
+  activeTypewriterCancel = streamedText && result.content.startsWith(streamedText)
+    ? (() => { renderMarkdown(result.content, reply.body); finishAssistantNode(reply.root, message); busy = false; activeTurnController = null; activeTypewriterCancel = null; activeReplyBody = null; activeAssistantMessage = null; syncSendButton(); autosize(); if (nearBottom()) scrollToEnd(); return () => undefined; })()
+    : typewriter(reply.body, result.content, () => {
     finishAssistantNode(reply.root, message);
     busy = false;
     activeTurnController = null;
@@ -2557,6 +2690,21 @@ for (const [label, prompt] of SUGGESTIONS) {
 const hour = new Date().getHours();
 greetingEl.textContent = (hour < 5 ? "Still awake" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") + ".";
 
+chatAttachButton.addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter" || (event as KeyboardEvent).key === " ") { event.preventDefault(); chatFileInput.click(); } });
+chatFileInput.addEventListener("change", async () => {
+  const files = Array.from(chatFileInput.files ?? []);
+  chatFileInput.value = "";
+  for (const file of files) {
+    try {
+      if (pendingAttachments.length >= 5) throw new Error("Attach up to five files per message.");
+      pendingAttachments.push(await readChatAttachment(file));
+    } catch (error) {
+      voiceStatus(error instanceof Error ? error.message : "Could not attach file.", true);
+    }
+  }
+  renderPendingAttachments();
+  syncSendButton();
+});
 promptEl.addEventListener("input", autosize);
 promptEl.addEventListener("keydown", (event) => {
   // Enter sends on a hardware keyboard; on a touch keyboard it is a newline.

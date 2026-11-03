@@ -30,3 +30,16 @@ test("finishing layer maintains one accent and supports narrow devices and acces
   assert.match(css, /:focus-visible/);
   assert.match(css, /overscroll-behavior-x:\s*none/);
 });
+
+
+test("phone experience visuals do not reintroduce the retired gold palette", async () => {
+  const css = await read("src/experience.css");
+  for (const legacyColor of [
+    "#fff5d8", "#f2ead8", "#f1d58e", "#a58f5b", "#e6cb83",
+    "#e6c77a", "#e6c878", "#8e7140", "#6d532c", "#f0d99a", "#c49b4d",
+    "rgba(217,185,108", "rgba(196,155,77",
+  ]) {
+    assert.equal(css.toLowerCase().includes(legacyColor.toLowerCase()), false,
+      "retired gold color " + legacyColor + " must not appear in the phone experience layer");
+  }
+});

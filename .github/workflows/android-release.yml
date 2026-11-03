@@ -237,26 +237,63 @@ jobs:
       # A successful Gradle build and signature check do not prove that
       # PackageManager can parse/install the APK. Test the exact release file
       # on an Android 12 emulator before publishing it.
+      - name: Install Android emulator image
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --install "emulator" "system-images;android-31;google_apis;x86_64" > /dev/null
+          yes | sdkmanager --licenses > /dev/null || true
+
+      # Run the emulator directly instead of delegating its lifecycle to a
+      # composite action. Explicit boot and command timeouts ensure a stalled
+      # emulator cannot leave the release job waiting indefinitely.
       - name: Android 12 install and launch smoke test
         timeout-minutes: 15
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          emulator-boot-timeout: 600
-          api-level: 31
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          # The emulator action executes each script line through sh separately.
-          # Keep the smoke test as one shell command so control flow isn't split.
-          script: >-
-            APK="${{ runner.temp }}/ultran-release.apk";
-            test -s "$APK" &&
-            sha256sum "$APK" &&
-            adb install -r "$APK" &&
-            adb shell monkey -p app.ultran.mobile 1 &&
-            adb shell dumpsys package app.ultran.mobile | grep -q "versionName=${{ steps.version.outputs.name }}" &&
-            echo "Android PackageManager installed and launched Ultran successfully"
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/ultran-release.apk"
+          AVD_NAME="ultran-api31"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+          test -s "$APK"
+          echo "Testing APK SHA-256:"
+          sha256sum "$APK"
+
+          echo "no" | avdmanager create avd --force --name "$AVD_NAME" \
+            --package "system-images;android-31;google_apis;x86_64" --device "pixel_6"
+
+          "$EMULATOR" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim \
+            -gpu swiftshader_indirect -no-snapshot -wipe-data \
+            > "$RUNNER_TEMP/ultran-emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          cleanup() {
+            adb emu kill >/dev/null 2>&1 || true
+            kill "$EMULATOR_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          timeout 600 adb wait-for-device
+          BOOTED=false
+          for attempt in $(seq 1 120); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              BOOTED=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$BOOTED" != "true" ]; then
+            echo "::error::Android 12 emulator did not finish booting"
+            tail -200 "$RUNNER_TEMP/ultran-emulator.log" || true
+            exit 1
+          fi
+
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb install -r "$APK"
+          adb shell monkey -p app.ultran.mobile 1
+          sleep 5
+          adb shell dumpsys package app.ultran.mobile | grep -Fq "versionName=${{ steps.version.outputs.name }}"
+          echo "Android 12 PackageManager installed Ultran and launch intent completed"
 
       - name: Package Capacitor project
         run: |

@@ -333,9 +333,9 @@ test("skills engine exposes bounded read-only search and resource reads for refe
 });
 
 
-test("background intent detector distinguishes questions, explicit actions, and continuation", () => {
+test("background intent detector distinguishes questions, explicit actions, and continuation", async () => {
   const start = main.indexOf("function backgroundRequestNeedsTools(userText: string): boolean {");
-  const end = main.indexOf("\\n}\\n\\nasync function remoteBackgroundReply", start) + 2;
+  const end = main.indexOf("\n}\n\nasync function remoteBackgroundReply", start) + 2;
   assert.ok(start >= 0 && end > 2, "background intent detector must be present");
   const source = main.slice(start, end).replace("function backgroundRequestNeedsTools(userText: string): boolean {", "function backgroundRequestNeedsTools(userText) {");
   const detector = (await import("node:vm")).runInNewContext("(" + source + ")");

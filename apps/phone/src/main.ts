@@ -1536,11 +1536,11 @@ function backgroundRequestNeedsTools(userText: string): boolean {
   if (!text) return false;
   // Questions stay on the normal model path unless the user clearly asks us to
   // perform an action in the same turn.
-  const asksQuestion = /^(?:what|why|when|where|who|which|how|explain|describe|define|tell me about|can you explain|could you explain)\\b/i.test(text);
-  const explicitAction = /\\b(?:please\\s+)?(?:create|build|write|edit|rewrite|update|delete|remove|send|compose|open|launch|install|download|import|export|convert|generate|run|execute|search|look up|find|fetch|connect|disconnect|schedule|book|purchase|summari[sz]e this|analy[sz]e this|review this|test|debug|fix|deploy|commit|push|continue|proceed|carry on|keep working|go ahead)\\b/i.test(text)
-    || /\\b(?:i need you to|i want you to|do this for me|carry out|take care of|perform)\\b/i.test(text);
-  const negated = /\\b(?:do not|don't|dont|never|avoid|without)\\s+(?:run|execute|install|download|build|compile|test|debug|fix|search|open|send|delete|remove)\\b/i.test(text);
-  return explicitAction && !negated && (!asksQuestion || /\\b(?:do|perform|carry out|run|execute|build|create|fix|test|download|install)\\b/i.test(text));
+  const asksQuestion = /^(?:what|why|when|where|who|which|how|explain|describe|define|tell me about|can you explain|could you explain)\b/i.test(text);
+  const explicitAction = /\b(?:please\s+)?(?:create|build|write|edit|rewrite|update|delete|remove|send|compose|open|launch|install|download|import|export|convert|generate|run|execute|search|look up|find|fetch|connect|disconnect|schedule|book|purchase|summari[sz]e this|analy[sz]e this|review this|test|debug|fix|deploy|commit|push|continue|proceed|carry on|keep working|go ahead)\b/i.test(text)
+    || /\b(?:i need you to|i want you to|do this for me|carry out|take care of|perform)\b/i.test(text);
+  const negated = /\b(?:do not|don't|dont|never|avoid|without)\s+(?:run|execute|install|download|build|compile|test|debug|fix|search|open|send|delete|remove)\b/i.test(text);
+  return explicitAction && !negated && (!asksQuestion || /\b(?:do|perform|carry out|run|execute|build|create|fix|test|download|install)\b/i.test(text));
 }
 
 async function remoteBackgroundReply(

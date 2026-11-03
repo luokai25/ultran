@@ -56,3 +56,11 @@ test("local model import is directly discoverable on the home screen and wired t
   assert.match(html, /id="hero-import-model"[^>]*>Import a local model/);
   assert.match(app, /#hero-import-model[\s\S]{0,120}importNativeModel\(\)/);
 });
+
+
+test("knowledge map uses the unified Ultran plasma accent instead of legacy gold", async () => {
+  const map = await read("src/mind-map.ts");
+  assert.match(map, /root:\s*"#ff7180"/);
+  assert.match(map, /project:\s*"#e52d41"/);
+  assert.doesNotMatch(map, /#e5c36b|#c99b52/i);
+});

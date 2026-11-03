@@ -240,7 +240,7 @@ jobs:
       - name: Install Android emulator image
         run: |
           set -euo pipefail
-          yes | sdkmanager --install "emulator" "system-images;android-31;google_apis;x86_64" > /dev/null
+          sdkmanager --install "emulator" "system-images;android-31;google_apis;x86_64"
           yes | sdkmanager --licenses > /dev/null || true
 
       # Run the emulator directly instead of delegating its lifecycle to a

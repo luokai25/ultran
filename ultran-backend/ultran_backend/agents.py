@@ -575,8 +575,6 @@ class AgentService:
                 "\n\nANDROID PHONE ACTIONS (available only through the native Ultran Android client):"
                 "\n- For an explicitly requested WhatsApp message, emit exactly ULTRAN_TOOL_CALL:"
                 '{"tool":"whatsapp.compose","number":"+internationalnumber","body":"exact message"}.'
-                "\n- For an explicitly requested SMS, emit exactly ULTRAN_TOOL_CALL:"
-                '{"tool":"sms.compose","number":"+internationalnumber","body":"exact message"}.'
                 "\n- For an explicitly requested Telegram message, emit exactly ULTRAN_TOOL_CALL:"
                 '{"tool":"telegram.compose","body":"exact message"}.'
                 "\n- To open an installed supported app, emit exactly ULTRAN_TOOL_CALL:"

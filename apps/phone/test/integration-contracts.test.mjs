@@ -201,6 +201,13 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.doesNotMatch(html, /id="proactive-btn"|id="sms-btn"|id="voice-btn"|id="mic-btn"|id="background-btn/);
 });
 
+test("SMS composition is absent from phone capabilities and backend prompts", () => {
+  assert.doesNotMatch(agentRuntime, /sms\.compose|explicitly requested SMS/);
+  assert.doesNotMatch(companion, /composeSms|smsto:|sms_body/);
+  assert.doesNotMatch(main, /sms\.compose|composeSms/);
+  assert.doesNotMatch(html, /sms-btn/);
+});
+
 test("WhatsApp handoff never sends or taps automatically", () => {
   assert.match(companion, /Review WhatsApp message/);
   assert.match(companion, /press Send yourself/);

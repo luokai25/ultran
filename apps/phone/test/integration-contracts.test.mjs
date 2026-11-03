@@ -368,13 +368,14 @@ test("every local tool requires matching explicit intent from the current user t
   assert.match(main, /case "app.open":[\s\S]*?open\|launch\|start/);
   assert.match(main, /if \(!text\) return false/);
   const matcherStart = main.indexOf("function toolRequestMatchesUserIntent(");
-  const matcherEnd = main.indexOf("\\n}\\n\\nfunction parseLocalToolRequest", matcherStart) + 2;
+  const matcherEnd = main.indexOf("\n}\n\nfunction parseLocalToolRequest", matcherStart) + 2;
+  assert.ok(matcherStart >= 0 && matcherEnd > 2, "local tool intent matcher must be present");
   const matcher = main.slice(matcherStart, matcherEnd);
   assert.match(matcher, /const asksQuestion =/);
   assert.match(matcher, /if \(asksQuestion\) return false/);
-  assert.match(matcher, /case "runtime.exec":[\\s\\S]*?continue\\|proceed/);
-  assert.match(matcher, /case "whatsapp.compose":[\\s\\S]*?matches\\(\\/\\\\bwhatsapp\\\\b\\/i\\)/);
-  assert.match(matcher, /case "telegram.compose":[\\s\\S]*?matches\\(\\/\\\\btelegram\\\\b\\/i\\)/);
+  assert.ok(matcher.includes("continue|proceed|carry on|keep working|go ahead"));
+  assert.match(matcher, /matches\(\/\\bwhatsapp\\b\/i\)/);
+  assert.match(matcher, /matches\(\/\\btelegram\\b\/i\)/);
 });
 
 test("ordinary conversation is the default and native Stop interrupts llama.cpp decoding", () => {

@@ -1529,6 +1529,16 @@ async function remoteReply(
 }
 
 /** The on-device responder: honest about being small, useful for the basics. */
+/** Background mode is not blanket permission to invoke tools. Keep ordinary
+ * conversation on the model path; enable tools only for clear action requests. */
+function backgroundRequestNeedsTools(userText: string): boolean {
+  const text = userText.trim();
+  if (!text) return false;
+  if (/^(?:what|why|when|where|who|which|how|explain|describe|define|tell me about|can you explain|could you explain)\\b/i.test(text)) return false;
+  return /\\b(?:please\\s+)?(?:create|build|write|edit|rewrite|update|delete|remove|send|compose|open|launch|install|download|import|export|convert|generate|run|execute|search|look up|find|fetch|connect|disconnect|schedule|book|purchase|summari[sz]e this|analy[sz]e this|review this|test|debug|fix|deploy|commit|push)\\b/i.test(text)
+    || /\\b(?:i need you to|i want you to|do this for me|carry out|take care of|perform)\\b/i.test(text);
+}
+
 async function remoteBackgroundReply(
   convo: Conversation,
   text: string,

@@ -243,8 +243,13 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
 test("chat supports editing and resending user turns, regenerating assistant turns, and real attachment payloads", () => {
   assert.ok(html.includes('id="chat-file-input"'));
   assert.ok(html.includes('id="chat-attach-btn"'));
+  assert.match(html, /\.docx/);
   assert.match(main, /readChatAttachment\(file: File\)/);
   assert.match(main, /file\.text\(\)/);
+  assert.match(main, /pdfjs\.getDocument/);
+  assert.match(main, /mammoth\.extractRawText/);
+  assert.match(main, /pdfjs\.getDocument/);
+  assert.match(main, /attachment-thumb/);
   assert.match(main, /const images = item\.attachments\.filter/);
   assert.match(main, /attachmentContext/);
   assert.match(main, /Edit & resend/);
@@ -260,6 +265,8 @@ test("chat supports editing and resending user turns, regenerating assistant tur
   assert.match(main, /finishUserNode\(root, message\)/);
   assert.match(main, /nativeRequestText/);
   assert.match(main, /remoteRequestText/);
+  assert.match(main, /data_url: attachment\.dataUrl/);
+  assert.match(main, /remoteBackgroundRequestText/);
   assert.match(nativeLlamaJava, /interface TokenCallback/);
   assert.match(nativePluginJava, /notifyListeners\(\"generationToken\"/);
   assert.match(nativeJni, /CallVoidMethod\(callback, on_token/);

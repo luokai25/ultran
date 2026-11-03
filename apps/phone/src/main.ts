@@ -541,10 +541,29 @@ function renderMessageAttachments(body: HTMLElement, attachments: ChatAttachment
   for (const attachment of attachments) {
     const chip = document.createElement("span");
     chip.className = "message-attachment";
-    chip.textContent = `${attachment.type.startsWith("image/") ? "Image" : attachment.type === "application/pdf" ? "PDF" : "File"} · ${attachment.name}`;
+    if (attachment.dataUrl) {
+      const preview = document.createElement("img");
+      preview.className = "attachment-thumb";
+      preview.src = attachment.dataUrl;
+      preview.alt = attachment.name;
+      chip.appendChild(preview);
+    }
+    const name = document.createElement("span");
+    name.textContent = `${attachment.type.startsWith("image/") ? "Image" : attachment.type === "application/pdf" ? "PDF" : "File"} · ${attachment.name}`;
+    chip.appendChild(name);
+    if (attachment.text) {
+      const snippet = document.createElement("small");
+      snippet.className = "attachment-snippet";
+      snippet.textContent = attachment.text.slice(0, 180);
+      chip.appendChild(snippet);
+    }
     tray.appendChild(chip);
   }
   body.appendChild(tray);
+}
+
+function attachmentStorageBytes(attachment: ChatAttachment): number {
+  return attachment.dataUrl?.length ?? ((attachment.text?.length ?? 0) * 2 + 512);
 }
 
 function renderPendingAttachments(): void {
@@ -553,8 +572,21 @@ function renderPendingAttachments(): void {
   for (const attachment of pendingAttachments) {
     const chip = document.createElement("span");
     chip.className = "attachment-chip";
+    if (attachment.dataUrl) {
+      const preview = document.createElement("img");
+      preview.className = "attachment-thumb";
+      preview.src = attachment.dataUrl;
+      preview.alt = attachment.name;
+      chip.appendChild(preview);
+    }
     const label = document.createElement("span");
     label.textContent = `${attachment.name} · ${formatBytes(attachment.size)}`;
+    if (attachment.text) {
+      const snippet = document.createElement("small");
+      snippet.className = "attachment-snippet";
+      snippet.textContent = attachment.text.slice(0, 140);
+      chip.appendChild(snippet);
+    }
     const remove = document.createElement("button");
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove ${attachment.name}`);
@@ -576,7 +608,14 @@ async function readChatAttachment(file: File): Promise<ChatAttachment> {
   if (textTypes.test(attachment.type) || textExtensions.test(file.name)) {
     if (file.size > 512 * 1024) throw new Error(`${file.name} is larger than the 512 KB text attachment limit.`);
     attachment.text = (await file.text()).slice(0, 60_000);
+  } else if (attachment.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.name.toLowerCase().endsWith(".docx")) {
+    if (file.size > 12 * 1024 * 1024) throw new Error(`${file.name} is larger than the 12 MB DOCX limit.`);
+    const mammoth = await import("mammoth");
+    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    attachment.text = result.value.slice(0, 60_000);
+    if (!attachment.text.trim()) throw new Error(`${file.name} contains no extractable text.`);
   } else if (attachment.type.startsWith("image/")) {
+    if (!/^image\/(png|jpeg|webp|gif)$/i.test(attachment.type)) throw new Error(`${file.name} uses an unsupported image format. Use PNG, JPEG, WebP, or GIF.`);
     if (file.size > 768 * 1024) throw new Error(`${file.name} is larger than the 768 KB image limit. Compress it before attaching to keep local conversation storage reliable.`);
     attachment.dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -584,8 +623,24 @@ async function readChatAttachment(file: File): Promise<ChatAttachment> {
       reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
       reader.readAsDataURL(file);
     });
-  } else if (attachment.type === "application/pdf" && file.size > 768 * 1024) {
-    throw new Error(`${file.name} is larger than the 768 KB PDF metadata limit. PDF text extraction is not available yet.`);
+  } else if (attachment.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    if (file.size > 12 * 1024 * 1024) throw new Error(`${file.name} is larger than the 12 MB PDF limit.`);
+    const [pdfjs, worker] = await Promise.all([
+      import("pdfjs-dist/legacy/build/pdf.mjs"),
+      import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
+    ]);
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+    const document = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    if (document.numPages > 30) throw new Error(`${file.name} has ${document.numPages} pages. Attach a PDF with 30 pages or fewer.`);
+    const pages: string[] = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const text = await page.getTextContent();
+      pages.push(text.items.map((item) => "str" in item ? item.str : "").filter(Boolean).join(" "));
+      if (pages.join("\n").length > 60_000) break;
+    }
+    attachment.text = pages.join("\n\n").slice(0, 60_000);
+    if (!attachment.text.trim()) throw new Error(`${file.name} contains no extractable text. Scanned PDFs need OCR, which this build does not provide.`);
   }
   return attachment;
 }
@@ -1402,6 +1457,9 @@ async function remoteReply(
       && /\b(whatsapp|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
     const body = JSON.stringify({
       message: taskMessage,
+      attachments: (convo.messages[convo.messages.length - 1]?.attachments ?? [])
+        .filter((attachment) => attachment.dataUrl)
+        .map((attachment) => ({ name: attachment.name, data_url: attachment.dataUrl })),
       session_id: convo.sessionId ?? null,
       client_capabilities: Capacitor.getPlatform() === "android" ? ["android_phone_actions"] : [],
       allow_tools: !nativeToolFollowup && !nativePhoneIntent,
@@ -1924,8 +1982,8 @@ function typewriter(target: HTMLElement, text: string, onDone: () => void): () =
 }
 
 async function submit(raw: string): Promise<void> {
-  const text = raw.trim();
-  if ((!text && pendingAttachments.length === 0) || busy) return;
+  const text = raw.trim() || (pendingAttachments.length ? "Please inspect the attached file(s) and help me understand them." : "");
+  if (!text || busy) return;
 
   let convo = active();
   if (!convo) {
@@ -1941,8 +1999,10 @@ async function submit(raw: string): Promise<void> {
   const requestText = text + attachmentContext;
   const nativeRequestText = requestText + turnAttachments.filter((item) => !item.text)
     .map((item) => `\n\n[${item.type.startsWith("image/") ? "Image" : item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. This on-device GGUF model is text-only in this build, so the file bytes are not included in its inference context.]`).join("");
-  const remoteRequestText = requestText + turnAttachments.filter((item) => !item.text)
-    .map((item) => `\n\n[${item.type.startsWith("image/") ? "Image" : item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. The hosted chat endpoint currently accepts text only, so the file bytes are not transmitted.]`).join("");
+  const remoteRequestText = (requestText + turnAttachments.filter((item) => !item.text && !item.dataUrl)
+    .map((item) => `\n\n[${item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. Its contents were not extracted.]`).join("")).slice(0, 16_000);
+  const remoteBackgroundRequestText = (remoteRequestText + turnAttachments.filter((item) => item.dataUrl)
+    .map((item) => `\n\n[Image attached: ${item.name}. Background task submissions currently accept text only, so the image bytes are not sent in background mode.]`).join("")).slice(0, 16_000);
   convo.messages.push({ role: "user", content: text, ...(turnAttachments.length ? { attachments: turnAttachments } : {}) });
   pendingAttachments = [];
   renderPendingAttachments();
@@ -2060,7 +2120,7 @@ async function submit(raw: string): Promise<void> {
         && /\b(whatsapp|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
       // Native actions must stay foreground so the user can approve them in real time.
       result = backgroundMode && !nativePhoneIntent
-        ? await remoteBackgroundReply(convo, remoteRequestText, (event) => renderLiveEvent(reply.body, event))
+        ? await remoteBackgroundReply(convo, remoteBackgroundRequestText, (event) => renderLiveEvent(reply.body, event))
         : await remoteReply(convo, remoteRequestText, (event) => {
           if (event.type === "assistant_stream_delta" && typeof event.delta === "string") {
             streamedText += event.delta;
@@ -2765,8 +2825,10 @@ chatFileInput.addEventListener("change", async () => {
   for (const file of files) {
     try {
       if (pendingAttachments.length >= 5) throw new Error("Attach up to five files per message.");
-      if (pendingAttachments.reduce((total, item) => total + item.size, 0) + file.size > 1536 * 1024) throw new Error("Keep the combined attachment size below 1.5 MB so the conversation remains safely stored on this phone.");
-      pendingAttachments.push(await readChatAttachment(file));
+      const attachment = await readChatAttachment(file);
+      const storedSize = pendingAttachments.reduce((total, item) => total + attachmentStorageBytes(item), 0) + attachmentStorageBytes(attachment);
+      if (storedSize > 2560 * 1024) throw new Error("The extracted attachment previews exceed 2.5 MB. Remove a file or use smaller images to keep local conversation storage reliable.");
+      pendingAttachments.push(attachment);
     } catch (error) {
       voiceStatus(error instanceof Error ? error.message : "Could not attach file.", true);
     }

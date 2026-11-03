@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import re
 from datetime import datetime
 from typing import Any, Literal
@@ -130,8 +131,28 @@ class AgentMemoryOut(BaseModel):
     updated_at: datetime
 
 
+class ChatImageAttachment(_Strict):
+    name: str = Field(min_length=1, max_length=160)
+    data_url: str = Field(min_length=26, max_length=1_100_000)
+
+    @field_validator("data_url")
+    @classmethod
+    def _validate_image_data_url(cls, value: str) -> str:
+        match = re.fullmatch(r"data:image/(?:png|jpeg|webp|gif);base64,([A-Za-z0-9+/]+={0,2})", value)
+        if not match:
+            raise ValueError("image attachment must be a PNG, JPEG, WebP, or GIF data URL")
+        try:
+            decoded = base64.b64decode(match.group(1), validate=True)
+        except Exception as exc:
+            raise ValueError("image attachment contains invalid base64") from exc
+        if not decoded or len(decoded) > 768 * 1024:
+            raise ValueError("image attachment must be between 1 byte and 768 KB")
+        return value
+
+
 class ChatTurn(_Strict):
     message: str = Field(min_length=1, max_length=16_000)
+    attachments: list[ChatImageAttachment] = Field(default_factory=list, max_length=5)
     session_id: str | None = Field(default=None, max_length=64)
     allow_tools: bool = True
     max_tool_calls: int = Field(default=4, ge=0, le=16)

@@ -51,6 +51,19 @@ def words(text: str) -> list[str]:
 class BrainMessage:
     role: str
     content: str
+    images: list[str] = field(default_factory=list)
+
+
+def _openai_message(message: BrainMessage) -> dict[str, Any]:
+    if not message.images:
+        return {"role": message.role, "content": message.content}
+    return {
+        "role": message.role,
+        "content": [
+            {"type": "text", "text": message.content},
+            *({"type": "image_url", "image_url": {"url": image}} for image in message.images),
+        ],
+    }
 
 
 @dataclass
@@ -170,7 +183,10 @@ class OllamaBackend:
     ) -> BrainReply:
         payload = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [
+                {"role": m.role, "content": m.content, **({"images": [image.split(",", 1)[-1] for image in m.images]} if m.images else {})}
+                for m in messages
+            ],
             "stream": False,
             "options": {"temperature": temperature},
         }
@@ -206,7 +222,10 @@ class OllamaBackend:
         import json
         payload = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [
+                {"role": m.role, "content": m.content, **({"images": [image.split(",", 1)[-1] for image in m.images]} if m.images else {})}
+                for m in messages
+            ],
             "stream": True,
             "options": {"temperature": temperature},
         }
@@ -270,7 +289,7 @@ class OpenAICompatBackend:
     ) -> BrainReply:
         payload = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [_openai_message(m) for m in messages],
             "temperature": temperature,
             "stream": False,
         }
@@ -315,7 +334,7 @@ class OpenAICompatBackend:
         import json
         payload = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [_openai_message(m) for m in messages],
             "temperature": temperature,
             "stream": True,
         }

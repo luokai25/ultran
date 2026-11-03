@@ -40,7 +40,7 @@ def _budget_history(messages: list[BrainMessage], *, max_messages: int, max_char
             head = int(available * 0.65)
             tail = max(0, available - head)
             content = content[:head] + marker + (content[-tail:] if tail else "")
-        selected.append(BrainMessage(role=message.role, content=content))
+        selected.append(BrainMessage(role=message.role, content=content, images=list(message.images)))
         used += len(content)
     return list(reversed(selected))
 
@@ -513,6 +513,7 @@ class AgentService:
         allow_tools: bool = True,
         max_tool_calls: int = 4,
         client_capabilities: list[str] | None = None,
+        attachments: list[dict[str, str]] | None = None,
         event_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         def emit(event: dict[str, Any]) -> None:
@@ -584,12 +585,25 @@ class AgentService:
                 "\n- Never claim delivery; WhatsApp's native action result cannot confirm recipient delivery."
                 "\n- Emit only one phone tool call per turn and never put explanatory prose before or after the JSON tool payload."
             )
+        if image_data:
+            system_message += (
+                "\n\nIMAGE ATTACHMENT POLICY: The current user turn includes image payloads. "
+                "Inspect their actual visual content only if the active model/provider supports vision. "
+                "If the provider rejects images or the model cannot interpret them, say so plainly and ask for a text description. "
+                "Never infer image contents from filenames or claim to have seen details that were not available."
+            )
         if artifact_format:
             system_message += _artifact_authoring_instruction(artifact_format)
         messages = [
             BrainMessage("system", system_message),
             *_budget_history(session.messages, max_messages=profile.history_messages, max_chars=profile.context_chars),
         ]
+        image_data = [item["data_url"] for item in (attachments or []) if item.get("data_url")]
+        if image_data:
+            for index in range(len(messages) - 1, 0, -1):
+                if messages[index].role == "user":
+                    messages[index] = BrainMessage("user", messages[index].content, images=image_data)
+                    break
         # Preserve the normal inference preflight: a broken model must not cause
         # side effects merely because a message happened to match a tool name.
         emit({"type": "thinking", "stage": "planning", "label": "Understanding your request"})
@@ -620,6 +634,11 @@ class AgentService:
                 BrainMessage("system", system_message),
                 *_budget_history(session.messages, max_messages=profile.history_messages, max_chars=profile.context_chars),
             ]
+            if image_data:
+                for index in range(len(messages) - 1, 0, -1):
+                    if messages[index].role == "user":
+                        messages[index] = BrainMessage("user", messages[index].content, images=image_data)
+                        break
             tool_context = json.dumps(tool_calls, ensure_ascii=False, default=str)[:16_000]
             messages.append(BrainMessage(
                 "user",

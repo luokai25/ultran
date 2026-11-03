@@ -205,6 +205,26 @@ def test_brain_runtime_forwards_streamed_tokens_from_provider():
     assert reply.content == "ok"
 
 
+def test_ollama_forwards_image_payloads_to_vision_models():
+    client = _StubClient(_StubResponse(200, {"message": {"content": "A cat"}}))
+    image = "data:image/png;base64,Y2F0"
+    message = [BrainMessage("user", "Describe this image", images=[image])]
+    OllamaBackend("http://h", client=client).complete(message, model="llava", temperature=0.2)
+    payload_message = client.calls[0][1]["messages"][0]
+    assert payload_message["images"] == ["Y2F0"]
+    assert payload_message["content"] == "Describe this image"
+
+
+def test_openai_compatible_forwards_multimodal_image_content():
+    client = _StubClient(_StubResponse(200, {"choices": [{"message": {"content": "A cat"}}]}))
+    image = "data:image/png;base64,Y2F0"
+    message = [BrainMessage("user", "Describe this image", images=[image])]
+    OpenAICompatBackend("http://h", client=client).complete(message, model="vision-model", temperature=0.2)
+    content = client.calls[0][1]["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Describe this image"}
+    assert content[1] == {"type": "image_url", "image_url": {"url": image}}
+
+
 def test_ollama_posts_to_the_chat_endpoint():
     client = _StubClient(_StubResponse(200, {"message": {"content": "hi"}, "eval_count": 3}))
     backend = OllamaBackend("http://127.0.0.1:11434", client=client)

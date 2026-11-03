@@ -221,3 +221,5 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .attachment-preview{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}.attachment-chip,.message-attachment{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:6px 9px;border:1px solid rgba(229,45,65,.22);border-radius:10px;background:rgba(229,45,65,.07);color:#e8e5dc;font-size:10px}.attachment-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment-chip button{border:0;background:transparent;color:#ff7180;font-size:16px;line-height:1}.message-attachments{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.message-attachment{font-size:10px;color:#ff9aa4}
 
 #chat-attach-btn{display:inline-flex;align-items:center;cursor:pointer;user-select:none}
+
+.attachment-snippet{display:block;max-width:220px;overflow:hidden;color:rgba(232,229,220,.68);font-size:9px;line-height:1.35;white-space:normal}

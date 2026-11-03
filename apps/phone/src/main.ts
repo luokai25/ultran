@@ -2525,6 +2525,7 @@ function exportObsidianVault():void{const map=mindMap.nodes.length?mindMap:build
  * Wiring
  * ------------------------------------------------------------------ */
 chatModelButton.addEventListener("click", () => void openChatModelMenu());
+req<HTMLButtonElement>("#hero-import-model").addEventListener("click", () => void importNativeModel());
 req<HTMLButtonElement>("#chat-model-import").addEventListener("click", () => { closeChatModelMenu(); void importNativeModel(); });
 req<HTMLButtonElement>("#chat-model-close").addEventListener("click", closeChatModelMenu);
 req<HTMLButtonElement>("#chat-model-settings").addEventListener("click", () => { closeChatModelMenu(); openSheet(); });

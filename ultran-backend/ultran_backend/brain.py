@@ -198,6 +198,53 @@ class OllamaBackend:
         )
 
 
+    def complete_stream(
+        self, messages: list[BrainMessage], *, model: str, temperature: float,
+        on_token: Callable[[str], None],
+    ) -> BrainReply:
+        """Stream Ollama NDJSON tokens while retaining the normal reply contract."""
+        import json
+        payload = {
+            "model": model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "stream": True,
+            "options": {"temperature": temperature},
+        }
+        client = self._get_client()
+        chunks: list[str] = []
+        final: dict[str, Any] = {}
+        try:
+            with client.stream("POST", f"{self.endpoint}/api/chat", json=payload) as resp:
+                if resp.status_code >= 400:
+                    raise DependencyUnavailable(
+                        "local model runtime returned an error",
+                        details={"status": resp.status_code, "endpoint": self.endpoint},
+                    )
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    event = json.loads(line)
+                    token = ((event.get("message") or {}).get("content") or "")
+                    if token:
+                        chunks.append(token)
+                        on_token(token)
+                    if event.get("done"):
+                        final = event
+        except DependencyUnavailable:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise DependencyUnavailable(
+                "local model runtime is unreachable", details={"endpoint": self.endpoint}
+            ) from exc
+        content = "".join(chunks)
+        return BrainReply(
+            content=content,
+            tokens_in=final.get("prompt_eval_count") or sum(estimate_tokens(m.content) for m in messages),
+            tokens_out=final.get("eval_count") or estimate_tokens(content),
+            model=model, backend=self.name, raw=final,
+        )
+
+
 class OpenAICompatBackend:
     """Talks to a self-hosted OpenAI-compatible ``/v1/chat/completions`` server."""
 
@@ -257,6 +304,66 @@ class OpenAICompatBackend:
             backend=self.name,
             finish_reason=choice.get("finish_reason") or "stop",
             raw=data,
+        )
+
+
+    def complete_stream(
+        self, messages: list[BrainMessage], *, model: str, temperature: float,
+        on_token: Callable[[str], None],
+    ) -> BrainReply:
+        """Stream OpenAI-compatible SSE deltas; tolerate providers omitting usage."""
+        import json
+        payload = {
+            "model": model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "temperature": temperature,
+            "stream": True,
+        }
+        client = self._get_client()
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        chunks: list[str] = []
+        usage: dict[str, Any] = {}
+        finish_reason = "stop"
+        try:
+            with client.stream("POST", f"{self.endpoint}/v1/chat/completions", json=payload, headers=headers) as resp:
+                if resp.status_code >= 400:
+                    raise DependencyUnavailable(
+                        "local model runtime returned an error",
+                        details={"status": resp.status_code, "endpoint": self.endpoint},
+                    )
+                for line in resp.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    event = json.loads(data)
+                    if event.get("usage"):
+                        usage = event["usage"]
+                    choices = event.get("choices") or []
+                    if not choices:
+                        continue
+                    choice = choices[0] or {}
+                    delta = choice.get("delta") or {}
+                    token = delta.get("content") or ""
+                    if isinstance(token, str) and token:
+                        chunks.append(token)
+                        on_token(token)
+                    if choice.get("finish_reason"):
+                        finish_reason = choice["finish_reason"]
+        except DependencyUnavailable:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise DependencyUnavailable(
+                "local model runtime is unreachable", details={"endpoint": self.endpoint}
+            ) from exc
+        content = "".join(chunks)
+        return BrainReply(
+            content=content,
+            tokens_in=usage.get("prompt_tokens") or sum(estimate_tokens(m.content) for m in messages),
+            tokens_out=usage.get("completion_tokens") or estimate_tokens(content),
+            model=model, backend=self.name, finish_reason=finish_reason,
+            raw={"usage": usage},
         )
 
 
@@ -354,6 +461,42 @@ class FailoverBackend:
                 return reply
         raise DependencyUnavailable("every brain backend is unavailable", details={"attempts": attempts})
 
+    def complete_stream(
+        self, messages: list[BrainMessage], *, model: str, temperature: float,
+        on_token: Callable[[str], None],
+    ) -> BrainReply:
+        attempts: list[dict[str, Any]] = []
+        for index, backend in enumerate(self.backends):
+            if self._is_open(backend):
+                attempts.append({"backend": backend.name, "skipped": "circuit open"})
+                continue
+            for attempt in range(self.retries + 1):
+                emitted = False
+                def publish(token: str) -> None:
+                    nonlocal emitted
+                    emitted = True
+                    on_token(token)
+                try:
+                    stream = getattr(backend, "complete_stream", None)
+                    reply = stream(messages, model=model, temperature=temperature, on_token=publish) if callable(stream) else backend.complete(messages, model=model, temperature=temperature)
+                    if not emitted and reply.content:
+                        on_token(reply.content)
+                    self._record_success(backend)
+                except DependencyUnavailable as exc:
+                    self._record_failure(backend, exc)
+                    if emitted:
+                        raise
+                    attempts.append({"backend": backend.name, "error": exc.message})
+                    if attempt < self.retries and not self._is_open(backend):
+                        self._sleep(self.backoff_s * (2**attempt))
+                        continue
+                    break
+                if index > 0 or attempts:
+                    self.failovers += 1
+                    reply.raw = {**reply.raw, "failover_attempts": attempts}
+                return reply
+        raise DependencyUnavailable("every brain backend is unavailable", details={"attempts": attempts})
+
     def status(self) -> list[dict[str, Any]]:
         out = []
         for b in self.backends:
@@ -421,13 +564,23 @@ class BrainRuntime:
         model: str | None = None,
         temperature: float = 0.4,
         backend_override: BrainBackend | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> BrainReply:
         if not 0.0 <= temperature <= 2.0:
             raise ValidationFailed("temperature must be between 0 and 2")
         backend = backend_override or self.backend
-        reply = backend.complete(
-            messages, model=model or self.default_model, temperature=temperature
-        )
+        if on_token is not None:
+            stream = getattr(backend, "complete_stream", None)
+            if callable(stream):
+                reply = stream(messages, model=model or self.default_model, temperature=temperature, on_token=on_token)
+            else:
+                reply = backend.complete(messages, model=model or self.default_model, temperature=temperature)
+                if reply.content:
+                    on_token(reply.content)
+        else:
+            reply = backend.complete(
+                messages, model=model or self.default_model, temperature=temperature
+            )
         self.calls += 1
         self.tokens_in += reply.tokens_in
         self.tokens_out += reply.tokens_out

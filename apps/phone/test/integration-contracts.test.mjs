@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary, nativeBuild, nativeJni] = await Promise.all([
+const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary, nativeBuild, nativeJni, nativeLlamaJava, nativePluginJava, brainRuntime, agentRuntime] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("src/semantic-graph.ts"),
@@ -28,6 +28,10 @@ const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKern
   read("src/model-library.ts"),
   read("android/app/src/main/cpp/CMakeLists.txt"),
   read("android/app/src/main/cpp/ultran_llama_jni.cpp"),
+  read("android/app/src/main/java/app/ultran/mobile/NativeLlama.java"),
+  read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
+  read("../../ultran-backend/ultran_backend/brain.py"),
+  read("../../ultran-backend/ultran_backend/agents.py"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {
@@ -248,6 +252,19 @@ test("chat supports editing and resending user turns, regenerating assistant tur
   assert.match(main, /convo\.messages\.splice\(messageIndex\)/);
   assert.match(main, /convo\.messages\.splice\(previousUser\)/);
   assert.match(main, /assistant_stream_delta/);
+  assert.match(main, /generateNativeStreaming/);
+  assert.match(main, /generationToken/);
+  assert.match(main, /stream: !toolFollowup/);
+  assert.match(main, /response\.body\.getReader\(\)/);
+  assert.match(main, /function finishUserNode/);
+  assert.match(main, /finishUserNode\(root, message\)/);
+  assert.match(main, /nativeRequestText/);
+  assert.match(main, /remoteRequestText/);
+  assert.match(nativeLlamaJava, /interface TokenCallback/);
+  assert.match(nativePluginJava, /notifyListeners\(\"generationToken\"/);
+  assert.match(nativeJni, /CallVoidMethod\(callback, on_token/);
+  assert.match(brainRuntime, /def complete_stream/);
+  assert.match(agentRuntime, /on_token.*type.*token/);
 });
 
 test("Qwen3.5 4B is offered in the Android model library with a pinned SHA-256", () => {

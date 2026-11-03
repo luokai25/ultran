@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import re
 import hashlib
 import sqlite3
@@ -592,10 +593,16 @@ class AgentService:
         # Preserve the normal inference preflight: a broken model must not cause
         # side effects merely because a message happened to match a tool name.
         emit({"type": "thinking", "stage": "planning", "label": "Understanding your request"})
-        reply = self.brain.complete(
-            messages, model=agent.model, temperature=task_temperature,
-            backend_override=backend_override,
-        )
+        complete_kwargs = {
+            "model": agent.model,
+            "temperature": task_temperature,
+            "backend_override": backend_override,
+        }
+        # Preserve compatibility with small test/custom brain adapters that
+        # implement the original complete() contract without streaming support.
+        if "on_token" in inspect.signature(self.brain.complete).parameters:
+            complete_kwargs["on_token"] = lambda token: emit({"type": "token", "token": token})
+        reply = self.brain.complete(messages, **complete_kwargs)
 
         tool_calls: list[dict[str, Any]] = []
         if allow_tools and agent.tools and max_tool_calls > 0:

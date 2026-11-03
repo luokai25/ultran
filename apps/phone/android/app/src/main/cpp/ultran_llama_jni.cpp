@@ -201,9 +201,9 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_app_ultran_mobile_NativeLlama_nativeGenerate(
-    JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens) {
-    g_cancel_requested.store(false, std::memory_order_release);
+    JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens, jobject callback) {
     std::lock_guard<std::mutex> lock(g_mutex);
+    g_cancel_requested.store(false, std::memory_order_release);
     if (!g_model || !g_context) return env->NewStringUTF("No native model is loaded.");
     using Clock = std::chrono::steady_clock;
     g_last_prompt_tokens = 0;
@@ -266,6 +266,8 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(42));
 
     const llama_vocab *vocab = llama_model_get_vocab(g_model);
+    jclass callback_class = callback ? env->GetObjectClass(callback) : nullptr;
+    jmethodID on_token = callback_class ? env->GetMethodID(callback_class, "onToken", "(Ljava/lang/String;)V") : nullptr;
     std::string output;
     for (int i = 0; i < limit; ++i) {
         if (g_cancel_requested.load(std::memory_order_acquire)) break;
@@ -276,7 +278,19 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
 
         char piece[512];
         const int32_t piece_size = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
-        if (piece_size > 0) output.append(piece, static_cast<size_t>(piece_size));
+        if (piece_size > 0) {
+            output.append(piece, static_cast<size_t>(piece_size));
+            if (callback && on_token) {
+                jstring piece_text = to_java_string(env, std::string(piece, static_cast<size_t>(piece_size)));
+                env->CallVoidMethod(callback, on_token, piece_text);
+                env->DeleteLocalRef(piece_text);
+                if (env->ExceptionCheck()) {
+                    env->ExceptionClear();
+                    g_cancel_requested.store(true, std::memory_order_release);
+                    break;
+                }
+            }
+        }
 
         llama_token next = token;
         llama_batch batch = llama_batch_get_one(&next, 1);

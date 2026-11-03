@@ -142,6 +142,69 @@ class _StubClient:
         return self.response
 
 
+
+
+class _StreamResponse:
+    def __init__(self, lines, status_code=200):
+        self.lines = lines
+        self.status_code = status_code
+    def __enter__(self): return self
+    def __exit__(self, *_): return False
+    def iter_lines(self): return iter(self.lines)
+
+
+class _StreamingClient:
+    def __init__(self, lines):
+        self.lines = lines
+        self.calls = []
+    def stream(self, method, url, json=None, headers=None):
+        self.calls.append((method, url, json, headers or {}))
+        return _StreamResponse(self.lines)
+
+
+def test_ollama_streams_ndjson_tokens_and_reports_final_usage():
+    import json
+    client = _StreamingClient([
+        json.dumps({"message": {"content": "Hello"}, "done": False}),
+        json.dumps({"message": {"content": " world"}, "done": True, "prompt_eval_count": 8, "eval_count": 2}),
+    ])
+    chunks = []
+    reply = OllamaBackend("http://h", client=client).complete_stream(
+        user("hello"), model="m", temperature=0.2, on_token=chunks.append,
+    )
+    assert chunks == ["Hello", " world"]
+    assert reply.content == "Hello world"
+    assert (reply.tokens_in, reply.tokens_out) == (8, 2)
+    assert client.calls[0][2]["stream"] is True
+
+
+def test_openai_compatible_streams_sse_deltas_and_usage():
+    import json
+    client = _StreamingClient([
+        "data: " + json.dumps({"choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]}),
+        "data: " + json.dumps({"choices": [{"delta": {"content": " world"}, "finish_reason": "stop"}]}),
+        "data: " + json.dumps({"choices": [], "usage": {"prompt_tokens": 6, "completion_tokens": 2}}),
+        "data: [DONE]",
+    ])
+    chunks = []
+    reply = OpenAICompatBackend("http://h", client=client).complete_stream(
+        user("hello"), model="m", temperature=0.2, on_token=chunks.append,
+    )
+    assert chunks == ["Hello", " world"]
+    assert reply.content == "Hello world"
+    assert (reply.tokens_in, reply.tokens_out) == (6, 2)
+    assert client.calls[0][2]["stream"] is True
+
+
+def test_brain_runtime_forwards_streamed_tokens_from_provider():
+    client = _StreamingClient(["data: " + __import__("json").dumps({"choices": [{"delta": {"content": "ok"}}]}), "data: [DONE]"])
+    chunks = []
+    runtime = BrainRuntime(OpenAICompatBackend("http://h", client=client), default_model="m")
+    reply = runtime.complete(user("hi"), on_token=chunks.append)
+    assert chunks == ["ok"]
+    assert reply.content == "ok"
+
+
 def test_ollama_posts_to_the_chat_endpoint():
     client = _StubClient(_StubResponse(200, {"message": {"content": "hi"}, "eval_count": 3}))
     backend = OllamaBackend("http://127.0.0.1:11434", client=client)

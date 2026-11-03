@@ -644,7 +644,8 @@ public class UltranLocalAiPlugin extends Plugin {
                 String output = NativeLlama.nativeGenerate(
                         new String[]{"user"},
                         new String[]{"Reply with one short word: READY."},
-                        48
+                        48,
+                        null
                 );
                 JSObject result = new JSObject();
                 result.put("model", new File(loadedModelPath).getName());
@@ -700,7 +701,15 @@ public class UltranLocalAiPlugin extends Plugin {
                     call.reject("The local model was unloaded before inference started.");
                     return;
                 }
-                String text = NativeLlama.nativeGenerate(roleArray, contentArray, maxTokens);
+                String text = NativeLlama.nativeGenerate(roleArray, contentArray, maxTokens, token -> {
+                    android.app.Activity activity = getActivity();
+                    if (activity == null) return;
+                    activity.runOnUiThread(() -> {
+                        JSObject event = new JSObject();
+                        event.put("token", token);
+                        notifyListeners("generationToken", event);
+                    });
+                });
                 JSObject response = new JSObject();
                 response.put("content", text == null ? "" : text);
                 response.put("model", new File(loadedModelPath).getName());

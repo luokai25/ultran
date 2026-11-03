@@ -43,3 +43,11 @@ test("phone experience visuals do not reintroduce the retired gold palette", asy
       "retired gold color " + legacyColor + " must not appear in the phone experience layer");
   }
 });
+
+
+test("local model import is directly discoverable on the home screen and wired to native import", async () => {
+  const html = await read("index.html");
+  const app = await read("src/main.ts");
+  assert.match(html, /id="hero-import-model"[^>]*>Import a local model/);
+  assert.match(app, /#hero-import-model[\s\S]{0,120}importNativeModel\(\)/);
+});

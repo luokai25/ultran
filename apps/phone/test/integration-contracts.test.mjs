@@ -334,9 +334,9 @@ test("skills engine exposes bounded read-only search and resource reads for refe
 
 
 test("background mode only enables tools for explicit action requests", () => {
-  assert.match(main, /function backgroundRequestNeedsTools\\(userText: string\\)/);
-  assert.match(main, /const allowTools = backgroundRequestNeedsTools\\(taskMessage\\)/);
-  assert.match(main, /allow_tools: allowTools, max_tool_calls: allowTools \\? 8 : 0/);
+  assert.match(main, /function backgroundRequestNeedsTools\(userText: string\)/);
+  assert.match(main, /const allowTools = backgroundRequestNeedsTools\(taskMessage\)/);
+  assert.match(main, /allow_tools: allowTools, max_tool_calls: allowTools \? 8 : 0/);
   assert.match(main, /what|why|when|where|who|which|how|explain|describe/);
   assert.match(main, /create|build|write|edit|send|open|download|run|execute|search|deploy|commit|push/);
 });

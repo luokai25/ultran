@@ -333,6 +333,23 @@ test("skills engine exposes bounded read-only search and resource reads for refe
 });
 
 
+test("background intent detector distinguishes questions, explicit actions, and continuation", () => {
+  const start = main.indexOf("function backgroundRequestNeedsTools(userText: string): boolean {");
+  const end = main.indexOf("\\n}\\n\\nasync function remoteBackgroundReply", start) + 2;
+  assert.ok(start >= 0 && end > 2, "background intent detector must be present");
+  const source = main.slice(start, end).replace("function backgroundRequestNeedsTools(userText: string): boolean {", "function backgroundRequestNeedsTools(userText) {");
+  const detector = (await import("node:vm")).runInNewContext("(" + source + ")");
+  for (const question of ["hello", "How do I run a build?", "What command installs the model?", "Explain how tools work"]) {
+    assert.equal(detector(question), false, question);
+  }
+  for (const action of ["Build the APK", "Please run the tests", "Continue improving Ultran", "Go ahead and fix it"]) {
+    assert.equal(detector(action), true, action);
+  }
+  for (const negated of ["Do not run the tests", "Never install packages"]) {
+    assert.equal(detector(negated), false, negated);
+  }
+});
+
 test("background mode only enables tools for explicit action requests", () => {
   assert.match(main, /function backgroundRequestNeedsTools\(userText: string\)/);
   assert.match(main, /const allowTools = backgroundRequestNeedsTools\(taskMessage\)/);

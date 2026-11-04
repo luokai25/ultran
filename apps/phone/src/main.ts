@@ -201,6 +201,7 @@ const cloudDisconnectButton = req<HTMLButtonElement>("#cloud-disconnect");
 const cloudSyncStatusEl = req<HTMLElement>("#cloud-sync-status");
 let cloudUnsubscribe: (() => void) | null = null;
 let cloudRefreshInFlight = false;
+let cloudRefreshQueued = false;
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeProjectorSelect = req<HTMLSelectElement>("#native-projector-select");
 const nativeProjectorButton = req<HTMLButtonElement>("#native-projector-import-btn");
@@ -683,30 +684,45 @@ async function applyInitialCloudSync(): Promise<void> {
 }
 
 async function refreshFromCloud(): Promise<void> {
-  if (cloudRefreshInFlight) return;
+  if (cloudRefreshInFlight) {
+    cloudRefreshQueued = true;
+    return;
+  }
   cloudRefreshInFlight = true;
   try {
-    mergeRemoteSemanticGraph(await pullCloudSetting("semantic_graph"));
-    const remote = await pullCloudWorkspace();
-    store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
-    await syncCloudWorkspace(store.conversations);
-    rememberCloudWorkspace(store.conversations);
+    do {
+      // Realtime events arriving during a refresh are coalesced into one more
+      // pull instead of being silently discarded.
+      cloudRefreshQueued = false;
+      mergeRemoteSemanticGraph(await pullCloudSetting("semantic_graph"));
+      const remote = await pullCloudWorkspace();
+      store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
+      await syncCloudWorkspace(store.conversations);
+      rememberCloudWorkspace(store.conversations);
 
-    const remoteMemories = await pullCloudMemories();
-    const newerRemoteMemories = remoteMemories.filter((memory) => {
-      const local = vectorMemory.records.find((record) => record.id === memory.id);
-      return !local || memory.updatedAt > local.updatedAt;
-    });
-    vectorMemory = syncVectorMemory(vectorMemory, newerRemoteMemories);
-    writeJson(VECTOR_MEMORY_KEY, vectorMemory);
-    await syncCloudMemories(vectorMemory.records);
-    rememberCloudMemories(vectorMemory.records);
-    saveStore();
-    renderHistory();
-    renderConversation();
-    cloudSyncStatusEl.textContent = `Connected · ${store.conversations.length} conversations synchronized.`;
+      const remoteMemories = await pullCloudMemories();
+      const newerRemoteMemories = remoteMemories.filter((memory) => {
+        const local = vectorMemory.records.find((record) => record.id === memory.id);
+        return !local || memory.updatedAt > local.updatedAt;
+      });
+      vectorMemory = syncVectorMemory(vectorMemory, newerRemoteMemories);
+      writeJson(VECTOR_MEMORY_KEY, vectorMemory);
+      await syncCloudMemories(vectorMemory.records);
+      rememberCloudMemories(vectorMemory.records);
+      saveStore();
+      renderHistory();
+      renderConversation();
+      cloudSyncStatusEl.textContent = `Connected · ${store.conversations.length} conversations synchronized.`;
+    } while (cloudRefreshQueued);
   } finally {
+    const retry = cloudRefreshQueued;
+    cloudRefreshQueued = false;
     cloudRefreshInFlight = false;
+    if (retry) {
+      void refreshFromCloud().catch((error) => {
+        cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Cloud refresh failed.";
+      });
+    }
   }
 }
 

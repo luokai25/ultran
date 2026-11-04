@@ -22,6 +22,7 @@ import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, 
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
+import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, buildLearningContext, type LearningLedger } from "./ultron-learning";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -196,6 +197,7 @@ document.head.append(favicon);
 const STORE_KEY = "ultron.chat.v1";
 const SETTINGS_KEY = "ultron.settings.v1";
 const PROJECTOR_KEY = "ultron.native-projector.v1";
+const LEARNING_KEY = "ultron.learning.v1";
 
 const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string): string {
@@ -219,8 +221,9 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   const cognition = cognitiveProfile.mode === "direct" ? "" : buildCognitiveInstructions(cognitiveProfile);
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
+  const learningContext = buildLearningContext(learningLedger);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, memoryContext, learningContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -239,6 +242,9 @@ function writeJson(key: string, value: unknown): void {
     /* storage full or blocked: the session still works in memory */
   }
 }
+
+const learningLedger: LearningLedger = validateLearningLedger(readJson<unknown>(LEARNING_KEY, createLearningLedger()));
+const saveLearningLedger = (): void => writeJson(LEARNING_KEY, learningLedger);
 
 const storedIdentityState = readJson<Partial<IdentityState> & { overrides?: { ultron?: string } }>(IDENTITY_STORAGE_KEY, {});
 const identityState: IdentityState = { ...DEFAULT_IDENTITY_STATE, ...storedIdentityState, active: "ultron", customInstructions: storedIdentityState.customInstructions ?? storedIdentityState.overrides?.ultron ?? "" };
@@ -2330,7 +2336,35 @@ async function submit(raw: string): Promise<void> {
 
   const finalProfile = classifyUltronTask(text);
   const validation = validateUltronDraft(text, result.content, finalProfile);
-  for (const issue of validation.issues) ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });
+  for (const [index, issue] of validation.issues.entries()) {
+    ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });
+    if (issue.severity === "info") continue;
+    const eventId = `learn-${Date.now().toString(36)}-${index}`;
+    const recorded = recordLearningEvent(learningLedger, {
+      id: eventId,
+      signal: "verification_failure",
+      category: issue.code,
+      summary: issue.message,
+      severity: issue.severity === "error" ? "high" : "medium",
+      source: "runtime",
+      evidenceIds: [],
+    });
+    if (!recorded.accepted) continue;
+    Object.assign(learningLedger, recorded.ledger);
+    const proposalId = `improve-${Date.now().toString(36)}-${index}`;
+    const proposed = proposeLearningImprovement(learningLedger, {
+      id: proposalId,
+      title: `Address ${issue.code}`,
+      hypothesis: `Add a focused regression test for ${issue.code}, then adjust the responsible validation or response path without weakening existing safety checks.`,
+      category: issue.code,
+      evidenceIds: [eventId],
+      impact: issue.severity === "error" ? 0.9 : 0.65,
+      confidence: 0.72,
+      risk: 0.25,
+    });
+    if (proposed.accepted) Object.assign(learningLedger, proposed.ledger);
+    saveLearningLedger();
+  }
   const identityIssues = auditUltronIdentityOutput(text, result.content, { successfulActions: result.tool_calls?.filter((call) => call.ok).map((call) => `${call.connector}.${call.action}`) ?? [], attemptedToolCalls: result.tool_calls?.length ?? 0 });
   for (const issue of summarizeIdentityAudit(identityIssues)) ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
   const message: Message = { role: "assistant", content: result.content };

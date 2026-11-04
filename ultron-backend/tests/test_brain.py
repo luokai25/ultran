@@ -8,7 +8,6 @@ from ultron_backend.brain import (
     BrainMessage,
     BrainRuntime,
     EchoBackend,
-    OllamaBackend,
     OpenAICompatBackend,
     estimate_tokens,
     words,
@@ -162,37 +161,6 @@ class _StreamingClient:
         return _StreamResponse(self.lines)
 
 
-def test_ollama_streams_ndjson_tokens_and_reports_final_usage():
-    import json
-    client = _StreamingClient([
-        json.dumps({"message": {"content": "Hello"}, "done": False}),
-        json.dumps({"message": {"content": " world"}, "done": True, "prompt_eval_count": 8, "eval_count": 2}),
-    ])
-    chunks = []
-    reply = OllamaBackend("http://h", client=client).complete_stream(
-        user("hello"), model="m", temperature=0.2, on_token=chunks.append,
-    )
-    assert chunks == ["Hello", " world"]
-    assert reply.content == "Hello world"
-    assert (reply.tokens_in, reply.tokens_out) == (8, 2)
-    assert client.calls[0][2]["stream"] is True
-
-
-def test_ollama_streams_image_payloads_to_vision_models():
-    import json
-    client = _StreamingClient([
-        json.dumps({"message": {"content": "A cat"}, "done": True}),
-    ])
-    image = "data:image/png;base64,Y2F0"
-    chunks = []
-    OllamaBackend("http://h", client=client).complete_stream(
-        [BrainMessage("user", "Describe this image", images=[image])],
-        model="llava", temperature=0.2, on_token=chunks.append,
-    )
-    assert client.calls[0][2]["messages"][0]["images"] == ["Y2F0"]
-    assert chunks == ["A cat"]
-
-
 def test_openai_compatible_streams_multimodal_image_content():
     import json
     client = _StreamingClient([
@@ -248,16 +216,6 @@ def test_echo_brain_never_claims_to_inspect_images():
     assert "cannot inspect" in reply.content
 
 
-def test_ollama_forwards_image_payloads_to_vision_models():
-    client = _StubClient(_StubResponse(200, {"message": {"content": "A cat"}}))
-    image = "data:image/png;base64,Y2F0"
-    message = [BrainMessage("user", "Describe this image", images=[image])]
-    OllamaBackend("http://h", client=client).complete(message, model="llava", temperature=0.2)
-    payload_message = client.calls[0][1]["messages"][0]
-    assert payload_message["images"] == ["Y2F0"]
-    assert payload_message["content"] == "Describe this image"
-
-
 def test_openai_compatible_forwards_multimodal_image_content():
     client = _StubClient(_StubResponse(200, {"choices": [{"message": {"content": "A cat"}}]}))
     image = "data:image/png;base64,Y2F0"
@@ -266,61 +224,6 @@ def test_openai_compatible_forwards_multimodal_image_content():
     content = client.calls[0][1]["messages"][0]["content"]
     assert content[0] == {"type": "text", "text": "Describe this image"}
     assert content[1] == {"type": "image_url", "image_url": {"url": image}}
-
-
-def test_ollama_posts_to_the_chat_endpoint():
-    client = _StubClient(_StubResponse(200, {"message": {"content": "hi"}, "eval_count": 3}))
-    backend = OllamaBackend("http://127.0.0.1:11434", client=client)
-    reply = backend.complete(user("hello"), model="llama3", temperature=0.2)
-    assert reply.content == "hi"
-    assert reply.backend == "ollama"
-    assert client.calls[0][0].endswith("/api/chat")
-
-
-def test_ollama_sends_model_and_temperature():
-    client = _StubClient(_StubResponse(200, {"message": {"content": ""}}))
-    OllamaBackend("http://h", client=client).complete(user("x"), model="m1", temperature=0.77)
-    payload = client.calls[0][1]
-    assert payload["model"] == "m1"
-    assert payload["options"]["temperature"] == 0.77
-    assert payload["stream"] is False
-
-
-def test_ollama_strips_trailing_slash():
-    client = _StubClient(_StubResponse(200, {"message": {"content": ""}}))
-    OllamaBackend("http://h/", client=client).complete(user("x"), model="m", temperature=0.1)
-    assert client.calls[0][0] == "http://h/api/chat"
-
-
-def test_ollama_uses_reported_token_counts():
-    client = _StubClient(
-        _StubResponse(200, {"message": {"content": "yo"}, "prompt_eval_count": 11, "eval_count": 7})
-    )
-    reply = OllamaBackend("http://h", client=client).complete(user("x"), model="m", temperature=0.1)
-    assert reply.tokens_in == 11
-    assert reply.tokens_out == 7
-
-
-def test_ollama_falls_back_to_estimates():
-    client = _StubClient(_StubResponse(200, {"message": {"content": "abcdefgh"}}))
-    reply = OllamaBackend("http://h", client=client).complete(user("abcd"), model="m", temperature=0.1)
-    assert reply.tokens_in == estimate_tokens("abcd")
-    assert reply.tokens_out == estimate_tokens("abcdefgh")
-
-
-def test_ollama_network_error_becomes_dependency_unavailable():
-    client = _StubClient(raises=OSError("connection refused"))
-    with pytest.raises(DependencyUnavailable, match="unreachable"):
-        OllamaBackend("http://h", client=client).complete(user("x"), model="m", temperature=0.1)
-
-
-def test_ollama_http_error_becomes_dependency_unavailable():
-    client = _StubClient(_StubResponse(500, {}))
-    with pytest.raises(DependencyUnavailable, match="error"):
-        OllamaBackend("http://h", client=client).complete(user("x"), model="m", temperature=0.1)
-
-
-# ------------------------------------------------------------ the runtime
 
 
 def test_runtime_accumulates_stats():
@@ -356,14 +259,6 @@ def test_runtime_from_settings_picks_echo_by_default():
 
     rt = BrainRuntime.from_settings(Settings())
     assert rt.name == "echo"
-
-
-def test_runtime_from_settings_picks_ollama():
-    from ultron_backend.config import Settings
-
-    rt = BrainRuntime.from_settings(Settings(brain_backend="ollama"))
-    assert rt.name == "ollama"
-    assert isinstance(rt.backend, OllamaBackend)
 
 
 def test_runtime_does_not_count_failed_calls():

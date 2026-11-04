@@ -206,7 +206,7 @@ def test_failed_half_open_probe_reopens_the_breaker():
 
 def test_runtime_chain_ends_at_echo_floor():
     rt = BrainRuntime.from_settings(
-        Settings(brain_backend="openai", brain_fallbacks=(), brain_retries=0)
+        Settings(brain_backend="openai", brain_fallbacks=("echo",), brain_retries=0)
     )
     assert isinstance(rt.backend, FailoverBackend)
     assert [b.name for b in rt.backend.backends] == ["openai", "echo"]
@@ -217,7 +217,7 @@ def test_runtime_survives_every_model_runtime_being_down():
         Settings(
             brain_backend="openai",
             brain_openai_endpoint="http://127.0.0.1:1",
-            brain_fallbacks=(),
+            brain_fallbacks=("echo",),
             brain_retries=0,
             brain_timeout_s=0.2,
         )
@@ -226,7 +226,7 @@ def test_runtime_survives_every_model_runtime_being_down():
     assert reply.backend == "echo" and "Intent: deploy" in reply.content
     stats = rt.stats()
     assert stats["failovers"] == 1
-    assert [c["backend"] for c in stats["chain"]] == ["ollama", "openai", "echo"]
+    assert [c["backend"] for c in stats["chain"]] == ["openai", "echo"]
 
 
 def test_no_fallbacks_keeps_a_plain_backend():

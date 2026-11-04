@@ -523,3 +523,26 @@ export function scheduleCloudSetting(
     });
   }, 900);
 }
+
+export async function saveCloudModelProfile(modelId: string, displayName = modelId): Promise<void> {
+  const session = await getCloudSession();
+  if (!session || !modelId.trim()) return;
+  const { error: clearError } = await cloudClient
+    .from('ultron_model_profiles')
+    .update({ is_default: false })
+    .eq('owner_id', session.user.id);
+  if (clearError) throw clearError;
+  const { error } = await cloudClient.from('ultron_model_profiles').upsert({
+    owner_id: session.user.id,
+    provider: 'llama.cpp',
+    model_id: modelId,
+    display_name: displayName,
+    runtime_kind: 'local',
+    capabilities: ['chat', 'offline'],
+    is_enabled: true,
+    is_default: true,
+    priority: 1,
+    config: { device_local_weights: true, weights_synced: false },
+  }, { onConflict: 'owner_id,provider,model_id' });
+  if (error) throw error;
+}

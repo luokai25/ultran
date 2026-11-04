@@ -1,4 +1,4 @@
-/* Ultran - plasma red on obsidian. A conversation console, not a dashboard. */
+/* Ultron - plasma red on obsidian. A conversation console, not a dashboard. */
 
 :root {
   --void: #050505;
@@ -1542,13 +1542,13 @@ button {
 
 
 
-/* ---------- Ultran voice identity and dictation ---------- */
+/* ---------- Ultron voice identity and dictation ---------- */
 .mic-toggle[data-active="true"] {
   color: var(--gold-bright);
   border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 15%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 8%, transparent), 0 0 22px color-mix(in srgb, var(--gold) 13%, transparent);
-  animation: ultran-listening-pulse 1.5s ease-in-out infinite;
+  animation: ultron-listening-pulse 1.5s ease-in-out infinite;
 }
 .voice-status {
   max-width: 760px;
@@ -1565,7 +1565,7 @@ button {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--hairline));
 }
 .voice-status[hidden] { display: none; }
-@keyframes ultran-listening-pulse {
+@keyframes ultron-listening-pulse {
   0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 6%, transparent); }
   50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--gold) 13%, transparent); }
 }

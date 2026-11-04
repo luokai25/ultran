@@ -1,5 +1,5 @@
 /**
- * Process entry for @ultran/agent-core.
+ * Process entry for @ultron/agent-core.
  *
  * Binds to loopback by default. The local brain uses Ollama when available;
  * models must be explicitly loaded with a SHA-256 digest before inference.
@@ -13,10 +13,10 @@ import { ToolSandbox } from './sandbox/sandbox.js';
 import { UsageLedger } from './monetization/ledger.js';
 import { PolicyGate } from './monetization/policy-gate.js';
 
-const PORT = Number(process.env.ULTRAN_PORT ?? 7700);
+const PORT = Number(process.env.ULTRON_PORT ?? 7700);
 // Keep this unauthenticated local control surface loopback-only.
 const HOST = '127.0.0.1';
-const OLLAMA_URL = process.env.ULTRAN_OLLAMA_URL ?? 'http://127.0.0.1:11434';
+const OLLAMA_URL = process.env.ULTRON_OLLAMA_URL ?? 'http://127.0.0.1:11434';
 
 const ollama = new OllamaBackend({ endpoint: OLLAMA_URL });
 const brain = new BrainRuntime({ backends: [ollama] });
@@ -56,7 +56,7 @@ const server = createServer(async (req, res) => {
 
   try {
     if (req.method === 'GET' && req.url === '/health') {
-      send(200, { service: '@ultran/agent-core', ...(await brain.health()) });
+      send(200, { service: '@ultron/agent-core', ...(await brain.health()) });
       return;
     }
 

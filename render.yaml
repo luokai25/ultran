@@ -1,26 +1,26 @@
-# Zero-cost Render Blueprint for Ultran's API prototype.
+# Zero-cost Render Blueprint for Ultron's API prototype.
 # Free instances have an ephemeral filesystem: do not store real credentials or rely on local data persisting.
 services:
   - type: web
-    name: ultran-api
+    name: ultron-api
     runtime: docker
     region: frankfurt
     plan: free
     branch: main
     autoDeploy: true
-    dockerContext: ./ultran-backend
-    dockerfilePath: ./ultran-backend/Dockerfile
+    dockerContext: ./ultron-backend
+    dockerfilePath: ./ultron-backend/Dockerfile
     healthCheckPath: /v1/health
     envVars:
-      - key: ULTRAN_ENV
+      - key: ULTRON_ENV
         value: production
-      - key: ULTRAN_DEBUG
+      - key: ULTRON_DEBUG
         value: "false"
-      - key: ULTRAN_BRAIN_BACKEND
+      - key: ULTRON_BRAIN_BACKEND
         value: echo
-      - key: ULTRAN_BRAIN_FALLBACKS
+      - key: ULTRON_BRAIN_FALLBACKS
         value: echo
-      - key: ULTRAN_DATA_DIR
-        value: /tmp/ultran-data
-      - key: ULTRAN_CREDENTIAL_ENCRYPTION_KEY
+      - key: ULTRON_DATA_DIR
+        value: /tmp/ultron-data
+      - key: ULTRON_CREDENTIAL_ENCRYPTION_KEY
         sync: false

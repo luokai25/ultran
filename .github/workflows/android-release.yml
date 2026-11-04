@@ -2,7 +2,7 @@ name: Android Release
 
 # The APK is built here and nowhere else. A sandbox build is not reproducible and
 # leaves no audit trail; this workflow is the single source of truth for the
-# Ultran Android release.
+# Ultron Android release.
 
 on:
   push:
@@ -88,7 +88,7 @@ jobs:
           echo "Building $VERSION (code $VERSION_CODE)"
 
       - name: Build connector SDK
-        run: pnpm --filter @ultran/connectors build
+        run: pnpm --filter @ultron/connectors build
 
       - name: Build web assets
         working-directory: ${{ env.WORKDIR }}
@@ -161,8 +161,8 @@ jobs:
           APP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           APP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           APP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ULTRAN_VERSION_NAME: ${{ steps.version.outputs.name }}
-          ULTRAN_VERSION_CODE: ${{ steps.version.outputs.code }}
+          ULTRON_VERSION_NAME: ${{ steps.version.outputs.name }}
+          ULTRON_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
           gradle assembleRelease --no-daemon --console=plain --stacktrace --max-workers=2 2>&1 | tee build.log
@@ -214,7 +214,7 @@ jobs:
           # Fail the release if Gradle silently omits the native inference
           # runtime or one of its shared llama.cpp libraries for either ABI.
           for ABI in arm64-v8a x86_64; do
-            unzip -l "$APK" | grep -q "lib/$ABI/libultran-llama.so"
+            unzip -l "$APK" | grep -q "lib/$ABI/libultron-llama.so"
             unzip -l "$APK" | grep -q "lib/$ABI/libllama.so"
             unzip -l "$APK" | grep -q "lib/$ABI/libmtmd.so"
           done
@@ -227,13 +227,13 @@ jobs:
           fi
 
           mkdir -p "$RUNNER_TEMP/out"
-          cp "$APK" "$RUNNER_TEMP/ultran-release.apk"
-          cp "$APK" "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
-          test -s "$RUNNER_TEMP/ultran-release.apk"
-          test -s "$RUNNER_TEMP/out/ultran-${{ steps.version.outputs.name }}.apk"
-          sha256sum "$RUNNER_TEMP/ultran-release.apk"
-          echo "apk=$RUNNER_TEMP/ultran-release.apk" >> "$GITHUB_OUTPUT"
-          echo "Verified APK copied to runner temp: $RUNNER_TEMP/ultran-release.apk"
+          cp "$APK" "$RUNNER_TEMP/ultron-release.apk"
+          cp "$APK" "$RUNNER_TEMP/out/ultron-${{ steps.version.outputs.name }}.apk"
+          test -s "$RUNNER_TEMP/ultron-release.apk"
+          test -s "$RUNNER_TEMP/out/ultron-${{ steps.version.outputs.name }}.apk"
+          sha256sum "$RUNNER_TEMP/ultron-release.apk"
+          echo "apk=$RUNNER_TEMP/ultron-release.apk" >> "$GITHUB_OUTPUT"
+          echo "Verified APK copied to runner temp: $RUNNER_TEMP/ultron-release.apk"
 
       # A successful Gradle build and signature check do not prove that
       # PackageManager can parse/install the APK. Test the exact release file
@@ -266,8 +266,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK="$RUNNER_TEMP/ultran-release.apk"
-          AVD_NAME="ultran-api31"
+          APK="$RUNNER_TEMP/ultron-release.apk"
+          AVD_NAME="ultron-api31"
           EMULATOR="$ANDROID_HOME/emulator/emulator"
           # setup-android may export an alternate AVD home. Pin both the
           # creator and emulator to the same standard directory.
@@ -288,7 +288,7 @@ jobs:
           adb start-server
           "$EMULATOR" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim \
             -gpu swiftshader_indirect -no-snapshot-load -no-snapshot-save -wipe-data \
-            -verbose > "$RUNNER_TEMP/ultran-emulator.log" 2>&1 &
+            -verbose > "$RUNNER_TEMP/ultron-emulator.log" 2>&1 &
           EMULATOR_PID=$!
           cleanup() {
             adb emu kill >/dev/null 2>&1 || true
@@ -303,7 +303,7 @@ jobs:
             echo "ADB devices:"
             adb devices -l || true
             echo "Emulator log (last 250 lines):"
-            tail -250 "$RUNNER_TEMP/ultran-emulator.log" || true
+            tail -250 "$RUNNER_TEMP/ultron-emulator.log" || true
             exit 1
           fi
           BOOTED=false
@@ -316,7 +316,7 @@ jobs:
           done
           if [ "$BOOTED" != "true" ]; then
             echo "::error::Android 12 emulator did not finish booting"
-            tail -200 "$RUNNER_TEMP/ultran-emulator.log" || true
+            tail -200 "$RUNNER_TEMP/ultron-emulator.log" || true
             exit 1
           fi
 
@@ -324,10 +324,10 @@ jobs:
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           adb install -r "$APK"
-          adb shell monkey -p app.ultran.mobile 1
+          adb shell monkey -p app.ultron.mobile 1
           sleep 5
-          adb shell dumpsys package app.ultran.mobile | grep -Fq "versionName=${{ steps.version.outputs.name }}"
-          echo "Android 12 PackageManager installed Ultran and launch intent completed"
+          adb shell dumpsys package app.ultron.mobile | grep -Fq "versionName=${{ steps.version.outputs.name }}"
+          echo "Android 12 PackageManager installed Ultron and launch intent completed"
 
       - name: Package Capacitor project
         run: |
@@ -335,7 +335,7 @@ jobs:
           cd "${{ env.WORKDIR }}"
           # Ship the native project so the APK can be rebuilt from the release
           # alone, without cloning and re-running cap add.
-          zip -r "$RUNNER_TEMP/out/ultran-capacitor-android-${{ steps.version.outputs.name }}.zip" \
+          zip -r "$RUNNER_TEMP/out/ultron-capacitor-android-${{ steps.version.outputs.name }}.zip" \
             android \
             capacitor.config.ts \
             package.json \
@@ -353,7 +353,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Ultran Android ${{ steps.version.outputs.name }} (build ${{ github.run_number }})
+          name: Ultron Android ${{ steps.version.outputs.name }} (build ${{ github.run_number }})
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -364,20 +364,20 @@ jobs:
             | --- | --- |
             | Version | `${{ steps.version.outputs.name }}` |
             | versionCode | `${{ steps.version.outputs.code }}` |
-            | Package | `app.ultran.mobile` |
+            | Package | `app.ultron.mobile` |
             | Signed | `${{ steps.keystore.outputs.signed }}` |
             | Commit | `${{ github.sha }}` |
 
             **Assets**
 
-            - `ultran-${{ steps.version.outputs.name }}.apk` - installable release APK
-            - `ultran-capacitor-android-${{ steps.version.outputs.name }}.zip` - the full
+            - `ultron-${{ steps.version.outputs.name }}.apk` - installable release APK
+            - `ultron-capacitor-android-${{ steps.version.outputs.name }}.zip` - the full
               Capacitor Android project, so the APK can be rebuilt from this release alone
 
-            Install with `adb install -r ultran-${{ steps.version.outputs.name }}.apk`.
+            Install with `adb install -r ultron-${{ steps.version.outputs.name }}.apk`.
           files: |
-            ${{ runner.temp }}/out/ultran-${{ steps.version.outputs.name }}.apk
-            ${{ runner.temp }}/out/ultran-capacitor-android-${{ steps.version.outputs.name }}.zip
+            ${{ runner.temp }}/out/ultron-${{ steps.version.outputs.name }}.apk
+            ${{ runner.temp }}/out/ultron-capacitor-android-${{ steps.version.outputs.name }}.zip
 
       - name: Upload build log on failure
         if: failure()

@@ -19,18 +19,18 @@ fi
 terraform init -input=false
 terraform fmt -check -recursive
 terraform validate
-terraform plan -input=false -out=ultran.tfplan
-terraform show ultran.tfplan
+terraform plan -input=false -out=ultron.tfplan
+terraform show ultron.tfplan
 
 echo
 echo "Review the plan above. Creating a Hetzner server and enabling backups may incur charges."
-read -r -p 'Type CREATE ULTRAN VPS to apply this exact plan: ' confirmation
-if [[ "${confirmation}" != "CREATE ULTRAN VPS" ]]; then
+read -r -p 'Type CREATE ULTRON VPS to apply this exact plan: ' confirmation
+if [[ "${confirmation}" != "CREATE ULTRON VPS" ]]; then
   echo "Provisioning cancelled. No resources were created."
   exit 0
 fi
 
-terraform apply -input=false ultran.tfplan
+terraform apply -input=false ultron.tfplan
 echo
 echo "Server provisioned. Save these outputs and point your API DNS A record to server_ipv4:"
 terraform output

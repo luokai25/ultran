@@ -18,7 +18,7 @@ const server = createServer((req, res) => {
     res.end(
       JSON.stringify({
         status: 'ok',
-        service: 'ultran-api',
+        service: 'ultron-api',
         version: '0.1.0',
         time: new Date().toISOString(),
       }),

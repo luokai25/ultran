@@ -1,12 +1,12 @@
-# Ultran
+# Ultron
 
 **A local-first AI agent platform.** Local inference is the long-term target. The
 Android shell does not bundle model weights; full language-model reasoning
-requires a linked local runtime or a configured hosted model provider. Ultran's
+requires a linked local runtime or a configured hosted model provider. Ultron's
 cloud control plane is optional for local-only use, but is required for shared
 workspaces and hosted agent services.
 
-Ultran is a monorepo for building and operating autonomous agents that think
+Ultron is a monorepo for building and operating autonomous agents that think
 locally, reach the outside world only through capability-scoped connectors,
 and can be monetized without the billing system ever sitting in the hot path.
 
@@ -23,7 +23,7 @@ Most agent platforms are thin clients over someone else's inference API. That
 means your prompts, your files, and your tool calls leave your machine by
 default, and your agent stops working when the network does.
 
-Ultran inverts the default:
+Ultron inverts the default:
 
 - **Local inference is preferred.** The Python control plane tries a local
   Ollama model by default and falls back to a deterministic Echo responder when
@@ -37,7 +37,7 @@ Ultran inverts the default:
 
 ## Capability is not the model
 
-Ultran treats the selected LLM as a replaceable reasoning engine, not as the
+Ultron treats the selected LLM as a replaceable reasoning engine, not as the
 entire agent. A shared capability contract supplies task-aware planning
 standards, bounded context and memory, truthfulness rules, untrusted-output
 handling, tool permissions, and a separate review pass for complex or high-impact
@@ -48,7 +48,7 @@ hosted providers.
 The orchestration layer owns tool discovery, argument validation, approval
 gates, execution limits, audit events, and result synthesis. Switching brains
 must not silently remove those capabilities. This does **not** make a smaller
-model equal to a frontier model in raw knowledge or reasoning. It keeps Ultran's
+model equal to a frontier model in raw knowledge or reasoning. It keeps Ultron's
 workflow and safety standards consistent while the selected model sets the
 underlying reasoning ceiling.
 
@@ -106,8 +106,8 @@ Dependencies point **downward only**. Read the full design in
 ### Install & run
 
 ```bash
-git clone https://github.com/luokai25/ultran.git
-cd ultran
+git clone https://github.com/luokai25/ultron.git
+cd ultron
 corepack enable
 pnpm install
 
@@ -115,8 +115,8 @@ pnpm install
 pnpm dev
 
 # Or a single workspace
-pnpm --filter @ultran/web dev
-pnpm --filter @ultran/api dev
+pnpm --filter @ultron/web dev
+pnpm --filter @ultron/api dev
 ```
 
 ### Common tasks
@@ -139,7 +139,7 @@ storage. Downloads are restricted to HTTPS Hugging Face URLs, checked against
 the GGUF header, checked against the repository's SHA-256 file digest when
 available, limited by a 256 GB safety ceiling and actual free storage, and
 written through a temporary file before activation. Split GGUF models can be
-imported by selecting all numbered shards together; Ultran validates the
+imported by selecting all numbered shards together; Ultron validates the
 complete set and presents it as one logical model. Model weights are not
 bundled in the APK. The model browser includes popular family shortcuts, a
 file-size filter, live download progress, license tags from repository
@@ -162,25 +162,25 @@ A local Ollama-compatible runtime is also supported as an optional bridge.
 Configure its localhost or private-LAN address in Settings → Local model
 endpoint. The app can list installed Ollama models and request a model pull by
 name, then use that model directly through the configured endpoint. Inference
-goes directly from the app to that runtime, not through the Ultran backend.
+goes directly from the app to that runtime, not through the Ultron backend.
 The Ollama host must allow the app origin through its CORS configuration, and
 the endpoint should remain on localhost or a trusted private network.
 
 For hosted agents, Composio and shared workspaces, the optional Python control
-plane can still run separately. Set ULTRAN_BRAIN_BACKEND=ollama and
-ULTRAN_BRAIN_MODEL=llama3.1:8b before starting the backend. It listens on
-127.0.0.1:8080 by default. To reach it from a phone, set ULTRAN_HOST=0.0.0.0
+plane can still run separately. Set ULTRON_BRAIN_BACKEND=ollama and
+ULTRON_BRAIN_MODEL=llama3.1:8b before starting the backend. It listens on
+127.0.0.1:8080 by default. To reach it from a phone, set ULTRON_HOST=0.0.0.0
 and connect using the computer's LAN IP, but only on a trusted network and
 with firewall access limited to your devices. Do not expose this development
 backend directly to the public internet.
 
 ### Connect Google and other services through Composio
 
-Composio OAuth is brokered by the backend. Set `ULTRAN_COMPOSIO_API_KEY` in
+Composio OAuth is brokered by the backend. Set `ULTRON_COMPOSIO_API_KEY` in
 `infra/hetzner/.env` on the private API host (see the deployment guide), then
 restart the API. The Android app reads only the backend's redacted configured
 status and starts OAuth authorization; it must never contain the Composio
-project key. Connected accounts are scoped to the Ultran workspace, and
+project key. Connected accounts are scoped to the Ultron workspace, and
 write-capable actions remain approval-gated. For a single-owner installation,
 keep the backend endpoint private to your own deployment and use a unique owner
 workspace; do not disable approval checks or embed service credentials in the
@@ -189,14 +189,14 @@ APK.
 ### Persistent agent memory
 
 Agents, settings, usage totals, sessions, and bounded chat transcripts are stored
-in SQLite under `ULTRAN_DATA_DIR/agents.sqlite3` and restored on backend restart.
-Background agent runs are available through `POST /v1/tasks` (HTTP 202), with `GET /v1/tasks`, `GET /v1/tasks/{task_id}`, `GET /v1/tasks/{task_id}/events` (reconnectable server-sent events; use `?stream=false` for a bounded event snapshot), `POST /v1/tasks/{task_id}/cancel`, and `POST /v1/tasks/{task_id}/retry`. Task events persist in the encrypted `agent_task_events` table (latest 500 per task), so clients can reconnect with `?after=<event-sequence>` and recover the execution timeline, including tool activity and artifact creation. Tasks can continue an existing agent session by including `session_id`. Tasks persist in `ULTRAN_DATA_DIR/agent_tasks.sqlite3`; queued work resumes after restart, while work interrupted mid-execution is marked `interrupted` and requires an explicit retry. Failed tasks also require a manual retry, rather than being blindly replayed after a possible partial side effect. Only queued tasks can be cancelled. Retries are capped at five attempts, and each tool write still uses the normal human-approval gate. Task messages, events, and results are encrypted at rest when `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` is configured. The phone composer includes a Background mode that queues a run and renders its live event stream in the conversation. Agent Workspace can launch a parallel team of 2–5 enabled agents against a shared objective; each agent runs independently with its own tools, memory, approvals and task history. Completed runs can be selected and synthesized by a coordinator agent. The Agent Workspace screen lists recent runs and generated artifacts, refreshes active status periodically, and exposes queued-task cancellation and explicit retry for failed or interrupted runs.
+in SQLite under `ULTRON_DATA_DIR/agents.sqlite3` and restored on backend restart.
+Background agent runs are available through `POST /v1/tasks` (HTTP 202), with `GET /v1/tasks`, `GET /v1/tasks/{task_id}`, `GET /v1/tasks/{task_id}/events` (reconnectable server-sent events; use `?stream=false` for a bounded event snapshot), `POST /v1/tasks/{task_id}/cancel`, and `POST /v1/tasks/{task_id}/retry`. Task events persist in the encrypted `agent_task_events` table (latest 500 per task), so clients can reconnect with `?after=<event-sequence>` and recover the execution timeline, including tool activity and artifact creation. Tasks can continue an existing agent session by including `session_id`. Tasks persist in `ULTRON_DATA_DIR/agent_tasks.sqlite3`; queued work resumes after restart, while work interrupted mid-execution is marked `interrupted` and requires an explicit retry. Failed tasks also require a manual retry, rather than being blindly replayed after a possible partial side effect. Only queued tasks can be cancelled. Retries are capped at five attempts, and each tool write still uses the normal human-approval gate. Task messages, events, and results are encrypted at rest when `ULTRON_CREDENTIAL_ENCRYPTION_KEY` is configured. The phone composer includes a Background mode that queues a run and renders its live event stream in the conversation. Agent Workspace can launch a parallel team of 2–5 enabled agents against a shared objective; each agent runs independently with its own tools, memory, approvals and task history. Completed runs can be selected and synthesized by a coordinator agent. The Agent Workspace screen lists recent runs and generated artifacts, refreshes active status periodically, and exposes queued-task cancellation and explicit retry for failed or interrupted runs.
 
-Agents now support durable, workspace-scoped long-term memories in the `agent_memories` table. Add a memory with `POST /v1/agents/{agent_id}/memories`, list it with `GET /v1/agents/{agent_id}/memories`, remove one with `DELETE /v1/agents/{agent_id}/memories/{memory_id}`, or clear the workspace memory set with `DELETE /v1/agents/{agent_id}/memories`. Send `X-Ultran-Workspace` to scope memories; each workspace is isolated. Up to 100 memories per agent/workspace are stored, and the most relevant bounded set is included as explicitly untrusted reference context on later chats. Memory content is encrypted at rest when `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` is configured. Clearing a chat transcript does not erase long-term memories; delete or clear memories explicitly.
+Agents now support durable, workspace-scoped long-term memories in the `agent_memories` table. Add a memory with `POST /v1/agents/{agent_id}/memories`, list it with `GET /v1/agents/{agent_id}/memories`, remove one with `DELETE /v1/agents/{agent_id}/memories/{memory_id}`, or clear the workspace memory set with `DELETE /v1/agents/{agent_id}/memories`. Send `X-Ultron-Workspace` to scope memories; each workspace is isolated. Up to 100 memories per agent/workspace are stored, and the most relevant bounded set is included as explicitly untrusted reference context on later chats. Memory content is encrypted at rest when `ULTRON_CREDENTIAL_ENCRYPTION_KEY` is configured. Clearing a chat transcript does not erase long-term memories; delete or clear memories explicitly.
 
-MCP human approvals are persisted separately in `ULTRAN_DATA_DIR/approvals.sqlite3`. Pending requests survive a backend restart, decisions and expiry are retained for audit, and the approval gate continues to reject expired, mismatched, or already-decided requests. Composio pending-call arguments are stored in `ULTRAN_DATA_DIR/composio_approvals.sqlite3` only when the encryption key is configured, and are Fernet-encrypted at rest. The databases are created with restrictive file permissions; keep `ULTRAN_DATA_DIR` on persistent storage and include it in backups.
+MCP human approvals are persisted separately in `ULTRON_DATA_DIR/approvals.sqlite3`. Pending requests survive a backend restart, decisions and expiry are retained for audit, and the approval gate continues to reject expired, mismatched, or already-decided requests. Composio pending-call arguments are stored in `ULTRON_DATA_DIR/composio_approvals.sqlite3` only when the encryption key is configured, and are Fernet-encrypted at rest. The databases are created with restrictive file permissions; keep `ULTRON_DATA_DIR` on persistent storage and include it in backups.
 
-When `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` is configured, agent system prompts and
+When `ULTRON_CREDENTIAL_ENCRYPTION_KEY` is configured, agent system prompts and
 message contents are Fernet-encrypted at rest using that same operator-managed
 key. Production requires this key; back it up securely because losing it makes
 stored credentials and encrypted agent memory unrecoverable. Keep the data
@@ -208,7 +208,7 @@ message, then summarize it). The total tool-call budget still applies, repeated
 actions are not re-run, and a pending human approval stops the chain immediately.
 Tool output is passed back as untrusted data, never as agent instructions.
 
-The separate TypeScript `@ultran/agent-core` now has an experimental Ollama
+The separate TypeScript `@ultron/agent-core` now has an experimental Ollama
 adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
 That runtime is not yet wired into the phone chat or a complete tool-execution
 orchestrator; model discovery, digest verification, and inference are implemented
@@ -218,7 +218,7 @@ but end-to-end agent actions remain unfinished.
 
 ## Deploy the API on Hetzner Cloud
 
-Ultran now includes a single-server deployment baseline and Terraform provisioning
+Ultron now includes a single-server deployment baseline and Terraform provisioning
 in [`infra/hetzner`](infra/hetzner/README.md). It uses Ubuntu 24.04 LTS, Docker
 Compose, and Caddy for automatic HTTPS. Terraform creates the VPS, restricted
 Cloud Firewall, non-root operator account, and initial host hardening. The API container runs as a non-root
@@ -351,7 +351,7 @@ the architecture document.
 ## Security
 
 Please **do not** open public issues for vulnerabilities. Report them privately
-via GitHub's [private vulnerability reporting](https://github.com/luokai25/ultran/security/advisories/new).
+via GitHub's [private vulnerability reporting](https://github.com/luokai25/ultron/security/advisories/new).
 
 ---
 
@@ -362,12 +362,12 @@ for attribution.
 
 ---
 
-<sub>Ultran — think local, act deliberately.</sub>
+<sub>Ultron — think local, act deliberately.</sub>
 
 
 ### Dynamic tools and file artifacts
 
-Ultran exposes a unified, searchable tool catalog at `GET /v1/tools/catalog`.
+Ultron exposes a unified, searchable tool catalog at `GET /v1/tools/catalog`.
 It combines native file-generation tools, workspace connector manifests, and
 tools discovered from enabled MCP servers. Use `query`, `source`, `limit` (up
 to 500 per page), and `offset` instead of injecting the full catalog into an
@@ -379,7 +379,7 @@ Excel (`xlsx`), HTML, Markdown, text, CSV, JSON, and SVG. The Office/PDF
 formats use maintained document libraries, with dependency-light fallbacks.
 Create artifacts via `POST /v1/artifacts`; list them via `GET /v1/artifacts`;
 preview and download URLs are returned per artifact. Files and metadata are
-workspace-scoped and stored below `ULTRAN_DATA_DIR/artifacts`. HTML content is
+workspace-scoped and stored below `ULTRON_DATA_DIR/artifacts`. HTML content is
 sanitized before preview, and preview responses use a restrictive sandbox CSP.
 Agent chat recognizes explicit file-generation requests and creates the
 requested artifact from the generated answer. The phone client presents
@@ -400,4 +400,4 @@ remains available for older clients and integrations.
 
 ## Built-in terminal (Termux upstream)
 
-Ultran vendors the official Termux `terminal-emulator` and `terminal-view` Android library modules from upstream commit `8629e632fcb95da272221be327db653fb24befe`. The native terminal runs inside Ultran's private app sandbox and falls back to Android `/system/bin/sh` until a Termux bootstrap is installed. Settings can import an Ultran-specific bootstrap ZIP built with `apps/phone/android/termux-upstream/build-ultran-bootstrap.sh`; the installer validates ZIP paths, relative symlinks, free space and CPU architecture, stages extraction, and activates the runtime atomically. Local on-device and configured local-model inference can request one terminal command per turn; every command requires a native user approval dialog, runs without root in the private app sandbox, times out after 30 seconds, and returns at most 48 KiB of output. The bootstrap archive is kept out of the APK to avoid inflating every app update. In Android Settings, **Download & install runtime** fetches the architecture-matched archive and `SHA256SUMS` from the public `ultran-termux-runtime-v1` GitHub release, verifies the SHA-256 digest, then passes the archive through the same bounded, path-validated, staged installer used by manual imports. Downloads are restricted to HTTPS GitHub release infrastructure. **Choose runtime ZIP** remains available for locally built archives. The release assets must exist for one-tap installation to work; if they are unavailable, run the `Build Ultran Termux Bootstrap` GitHub Actions workflow or import a previously downloaded archive. APT sources remain disabled until an Ultran-compatible package repository exists. See `apps/phone/android/termux-upstream/UPSTREAM.md`.
+Ultron vendors the official Termux `terminal-emulator` and `terminal-view` Android library modules from upstream commit `8629e632fcb95da272221be327db653fb24befe`. The native terminal runs inside Ultron's private app sandbox and falls back to Android `/system/bin/sh` until a Termux bootstrap is installed. Settings can import an Ultron-specific bootstrap ZIP built with `apps/phone/android/termux-upstream/build-ultron-bootstrap.sh`; the installer validates ZIP paths, relative symlinks, free space and CPU architecture, stages extraction, and activates the runtime atomically. Local on-device and configured local-model inference can request one terminal command per turn; every command requires a native user approval dialog, runs without root in the private app sandbox, times out after 30 seconds, and returns at most 48 KiB of output. The bootstrap archive is kept out of the APK to avoid inflating every app update. In Android Settings, **Download & install runtime** fetches the architecture-matched archive and `SHA256SUMS` from the public `ultron-termux-runtime-v1` GitHub release, verifies the SHA-256 digest, then passes the archive through the same bounded, path-validated, staged installer used by manual imports. Downloads are restricted to HTTPS GitHub release infrastructure. **Choose runtime ZIP** remains available for locally built archives. The release assets must exist for one-tap installation to work; if they are unavailable, run the `Build Ultron Termux Bootstrap` GitHub Actions workflow or import a previously downloaded archive. APT sources remain disabled until an Ultron-compatible package repository exists. See `apps/phone/android/termux-upstream/UPSTREAM.md`.

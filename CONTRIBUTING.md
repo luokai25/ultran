@@ -1,4 +1,4 @@
-# Contributing to Ultran
+# Contributing to Ultron
 
 ## Before you start
 
@@ -63,4 +63,4 @@ clear enough to record.
 ## Security
 
 Do not open public issues for vulnerabilities. Use
-[private vulnerability reporting](https://github.com/luokai25/ultran/security/advisories/new).
+[private vulnerability reporting](https://github.com/luokai25/ultron/security/advisories/new).

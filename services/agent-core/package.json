@@ -1,8 +1,8 @@
 {
-  "name": "@ultran/agent-core",
+  "name": "@ultron/agent-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Ultran local agent runtime - brain runtime, orchestrator, and tool sandbox.",
+  "description": "Ultron local agent runtime - brain runtime, orchestrator, and tool sandbox.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -31,7 +31,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ultran/connectors": "workspace:*"
+    "@ultron/connectors": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",

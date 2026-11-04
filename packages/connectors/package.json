@@ -1,8 +1,8 @@
 {
-  "name": "@ultran/connectors",
+  "name": "@ultron/connectors",
   "version": "0.1.0",
   "private": true,
-  "description": "Ultran connector SDK - manifest schema, registry, and built-in connectors.",
+  "description": "Ultron connector SDK - manifest schema, registry, and built-in connectors.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",

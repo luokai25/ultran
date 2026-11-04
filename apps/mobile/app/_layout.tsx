@@ -12,7 +12,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: '#0b0d10' },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Ultran' }} />
+        <Stack.Screen name="index" options={{ title: 'Ultron' }} />
       </Stack>
     </>
   );

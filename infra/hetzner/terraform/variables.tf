@@ -1,7 +1,7 @@
 variable "server_name" {
   description = "Hetzner server name."
   type        = string
-  default     = "ultran-api"
+  default     = "ultron-api"
 }
 
 variable "server_type" {
@@ -39,7 +39,7 @@ variable "ssh_public_key" {
 variable "admin_user" {
   description = "Non-root Linux operator account."
   type        = string
-  default     = "ultranops"
+  default     = "ultronops"
 
   validation {
     condition     = can(regex("^[a-z_][a-z0-9_-]{0,30}$", var.admin_user))

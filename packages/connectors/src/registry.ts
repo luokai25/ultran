@@ -117,7 +117,7 @@ export function buildToolManual(tools: ToolSchema[]): string {
   }));
 
   return [
-    'ULTRAN UNIVERSAL TOOL MANUAL',
+    'ULTRON UNIVERSAL TOOL MANUAL',
     'This manual applies to every model provider and backend.',
     'DISCOVERY: Choose only an exact tool ID from the live catalogue below. Tool IDs are case-sensitive.',
     'SELECTION: Use a tool when it materially helps complete the user\'s requested outcome. Do not call tools merely to appear active.',

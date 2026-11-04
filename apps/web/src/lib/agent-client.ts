@@ -12,7 +12,7 @@ export interface RunSummary {
   goal: string;
 }
 
-const BASE_URL = process.env.ULTRAN_AGENT_CORE_URL ?? 'http://127.0.0.1:7700';
+const BASE_URL = process.env.ULTRON_AGENT_CORE_URL ?? 'http://127.0.0.1:7700';
 
 export async function listRuns(): Promise<RunSummary[]> {
   const res = await fetch(`${BASE_URL}/runs`, { cache: 'no-store' });

@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@ultran/ui', '@ultran/connectors'],
+  transpilePackages: ['@ultron/ui', '@ultron/connectors'],
   experimental: {
     typedRoutes: true,
   },

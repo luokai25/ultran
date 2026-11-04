@@ -1,6 +1,6 @@
-# @ultran/agent-core
+# @ultron/agent-core
 
-The local agent runtime. This service is the heart of Ultran and runs
+The local agent runtime. This service is the heart of Ultron and runs
 **on the user's device**, not in the cloud.
 
 ## Why a separate process
@@ -52,7 +52,7 @@ src/
 ## Getting started
 
 ```bash
-pnpm --filter @ultran/agent-core dev
-pnpm --filter @ultran/agent-core build
-pnpm --filter @ultran/agent-core start
+pnpm --filter @ultron/agent-core dev
+pnpm --filter @ultron/agent-core build
+pnpm --filter @ultron/agent-core start
 ```

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(ultran_llama_jni LANGUAGES C CXX)
+project(ultron_llama_jni LANGUAGES C CXX)
 
 include(FetchContent)
 
@@ -35,8 +35,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(llama_cpp)
 
-add_library(ultran-llama SHARED ultran_llama_jni.cpp)
-target_compile_features(ultran-llama PRIVATE cxx_std_17)
-target_include_directories(ultran-llama PRIVATE "${llama_cpp_SOURCE_DIR}/include" "${llama_cpp_SOURCE_DIR}/tools/mtmd")
+add_library(ultron-llama SHARED ultron_llama_jni.cpp)
+target_compile_features(ultron-llama PRIVATE cxx_std_17)
+target_include_directories(ultron-llama PRIVATE "${llama_cpp_SOURCE_DIR}/include" "${llama_cpp_SOURCE_DIR}/tools/mtmd")
 find_library(android-log log)
-target_link_libraries(ultran-llama PRIVATE llama mtmd ${android-log})
+target_link_libraries(ultron-llama PRIVATE llama mtmd ${android-log})

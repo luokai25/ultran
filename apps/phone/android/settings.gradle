@@ -4,4 +4,4 @@ project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor
 
 apply from: 'capacitor.settings.gradle'
 // The upstream terminal UI sources remain vendored for provenance, but are not compiled.
-// Ultran uses the headless Termux-compatible runtime installed into private app storage.
+// Ultron uses the headless Termux-compatible runtime installed into private app storage.

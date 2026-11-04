@@ -1,6 +1,6 @@
 {
-	"appId": "app.ultran.mobile",
-	"appName": "Ultran",
+	"appId": "app.ultron.mobile",
+	"appName": "Ultron",
 	"webDir": "dist",
 	"android": {
 		"backgroundColor": "#050505",

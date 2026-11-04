@@ -1,4 +1,4 @@
-# Ultran mobile large-model inference
+# Ultron mobile large-model inference
 
 Status: first native low-memory stage implemented; multi-shard model management, true layer scheduling, accelerator paths, and on-device benchmarks remain staged work. This document records public-source analysis and the Android-specific port strategy. It does not claim that every AirLLM model or performance result has been reproduced on a phone.
 
@@ -50,7 +50,7 @@ The benchmark is intentionally a small warm-run probe, not a standardized cross-
 
 The next genuine AirLLM-inspired stage is module-aware scheduling. It must be designed against llama.cpp's graph/tensor lifetime APIs and GGUF tensor metadata, not implemented by manually moving arbitrary tensors while the graph executor still references them. Any layer residency experiment needs correctness tests against the unmodified llama.cpp output, memory high-water measurements, and tests across dense and MoE architectures before it can become the default path.
 
-## What Ultran's split import does and does not mean
+## What Ultron's split import does and does not mean
 
 The new multi-select import supports llama.cpp's standard multi-file GGUF
 checkpoint convention. It validates and stores all files together so the
@@ -76,7 +76,7 @@ AirLLM's headline low-VRAM results are GPU-backed laptop/server results. They mu
 6. **Storage and cache controls.** Add resumable downloads, per-shard hashes, LRU page-cache hints where supported, user-controlled model deletion, and disk-space reservation. Never silently delete source models.
 7. **Mobile acceleration.** Benchmark CPU, Vulkan, and Android NNAPI/NPU possibilities per device. Do not advertise GPU/NPU acceleration until a supported backend is actually compiled and tested.
 8. **Benchmark suite.** Record peak PSS/RSS, available RAM before/after, model load time, time-to-first-token, decode tokens/sec, storage read rate, battery drain, temperature, and app survival under memory pressure. Test 1B, 3B, 7B, 14B and larger models on real arm64 devices.
-9. **Agent integration.** Keep the native model behind the existing Ultran capability and approval layers. Large-model inference must not bypass connector permissions, confirmation gates, audit records, or tool sandboxing.
+9. **Agent integration.** Keep the native model behind the existing Ultron capability and approval layers. Large-model inference must not bypass connector permissions, confirmation gates, audit records, or tool sandboxing.
 
 ## Acceptance criteria
 
@@ -85,5 +85,5 @@ AirLLM's headline low-VRAM results are GPU-backed laptop/server results. They mu
 - A too-large context fails with an actionable message, not a crash.
 - Split model sets are either completely verified and loadable or rejected without leaving partial files presented as a valid model.
 - No network transfer occurs during local inference.
-- No Ultran agent capability or approval behavior is weakened.
+- No Ultron agent capability or approval behavior is weakened.
 - Performance claims are based on reproducible measurements from physical Android devices, not extrapolated from GPU benchmarks.

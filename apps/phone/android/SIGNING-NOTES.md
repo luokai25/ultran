@@ -17,7 +17,7 @@ yours, so it is treated as a production secret.
 | --- | --- |
 | `ANDROID_KEYSTORE_BASE64` | `base64 -w0 app-release.keystore` |
 | `KEYSTORE_PASSWORD` | the store password |
-| `KEY_ALIAS` | `ultran` |
+| `KEY_ALIAS` | `ultron` |
 | `KEY_PASSWORD` | the key password |
 
 Set them with the GitHub CLI:
@@ -25,7 +25,7 @@ Set them with the GitHub CLI:
 ```bash
 base64 -w0 app-release.keystore | gh secret set ANDROID_KEYSTORE_BASE64
 gh secret set KEYSTORE_PASSWORD
-gh secret set KEY_ALIAS --body ultran
+gh secret set KEY_ALIAS --body ultron
 gh secret set KEY_PASSWORD
 ```
 

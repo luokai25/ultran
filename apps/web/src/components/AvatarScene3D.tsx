@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AvatarScene3D - the Ultran avatar rendered with three.js.
+ * AvatarScene3D - the Ultron avatar rendered with three.js.
  *
  * The head is a 499,280-triangle geodesic mesh sculpted on the GPU (see
  * avatar/faceGeometry.ts and avatar/faceShader.ts): brow, sockets, nose, a jaw
@@ -339,7 +339,7 @@ function FaceCount({ value }: { value: number }) {
   }, [value]);
 
   return (
-    <span className="ultran-chip ultran-chip--free" title={`Head mesh. Legion adds ${(LEGION_COUNT * faceCount(LEGION_SEGMENTS)).toLocaleString()} more.`}>
+    <span className="ultron-chip ultron-chip--free" title={`Head mesh. Legion adds ${(LEGION_COUNT * faceCount(LEGION_SEGMENTS)).toLocaleString()} more.`}>
       <span ref={ref}>0</span> faces
     </span>
   );
@@ -455,7 +455,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
         target: detail.target ?? "",
       };
     };
-    window.addEventListener("ultran:avatar-gesture", onAvatarGesture);
+    window.addEventListener("ultron:avatar-gesture", onAvatarGesture);
 
     let raf = 0;
     let running = false;
@@ -672,7 +672,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("ultran:avatar-gesture", onAvatarGesture);
+      window.removeEventListener("ultron:avatar-gesture", onAvatarGesture);
       renderer.debug.onShaderError = null;
       world.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.LineSegments) {
@@ -689,22 +689,22 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
   }, [height, quality]);
 
   return (
-    <div className="ultran-stage" ref={mountRef} style={{ height }} aria-label="3D Ultran avatar">
-      <div className="ultran-stage-overlay">
+    <div className="ultron-stage" ref={mountRef} style={{ height }} aria-label="3D Ultron avatar">
+      <div className="ultron-stage-overlay">
         <div>
-          <div className="ultran-stage-caption">Ultran</div>
-          <div className="ultran-stage-scene">{scenes[scene]?.label ?? "Obsidian Palace"}</div>
+          <div className="ultron-stage-caption">Ultron</div>
+          <div className="ultron-stage-scene">{scenes[scene]?.label ?? "Obsidian Palace"}</div>
         </div>
         <div>
           <FaceCount value={faces} />
-          <span className="ultran-chip ultran-chip--free">legion x{LEGION_COUNT}</span>
+          <span className="ultron-chip ultron-chip--free">legion x{LEGION_COUNT}</span>
           <span
             key={emotion}
-            className={`ultran-chip ultran-chip--pop ${emotion === "alert" ? "ultran-chip--paid" : "ultran-chip--free"}`}
+            className={`ultron-chip ultron-chip--pop ${emotion === "alert" ? "ultron-chip--paid" : "ultron-chip--free"}`}
           >
             {emotion}
           </span>
-          {!ready && <span className="ultran-chip">initialising</span>}
+          {!ready && <span className="ultron-chip">initialising</span>}
         </div>
       </div>
     </div>

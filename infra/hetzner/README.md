@@ -1,6 +1,6 @@
-# Ultran on Hetzner Cloud
+# Ultron on Hetzner Cloud
 
-This is the first production deployment target for the Ultran API. It uses a
+This is the first production deployment target for the Ultron API. It uses a
 single Ubuntu LTS VPS, Docker Compose, and Caddy for automatic HTTPS. It is
 intentionally separate from `infra/terraform`, which currently provisions AWS
 resources.
@@ -82,7 +82,7 @@ export HCLOUD_TOKEN="YOUR_HETZNER_CLOUD_API_TOKEN"
 ```
 
 It initializes Terraform, validates the configuration, displays the exact plan,
-and requires you to type `CREATE ULTRAN VPS` before applying it. If you do not
+and requires you to type `CREATE ULTRON VPS` before applying it. If you do not
 confirm, it exits without creating resources. The token is read from the
 environment and never written to the Terraform variables file.
 
@@ -108,20 +108,20 @@ Review the plan carefully: Terraform can create billable resources.
 
 ## First deployment
 
-Clone the repository on the server at `/opt/ultran`, then:
+Clone the repository on the server at `/opt/ultron`, then:
 
 ```bash
-cd /opt/ultran/infra/hetzner
+cd /opt/ultron/infra/hetzner
 cp .env.example .env
 chmod 600 .env
 ```
 
 Edit `.env`:
-- Set `ULTRAN_DOMAIN` to a DNS name whose A record points to this server.
+- Set `ULTRON_DOMAIN` to a DNS name whose A record points to this server.
 - Set `ACME_EMAIL` to an address for TLS certificate notices.
-- Set `ULTRAN_CORS_ORIGINS` to the exact HTTPS origin(s) of the web app.
+- Set `ULTRON_CORS_ORIGINS` to the exact HTTPS origin(s) of the web app.
 - To enable Composio-managed OAuth connectors, create/copy the project API key
-  from your Composio project settings and set `ULTRAN_COMPOSIO_API_KEY` in this
+  from your Composio project settings and set `ULTRON_COMPOSIO_API_KEY` in this
   private server-side `.env` file. Keep permissions at `0600`; never commit the
   populated file, add the key to GitHub source, expose it through a frontend
   variable, or bundle it into the APK. The Android app checks the backend's
@@ -145,7 +145,7 @@ from pathlib import Path
 p = Path(".env")
 key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
 text = p.read_text()
-text = text.replace("ULTRAN_CREDENTIAL_ENCRYPTION_KEY=", f"ULTRAN_CREDENTIAL_ENCRYPTION_KEY={key}")
+text = text.replace("ULTRON_CREDENTIAL_ENCRYPTION_KEY=", f"ULTRON_CREDENTIAL_ENCRYPTION_KEY={key}")
 p.write_text(text)
 p.chmod(0o600)
 print("Encryption key written to .env. Store a separate secure backup now.")
@@ -165,7 +165,7 @@ Verify `https://YOUR_DOMAIN/v1/health` returns HTTP 200 and confirm that
 
 ## Backups and recovery
 
-The named `ultran-data` volume contains the SQLite credential vault, persistent
+The named `ultron-data` volume contains the SQLite credential vault, persistent
 agent/session and long-term memory database (`agents.sqlite3`), MCP approval
 history (`approvals.sqlite3`), encrypted Composio pending calls
 (`composio_approvals.sqlite3`), and background task queue (`agent_tasks.sqlite3`).
@@ -175,7 +175,7 @@ they leave the server, and store at least one copy outside the VPS. A backup on
 the same server is not a disaster-recovery plan.
 
 Back up these items together:
-- All SQLite databases from the `ultran-data` volume.
+- All SQLite databases from the `ultron-data` volume.
 - The Fernet encryption key from the secret store.
 - The deployment `.env` file, excluding any unrelated temporary secrets.
 - The exact Git commit deployed.
@@ -199,17 +199,17 @@ SFTP-compatible backup host. Create the remote repository account and install
 an SSH key for root on the VPS. Pin the provider's SSH host key in
 `/root/.ssh/known_hosts`; do not disable SSH host-key checking.
 
-On the VPS, clone the repository to `/opt/ultran` and configure:
+On the VPS, clone the repository to `/opt/ultron` and configure:
 
 ```bash
-install -d -m 0700 /etc/ultran
-install -m 0600 /opt/ultran/infra/hetzner/restic.env.example /etc/ultran-backup.env
-install -m 0600 /dev/null /etc/ultran-restic-password
+install -d -m 0700 /etc/ultron
+install -m 0600 /opt/ultron/infra/hetzner/restic.env.example /etc/ultron-backup.env
+install -m 0600 /dev/null /etc/ultron-restic-password
 ```
 
 Generate a long random Restic repository password and place it in
-`/etc/ultran-restic-password` using a secure method. Store a separate recovery
-copy offline. Edit `/etc/ultran-backup.env` with the real SFTP repository
+`/etc/ultron-restic-password` using a secure method. Store a separate recovery
+copy offline. Edit `/etc/ultron-backup.env` with the real SFTP repository
 address and password-file path. Ensure root's SSH client can reach the backup
 host with the pinned host key and private key.
 
@@ -217,7 +217,7 @@ Initialize the remote repository once:
 
 ```bash
 set -a
-. /etc/ultran-backup.env
+. /etc/ultron-backup.env
 set +a
 restic init
 ```
@@ -225,30 +225,30 @@ restic init
 Install and enable the timer:
 
 ```bash
-chmod 0755 /opt/ultran/infra/hetzner/backup.sh
-chmod 0755 /opt/ultran/infra/hetzner/backup.sh /opt/ultran/infra/hetzner/monitor.sh
-install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.service /etc/systemd/system/
-install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-backup.timer /etc/systemd/system/
-install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-monitor.service /etc/systemd/system/
-install -m 0644 /opt/ultran/infra/hetzner/systemd/ultran-monitor.timer /etc/systemd/system/
+chmod 0755 /opt/ultron/infra/hetzner/backup.sh
+chmod 0755 /opt/ultron/infra/hetzner/backup.sh /opt/ultron/infra/hetzner/monitor.sh
+install -m 0644 /opt/ultron/infra/hetzner/systemd/ultron-backup.service /etc/systemd/system/
+install -m 0644 /opt/ultron/infra/hetzner/systemd/ultron-backup.timer /etc/systemd/system/
+install -m 0644 /opt/ultron/infra/hetzner/systemd/ultron-monitor.service /etc/systemd/system/
+install -m 0644 /opt/ultron/infra/hetzner/systemd/ultron-monitor.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now ultran-backup.timer
-systemctl start ultran-backup.service
-systemctl enable --now ultran-monitor.timer
-systemctl status ultran-backup.service
-systemctl status ultran-monitor.timer
+systemctl enable --now ultron-backup.timer
+systemctl start ultron-backup.service
+systemctl enable --now ultron-monitor.timer
+systemctl status ultron-backup.service
+systemctl status ultron-monitor.timer
 ```
 
 The backup timer runs daily at approximately 02:30 server time, with a
 randomized delay. Retention is 7 daily, 4 weekly, and 6 monthly snapshots. Check
-recent runs with `journalctl -u ultran-backup.service` and verify remote
+recent runs with `journalctl -u ultron-backup.service` and verify remote
 snapshots with `restic snapshots`.
 
 The monitoring timer runs every five minutes. It checks the API container's
 Docker health, Caddy's running state, the public HTTPS health endpoint, root
 disk usage, and whether the backup timer is active. Results and failures are
 recorded in the systemd journal; inspect them with
-`journalctl -u ultran-monitor.service`. This is local health monitoring, not
+`journalctl -u ultron-monitor.service`. This is local health monitoring, not
 off-host alerting. External notifications still need a separately connected
 monitoring or alert provider.
 
@@ -299,7 +299,7 @@ does not claim that a VPS has been created or that the service is live; those
 steps require the Hetzner account, server details, and DNS control.
 
 
-Generated user artifacts live under `/srv/ultran/.ultran-data/artifacts` and are
+Generated user artifacts live under `/srv/ultron/.ultron-data/artifacts` and are
 included in the Restic backup alongside the SQLite snapshots and deployment
 environment. Restore this directory together with the databases to preserve
 artifact download and preview links after recovery.

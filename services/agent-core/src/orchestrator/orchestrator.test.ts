@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { ConnectorRegistry, type ConnectorManifest } from '@ultran/connectors';
+import { ConnectorRegistry, type ConnectorManifest } from '@ultron/connectors';
 import { BrainRuntime } from '../brain/runtime.js';
 import { OllamaBackend } from '../brain/ollama-backend.js';
 import { InMemoryGrantStore } from '../sandbox/grants.js';

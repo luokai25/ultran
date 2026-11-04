@@ -1,6 +1,6 @@
-/** Typed client for the Ultran control plane. */
+/** Typed client for the Ultron control plane. */
 
-export const API_BASE = process.env.NEXT_PUBLIC_ULTRAN_API ?? "http://127.0.0.1:8080/v1";
+export const API_BASE = process.env.NEXT_PUBLIC_ULTRON_API ?? "http://127.0.0.1:8080/v1";
 
 export class ApiError extends Error {
   constructor(
@@ -94,7 +94,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-Ultran-Workspace": "local",
+      "X-Ultron-Workspace": "local",
       ...(init?.headers ?? {}),
     },
     cache: "no-store",

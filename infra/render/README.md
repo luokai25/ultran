@@ -1,6 +1,6 @@
-# Deploy Ultran on Render's Free Tier
+# Deploy Ultron on Render's Free Tier
 
-Render is the current deployment target, with a strict **$0-only** requirement. The root `render.yaml` describes a free web service for testing the Ultran FastAPI control plane.
+Render is the current deployment target, with a strict **$0-only** requirement. The root `render.yaml` describes a free web service for testing the Ultron FastAPI control plane.
 
 ## Free-tier limits and safety
 
@@ -13,9 +13,9 @@ Render is the current deployment target, with a strict **$0-only** requirement. 
 
 ## Deploy
 
-1. Open the Render dashboard and connect the GitHub repository `luokai25/ultran`.
+1. Open the Render dashboard and connect the GitHub repository `luokai25/ultron`.
 2. Choose **New → Blueprint** and select the repository's `render.yaml` on branch `main`.
-3. If prompted, set `ULTRAN_CREDENTIAL_ENCRYPTION_KEY` as a secret environment variable. Generate a Fernet key locally with Python and cryptography:
+3. If prompted, set `ULTRON_CREDENTIAL_ENCRYPTION_KEY` as a secret environment variable. Generate a Fernet key locally with Python and cryptography:
 
    ```bash
    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

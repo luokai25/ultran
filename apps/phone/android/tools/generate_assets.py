@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Ultran launcher icons and splash screens.
+"""Generate the Ultron launcher icons and splash screens.
 
 The Android project is committed as text. Its raster assets are generated here
 instead of being checked in, so the repository carries no opaque binaries and
@@ -46,7 +46,7 @@ SPLASHES = {
 }
 
 # ---------------------------------------------------------------------------
-# Ultran's plasma orb mark. Geometry mirrors apps/phone/src/mark.ts.
+# Ultron's plasma orb mark. Geometry mirrors apps/phone/src/mark.ts.
 # ---------------------------------------------------------------------------
 
 Poly = list[tuple[float, float]]
@@ -87,7 +87,7 @@ def draw_mark(img: Image.Image, size: float, ox: float, oy: float) -> None:
     radius = ORBIT_RADIUS * scale
     stroke = max(1, round(ORBIT_STROKE * scale))
     draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=PLASMA, width=stroke)
-    # Two orbital ellipses and a three-layer plasma nucleus: the Ultran orb, no lettermark.
+    # Two orbital ellipses and a three-layer plasma nucleus: the Ultron orb, no lettermark.
     for rx, ry, angle, color, width in [(47,17,-32,PLASMA_BRIGHT,2.4),(44,13,48,PLASMA,1.5)]:
         layer = Image.new("RGBA", img.size, (0,0,0,0))
         ld = ImageDraw.Draw(layer)

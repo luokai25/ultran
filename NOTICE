@@ -1,8 +1,8 @@
-Ultran
-Copyright 2026 Ultran contributors
+Ultron
+Copyright 2026 Ultron contributors
 
-This product includes software developed as part of the Ultran project
-(https://github.com/luokai25/ultran).
+This product includes software developed as part of the Ultron project
+(https://github.com/luokai25/ultron).
 
 ---
 
@@ -24,4 +24,4 @@ Third-party architecture reference
 AirLLM (https://github.com/lyogavin/airllm)
 Copyright (c) AirLLM contributors
 Licensed under the Apache License, Version 2.0.
-Ultran's mobile implementation is an independent native adaptation using llama.cpp file-backed loading; no AirLLM Python source is bundled.
+Ultron's mobile implementation is an independent native adaptation using llama.cpp file-backed loading; no AirLLM Python source is bundled.

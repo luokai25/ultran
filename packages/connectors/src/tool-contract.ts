@@ -29,7 +29,7 @@ function parsePayload(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   let text = value.trim();
   if (!text) return undefined;
-  const marker = text.match(/^ULTRAN_TOOL_CALL\s*:\s*([\s\S]+)$/);
+  const marker = text.match(/^ULTRON_TOOL_CALL\s*:\s*([\s\S]+)$/);
   if (marker) text = marker[1]?.trim() ?? "";
   const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   if (fenced) text = fenced[1]?.trim() ?? "";
@@ -60,7 +60,7 @@ export function normalizeToolCall(value: unknown, availableTools?: readonly Tool
   }
   const toolId = toolIdValue.trim();
   let argsValue: unknown = parsed.args ?? parsed.input ?? fn?.arguments ?? parsed.arguments;
-  // Ultran's phone protocol historically keeps tool arguments beside `tool`.
+  // Ultron's phone protocol historically keeps tool arguments beside `tool`.
   // Adapt that explicit envelope without accepting arbitrary prose as a call.
   if (argsValue === undefined && typeof parsed.tool === 'string') {
     const { tool: _tool, ...inlineArgs } = parsed;

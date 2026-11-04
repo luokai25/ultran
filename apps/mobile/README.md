@@ -1,6 +1,6 @@
-# @ultran/mobile
+# @ultron/mobile
 
-The Ultran mobile client - a React Native (Expo) console for a local brain.
+The Ultron mobile client - a React Native (Expo) console for a local brain.
 
 ## Responsibilities
 
@@ -22,9 +22,9 @@ The Ultran mobile client - a React Native (Expo) console for a local brain.
 ## Getting started
 
 ```bash
-pnpm --filter @ultran/mobile dev
-pnpm --filter @ultran/mobile ios
-pnpm --filter @ultran/mobile android
+pnpm --filter @ultron/mobile dev
+pnpm --filter @ultron/mobile ios
+pnpm --filter @ultron/mobile android
 ```
 
 ## Structure

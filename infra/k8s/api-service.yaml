@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ultran
+  name: ultron
   labels:
-    app.kubernetes.io/part-of: ultran
+    app.kubernetes.io/part-of: ultron
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ultran-api
-  namespace: ultran
+  name: ultron-api
+  namespace: ultron
   labels:
-    app.kubernetes.io/name: ultran-api
-    app.kubernetes.io/part-of: ultran
+    app.kubernetes.io/name: ultron-api
+    app.kubernetes.io/part-of: ultron
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ultran-api
+    app.kubernetes.io/name: ultron-api
   ports:
     - name: http
       port: 80
@@ -26,10 +26,10 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: ultran-api
-  namespace: ultran
+  name: ultron-api
+  namespace: ultron
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ultran-api
+      app.kubernetes.io/name: ultron-api

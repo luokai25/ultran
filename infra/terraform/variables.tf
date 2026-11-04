@@ -29,5 +29,5 @@ variable "db_instance_class" {
 variable "db_username" {
   description = "Master username. The password is managed by the secret manager."
   type        = string
-  default     = "ultran"
+  default     = "ultron"
 }

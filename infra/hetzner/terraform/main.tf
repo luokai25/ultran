@@ -58,7 +58,7 @@ resource "hcloud_server" "api" {
   })
 
   labels = {
-    project     = "ultran"
+    project     = "ultron"
     environment = "production"
     managed_by  = "terraform"
   }

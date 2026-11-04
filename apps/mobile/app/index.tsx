@@ -1,4 +1,4 @@
-import { BUILTIN_CONNECTORS } from '@ultran/connectors';
+import { BUILTIN_CONNECTORS } from '@ultron/connectors';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const LAYERS: ReadonlyArray<readonly [string, string]> = [
@@ -12,7 +12,7 @@ export default function HomeScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.eyebrow}>LOCAL-FIRST AI WORKSPACE</Text>
-      <Text style={styles.title}>Ultran</Text>
+      <Text style={styles.title}>Ultron</Text>
       <Text style={styles.lede}>
         Your agents, models, tools, and connections in one place.
       </Text>

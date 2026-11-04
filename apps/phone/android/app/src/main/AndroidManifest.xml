@@ -51,7 +51,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-        <service android:name=".UltranVoiceService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".UltronVoiceService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
     </application>
 
     <!-- Permissions -->

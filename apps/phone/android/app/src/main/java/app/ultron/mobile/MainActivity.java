@@ -1,0 +1,13 @@
+package app.ultron.mobile;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(android.os.Bundle savedInstanceState) {
+        registerPlugin(UltronLocalAiPlugin.class);
+        registerPlugin(UltronRuntimePlugin.class);
+        registerPlugin(UltronCompanionPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}

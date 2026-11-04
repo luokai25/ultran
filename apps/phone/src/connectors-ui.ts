@@ -2,8 +2,8 @@
  * Connectors screen.
  *
  * The catalog ships inside the app (`connectors.catalog.json`, generated from the
- * backend catalog by `ultran-backend/tools/export_catalog.py`), so the full list
- * is browsable with no network. Enabling and connecting go to the linked Ultran
+ * backend catalog by `ultron-backend/tools/export_catalog.py`), so the full list
+ * is browsable with no network. Enabling and connecting go to the linked Ultron
  * backend; with no endpoint set the screen is read-only and says so.
  *
  * Secrets: a key typed here is sent once to the backend vault and cleared from
@@ -65,7 +65,7 @@ function need<T extends Element>(selector: string): T {
 }
 
 export function initConnectors(deps: Deps): void {
-  (window as unknown as {__ULTRAN_CONNECTOR_CATALOG__?:CatalogEntry[]}).__ULTRAN_CONNECTOR_CATALOG__=CATALOG;
+  (window as unknown as {__ULTRON_CONNECTOR_CATALOG__?:CatalogEntry[]}).__ULTRON_CONNECTOR_CATALOG__=CATALOG;
   const panel = need<HTMLElement>("#connectors-panel");
   const listEl = need<HTMLElement>("#connectors-list");
   const searchEl = need<HTMLInputElement>("#connectors-search");
@@ -193,7 +193,7 @@ export function initConnectors(deps: Deps): void {
 
   async function refreshEnabled(): Promise<void> {
     if (!deps.linked()) {
-      setPermissionOverview("empty", 0, "No permissions are granted. Ultran can browse the local connector catalogue, and asks only when you enable a capability.");
+      setPermissionOverview("empty", 0, "No permissions are granted. Ultron can browse the local connector catalogue, and asks only when you enable a capability.");
       remoteKnown = false;
       enabled = new Set();
       statusEl.textContent = "Browsing offline. Link your backend in Settings to enable connectors.";
@@ -228,7 +228,7 @@ export function initConnectors(deps: Deps): void {
       enabled = new Set();
       statusEl.textContent = "Could not reach your backend. Showing the catalog only.";
       statusEl.dataset.tone = "bad";
-      setPermissionOverview("error", null, "Permission state unavailable. Ultran will not display old grants as if they were current.");
+      setPermissionOverview("error", null, "Permission state unavailable. Ultron will not display old grants as if they were current.");
     }
     render();
   }
@@ -238,7 +238,7 @@ export function initConnectors(deps: Deps): void {
     if (!deps.linked()) {
       composioHealth.dataset.state = "disconnected";
       composioHealthLabel.textContent = "Backend not linked";
-      composioHealthDetail.textContent = "Connect a private Ultran backend in Settings to check Composio.";
+      composioHealthDetail.textContent = "Connect a private Ultron backend in Settings to check Composio.";
       return;
     }
     composioHealth.dataset.state = "loading";
@@ -252,7 +252,7 @@ export function initConnectors(deps: Deps): void {
         composioHealth.dataset.state = "disconnected";
         composioHealthLabel.textContent = "Not configured";
         composioHealthDetail.textContent = "Composio is not configured on this backend. Add its key to the private server environment, never to the APK.";
-        statusEl.textContent = "Composio is not configured on the backend. Set ULTRAN_COMPOSIO_API_KEY in the private server .env, then restart the API. Never add this key to the APK.";
+        statusEl.textContent = "Composio is not configured on the backend. Set ULTRON_COMPOSIO_API_KEY in the private server .env, then restart the API. Never add this key to the APK.";
         statusEl.dataset.tone = "warn";
         return;
       }
@@ -395,7 +395,7 @@ export function initConnectors(deps: Deps): void {
 
     const canAct = deps.linked();
     if (!canAct) {
-      note.textContent = "Link your Ultran backend in Settings to enable this connector.";
+      note.textContent = "Link your Ultron backend in Settings to enable this connector.";
     }
 
     const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : entry.auth === "oauth2" ? (oauthOn ? "Reconnect account" : "Connect account") : on ? "Update key" : "Connect");
@@ -412,7 +412,7 @@ export function initConnectors(deps: Deps): void {
           const body = (await res.json()) as { redirect_url?: string };
           if (!body.redirect_url || !body.redirect_url.startsWith("https://")) throw new Error("Invalid authorization link");
           await deps.openExternal(body.redirect_url);
-          note.textContent = "Complete sign-in in your browser, return to Ultran, then refresh the connection status.";
+          note.textContent = "Complete sign-in in your browser, return to Ultron, then refresh the connection status.";
           act.disabled = false;
           return;
         } else if (entry.auth === "none") {

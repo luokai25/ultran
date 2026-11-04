@@ -26,7 +26,7 @@ const PROVIDERS = [
   { id: "anthropic", name: "Anthropic", note: "Claude models", url: "https://console.anthropic.com/settings/keys", plan: "paid" },
 ] as const;
 
-const API = process.env.NEXT_PUBLIC_ULTRAN_API_URL ?? "http://127.0.0.1:8080/v1";
+const API = process.env.NEXT_PUBLIC_ULTRON_API_URL ?? "http://127.0.0.1:8080/v1";
 const PROBE_SUPPORTED = new Set(["openai", "groq", "openrouter", "together-ai", "deepseek", "fireworks-ai", "cerebras", "mistral", "xai", "google-ai-studio", "anthropic", "cohere"]);
 
 export default function ModelHub() {
@@ -106,60 +106,60 @@ export default function ModelHub() {
   const command = selected ? `ollama pull ${selected}` : "ollama pull qwen2.5:3b";
 
   return (
-    <section className="ultran-model-hub" aria-label="AI model hub">
-      <div className="ultran-model-heading">
-        <div><span className="ultran-eyebrow">ULTRAN BRAIN</span><h2>Model Hub</h2><p>Find a model, run it locally, or connect a provider key.</p></div>
-        <span className="ultran-model-count">12+ providers · live model search</span>
+    <section className="ultron-model-hub" aria-label="AI model hub">
+      <div className="ultron-model-heading">
+        <div><span className="ultron-eyebrow">ULTRON BRAIN</span><h2>Model Hub</h2><p>Find a model, run it locally, or connect a provider key.</p></div>
+        <span className="ultron-model-count">12+ providers · live model search</span>
       </div>
-      <div className="ultran-model-tabs" role="tablist" aria-label="Model hub sections">
+      <div className="ultron-model-tabs" role="tablist" aria-label="Model hub sections">
         <button role="tab" aria-selected={tab === "discover"} onClick={() => setTab("discover")}>Discover models</button>
         <button role="tab" aria-selected={tab === "providers"} onClick={() => setTab("providers")}>API providers</button>
         <button role="tab" aria-selected={tab === "local"} onClick={() => setTab("local")}>On this device</button>
       </div>
 
-      {tab === "discover" && <div className="ultran-model-panel">
-        <form className="ultran-model-search" onSubmit={searchModels}>
+      {tab === "discover" && <div className="ultron-model-panel">
+        <form className="ultron-model-search" onSubmit={searchModels}>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Qwen, Llama, Gemma, Phi…" aria-label="Search open models" />
           <button type="submit" disabled={loading}>{loading ? "Searching…" : "Search"}</button>
         </form>
-        <p className="ultran-model-hint">Searches Hugging Face for downloadable GGUF models. Check each model card, license, quantization and hardware needs before downloading.</p>
-        {error && <p className="ultran-model-error">{error}</p>}
-        <div className="ultran-model-results">
-          {models.map((model) => <article className="ultran-model-card" key={model.id}>
+        <p className="ultron-model-hint">Searches Hugging Face for downloadable GGUF models. Check each model card, license, quantization and hardware needs before downloading.</p>
+        {error && <p className="ultron-model-error">{error}</p>}
+        <div className="ultron-model-results">
+          {models.map((model) => <article className="ultron-model-card" key={model.id}>
             <div><strong>{model.id}</strong><span>{model.pipeline_tag ?? "Text generation"} · {(model.downloads ?? 0).toLocaleString()} downloads · ♥ {model.likes ?? 0}</span></div>
-            <button className="ultran-model-secondary" onClick={() => { setSelectedHubModel(model.id); setTab("local"); }}>Select</button>
+            <button className="ultron-model-secondary" onClick={() => { setSelectedHubModel(model.id); setTab("local"); }}>Select</button>
             <a href={`https://huggingface.co/${model.id}`} target="_blank" rel="noreferrer">Model card ↗</a>
           </article>)}
-          {!models.length && !loading && <div className="ultran-model-empty">Search hundreds of community models. Start with Qwen GGUF or Llama GGUF.</div>}
+          {!models.length && !loading && <div className="ultron-model-empty">Search hundreds of community models. Start with Qwen GGUF or Llama GGUF.</div>}
         </div>
       </div>}
 
-      {tab === "providers" && <div className="ultran-model-panel">
-        <div className="ultran-provider-grid">
-          {PROVIDERS.map((item) => <button key={item.id} className={provider === item.id ? "ultran-provider-card active" : "ultran-provider-card"} onClick={() => { setProvider(item.id); setNotice(""); }}>
+      {tab === "providers" && <div className="ultron-model-panel">
+        <div className="ultron-provider-grid">
+          {PROVIDERS.map((item) => <button key={item.id} className={provider === item.id ? "ultron-provider-card active" : "ultron-provider-card"} onClick={() => { setProvider(item.id); setNotice(""); }}>
             <strong>{item.name}</strong><span>{item.note}</span><small>{item.plan === "free" ? "Free tier available" : "Usage may be paid"}</small>
           </button>)}
         </div>
-        <form className="ultran-provider-form" onSubmit={saveProviderKey}>
-          <div><strong>Connect {chosen.name}</strong><p>Get a key from the provider, then save it to Ultran&apos;s backend credential store.</p></div>
+        <form className="ultron-provider-form" onSubmit={saveProviderKey}>
+          <div><strong>Connect {chosen.name}</strong><p>Get a key from the provider, then save it to Ultron&apos;s backend credential store.</p></div>
           <a href={chosen.url} target="_blank" rel="noreferrer">Get API key ↗</a>
-          <label htmlFor="ultran-provider-key">API key</label>
-          <input id="ultran-provider-key" type="password" autoComplete="off" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your API key" />
+          <label htmlFor="ultron-provider-key">API key</label>
+          <input id="ultron-provider-key" type="password" autoComplete="off" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your API key" />
           <button type="submit" disabled={saving || key.trim().length < 8}>{saving ? "Saving securely…" : "Connect provider"}</button>
           {notice && <p role="status">{notice}</p>}
-          <small>Keys are sent to your configured Ultran backend and never placed in browser storage. Use HTTPS for remote deployments. Provider verification is a separate step.</small>
+          <small>Keys are sent to your configured Ultron backend and never placed in browser storage. Use HTTPS for remote deployments. Provider verification is a separate step.</small>
         </form>
       </div>}
 
-      {tab === "local" && <div className="ultran-model-panel">
-        <div className="ultran-local-feature"><strong>Run models locally with Ollama</strong><p>Download a quantized model once, then use it without a cloud API key. The device needs enough free RAM and storage.</p>{selectedHubModel && <p>Selected Hugging Face model: <strong>{selectedHubModel}</strong>. This is a model-card selection, not an Ollama tag. Check the card for a compatible GGUF file, or choose an Ollama model tag below.</p>}</div>
-        <label className="ultran-model-label" htmlFor="ultran-model-id">Ollama model name or tag</label>
-        <input id="ultran-model-id" value={selected} onChange={(event) => setSelected(event.target.value)} placeholder="qwen2.5:3b" />
-        <label className="ultran-model-label" htmlFor="ultran-ollama-host">Ollama endpoint</label>
-        <input id="ultran-ollama-host" value={ollamaHost} onChange={(event) => setOllamaHost(event.target.value)} />
-        <div className="ultran-install-command"><code>{command}</code><button onClick={() => navigator.clipboard?.writeText(command)}>Copy command</button></div>
-        <p className="ultran-model-hint">Run the command in the terminal on the machine hosting Ollama. For a phone, connect to an Ollama host on your trusted network; the browser cannot install model weights directly.</p>
-        <div className="ultran-airllm-note"><strong>AirLLM integration note</strong><p><a href="https://github.com/lyogavin/airllm" target="_blank" rel="noreferrer">AirLLM ↗</a> is a Python layer-streaming inference library for GPU/desktop environments, not an Android model downloader or a phone-native runtime. Ultran can support it later as an optional remote/local-host backend; for mobile-native inference, prioritize GGUF with llama.cpp.</p></div>
+      {tab === "local" && <div className="ultron-model-panel">
+        <div className="ultron-local-feature"><strong>Run models locally with Ollama</strong><p>Download a quantized model once, then use it without a cloud API key. The device needs enough free RAM and storage.</p>{selectedHubModel && <p>Selected Hugging Face model: <strong>{selectedHubModel}</strong>. This is a model-card selection, not an Ollama tag. Check the card for a compatible GGUF file, or choose an Ollama model tag below.</p>}</div>
+        <label className="ultron-model-label" htmlFor="ultron-model-id">Ollama model name or tag</label>
+        <input id="ultron-model-id" value={selected} onChange={(event) => setSelected(event.target.value)} placeholder="qwen2.5:3b" />
+        <label className="ultron-model-label" htmlFor="ultron-ollama-host">Ollama endpoint</label>
+        <input id="ultron-ollama-host" value={ollamaHost} onChange={(event) => setOllamaHost(event.target.value)} />
+        <div className="ultron-install-command"><code>{command}</code><button onClick={() => navigator.clipboard?.writeText(command)}>Copy command</button></div>
+        <p className="ultron-model-hint">Run the command in the terminal on the machine hosting Ollama. For a phone, connect to an Ollama host on your trusted network; the browser cannot install model weights directly.</p>
+        <div className="ultron-airllm-note"><strong>AirLLM integration note</strong><p><a href="https://github.com/lyogavin/airllm" target="_blank" rel="noreferrer">AirLLM ↗</a> is a Python layer-streaming inference library for GPU/desktop environments, not an Android model downloader or a phone-native runtime. Ultron can support it later as an optional remote/local-host backend; for mobile-native inference, prioritize GGUF with llama.cpp.</p></div>
         <a href={ollamaHost.replace(/\/$/, "") + "/api/tags"} target="_blank" rel="noreferrer">Check configured Ollama host ↗</a>
       </div>}
     </section>

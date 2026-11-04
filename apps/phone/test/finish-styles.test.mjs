@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-test("Ultran v3 finishing stylesheet is loaded after all existing theme layers", async () => {
+test("Ultron v3 finishing stylesheet is loaded after all existing theme layers", async () => {
   const html = await read("index.html");
   const paths = [
     "./src/styles.css",
@@ -58,7 +58,7 @@ test("local model import is directly discoverable on the home screen and wired t
 });
 
 
-test("knowledge map uses the unified Ultran plasma accent instead of legacy gold", async () => {
+test("knowledge map uses the unified Ultron plasma accent instead of legacy gold", async () => {
   const map = await read("src/mind-map.ts");
   assert.match(map, /root:\s*"#ff7180"/);
   assert.match(map, /project:\s*"#e52d41"/);

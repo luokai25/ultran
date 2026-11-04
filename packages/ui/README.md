@@ -1,6 +1,6 @@
-# @ultran/ui
+# @ultron/ui
 
-The Ultran design system. One set of tokens, two renderers.
+The Ultron design system. One set of tokens, two renderers.
 
 ## Why it exists
 
@@ -17,7 +17,7 @@ web concerns (and vice versa). At v0.1 it ships tokens only.
 ## Usage
 
 ```ts
-import { colors, space, radius } from '@ultran/ui/tokens';
+import { colors, space, radius } from '@ultron/ui/tokens';
 
 const card = {
   background: colors.surface,

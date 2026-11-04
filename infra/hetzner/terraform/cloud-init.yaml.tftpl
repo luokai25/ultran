@@ -10,7 +10,7 @@ packages:
 users:
   - default
   - name: ${admin_user}
-    gecos: Ultran server operator
+    gecos: Ultron server operator
     groups: [sudo]
     shell: /bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
@@ -22,7 +22,7 @@ disable_root: true
 ssh_pwauth: false
 
 write_files:
-  - path: /etc/ssh/sshd_config.d/99-ultran-hardening.conf
+  - path: /etc/ssh/sshd_config.d/99-ultron-hardening.conf
     owner: root:root
     permissions: "0644"
     content: |

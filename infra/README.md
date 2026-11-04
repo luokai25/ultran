@@ -1,6 +1,6 @@
-# Ultran infrastructure
+# Ultron infrastructure
 
-Infrastructure for Ultran's hosted control plane. **Render Free is the attempted $0 deployment target.** The local-first agent runtime can also run on user devices or a separately managed model host.
+Infrastructure for Ultron's hosted control plane. **Render Free is the attempted $0 deployment target.** The local-first agent runtime can also run on user devices or a separately managed model host.
 
 ## Layout
 

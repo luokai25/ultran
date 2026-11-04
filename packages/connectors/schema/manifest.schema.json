@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ultran.dev/schemas/connector-manifest.json",
-  "title": "Ultran Connector Manifest",
+  "$id": "https://ultron.dev/schemas/connector-manifest.json",
+  "title": "Ultron Connector Manifest",
   "description": "A connector's declaration of capabilities, authentication, egress, and tools.",
   "type": "object",
   "required": ["id", "version", "displayName", "capabilities", "auth", "egress", "tools"],

@@ -23,10 +23,10 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@ultran/connectors':
+      '@ultron/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
-      '@ultran/ui':
+      '@ultron/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       expo:
@@ -69,7 +69,7 @@ importers:
       '@capacitor/core':
         specifier: ^6.2.0
         version: 6.2.3
-      '@ultran/connectors':
+      '@ultron/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
       mammoth:
@@ -97,10 +97,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@ultran/connectors':
+      '@ultron/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
-      '@ultran/ui':
+      '@ultron/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       next:
@@ -155,7 +155,7 @@ importers:
 
   services/agent-core:
     dependencies:
-      '@ultran/connectors':
+      '@ultron/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
     devDependencies:
@@ -168,7 +168,7 @@ importers:
 
   services/api:
     dependencies:
-      '@ultran/connectors':
+      '@ultron/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors
     devDependencies:

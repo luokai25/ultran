@@ -1,6 +1,6 @@
-# @ultran/web
+# @ultron/web
 
-The Ultran web console - a Next.js app for inspecting agent runs, browsing
+The Ultron web console - a Next.js app for inspecting agent runs, browsing
 connectors, managing capability grants, and reviewing usage and entitlements.
 
 ## Responsibilities
@@ -22,8 +22,8 @@ degrades to local-only mode.
 ## Getting started
 
 ```bash
-pnpm --filter @ultran/web dev      # http://localhost:3000
-pnpm --filter @ultran/web build
+pnpm --filter @ultron/web dev      # http://localhost:3000
+pnpm --filter @ultron/web build
 ```
 
 ## Structure

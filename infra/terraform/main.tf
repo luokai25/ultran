@@ -18,7 +18,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "ultran"
+      Project     = "ultron"
       Environment = var.environment
       ManagedBy   = "terraform"
     }
@@ -26,7 +26,7 @@ provider "aws" {
 }
 
 locals {
-  name_prefix = "ultran-${var.environment}"
+  name_prefix = "ultron-${var.environment}"
 }
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ resource "aws_db_instance" "postgres" {
   allocated_storage = 20
   storage_encrypted = true
 
-  db_name  = "ultran"
+  db_name  = "ultron"
   username = var.db_username
   # Password is managed by the secret manager; never a .tfvars value.
   manage_master_user_password = true

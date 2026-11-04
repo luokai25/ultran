@@ -18,7 +18,7 @@ type Props = {
 };
 
 const PRESETS = [
-  "Ultran online. All systems nominal.",
+  "Ultron online. All systems nominal.",
   "Nine connectors armed. Awaiting your objective.",
   "Deployment published. Rollback point secured.",
 ];
@@ -87,17 +87,17 @@ export default function UltronVoice({ onSpeakingChange }: Props) {
   }, [setSpeaking]);
 
   return (
-    <div className="ultran-panel">
-      <div className="ultran-eyebrow">Voice</div>
+    <div className="ultron-panel">
+      <div className="ultron-eyebrow">Voice</div>
       <h3 style={{ margin: "0 0 14px", fontSize: 16, color: "var(--ink)" }}>Ultron voice</h3>
 
-      {error && <div className="ultran-error">{error}</div>}
+      {error && <div className="ultron-error">{error}</div>}
 
-      <div className="ultran-field">
+      <div className="ultron-field">
         <label htmlFor="voice-line">Line</label>
         <textarea
           id="voice-line"
-          className="ultran-textarea"
+          className="ultron-textarea"
           style={{ minHeight: 92 }}
           value={text}
           maxLength={1200}
@@ -105,11 +105,11 @@ export default function UltronVoice({ onSpeakingChange }: Props) {
         />
       </div>
 
-      <div className="ultran-field">
+      <div className="ultron-field">
         <label htmlFor="voice-profile">Profile</label>
         <select
           id="voice-profile"
-          className="ultran-select"
+          className="ultron-select"
           value={voice}
           onChange={(e) => setVoice(e.target.value as typeof voice)}
         >
@@ -119,17 +119,17 @@ export default function UltronVoice({ onSpeakingChange }: Props) {
         </select>
       </div>
 
-      <div className="ultran-row">
-        <button className="ultran-btn" onClick={speak} disabled={busy || !text.trim()}>
+      <div className="ultron-row">
+        <button className="ultron-btn" onClick={speak} disabled={busy || !text.trim()}>
           {busy ? "Rendering" : "Speak"}
         </button>
-        <button className="ultran-btn ultran-btn--ghost" onClick={stop}>
+        <button className="ultron-btn ultron-btn--ghost" onClick={stop}>
           Stop
         </button>
         {PRESETS.map((preset) => (
           <button
             key={preset}
-            className="ultran-btn ultran-btn--ghost"
+            className="ultron-btn ultron-btn--ghost"
             onClick={() => setText(preset)}
             title={preset}
           >
@@ -140,10 +140,10 @@ export default function UltronVoice({ onSpeakingChange }: Props) {
 
       {rendered && (
         <div style={{ marginTop: 18 }}>
-          <div className="ultran-mono" style={{ marginBottom: 8 }}>
+          <div className="ultron-mono" style={{ marginBottom: 8 }}>
             {rendered.syllables} syllables / {rendered.duration_s}s
           </div>
-          <pre className="ultran-pre">{rendered.ssml}</pre>
+          <pre className="ultron-pre">{rendered.ssml}</pre>
         </div>
       )}
     </div>

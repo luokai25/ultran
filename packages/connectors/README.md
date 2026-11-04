@@ -1,4 +1,4 @@
-# @ultran/connectors
+# @ultron/connectors
 
 The connector SDK: the contract between what an agent *wants* to do and what
 the outside world *allows* it to do.
@@ -62,7 +62,7 @@ schema/
 ## Usage
 
 ```ts
-import { ConnectorRegistry } from '@ultran/connectors';
+import { ConnectorRegistry } from '@ultron/connectors';
 
 const registry = new ConnectorRegistry();
 registry.load(githubManifest);

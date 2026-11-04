@@ -1,8 +1,8 @@
-# Ultran Architecture
+# Ultron Architecture
 
 > **Status:** Draft · v0.1 · Last updated 2026-10-29
 >
-> Ultran is a **local-first agent platform**. The AI brain runs on the user's
+> Ultron is a **local-first agent platform**. The AI brain runs on the user's
 > own device; the cloud is optional and only exists to coordinate, sync, and
 > bill. This document describes the layered design and the contracts between
 > layers.
@@ -223,7 +223,7 @@ Monetization **observes** the system; it does not sit in the hot path.
 ## 4. Repository Layout
 
 ```
-ultran/
+ultron/
 ├── apps/
 │   ├── mobile/          # React Native (Expo) client
 │   └── web/             # Next.js console
@@ -301,7 +301,7 @@ UI responsive and makes the brain independently testable.
 2. **Model distribution.** Direct download vs. torrent-style peer assist for
    multi-GB weights.
 3. **Marketplace trust.** Do paid connectors require reproducible builds
-   signed by Ultran, or is publisher signing sufficient?
+   signed by Ultron, or is publisher signing sufficient?
 4. **Ledger compaction.** At what run volume do we snapshot the usage ledger?
 
 ---

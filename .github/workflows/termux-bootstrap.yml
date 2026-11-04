@@ -1,11 +1,11 @@
-name: Build Ultran Termux Bootstrap
+name: Build Ultron Termux Bootstrap
 
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/termux-bootstrap.yml'
-      - 'apps/phone/android/termux-upstream/build-ultran-bootstrap.sh'
+      - 'apps/phone/android/termux-upstream/build-ultron-bootstrap.sh'
   workflow_dispatch:
     inputs:
       packages:
@@ -18,7 +18,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ultran-termux-bootstrap-${{ github.ref }}
+  group: ultron-termux-bootstrap-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -27,27 +27,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - name: Checkout Ultran
+      - name: Checkout Ultron
         uses: actions/checkout@v4
 
       - name: Verify Docker
         run: docker info
 
-      - name: Build official Termux bootstrap for Ultran
+      - name: Build official Termux bootstrap for Ultron
         env:
-          ULTRAN_BOOTSTRAP_PACKAGES: ${{ inputs.packages }}
-          ULTRAN_BOOTSTRAP_OUTPUT_DIR: ${{ runner.temp }}/ultran-termux-bootstrap
-        run: ./apps/phone/android/termux-upstream/build-ultran-bootstrap.sh
+          ULTRON_BOOTSTRAP_PACKAGES: ${{ inputs.packages }}
+          ULTRON_BOOTSTRAP_OUTPUT_DIR: ${{ runner.temp }}/ultron-termux-bootstrap
+        run: ./apps/phone/android/termux-upstream/build-ultron-bootstrap.sh
 
       - name: Generate checksums
-        working-directory: ${{ runner.temp }}/ultran-termux-bootstrap
+        working-directory: ${{ runner.temp }}/ultron-termux-bootstrap
         run: sha256sum bootstrap-aarch64.zip bootstrap-x86_64.zip > SHA256SUMS
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ultran-termux-bootstrap-${{ github.run_id }}
-          path: ${{ runner.temp }}/ultran-termux-bootstrap/*
+          name: ultron-termux-bootstrap-${{ github.run_id }}
+          path: ${{ runner.temp }}/ultron-termux-bootstrap/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -55,14 +55,14 @@ jobs:
       - name: Publish runtime archives for direct download
         env:
           GH_TOKEN: ${{ github.token }}
-          OUTPUT_DIR: ${{ runner.temp }}/ultran-termux-bootstrap
+          OUTPUT_DIR: ${{ runner.temp }}/ultron-termux-bootstrap
         run: |
           set -euo pipefail
-          tag='ultran-termux-runtime-v1'
+          tag='ultron-termux-runtime-v1'
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" \
-              --title 'Ultran Termux Runtime' \
-              --notes 'Ultran-specific runtime archives built from pinned official termux/termux-packages source for package app.ultran.mobile and Ultran private storage. Default packages: git, Python, Node.js, Clang, build tools, shell utilities, proot-distro, curl/wget, SSH and common developer utilities. SHA256SUMS is included. APT sources are disabled until Ultran has its own compatible package repository.' \
+              --title 'Ultron Termux Runtime' \
+              --notes 'Ultron-specific runtime archives built from pinned official termux/termux-packages source for package app.ultron.mobile and Ultron private storage. Default packages: git, Python, Node.js, Clang, build tools, shell utilities, proot-distro, curl/wget, SSH and common developer utilities. SHA256SUMS is included. APT sources are disabled until Ultron has its own compatible package repository.' \
               --prerelease \
               --target "$GITHUB_SHA"
           fi

@@ -6,8 +6,8 @@ COMPOSE_FILE="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
 [[ -r "${ENV_FILE}" ]] || { echo "FAIL: deployment .env is missing"; exit 1; }
-DOMAIN="$(awk -F= '$1 == "ULTRAN_DOMAIN" { sub(/^[^=]*=/, ""); print; exit }' "${ENV_FILE}")"
-[[ -n "${DOMAIN}" ]] || { echo "FAIL: ULTRAN_DOMAIN is not configured"; exit 1; }
+DOMAIN="$(awk -F= '$1 == "ULTRON_DOMAIN" { sub(/^[^=]*=/, ""); print; exit }' "${ENV_FILE}")"
+[[ -n "${DOMAIN}" ]] || { echo "FAIL: ULTRON_DOMAIN is not configured"; exit 1; }
 
 API_CONTAINER="$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps -q api)"
 CADDY_CONTAINER="$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps -q caddy)"
@@ -29,7 +29,7 @@ if (( DISK_USED >= 85 )); then
   exit 1
 fi
 
-systemctl is-active --quiet ultran-backup.timer || {
+systemctl is-active --quiet ultron-backup.timer || {
   echo "FAIL: encrypted backup timer is not active"
   exit 1
 }

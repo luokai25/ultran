@@ -16,18 +16,18 @@ export default function HomePage() {
           fontSize: 12,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: 'var(--ultran-muted)',
+          color: 'var(--ultron-muted)',
           margin: 0,
         }}
       >
         Pre-alpha
       </p>
 
-      <h1 className="ultran-title-sheen" style={{ fontSize: 52, lineHeight: 1.05, margin: '16px 0 0' }}>
-        Ultran
+      <h1 className="ultron-title-sheen" style={{ fontSize: 52, lineHeight: 1.05, margin: '16px 0 0' }}>
+        Ultron
       </h1>
 
-      <p style={{ fontSize: 19, color: 'var(--ultran-muted)', lineHeight: 1.6 }}>
+      <p style={{ fontSize: 19, color: 'var(--ultron-muted)', lineHeight: 1.6 }}>
         A local-first AI agent platform. The brain runs on your device. The cloud
         is optional.
       </p>
@@ -47,12 +47,12 @@ export default function HomePage() {
         {LAYERS.map(([title, body], i) => (
           <div
             key={title}
-            className="ultran-reveal ultran-card-hover"
+            className="ultron-reveal ultron-card-hover"
             style={{
               ['--reveal-delay' as string]: `${120 + i * 90}ms`,
-              background: 'var(--ultran-surface)',
-              border: '1px solid var(--ultran-border)',
-              borderRadius: 'var(--ultran-radius)',
+              background: 'var(--ultron-surface)',
+              border: '1px solid var(--ultron-border)',
+              borderRadius: 'var(--ultron-radius)',
               padding: 18,
             }}
           >
@@ -60,7 +60,7 @@ export default function HomePage() {
             <p
               style={{
                 fontSize: 13.5,
-                color: 'var(--ultran-muted)',
+                color: 'var(--ultron-muted)',
                 margin: 0,
                 lineHeight: 1.5,
               }}

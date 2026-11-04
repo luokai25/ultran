@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Ultran local Termux bridge. No arbitrary shell execution; write operations require explicit confirmation. */
+/** Ultron local Termux bridge. No arbitrary shell execution; write operations require explicit confirmation. */
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,34 +7,34 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 
 const HOST = '127.0.0.1';
-const PORT = Number(process.env.ULTRAN_BRIDGE_PORT || 8765);
-const TOKEN = process.env.ULTRAN_BRIDGE_TOKEN || crypto.randomBytes(24).toString('hex');
-const ROOT = path.resolve(process.env.ULTRAN_FILES_ROOT || path.join(os.homedir(), 'storage', 'shared', 'Ultran'));
+const PORT = Number(process.env.ULTRON_BRIDGE_PORT || 8765);
+const TOKEN = process.env.ULTRON_BRIDGE_TOKEN || crypto.randomBytes(24).toString('hex');
+const ROOT = path.resolve(process.env.ULTRON_FILES_ROOT || path.join(os.homedir(), 'storage', 'shared', 'Ultron'));
 const MAX_READ = 256 * 1024;
 const ALLOWED_ORIGINS = new Set(['http://localhost', 'https://localhost', 'capacitor://localhost', 'http://127.0.0.1']);
 
 await fs.mkdir(ROOT, { recursive: true, mode: 0o700 });
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(JSON.stringify(body)); };
 async function safePath(relative) {
-  if (typeof relative !== 'string' || !relative || relative.includes('\0') || path.isAbsolute(relative)) throw new Error('Provide a relative path inside the Ultran folder.');
+  if (typeof relative !== 'string' || !relative || relative.includes('\0') || path.isAbsolute(relative)) throw new Error('Provide a relative path inside the Ultron folder.');
   const target = path.resolve(ROOT, relative);
-  if (target !== ROOT && !target.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultran folder.');
+  if (target !== ROOT && !target.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultron folder.');
   // Resolve existing symlinks (including a symlink used as the requested folder)
   // so lexical traversal checks cannot be bypassed to read/write outside the sandbox.
   let probe = target;
   while (true) {
     try {
       const real = await fs.realpath(probe);
-      if (real !== ROOT && !real.startsWith(ROOT + path.sep)) throw new Error('Symlink escapes the Ultran folder.');
+      if (real !== ROOT && !real.startsWith(ROOT + path.sep)) throw new Error('Symlink escapes the Ultron folder.');
       if (probe === target) return real;
       const relativeTail = path.relative(probe, target);
       const candidate = path.resolve(real, relativeTail);
-      if (candidate !== ROOT && !candidate.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultran folder.');
+      if (candidate !== ROOT && !candidate.startsWith(ROOT + path.sep)) throw new Error('Path escapes the Ultron folder.');
       return candidate;
     } catch (error) {
       if (error instanceof Error && (error.message.includes('escapes'))) throw error;
       const parent = path.dirname(probe);
-      if (parent === probe) throw new Error('Could not resolve a safe path inside the Ultran folder.');
+      if (parent === probe) throw new Error('Could not resolve a safe path inside the Ultron folder.');
       probe = parent;
     }
   }
@@ -45,13 +45,13 @@ async function body(req) {
 }
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.has(origin)) { res.setHeader('access-control-allow-origin', origin); res.setHeader('vary', 'Origin'); res.setHeader('access-control-allow-headers', 'content-type, x-ultran-token, x-ultran-approval'); res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS'); }
+  if (origin && ALLOWED_ORIGINS.has(origin)) { res.setHeader('access-control-allow-origin', origin); res.setHeader('vary', 'Origin'); res.setHeader('access-control-allow-headers', 'content-type, x-ultron-token, x-ultron-approval'); res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS'); }
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: 'Method not allowed.' });
-  if (req.headers['x-ultran-token'] !== TOKEN) return json(res, 401, { error: 'Pairing token is missing or invalid.' });
+  if (req.headers['x-ultron-token'] !== TOKEN) return json(res, 401, { error: 'Pairing token is missing or invalid.' });
   try {
     const url = new URL(req.url, `http://${HOST}:${PORT}`);
-    if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok: true, name: 'Ultran Termux Bridge', version: 1, filesRoot: ROOT, capabilities: ['device-info', 'list-files', 'read-text', 'write-text-approved'] });
+    if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok: true, name: 'Ultron Termux Bridge', version: 1, filesRoot: ROOT, capabilities: ['device-info', 'list-files', 'read-text', 'write-text-approved'] });
     if (req.method === 'GET' && url.pathname === '/v1/device') return json(res, 200, { platform: 'android-termux', arch: process.arch, release: os.release(), hostname: os.hostname(), uptimeSeconds: os.uptime(), freeMemoryBytes: os.freemem(), totalMemoryBytes: os.totalmem(), home: os.homedir() });
     if (req.method === 'POST' && url.pathname === '/v1/files/list') {
       const input = await body(req); const target = await safePath(input.path || '.'); const entries = await fs.readdir(target, { withFileTypes: true });
@@ -66,14 +66,14 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/v1/files/write') {
       const input = await body(req);
-      if (req.headers['x-ultran-approval'] !== 'approved') return json(res, 403, { error: 'Write denied. Ultran must show the exact path and content and obtain explicit user approval first.' });
+      if (req.headers['x-ultron-approval'] !== 'approved') return json(res, 403, { error: 'Write denied. Ultron must show the exact path and content and obtain explicit user approval first.' });
       if (typeof input.content !== 'string' || Buffer.byteLength(input.content) > MAX_READ) return json(res, 413, { error: 'Text content must be at most 256 KiB.' });
       const target = await safePath(input.path); await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-      const temp = `${target}.ultran-${crypto.randomBytes(6).toString('hex')}.partial`;
+      const temp = `${target}.ultron-${crypto.randomBytes(6).toString('hex')}.partial`;
       await fs.writeFile(temp, input.content, { encoding: 'utf8', mode: 0o600, flag: 'wx' }); await fs.rename(temp, target);
       return json(res, 200, { ok: true, path: input.path, sizeBytes: Buffer.byteLength(input.content) });
     }
     return json(res, 404, { error: 'Unknown bridge route.' });
   } catch (error) { return json(res, 400, { error: error instanceof Error ? error.message : 'Request failed.' }); }
 });
-server.listen(PORT, HOST, () => { console.log(`Ultran Termux Bridge listening on http://${HOST}:${PORT}`); console.log(`Files sandbox: ${ROOT}`); console.log(`Pairing token (keep private): ${TOKEN}`); console.log('Press Ctrl+C to stop.'); });
+server.listen(PORT, HOST, () => { console.log(`Ultron Termux Bridge listening on http://${HOST}:${PORT}`); console.log(`Files sandbox: ${ROOT}`); console.log(`Pairing token (keep private): ${TOKEN}`); console.log('Press Ctrl+C to stop.'); });

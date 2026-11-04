@@ -1,8 +1,8 @@
 {
-  "name": "ultran",
+  "name": "ultron",
   "version": "0.2.0",
   "private": true,
-  "description": "Ultran - local-first AI agent platform monorepo",
+  "description": "Ultron - local-first AI agent platform monorepo",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20.11.0",

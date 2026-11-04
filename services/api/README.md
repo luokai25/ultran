@@ -1,6 +1,6 @@
-# @ultran/api
+# @ultron/api
 
-The Ultran cloud control plane. **Entirely optional** - the product works
+The Ultron cloud control plane. **Entirely optional** - the product works
 without it. This service exists only for the things a single device cannot do.
 
 ## What lives here
@@ -38,8 +38,8 @@ without it. This service exists only for the things a single device cannot do.
 ## Getting started
 
 ```bash
-pnpm --filter @ultran/api dev      # http://localhost:8080
-pnpm --filter @ultran/api build
+pnpm --filter @ultron/api dev      # http://localhost:8080
+pnpm --filter @ultron/api build
 ```
 
 ## Structure

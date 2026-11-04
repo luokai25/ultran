@@ -1,7 +1,7 @@
 export type CuratedModel = {
   id: string; name: string; description: string; file: string; sizeLabel: string;
   sizeBytes?: number; url: string; license: string; bestFor: string; minRamGb: number; sha256?: string;
-  /** Input modes supported by Ultran native runtime, not just the model architecture. */
+  /** Input modes supported by Ultron native runtime, not just the model architecture. */
   nativeInput: "text";
 };
 

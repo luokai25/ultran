@@ -1,17 +1,17 @@
-name: ultran
+name: ultron
 
 services:
   # Named Docker volumes are root-owned on first creation. Prepare permissions
   # before the non-root API process starts.
   init-data-volume:
-    image: ultran-api:local
+    image: ultron-api:local
     build:
-      context: ../../ultran-backend
+      context: ../../ultron-backend
       dockerfile: Dockerfile
     user: "0:0"
     command: ["sh", "-c", "mkdir -p /data && chown -R 10001:10001 /data"]
     volumes:
-      - ultran-data:/data
+      - ultron-data:/data
     cap_drop:
       - ALL
     cap_add:
@@ -22,9 +22,9 @@ services:
 
   api:
     build:
-      context: ../../ultran-backend
+      context: ../../ultron-backend
       dockerfile: Dockerfile
-    image: ultran-api:local
+    image: ultron-api:local
     restart: unless-stopped
     depends_on:
       init-data-volume:
@@ -32,11 +32,11 @@ services:
     env_file:
       - .env
     environment:
-      ULTRAN_ENV: production
-      ULTRAN_DATA_DIR: /srv/ultran/.ultran-data
-      ULTRAN_DEBUG: "false"
+      ULTRON_ENV: production
+      ULTRON_DATA_DIR: /srv/ultron/.ultron-data
+      ULTRON_DEBUG: "false"
     volumes:
-      - ultran-data:/srv/ultran/.ultran-data
+      - ultron-data:/srv/ultron/.ultron-data
     expose:
       - "8080"
     networks:
@@ -65,7 +65,7 @@ services:
     image: caddy:2
     restart: unless-stopped
     environment:
-      ULTRAN_DOMAIN: ${ULTRAN_DOMAIN:?Set ULTRAN_DOMAIN in .env}
+      ULTRON_DOMAIN: ${ULTRON_DOMAIN:?Set ULTRON_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
     ports:
       - "80:80"
@@ -94,6 +94,6 @@ networks:
   edge:
 
 volumes:
-  ultran-data:
+  ultron-data:
   caddy-data:
   caddy-config:

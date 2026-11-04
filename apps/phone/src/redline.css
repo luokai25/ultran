@@ -1,4 +1,4 @@
-/* Ultran Redline: one system, every surface. */
+/* Ultron Redline: one system, every surface. */
 :root {
   color-scheme: dark;
   --void: #050506;
@@ -88,8 +88,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .suggestion b { color:var(--red-hot); font:600 var(--t1) var(--font); letter-spacing:.06em; }
 .suggestion:hover,.suggestion:focus-visible { border-color:var(--red); background:var(--red-wash); transform:none; }
 .messages { gap:var(--s3); }
-.msg { animation:ultran-enter .22s ease-out both; }
-@keyframes ultran-enter { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+.msg { animation:ultron-enter .22s ease-out both; }
+@keyframes ultron-enter { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
 .msg.user .body { border:1px solid rgba(225,29,46,.2); border-radius:var(--r2) var(--r2) 4px var(--r2); background:#241316; color:var(--text); font:400 var(--t2)/1.55 var(--font); }
 .msg.assistant .who { color:var(--red-hot); font:600 var(--t1) var(--font); letter-spacing:.1em; }
 .msg.assistant .who:before { border-color:var(--red); background:var(--red-wash); color:var(--red-hot); }

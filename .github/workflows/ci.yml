@@ -29,21 +29,21 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: ultran-backend/pyproject.toml
+          cache-dependency-path: ultron-backend/pyproject.toml
 
       - name: Install
-        working-directory: ultran-backend
+        working-directory: ultron-backend
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -e . pytest pytest-asyncio httpx
 
       - name: Import check
-        working-directory: ultran-backend
-        run: python -c "import ultran_backend; import ultran_backend.mcp; print('import ok')"
+        working-directory: ultron-backend
+        run: python -c "import ultron_backend; import ultron_backend.mcp; print('import ok')"
 
       - name: Test
-        working-directory: ultran-backend
+        working-directory: ultron-backend
         run: python -m pytest -q
 
   verify:
@@ -148,7 +148,7 @@ jobs:
       - name: Validate Docker Compose configuration
         working-directory: infra/hetzner
         env:
-          ULTRAN_DOMAIN: api.example.com
+          ULTRON_DOMAIN: api.example.com
           ACME_EMAIL: ops@example.com
         run: |
           cp .env.example .env
@@ -156,7 +156,7 @@ jobs:
           bash -n backup.sh monitor.sh terraform/provision.sh
 
       - name: Build production API image
-        run: docker build -f ultran-backend/Dockerfile -t ultran-api:ci ultran-backend
+        run: docker build -f ultron-backend/Dockerfile -t ultron-api:ci ultron-backend
 
       - uses: hashicorp/setup-terraform@v3
         with:

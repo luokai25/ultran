@@ -49,7 +49,7 @@ test("plasma orb identity stays aligned across web, Android generator, and adapt
     read("android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml"),
     read("android/app/src/main/res/drawable/ic_launcher_background.xml"),
   ]);
-  assert.match(mark, /ultran-core/);
+  assert.match(mark, /ultron-core/);
   assert.match(mark, /<circle cx="54" cy="54" r="11"/);
   assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
   assert.ok(generator.includes("Two orbital ellipses and a three-layer plasma nucleus"));
@@ -92,7 +92,7 @@ test("local file requests have a real PDF fallback and artifact card actions", a
   assert.match(main, /attachRequestedArtifact\(task, content, progressBody\)/);
   assert.match(kernel, /pdf\|docx\|pptx/);
   assert.match(kernel, /invisible internal quality-control pass/);
-  assert.doesNotMatch(kernel, /You are Ultran.s independent quality reviewer/);
+  assert.doesNotMatch(kernel, /You are Ultron.s independent quality reviewer/);
 });
 
 
@@ -112,7 +112,7 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
 
 test("model downloads validate the catalogue size and tolerate slow mobile transfers", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  const native = await readFile(new URL("../android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java", import.meta.url), "utf8");
+  const native = await readFile(new URL("../android/app/src/main/java/app/ultron/mobile/UltronLocalAiPlugin.java", import.meta.url), "utf8");
   assert.match(main, /NativeLocalAI\.downloadModel\(/);
   assert.match(main, /CURATED_MODELS/);
   assert.match(native, /optLong\("expectedBytes", -1L\)/);
@@ -150,14 +150,14 @@ test("version 3 keeps one red theme and retains native capability entry points",
     read("package.json"), read("src/main.ts"), read("index.html"), read("src/mark.ts"),
   ]);
   assert.ok(pkg.includes('"version": "3.0.0"'));
-  assert.ok(main.includes('type ThemeId = "ultran"'));
+  assert.ok(main.includes('type ThemeId = "ultron"'));
   assert.ok(main.includes("accent: 0xe52d41"));
   assert.ok(main.includes("importNativeModel()"));
   assert.ok(main.includes("initConnectors("));
   assert.ok(main.includes("NativeRuntime"));
   assert.ok(main.includes("NativeCompanion"));
   assert.ok(html.includes('id="chat-model-import"'));
-  assert.ok(html.includes('id="ultran-runtime-download"'));
-  assert.ok(mark.includes("ultran-core"));
+  assert.ok(html.includes('id="ultron-runtime-download"'));
+  assert.ok(mark.includes("ultron-core"));
   assert.ok(mark.includes("#ff304b"));
 });

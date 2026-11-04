@@ -9,8 +9,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * the fetch calls to the local control plane both accept.
  */
 const config: CapacitorConfig = {
-  appId: "app.ultran.mobile",
-  appName: "Ultran",
+  appId: "app.ultron.mobile",
+  appName: "Ultron",
   webDir: "dist",
   android: {
     backgroundColor: "#050505",

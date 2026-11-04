@@ -119,10 +119,10 @@ test('normalizes provider-native function and input calls', () => {
 });
 
 test('normalizes the phone brain marker and fenced JSON without parsing arbitrary prose', () => {
-  assert.deepEqual(normalizeToolCall('ULTRAN_TOOL_CALL:{"tool":"runtime.jobs"}'), {
+  assert.deepEqual(normalizeToolCall('ULTRON_TOOL_CALL:{"tool":"runtime.jobs"}'), {
     ok: true, call: { toolId: 'runtime.jobs', args: {} },
   });
-  assert.deepEqual(normalizeToolCall('ULTRAN_TOOL_CALL:{\"tool\":\"runtime.exec\",\"command\":\"pwd\"}'), {
+  assert.deepEqual(normalizeToolCall('ULTRON_TOOL_CALL:{\"tool\":\"runtime.exec\",\"command\":\"pwd\"}'), {
     ok: true, call: { toolId: 'runtime.exec', args: { command: 'pwd' } },
   });
   assert.deepEqual(normalizeToolCall('```json\n{"toolId":"files.list","args":{}}\n```'), {

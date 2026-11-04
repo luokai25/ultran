@@ -1,8 +1,8 @@
 {
-  "name": "@ultran/mobile",
+  "name": "@ultron/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Ultran mobile client - the pocket console for your local brain.",
+  "description": "Ultron mobile client - the pocket console for your local brain.",
   "license": "Apache-2.0",
   "main": "expo-router/entry",
   "scripts": {
@@ -16,8 +16,8 @@
     "clean": "rm -rf .expo dist"
   },
   "dependencies": {
-    "@ultran/connectors": "workspace:*",
-    "@ultran/ui": "workspace:*",
+    "@ultron/connectors": "workspace:*",
+    "@ultron/ui": "workspace:*",
     "expo": "~51.0.28",
     "expo-router": "~3.5.23",
     "expo-status-bar": "~1.12.1",

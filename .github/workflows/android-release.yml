@@ -323,7 +323,26 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-          adb install -r "$APK"
+          INSTALLED=false
+          for attempt in 1 2 3; do
+            if adb install -r "$APK"; then
+              INSTALLED=true
+              break
+            fi
+            echo "::warning::PackageManager install failed (attempt $attempt/3); reconnecting adb"
+            adb kill-server || true
+            sleep 3
+            adb start-server
+            timeout 60 adb wait-for-device
+            sleep 5
+          done
+          if [ "$INSTALLED" != "true" ]; then
+            echo "::error::Android 12 PackageManager could not install the verified APK after three attempts"
+            adb devices -l || true
+            adb logcat -d -t 300 || true
+            tail -150 "$RUNNER_TEMP/ultron-emulator.log" || true
+            exit 1
+          fi
           adb shell monkey -p app.ultron.mobile 1
           sleep 5
           adb shell dumpsys package app.ultron.mobile | grep -Fq "versionName=${{ steps.version.outputs.name }}"

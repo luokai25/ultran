@@ -68,9 +68,9 @@ test('ULTRON validates empty drafts and suspicious claims of external success', 
 
 test('ULTRON runtime contract identifies the imported model as brain and avoids multi-agent overhead', () => {
   const prompt = brain.buildUltronBrainContract({ model:'Qwen local', task:'Explain gravity' });
-  assert.match(prompt, /ULTRON PROGRAMMED IDENTITY RUNTIME/);
+  assert.match(prompt, /ULTRON v1\.0\.0/);
   assert.match(prompt, /Qwen local/);
-  assert.match(prompt, /Do not add agent loops/);
+  assert.match(prompt, /extra agent loops/);
 });
 
 test('ULTRON decision trace is bounded and can be cleared', () => {
@@ -132,4 +132,19 @@ test('ULTRON memory conflicts require explicit supersession and system constrain
     { id:'privacy', description:'system privacy rule', source:'system', priority:1, hard:true },
   ]);
   assert.equal(resolved[0].source, 'system');
+});
+
+
+test('ULTRON uses a compact single-pass contract for simple phone requests', () => {
+  const prompt = brain.buildUltronBrainContract({ model:'Qwen 4B', task:'Hello' });
+  assert.match(prompt, /one efficient pass/);
+  assert.doesNotMatch(prompt, /EXECUTION PLAN/);
+  assert.ok(prompt.length < 700);
+});
+
+test('ULTRON reserves the full operating contract and plan for complex work', () => {
+  const prompt = brain.buildUltronBrainContract({ model:'Qwen 4B', task:'Build, integrate, and test the complete offline connector runtime' });
+  assert.match(prompt, /EXECUTION PLAN/);
+  assert.match(prompt, /approval/);
+  assert.match(prompt, /verification/);
 });

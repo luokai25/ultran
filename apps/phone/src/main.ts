@@ -198,15 +198,15 @@ const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string): string {
   const profile = classifyUltronTask(task);
   const plan = createUltronPlan(task, profile);
-  const ledger = createUltronTaskLedger(`turn-${Date.now().toString(36)}`, task);
+  const ledger = profile.depth === "deep" || profile.depth === "critical" ? createUltronTaskLedger(`turn-${Date.now().toString(36)}`, task) : null;
   ultronDecisionTrace.record({ phase: "classify", code: profile.intent, detail: `risk=${profile.risk}; depth=${profile.depth}; tool=${profile.toolDecision}` });
   ultronDecisionTrace.record({ phase: "plan", code: "plan-created", detail: `${plan.length} bounded steps` });
-  const memoryMatches = rankUltronMemory(task, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(",") })), 6);
+  const memoryMatches = rankUltronMemory(task, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(",") })), profile.depth === "instant" ? 2 : 6);
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
-  const ledgerPrompt = buildUltronLedgerPrompt(ledger);
+  const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
   return [resolveIdentityPrompt(identityState), core, brain, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
 }
 

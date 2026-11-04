@@ -220,6 +220,27 @@ def test_chat_exposes_native_phone_tools_only_to_android_capable_clients(monkeyp
     assert "native approval" in system_prompt
 
 
+def test_chat_exposes_supabase_capability_tools_only_to_authenticated_ultron_clients(monkeypatch):
+    svc = service()
+    agent = svc.create(name="Supabase-enabled Ultron")
+    captured = []
+    original_complete = svc.brain.complete
+
+    def capture(messages, **kwargs):
+        captured.extend(messages)
+        return original_complete(messages, **kwargs)
+
+    monkeypatch.setattr(svc.brain, "complete", capture)
+    svc.chat(agent.id, "continue self-improvement", client_capabilities=["ultron_supabase_capabilities"])
+    system_prompt = captured[0].content
+    assert "ULTRON SUPABASE CAPABILITY INTERFACE" in system_prompt
+    assert 'capabilities.save_tool_draft' in system_prompt
+    assert 'capabilities.create_proposal' in system_prompt
+    assert 'capabilities.checkpoint_run' in system_prompt
+    assert "Never approve a proposal" in system_prompt
+    assert "never executable" in system_prompt
+
+
 def test_chat_does_not_advertise_native_phone_tools_without_client_capability(monkeypatch):
     svc = service()
     agent = svc.create(name="Web Ultron")

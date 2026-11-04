@@ -148,3 +148,28 @@ test('ULTRON reserves the full operating contract and plan for complex work', ()
   assert.match(prompt, /approval/);
   assert.match(prompt, /verification/);
 });
+
+
+test('ULTRON memory cannot reuse identifiers or admit malformed confidence and timestamps', () => {
+  const now = Date.now();
+  const base = { id:'fact-1', key:'theme', value:'black', confidence:.9, source:'user statement', observedAt:now, sensitivity:'ordinary' };
+  assert.equal(brain.admitUltronMemoryFact({ ...base, id:'fact-2', confidence:NaN }, []).accepted, false);
+  assert.equal(brain.admitUltronMemoryFact({ ...base, id:'fact-2', observedAt:now+3_600_000 }, []).accepted, false);
+  assert.equal(brain.admitUltronMemoryFact(base, [base]).accepted, false);
+});
+
+test('an expired replacement restores its still-valid predecessor in active memory', () => {
+  const now = Date.now();
+  const oldFact = { id:'theme-v1', key:'theme', value:'black', confidence:.9, source:'user statement', observedAt:now-10_000, sensitivity:'ordinary' };
+  const replacement = { id:'theme-v2', key:'theme', value:'gold', confidence:.95, source:'user correction', observedAt:now-5_000, expiresAt:now-1, sensitivity:'ordinary', supersedes:'theme-v1' };
+  assert.deepEqual(brain.activeUltronMemoryFacts([oldFact, replacement], now).map(fact => fact.id), ['theme-v1']);
+});
+
+test('a new memory must supersede the current active fact, not an older historical version', () => {
+  const now = Date.now();
+  const v1 = { id:'theme-v1', key:'theme', value:'black', confidence:.9, source:'user statement', observedAt:now-20_000, sensitivity:'ordinary' };
+  const v2 = { id:'theme-v2', key:'theme', value:'gold', confidence:.95, source:'user correction', observedAt:now-10_000, sensitivity:'ordinary', supersedes:'theme-v1' };
+  const invalid = { id:'theme-v3', key:'theme', value:'red', confidence:.95, source:'user correction', observedAt:now, sensitivity:'ordinary', supersedes:'theme-v1' };
+  assert.equal(brain.admitUltronMemoryFact(invalid, [v1, v2]).accepted, false);
+  assert.equal(brain.admitUltronMemoryFact({ ...invalid, supersedes:'theme-v2' }, [v1, v2]).accepted, true);
+});

@@ -64,7 +64,7 @@ type WorkspaceTask = { id: string; agent_id: string; message: string; status: st
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type ChatAttachment = { id: string; name: string; type: string; size: number; text?: string; dataUrl?: string };
-type Message = { id?: string; role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[]; learningFeedback?: "helpful" | "not_helpful" };
+type Message = { id?: string; sequenceNo?: number; role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[]; learningFeedback?: "helpful" | "not_helpful" };
 type Conversation = {
   id: string;
   title: string;
@@ -617,6 +617,7 @@ const saveStore = (): void => {
 
 
 async function applyInitialCloudSync(): Promise<void> {
+  saveStore();
   const remoteSettings = await pullCloudSetting("phone_settings");
   if (remoteSettings && typeof remoteSettings === "object" && !Array.isArray(remoteSettings)) {
     Object.assign(settings, remoteSettings);

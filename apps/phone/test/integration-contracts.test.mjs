@@ -490,3 +490,8 @@ test("chat image attachments stay compact and never expand to their source dimen
   assert.match(styles, /\.attachment-chip\s*\{[^}]*max-height:\s*68px;[^}]*overflow:\s*hidden/s);
   assert.match(styles, /\.attachment-chip \.attachment-snippet\s*\{[^}]*display:\s*none/s);
 });
+
+test("sent attachment badges remain compact and hide extracted text previews", () => {
+  assert.match(styles, /\.message-attachment\s*\{[^}]*max-height:\s*68px;[^}]*overflow:\s*hidden/s);
+  assert.match(styles, /\.message-attachment \.attachment-snippet\s*\{[^}]*display:\s*none/s);
+});

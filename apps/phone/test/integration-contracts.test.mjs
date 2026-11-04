@@ -34,6 +34,7 @@ const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKern
   read("../../ultron-backend/ultron_backend/agents.py"),
   read("src/styles.css"),
 ]);
+const [capabilityPanel, runtimeCloud] = await Promise.all([read("src/capability-panel.ts"), read("src/runtime-cloud.ts")]);
 
 test("every required phone UI selector exists exactly once", () => {
   const requiredIds = [...main.matchAll(/req<[^>]+>\("#([^"]+)"\)/g)].map((match) => match[1]);
@@ -207,7 +208,7 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(main, /parsed\.tool === "app\.open"/);
   assert.match(main, /client_capabilities: \[/);
   assert.match(main, /Capacitor\.getPlatform\(\) === "android" \? \["android_phone_actions"\] : \[\]/);
-  assert.match(main, /cloudSession \? \["ultron_supabase_capabilities"\] : \[\]/);
+  assert.match(main, /cloudSession \? \["ultron_supabase_capabilities", "ultron_supabase_runtime"\] : \[\]/);
   assert.match(main, /getCloudSession\(\)/);
   assert.match(main, /nativePhoneIntent/);
   assert.match(main, /handleNativeTool/);
@@ -545,4 +546,20 @@ test("semantic memory refuses unsourced, low-confidence, and credential-bearing 
   ], edges:[] });
   const merged = module.exports.mergeGraphProposal(graph, proposal, "test-model");
   assert.deepEqual(Array.from(merged.nodes, node => node.id), ["good-fact"]);
+});
+
+
+test("Supabase is the default shared runtime for ULTRON-authored tools and skills", () => {
+  assert.match(main, /ultron_supabase_runtime/);
+  assert.match(main, /runtime\.tool\.create/);
+  assert.match(main, /runtime\.tool\.run/);
+  assert.match(main, /skills\.cloud\.save/);
+  assert.match(main, /invokeUltronRuntime/);
+  assert.match(runtimeCloud, /functions\.invoke\("ultron-runtime"/);
+  assert.match(capabilityPanel, /runtimeInvoke\("list_tools"/);
+  assert.match(capabilityPanel, /runtimeInvoke\("list_tool_runs"/);
+  assert.match(capabilityPanel, /runtimeInvoke\("list_skills"/);
+  assert.match(html, /id="capability-cloud-tools"/);
+  assert.match(html, /id="capability-tool-runs"/);
+  assert.match(html, /id="capability-cloud-skills"/);
 });

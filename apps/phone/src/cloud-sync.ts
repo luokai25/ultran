@@ -276,6 +276,7 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
       idMap.messages[key] = messageId;
       const createdAt = idMap.messageTimes[key] ?? new Date(conversation.updatedAt).toISOString();
       idMap.messageTimes[key] = createdAt;
+      writeIdMap(idMap);
       const parts = (message.attachments ?? []).map((attachment) => ({
         type: 'attachment',
         id: attachment.id,
@@ -303,7 +304,10 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
   writeIdMap(idMap);
 }
 
-export function scheduleCloudSync(conversations: LocalConversationForSync[]): void {
+export function scheduleCloudSync(
+  conversations: LocalConversationForSync[],
+  onError?: (error: unknown) => void,
+): void {
   syncQueued = conversations;
   if (syncTimer) window.clearTimeout(syncTimer);
   syncTimer = window.setTimeout(() => {
@@ -312,7 +316,10 @@ export function scheduleCloudSync(conversations: LocalConversationForSync[]): vo
     syncQueued = null;
     syncInFlight = true;
     void syncCloudWorkspace(queued)
-      .catch((error) => console.warn('[ULTRON cloud sync]', error))
+      .catch((error) => {
+        console.warn('[ULTRON cloud sync]', error);
+        onError?.(error);
+      })
       .finally(() => {
         syncInFlight = false;
         if (syncQueued) scheduleCloudSync(syncQueued);

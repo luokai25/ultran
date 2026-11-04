@@ -1,37 +1,9 @@
+import { mergeCloudWorkspace, type CloudAttachment, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
+export { mergeCloudWorkspace, type CloudAttachment, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
 import { createClient, type Session } from '@supabase/supabase-js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { fetchAllPages } from './cloud-pagination';
 
-export type CloudAttachment = {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  text?: string;
-};
-
-export type CloudMessage = {
-  id?: string;
-  sequenceNo?: number;
-  role: 'user' | 'assistant';
-  content: string;
-  attachments?: CloudAttachment[];
-};
-
-export type CloudConversation = {
-  id: string;
-  title: string;
-  updatedAt: number;
-  messages: CloudMessage[];
-  deleted?: boolean;
-};
-
-export type LocalConversationForSync = CloudConversation & {
-  sessionId?: string;
-  executionLedger?: unknown;
-  cognitiveCheckpoint?: unknown;
-  knowledgeState?: unknown;
-};
 
 const SUPABASE_URL =
   import.meta.env.VITE_ULTRON_SUPABASE_URL ?? 'https://vshoxrtrfleptqxkrmtc.supabase.co';
@@ -257,52 +229,6 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
   return pulled;
 }
 
-export function mergeCloudWorkspace(
-  local: LocalConversationForSync[],
-  remote: CloudConversation[],
-): LocalConversationForSync[] {
-  const merged = new Map(local.map((conversation) => [conversation.id, conversation]));
-  for (const cloud of remote) {
-    if (cloud.deleted) {
-      merged.delete(cloud.id);
-      continue;
-    }
-    const existing = merged.get(cloud.id);
-    if (!existing) {
-      merged.set(cloud.id, cloud);
-      continue;
-    }
-    const remoteIsNewer = cloud.updatedAt > existing.updatedAt;
-    const messages = [...existing.messages];
-    const messageIndexes = new Map<string, number>();
-    messages.forEach((message, index) => {
-      messageIndexes.set(message.id ?? `local-index-${index}`, index);
-    });
-    cloud.messages.forEach((remoteMessage, index) => {
-      const key = remoteMessage.id ?? `remote-index-${index}`;
-      const existingIndex = messageIndexes.get(key);
-      if (existingIndex === undefined) {
-        messageIndexes.set(key, messages.length);
-        messages.push(remoteMessage);
-      } else if (remoteIsNewer) {
-        messages[existingIndex] = remoteMessage;
-      } else {
-        messages[existingIndex] = {
-          ...messages[existingIndex]!,
-          sequenceNo: remoteMessage.sequenceNo,
-        };
-      }
-    });
-    messages.sort((left, right) => (left.sequenceNo ?? Number.MAX_SAFE_INTEGER) - (right.sequenceNo ?? Number.MAX_SAFE_INTEGER));
-    merged.set(cloud.id, {
-      ...existing,
-      title: remoteIsNewer ? cloud.title : existing.title,
-      updatedAt: Math.max(existing.updatedAt, cloud.updatedAt),
-      messages,
-    });
-  }
-  return [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt);
-}
 
 function markSynced(conversations: LocalConversationForSync[]): void {
   for (const conversation of conversations) {

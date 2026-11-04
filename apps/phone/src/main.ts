@@ -1430,6 +1430,15 @@ function pushWorkspaceArtifact(artifact: ArtifactCard): void {
   if ("vibrate" in navigator) navigator.vibrate(12);
 }
 
+function renderStreamedReply(body: HTMLElement, content: string): void {
+  // Markdown rendering replaces body contents. Keep the live task panel
+  // attached while tokens arrive so the working state remains visible.
+  const livePanel = body.querySelector<HTMLElement>(".live-run");
+  livePanel?.remove();
+  renderMarkdown(content, body);
+  if (livePanel) body.appendChild(livePanel);
+}
+
 function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): void {
   let panel = body.querySelector<HTMLElement>(".live-run");
   if (!panel) {
@@ -2707,6 +2716,7 @@ async function submit(raw: string): Promise<void> {
   scrollToEnd();
   syncRender();
   setThinking(true);
+  renderLiveEvent(reply.body, { type: "thinking", stage: "starting", label: "Working on your request" });
   cloudSkillContext = "";
   cloudMemoryContext = "";
   try {
@@ -2746,7 +2756,7 @@ async function submit(raw: string): Promise<void> {
       renderLiveEvent(reply.body, { type: "thinking", stage: "drafting", label: requestedArtifactFormat(text) ? "Drafting the requested document" : "Working on your request" });
       const response = await generateNativeStreaming(messages, Math.min(profile.maxTokens, 384), (token) => {
         streamedText += token;
-        renderMarkdown(streamedText, reply.body);
+        renderStreamedReply(reply.body, streamedText);
         if (nearBottom()) scrollToEnd(false);
       });
       if (turnController.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
@@ -2821,7 +2831,7 @@ async function submit(raw: string): Promise<void> {
         : await remoteReply(convo, remoteRequestText, (event) => {
           if (event.type === "assistant_stream_delta" && typeof event.delta === "string") {
             streamedText += event.delta;
-            renderMarkdown(streamedText, reply.body);
+            renderStreamedReply(reply.body, streamedText);
             if (nearBottom()) scrollToEnd(false);
           } else {
             if ((event.type === "tool_started" || event.type === "tool_discovery" || event.type === "tool_completed" || event.type === "tool_failed") && streamedText) {
@@ -2848,7 +2858,7 @@ async function submit(raw: string): Promise<void> {
       result = await localModelReply(convo, undefined, reply.body, turnController.signal, (token) => {
         if (token === null) { streamedText = ""; reply.body.replaceChildren(); return; }
         streamedText += token;
-        renderMarkdown(streamedText, reply.body);
+        renderStreamedReply(reply.body, streamedText);
         if (nearBottom()) scrollToEnd(false);
       }, executionLedger, priorCheckpoint ?? undefined);
       setLink("online", "local model");

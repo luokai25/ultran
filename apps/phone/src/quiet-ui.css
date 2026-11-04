@@ -119,3 +119,23 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-actions button, .workspace-file button, .workspace-file-icon { border-color: #3a3e45 !important; background: #202329 !important; color: #d1d5db !important; }
 .learning-status, .learning-severity, .learning-category { filter: grayscale(1); }
 .conn-status, .capability-status, .status-badge { filter: grayscale(1); }
+
+
+/* Composer refinements: compact model switcher above the input, aligned actions. */
+.dock { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+.composer { border-radius: 22px; padding: 10px 12px 12px; }
+.composer-model-row { display:flex; align-items:center; min-height:34px; margin:0 0 4px; }
+.composer-model-row .chat-model-button {
+  display:inline-flex; align-items:center; gap:8px; min-height:32px; max-width:min(70vw,240px);
+  padding:5px 10px; border:1px solid #30343a; border-radius:999px;
+  background:#111316; color:#c9cdd3; font-size:12px; font-weight:600;
+}
+.composer-model-row .chat-model-button #chat-model-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.composer textarea { min-height:40px; }
+.composer-row { display:flex; align-items:center; gap:10px; }
+.composer-row #send-btn { margin-left:auto; flex:0 0 52px; width:52px; min-width:52px; height:52px; }
+.composer-row #link-pill { margin-left:2px; }
+@media (max-width:390px) {
+  .composer { border-radius:24px; }
+  .composer-row #send-btn { flex-basis:48px; width:48px; min-width:48px; height:48px; }
+}

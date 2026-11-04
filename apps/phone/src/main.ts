@@ -19,6 +19,7 @@ import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt,
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace } from "./ultron-brain";
+import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -205,9 +206,12 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
+  const cognitiveProfile = analyzeCognitiveProfile(task, { continuation: profile.intent === "continuation", hasAttachments: task.includes("[Attachment:") });
+  const cognition = cognitiveProfile.mode === "direct" ? "" : buildCognitiveInstructions(cognitiveProfile);
+  ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, brain, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, brain, cognition, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {

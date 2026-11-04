@@ -382,10 +382,12 @@ test("local tool intent is behavioral: questions and negated commands never auth
   const start = main.indexOf("function toolRequestMatchesUserIntent(");
   const end = main.indexOf("\n}\n\nfunction parseLocalToolRequest", start) + 2;
   assert.ok(start >= 0 && end > 2, "local tool intent matcher must be present");
-  const source = main.slice(start, end).replace(
-    "function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: string): boolean {",
-    "function toolRequestMatchesUserIntent(request, userText) {",
-  );
+  const source = main.slice(start, end)
+    .replace(
+      "function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: string): boolean {",
+      "function toolRequestMatchesUserIntent(request, userText) {",
+    )
+    .replace("const matches = (pattern: RegExp): boolean =>", "const matches = (pattern) =>");
   const matcher = (await import("node:vm")).runInNewContext("(" + source + ")");
   const cases = [
     [{ tool: "runtime.exec" }, "How do I build the APK?", false],

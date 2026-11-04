@@ -11,6 +11,7 @@ export type CloudAttachment = {
 
 export type CloudMessage = {
   id?: string;
+  sequenceNo?: number;
   role: 'user' | 'assistant';
   content: string;
   attachments?: CloudAttachment[];
@@ -198,7 +199,7 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
       ? metadata.local_message_id
       : `cloud_${row.id}`;
     const list = grouped.get(row.conversation_id) ?? [];
-    list.push({ id: localMessageId, role: row.role, content: row.content, ...(attachments.length ? { attachments } : {}) });
+    list.push({ id: localMessageId, sequenceNo: Number(row.sequence_no), role: row.role, content: row.content, ...(attachments.length ? { attachments } : {}) });
     grouped.set(row.conversation_id, list);
   }
 
@@ -343,7 +344,7 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
         size: attachment.size,
         ...(attachment.text ? { text: attachment.text.slice(0, 100_000) } : {}),
       }));
-      const { error } = await cloudClient.from('ultron_messages').upsert({
+      const { data: savedMessage, error } = await cloudClient.from('ultron_messages').upsert({
         id: messageId,
         owner_id: session.user.id,
         conversation_id: cloudId,
@@ -353,8 +354,9 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
         metadata: { local_message_id: localMessageId, local_message_index: index, local_conversation_id: conversation.id },
         created_at: createdAt,
         status: 'complete',
-      }, { onConflict: 'id' });
+      }, { onConflict: 'id' }).select('sequence_no').single();
       if (error) throw error;
+      message.sequenceNo = Number(savedMessage.sequence_no);
       syncedMessageFingerprints.set(key, fingerprint);
     }
   }

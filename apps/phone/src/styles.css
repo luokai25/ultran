@@ -556,6 +556,10 @@ button {
 }
 
 /* Compact attachment tray: keep the composer usable when images are selected. */
+.attachment-preview[hidden] {
+  display: none;
+}
+
 .attachment-preview {
   display: flex;
   flex-wrap: wrap;

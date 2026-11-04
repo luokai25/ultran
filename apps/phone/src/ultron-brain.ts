@@ -269,20 +269,29 @@ export type UltronMemoryDecision = { accepted: boolean; fact?: UltronMemoryFact;
 
 /** Durable memory admission rules prevent guesses, secrets and transient chatter becoming identity facts. */
 export function admitUltronMemoryFact(fact: UltronMemoryFact, existing: readonly UltronMemoryFact[]): UltronMemoryDecision {
-  if (!fact.id || !fact.value.trim() || !fact.source.trim()) return { accepted: false, reason: "A durable memory requires an id, value, and source." };
-  if (fact.sensitivity === "sensitive") return { accepted: false, reason: "Sensitive personal data is not admitted to the general semantic memory graph." };
-  if (fact.confidence < 0.72) return { accepted: false, reason: "The evidence confidence is below the durable-memory threshold." };
-  if (fact.expiresAt && fact.expiresAt <= Date.now()) return { accepted: false, reason: "The proposed memory has already expired." };
-  const prior = existing.filter((item) => (item.key ?? item.id) === (fact.key ?? fact.id)).sort((a, b) => b.observedAt - a.observedAt)[0];
-  if (prior && fact.observedAt <= prior.observedAt) return { accepted: false, reason: "An older observation cannot overwrite a newer memory." };
-  if (prior && fact.value !== prior.value && fact.supersedes !== prior.id) return { accepted: false, reason: "A conflicting memory must explicitly identify the exact fact it supersedes." };
-  return { accepted: true, fact: { ...fact, value: fact.value.slice(0, 1000), confidence: clamp(fact.confidence, 0, 1) }, reason: prior ? "Newer evidence explicitly supersedes the previous fact." : "Evidence meets the durable-memory admission rules." };
+  const reject = (reason: string): UltronMemoryDecision => ({ accepted: false, reason });
+  if (!fact.id?.trim() || !fact.value?.trim() || !fact.source?.trim()) return reject("A durable memory requires an id, value, and source.");
+  if (existing.some((item) => item.id === fact.id)) return reject("Memory identifiers are immutable and cannot be reused.");
+  if (fact.sensitivity === "sensitive") return reject("Sensitive personal data is not admitted to the general semantic memory graph.");
+  if (!Number.isFinite(fact.confidence) || fact.confidence < 0.72 || fact.confidence > 1) return reject("Confidence must be a finite value between 0.72 and 1.0.");
+  if (!Number.isFinite(fact.observedAt) || fact.observedAt <= 0 || fact.observedAt > Date.now() + 60_000) return reject("The observation timestamp is invalid or implausibly in the future.");
+  if (fact.expiresAt !== undefined && (!Number.isFinite(fact.expiresAt) || fact.expiresAt <= Math.max(Date.now(), fact.observedAt))) return reject("The proposed memory has already expired or has an invalid expiry.");
+  const active = activeUltronMemoryFacts(existing);
+  const prior = active.filter((item) => (item.key ?? item.id) === (fact.key ?? fact.id)).sort((a, b) => b.observedAt - a.observedAt)[0];
+  if (prior && fact.observedAt <= prior.observedAt) return reject("An older observation cannot overwrite a newer memory.");
+  if (prior && fact.supersedes !== prior.id) return reject("A replacement must explicitly identify the current active fact it supersedes.");
+  if (!prior && fact.supersedes) return reject("The superseded fact does not exist as an active memory in this key.");
+  return { accepted: true, fact: { ...fact, id: fact.id.trim(), key: fact.key?.trim(), value: fact.value.trim().slice(0, 1000), source: fact.source.trim().slice(0, 240), confidence: clamp(fact.confidence, 0, 1) }, reason: prior ? "Newer evidence explicitly supersedes the current active fact." : "Evidence meets the durable-memory admission rules." };
 }
 
-/** Expired and superseded facts are filtered before retrieval, not after prompt construction. */
+/**
+ * Expired facts cannot suppress the facts they once replaced. A replacement
+ * only supersedes its predecessor while the replacement itself is active.
+ */
 export function activeUltronMemoryFacts(facts: readonly UltronMemoryFact[], now = Date.now()): UltronMemoryFact[] {
-  const superseded = new Set(facts.map((fact) => fact.supersedes).filter((id): id is string => Boolean(id)));
-  return facts.filter((fact) => (!fact.expiresAt || fact.expiresAt > now) && !superseded.has(fact.id) && fact.sensitivity !== "sensitive");
+  const eligible = facts.filter((fact) => fact.sensitivity !== "sensitive" && (!fact.expiresAt || fact.expiresAt > now));
+  const superseded = new Set(eligible.map((fact) => fact.supersedes).filter((id): id is string => Boolean(id)));
+  return eligible.filter((fact) => !superseded.has(fact.id));
 }
 
 export type UltronConstraint = { id: string; description: string; source: "current_user" | "prior_user" | "system"; priority: number; hard: boolean };

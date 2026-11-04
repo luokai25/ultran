@@ -110,6 +110,19 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
   assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
 });
 
+test("model picker lives above the composer and request progress survives streamed tokens", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const composer = html.indexOf('id="composer"');
+  const modelButton = html.indexOf('id="chat-model-button"');
+  const topbarEnd = html.indexOf("</header>");
+  assert.ok(modelButton > composer && modelButton < html.indexOf('id="prompt"'));
+  assert.ok(modelButton > topbarEnd, "model selector must not occupy the top header");
+  assert.match(main, /function renderStreamedReply\(/);
+  assert.match(main, /livePanel\?\.remove\(\)[\s\S]*?renderMarkdown\(content, body\)[\s\S]*?body\.appendChild\(livePanel\)/);
+  assert.match(main, /stage: "starting", label: "Working on your request"/);
+});
+
 test("model downloads validate the catalogue size and tolerate slow mobile transfers", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const native = await readFile(new URL("../android/app/src/main/java/app/ultron/mobile/UltronLocalAiPlugin.java", import.meta.url), "utf8");
@@ -157,7 +170,9 @@ test("version 3 uses a neutral ULTRON identity and retains native capability ent
   assert.ok(main.includes("NativeRuntime"));
   assert.ok(main.includes("NativeCompanion"));
   assert.ok(html.includes('id="chat-model-import"'));
-  assert.ok(html.includes('id="ultron-runtime-download"'));
+  assert.ok(!html.includes('id="ultron-runtime-download"'), "runtime installation controls must stay out of Settings");
+  assert.ok(!html.includes('id="ultron-runtime-install"'), "runtime ZIP picker must stay out of Settings");
+  assert.ok(main.includes("NativeRuntime"), "the headless runtime remains available to ULTRON's internal tools");
   assert.ok(mark.includes("ultron-core"));
   assert.ok(mark.includes("#9ca3af"));
 });

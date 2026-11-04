@@ -229,7 +229,7 @@ def test_registry_routes_a_builtin_connector_to_the_sandbox(wired):
 
 def test_registry_requires_a_sandbox_for_builtin_connectors(wired):
     registry, _, _ = wired
-    registry.enable("ws", "arxiv")
+    registry.enable("ws", "github")
     with pytest.raises(ValidationFailed, match="sandbox"):
         registry.invoke("ws", "github", "list_repos", {})
 

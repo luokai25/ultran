@@ -140,3 +140,13 @@ test('learning review screen is reachable and exposes explicit human approval an
   assert.match(css, /learning-proposal/);
   assert.match(css, /@media\(max-width:420px\)/);
 });
+
+
+test('assistant response feedback is stored once and helpful signals do not create improvement proposals', () => {
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /learningFeedback\?: "helpful" \| "not_helpful"/);
+  assert.match(main, /User marked an assistant response as helpful/);
+  assert.match(main, /User marked an assistant response as not helpful/);
+  assert.match(main, /if \(message\.learningFeedback\) return/);
+  assert.match(main, /"user_success".*"assistant-response-feedback".*false/);
+});

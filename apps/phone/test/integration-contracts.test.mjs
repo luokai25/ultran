@@ -87,7 +87,7 @@ test("brain-independent capability policy is applied to native and connected bra
   assert.match(main, /executionLedger\?: UltronTaskLedger/);
   assert.match(main, /createUltronTaskLedger\(`task-\$\{convo\.id\}/);
   assert.ok(main.includes("const continuation = /"));
-  assert.match(main, /inheritedConstraints/);
+  assert.match(main, /buildUltronContinuationConstraints\(convo\.executionLedger\)/);
   assert.match(main, /const finalProfile = taskProfile/);
   assert.match(main, /const understandDone = transitionUltronLedger\(understandStart\.ledger, "understand", "completed"/);
   assert.match(main, /convo\.executionLedger = executionLedger/);

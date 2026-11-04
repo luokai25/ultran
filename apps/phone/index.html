@@ -248,7 +248,7 @@
             <button id="cloud-disconnect" class="ghost" type="button" disabled>Disconnect</button>
           </div>
           <p id="cloud-sync-status" class="native-model-status" role="status">Not connected. Local-only mode is active.</p>
-          <small>Authentication uses Supabase. The mobile app stores the session in its private WebView storage; this is not a substitute for device-level encrypted storage.</small>
+          <small>Authentication uses Supabase. On Android, the refreshable session is encrypted with AES-GCM and a key held by the Android Keystore; web preview uses browser storage.</small>
         </section>
         <label class="field">
           <span>Optional Ultron backend</span>

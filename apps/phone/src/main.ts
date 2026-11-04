@@ -19,6 +19,7 @@ import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt,
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace } from "./ultron-brain";
+import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
@@ -265,12 +266,15 @@ function recordLearningObservation(
   // independent observations before turning it into a persistent improvement task.
   const currentCause = learningLedger.events.find((item) => item.id === eventId)?.cause ?? "unknown";
   const related = learningLedger.events.filter((event) =>
-    event.category === category.toLowerCase().slice(0, 48) &&
+    event.category === category.trim().toLowerCase().slice(0, 48) &&
     event.cause === currentCause &&
     event.signal !== "user_success" &&
     Date.now() - event.at <= 30 * 24 * 60 * 60 * 1000
   );
-  if (related.length < 2) { saveLearningLedger(); return; }
+  // Repeated reports inside one conversation are one occurrence, not proof
+  // that the same weakness happened independently more than once.
+  const independent = [...new Map(related.map((event) => [event.correlationId ?? event.id, event])).values()];
+  if (independent.length < 2) { saveLearningLedger(); return; }
 
   const causeLabel = currentCause.replace(/_/g, " ");
   const proposalId = `improve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -279,9 +283,9 @@ function recordLearningObservation(
     title: `Investigate ${causeLabel}: ${category}`.slice(0, 120),
     hypothesis: `Repeated ${causeLabel} observations in ${category} suggest a recurring weakness. Add a focused regression test, inspect the responsible runtime path, and preserve existing permission and safety checks.`,
     category: `${currentCause}.${category}`.slice(0, 48),
-    evidenceIds: related.slice(-5).map((event) => event.id),
+    evidenceIds: independent.slice(-5).map((event) => event.id),
     impact: severity === "critical" || severity === "high" ? 0.9 : 0.65,
-    confidence: Math.min(0.95, 0.55 + related.length * 0.1),
+    confidence: Math.min(0.95, 0.55 + independent.length * 0.1),
     risk: 0.25,
   });
   if (proposed.accepted) Object.assign(learningLedger, proposed.ledger);
@@ -2406,8 +2410,27 @@ async function submit(raw: string): Promise<void> {
     ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
     recordLearningObservation("verification_failure", "identity-audit", issue, "high", "runtime", true, issue.toLowerCase().includes("permission") ? "permission_boundary" : "verification_gap", convo.id);
   }
+  const outcomePlan = createUltronPlan(text, finalProfile);
+  const outcome = evaluateUltronOutcome({
+    taskId: convo.id,
+    profile: finalProfile,
+    plan: outcomePlan,
+    tools: (result.tool_calls ?? []).map((call, index) => ({
+      id: `tool-${index}-${call.connector}-${call.action}`,
+      ok: call.ok,
+      approvalRequired: call.approval_required === true,
+    })),
+    validation: validation.issues,
+    finalText: result.content,
+  });
+  ultronDecisionTrace.record({ phase: "validate", code: `outcome-${outcome.status}`, detail: `${outcome.cause}; confidence=${outcome.confidence.toFixed(2)}` });
+  if (outcome.shouldRecord && outcome.cause === "positive_strategy") {
+    recordLearningObservation("user_success", `verified.${finalProfile.intent}`, "A runtime outcome was supported by successful execution evidence and passed validation.", "low", "runtime", false, "positive_strategy", convo.id);
+  } else if (outcome.shouldRecord && outcome.cause === "permission_boundary") {
+    recordLearningObservation("verification_failure", "permission-boundary", "A requested operation was blocked by an explicit approval or permission boundary.", "medium", "runtime", false, "permission_boundary", convo.id);
+  }
   for (const call of result.tool_calls ?? []) {
-    if (!call.ok) recordLearningObservation("tool_failure", `tool.${call.connector}.${call.action}`, `Tool ${call.connector}.${call.action} returned a failure result.`, "medium", "tool_result", true, "tool_execution", convo.id);
+    if (!call.ok && call.approval_required !== true) recordLearningObservation("tool_failure", `tool.${call.connector}.${call.action}`, `Tool ${call.connector}.${call.action} returned a failure result.`, "medium", "tool_result", true, "tool_execution", convo.id);
   }
   const message: Message = { role: "assistant", content: result.content };
   activeAssistantMessage = message;

@@ -173,3 +173,11 @@ test('a new memory must supersede the current active fact, not an older historic
   assert.equal(brain.admitUltronMemoryFact(invalid, [v1, v2]).accepted, false);
   assert.equal(brain.admitUltronMemoryFact({ ...invalid, supersedes:'theme-v2' }, [v1, v2]).accepted, true);
 });
+
+
+test('a replacement cannot suppress a fact from a different memory key', () => {
+  const now = Date.now();
+  const important = { id:'privacy-v1', key:'privacy', value:'private', confidence:.95, source:'user statement', observedAt:now-10_000, sensitivity:'ordinary' };
+  const unrelated = { id:'theme-v2', key:'theme', value:'gold', confidence:.95, source:'user statement', observedAt:now, sensitivity:'ordinary', supersedes:'privacy-v1' };
+  assert.deepEqual(brain.activeUltronMemoryFacts([important, unrelated], now).map(fact => fact.id), ['privacy-v1', 'theme-v2']);
+});

@@ -39,3 +39,14 @@ Never expose the Supabase `service_role` or secret key in Android, web client co
 ## Migrations
 
 The SQL files in `migrations/` are the source-controlled migration history for this backend. They correspond to the migrations already applied to the dedicated ULTRON project. Apply future schema changes as new timestamped migrations, and run Supabase Security and Performance Advisors after changes.
+
+
+## Autonomous capability loop
+
+The `ultron-capabilities` Edge Function is deployed with JWT verification enabled. The Android client calls it through its authenticated Supabase session. The function validates the user and singleton `ultron_instance` row, then performs database operations under that user's RLS context; it does not use a service-role key.
+
+The capability tables persist agent-loop checkpoints, versioned generated tool source, capability proposals and append-only audit events. ULTRON may create non-executable tool drafts, submit them for review and propose database migrations, Edge Functions, connectors, policy changes and runtime upgrades. Source versions are fingerprinted and immutable after submission.
+
+A saved draft is not an executable tool. The existing generated-tool policy and isolated-worker lifecycle must review and attest the exact source hash before activation. Database DDL, Edge Function deployment, permission changes and other infrastructure mutations remain proposals until the owner explicitly approves them. Never expose a service-role or secret key to Android, and never execute model-generated SQL directly against production.
+
+The phone's Realtime subscription includes agent runs, generated tool versions, capability proposals and capability events. The Edge Function also provides owner-facing approval and disable operations; approval actions are deliberately excluded from the model's tool catalogue.

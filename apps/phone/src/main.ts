@@ -23,7 +23,7 @@ import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
-import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
+import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, selectIndependentLearningEvidence, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -265,15 +265,13 @@ function recordLearningObservation(
   // A single complaint is a signal, not a diagnosis. Require recurrence across
   // independent observations before turning it into a persistent improvement task.
   const currentCause = learningLedger.events.find((item) => item.id === eventId)?.cause ?? "unknown";
-  const related = learningLedger.events.filter((event) =>
-    event.category === category.trim().toLowerCase().slice(0, 48) &&
-    event.cause === currentCause &&
-    event.signal !== "user_success" &&
-    Date.now() - event.at <= 30 * 24 * 60 * 60 * 1000
-  );
-  // Repeated reports inside one conversation are one occurrence, not proof
-  // that the same weakness happened independently more than once.
-  const independent = [...new Map(related.map((event) => [event.correlationId ?? event.id, event])).values()];
+  const independent = selectIndependentLearningEvidence(learningLedger.events, {
+    category,
+    cause: currentCause,
+    now: Date.now(),
+    windowDays: 30,
+    limit: 5,
+  });
   if (independent.length < 2) { saveLearningLedger(); return; }
 
   const causeLabel = currentCause.replace(/_/g, " ");

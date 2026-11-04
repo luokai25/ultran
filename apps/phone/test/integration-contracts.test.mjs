@@ -205,7 +205,10 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(companion, /public void composeTelegram/);
   assert.match(main, /openWhatsAppMessage/);
   assert.match(main, /parsed\.tool === "app\.open"/);
-  assert.match(main, /client_capabilities: Capacitor\.getPlatform\(\) === "android"/);
+  assert.match(main, /client_capabilities: \[/);
+  assert.match(main, /Capacitor\.getPlatform\(\) === "android" \? \["android_phone_actions"\] : \[\]/);
+  assert.match(main, /cloudSession \? \["ultron_supabase_capabilities"\] : \[\]/);
+  assert.match(main, /getCloudSession\(\)/);
   assert.match(main, /nativePhoneIntent/);
   assert.match(main, /handleNativeTool/);
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);

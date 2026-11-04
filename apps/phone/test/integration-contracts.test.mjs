@@ -378,6 +378,33 @@ test("every local tool requires matching explicit intent from the current user t
   assert.match(matcher, /matches\(\/\\btelegram\\b\/i\)/);
 });
 
+test("local tool intent is behavioral: questions and negated commands never authorize execution", async () => {
+  const start = main.indexOf("function toolRequestMatchesUserIntent(");
+  const end = main.indexOf("\n}\n\nfunction parseLocalToolRequest", start) + 2;
+  assert.ok(start >= 0 && end > 2, "local tool intent matcher must be present");
+  const source = main.slice(start, end).replace(
+    "function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: string): boolean {",
+    "function toolRequestMatchesUserIntent(request, userText) {",
+  );
+  const matcher = (await import("node:vm")).runInNewContext("(" + source + ")");
+  const cases = [
+    [{ tool: "runtime.exec" }, "How do I build the APK?", false],
+    [{ tool: "runtime.exec" }, "Don't run the tests", false],
+    [{ tool: "runtime.exec" }, "I don't want you to build the APK", false],
+    [{ tool: "runtime.exec" }, "Continue improving Ultran", true],
+    [{ tool: "runtime.exec" }, "Please run the tests", true],
+    [{ tool: "app.open", app: "whatsapp" }, "Don't open WhatsApp", false],
+    [{ tool: "app.open", app: "whatsapp" }, "Please open WhatsApp", true],
+    [{ tool: "whatsapp.compose" }, "How do I send a WhatsApp message?", false],
+    [{ tool: "whatsapp.compose" }, "Don't send a WhatsApp message", false],
+    [{ tool: "whatsapp.compose" }, "Prepare a WhatsApp message", true],
+    [{ tool: "telegram.compose" }, "Prepare a Telegram message", true],
+  ];
+  for (const [request, text, expected] of cases) {
+    assert.equal(matcher(request, text), expected, text);
+  }
+});
+
 test("ordinary conversation is the default and native Stop interrupts llama.cpp decoding", () => {
   assert.match(main, /DEFAULT TO NORMAL CONVERSATION/);
   assert.match(main, /Never emit a tool call for a greeting or ordinary informational question/);

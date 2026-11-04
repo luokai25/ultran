@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -136,14 +137,14 @@ function LoginScreen({
   );
 }
 
-function ConversationRow({ item }: { item: UltronConversation }) {
+function ConversationRow({ item, onPress }: { item: UltronConversation; onPress: () => void }) {
   const date = item.last_message_at ?? item.updated_at;
   const dateLabel = date
     ? new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : 'New';
 
   return (
-    <View style={styles.conversationRow}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.conversationRow}>
       <View style={styles.conversationIcon}>
         <Text style={styles.conversationIconText}>U</Text>
       </View>
@@ -152,7 +153,7 @@ function ConversationRow({ item }: { item: UltronConversation }) {
         <Text style={styles.conversationMeta}>{item.status === 'archived' ? 'Archived' : 'Conversation'} · {dateLabel}</Text>
       </View>
       <Text style={styles.rowChevron}>›</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -170,6 +171,7 @@ function WorkspaceScreen({
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const refresh = useCallback(async () => {
     try {
@@ -211,8 +213,9 @@ function WorkspaceScreen({
   const addConversation = async () => {
     setCreating(true);
     try {
-      await createWorkspaceConversation();
+      const conversation = await createWorkspaceConversation();
       await refresh();
+      router.push({ pathname: '/conversation/[id]', params: { id: conversation.id } });
     } catch (err) {
       Alert.alert('Could not create conversation', err instanceof Error ? err.message : 'Please try again.');
     } finally {
@@ -278,7 +281,7 @@ function WorkspaceScreen({
       ) : conversations.length ? (
         <View style={styles.listPanel}>
           {conversations.map((conversation) => (
-            <ConversationRow item={conversation} key={conversation.id} />
+            <ConversationRow item={conversation} key={conversation.id} onPress={() => router.push({ pathname: '/conversation/[id]', params: { id: conversation.id } })} />
           ))}
         </View>
       ) : (

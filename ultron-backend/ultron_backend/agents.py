@@ -583,8 +583,8 @@ class AgentService:
             )
         if "ultron_supabase_capabilities" in (client_capabilities or []):
             system_message += (
-                "\n\nULTRON LEGACY CAPABILITY RECORDS:"
-                "\nUse capabilities.status and capabilities.list to inspect legacy Python drafts, proposals and checkpoints. Do not create new operational tools through the legacy Python draft path; use runtime.tool.create and runtime.tool.run for all new tools. Use capabilities.create_proposal for infrastructure changes that need owner review, and capabilities.checkpoint_run to persist long-running agent progress."
+                "\n\nULTRON SUPABASE CAPABILITY INTERFACE (legacy capability records):"
+                "\nUse capabilities.status and capabilities.list to inspect legacy Python drafts, proposals and checkpoints. capabilities.save_tool_draft stores Python source drafts only; those drafts are never executable. Never approve a proposal or activate a legacy Python draft. Do not create new operational tools through the legacy Python draft path; use runtime.tool.create and runtime.tool.run for all new tools. Use capabilities.create_proposal for infrastructure changes that need owner review, and capabilities.checkpoint_run to persist long-running agent progress."
             )
         if "android_phone_actions" in (client_capabilities or []):
             system_message += (

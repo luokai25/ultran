@@ -848,3 +848,22 @@ def test_history_budget_preserves_recent_turns_under_a_hard_context_limit():
     assert sum(len(item.content) for item in bounded) <= 100
     assert bounded[-1].content == "latest request"
     assert "earlier context omitted" in bounded[0].content
+
+
+def test_chat_exposes_supabase_runtime_for_self_authored_tools_and_skills(monkeypatch):
+    svc = service()
+    agent = svc.create(name="Autonomous Ultron")
+    captured = []
+    original_complete = svc.brain.complete
+
+    def capture(messages, **kwargs):
+        captured.extend(messages)
+        return original_complete(messages, **kwargs)
+
+    monkeypatch.setattr(svc.brain, "complete", capture)
+    svc.chat(agent.id, "create a cloud tool", client_capabilities=["ultron_supabase_runtime"])
+    system_prompt = captured[0].content
+    assert "ULTRON SUPABASE SELF-EXTENSION RUNTIME" in system_prompt
+    assert "runtime.tool.create" in system_prompt
+    assert "runtime.tool.run" in system_prompt
+    assert "skills.cloud.save" in system_prompt

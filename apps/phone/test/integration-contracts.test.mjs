@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary, nativeBuild, nativeJni, nativeLlamaJava, nativePluginJava, brainRuntime, agentRuntime] = await Promise.all([
+const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary, nativeBuild, nativeJni, nativeLlamaJava, nativePluginJava, brainRuntime, agentRuntime, styles] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("src/semantic-graph.ts"),
@@ -32,6 +32,7 @@ const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKern
   read("android/app/src/main/java/app/ultran/mobile/UltranLocalAiPlugin.java"),
   read("../../ultran-backend/ultran_backend/brain.py"),
   read("../../ultran-backend/ultran_backend/agents.py"),
+  read("src/styles.css"),
 ]);
 
 test("every required phone UI selector exists exactly once", () => {
@@ -459,4 +460,12 @@ test("Android native vision projector import is private, optional, compatibility
   assert.match(nativeJni, /mtmd_support_vision\(g_mtmd_context\)/);
   assert.match(nativeJni, /mtmd_free\(g_mtmd_context\)/);
   assert.match(nativeBuild, /tools\/mtmd/);
+});
+
+test("chat image attachments stay compact and never expand to their source dimensions", () => {
+  assert.match(main, /preview\.className = "attachment-thumb"/);
+  assert.match(styles, /\.attachment-preview\s*\{[^}]*max-height:\s*88px/s);
+  assert.match(styles, /\.attachment-thumb\s*\{[^}]*width:\s*56px;[^}]*height:\s*56px;[^}]*object-fit:\s*cover/s);
+  assert.match(styles, /\.attachment-chip\s*\{[^}]*max-width:\s*min\(100%, 320px\)/s);
+  assert.match(styles, /\.attachment-preview\s*\{[^}]*overflow-y:\s*auto/s);
 });

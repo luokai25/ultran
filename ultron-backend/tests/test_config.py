@@ -24,7 +24,7 @@ def test_from_env_reads_every_knob():
             "ULTRON_ENV": "production",
             "ULTRON_CREDENTIAL_ENCRYPTION_KEY": "test-key-is-present-for-config-only",
             "ULTRON_API_PREFIX": "/api",
-            "ULTRON_BRAIN_BACKEND": "OLLAMA",
+            "ULTRON_BRAIN_BACKEND": "OPENAI",
             "ULTRON_BRAIN_TIMEOUT_S": "12.5",
             "ULTRON_SANDBOX_MAX_TTL_S": "60",
             "ULTRON_FREE_PLAN_MONTHLY_TOKENS": "4242",
@@ -34,7 +34,7 @@ def test_from_env_reads_every_knob():
     assert s.environment == "production"
     assert s.is_production is True
     assert s.api_prefix == "/api"
-    assert s.brain_backend == "ollama"
+    assert s.brain_backend == "openai"
     assert s.brain_fallbacks == ("echo",)
     assert s.brain_timeout_s == 12.5
     assert s.sandbox_max_ttl_s == 60
@@ -82,7 +82,12 @@ def test_settings_are_immutable_and_overridable():
     assert copy is not s
 
 
-def test_environment_defaults_to_local_ollama_with_echo_fallback():
+def test_environment_defaults_to_offline_echo():
     settings = Settings.from_env({})
-    assert settings.brain_backend == "ollama"
+    assert settings.brain_backend == "echo"
     assert settings.brain_fallbacks == ("echo",)
+
+
+def test_ollama_backend_is_not_supported():
+    with pytest.raises(ValueError, match="brain_backend"):
+        Settings(brain_backend="ollama")

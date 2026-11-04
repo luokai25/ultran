@@ -267,7 +267,7 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
         const jsize length = env->GetArrayLength(image);
         if (length <= 0 || length > 2 * 1024 * 1024) {
             env->DeleteLocalRef(image);
-            return env->NewStringUTF("An attached image exceeds the 1 MB native vision limit.");
+            return env->NewStringUTF("An attached image exceeds the 2 MB native vision limit.");
         }
         total_image_bytes += static_cast<size_t>(length);
         if (total_image_bytes > 4 * 1024 * 1024) {

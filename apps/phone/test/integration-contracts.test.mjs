@@ -464,6 +464,7 @@ test("Android native vision projector import is private, optional, compatibility
   assert.ok(nativeJni.includes("mtmd_tokenize("));
   assert.ok(nativeJni.includes("mtmd_helper_eval_chunks("));
   assert.ok(nativeJni.includes("jobjectArray jimages"));
+  assert.ok(nativeJni.includes("exceeds the 2 MB native vision limit"));
   assert.ok(nativePluginJava.includes('optJSONArray("images")'));
   assert.ok(nativePluginJava.includes("Base64.decode"));
   assert.ok(nativePluginJava.includes("imageArray"));

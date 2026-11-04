@@ -178,8 +178,9 @@ def test_iteration_yields_manifests():
 # ---------------------------------------------------------------- catalog
 
 
-def test_catalog_is_substantial():
-    assert catalog_size() >= 70
+def test_catalog_starts_with_github_only():
+    assert catalog_size() == 1
+    assert [m.id for m in BUILTIN_CONNECTORS] == ["github"]
 
 
 def test_catalog_has_no_duplicate_ids():
@@ -187,18 +188,12 @@ def test_catalog_has_no_duplicate_ids():
     assert len(ids) == len(set(ids))
 
 
-def test_catalog_mixes_free_and_paid_plans():
-    tiers = {m.tier for m in BUILTIN_CONNECTORS}
-    assert tiers == {"free", "paid"}
-    free = sum(1 for m in BUILTIN_CONNECTORS if m.tier == "free")
-    assert free >= 30
-
-
-def test_catalog_covers_the_expected_categories():
-    cats = catalog_categories()
-    for expected in ("ai", "communication", "infra", "productivity", "social"):
-        assert expected in cats
-        assert cats[expected] >= 3
+def test_catalog_is_focused_on_source_control():
+    assert catalog_categories() == {"source-control": 1}
+    github = BUILTIN_CONNECTORS[0]
+    assert github.auth_kind == "oauth2"
+    assert github.tier == "free"
+    assert set(github.actions) == {"list_repos", "get_file", "create_issue"}
 
 
 def test_catalog_every_manifest_is_valid_and_actionable():
@@ -214,27 +209,8 @@ def test_catalog_loads_into_a_registry():
     assert r.stats()["total"] == catalog_size()
 
 
-def test_catalog_includes_the_keyless_local_connectors():
-    by_id = {m.id: m for m in BUILTIN_CONNECTORS}
-    assert by_id["ollama"].auth_kind == "none"
-    assert by_id["arxiv"].auth_kind == "none"
-
-
-# ------------------------------------------------- expanded catalog (extension)
-
-
-def test_catalog_is_in_the_hundreds():
-    assert catalog_size() >= 400
-
-
-def test_catalog_extension_ids_do_not_shadow_the_core_set():
-    from ultron_backend.connectors.catalog import _ROWS
-    from ultron_backend.connectors.catalog_extra import EXTRA_ROWS
-
-    core = {row[0] for row in _ROWS}
-    extra = [row[0] for row in EXTRA_ROWS]
-    assert not core & set(extra)
-    assert len(extra) == len(set(extra))
+def test_catalog_exposes_no_unapproved_external_integrations():
+    assert {m.id for m in BUILTIN_CONNECTORS} == {"github"}
 
 
 def test_catalog_has_no_duplicate_display_names():
@@ -246,10 +222,6 @@ def test_catalog_ids_never_collide_with_the_reserved_test_ghost():
     # tests/test_api.py relies on "ghost" being an unknown connector.
     assert "ghost" not in {m.id for m in BUILTIN_CONNECTORS}
 
-
-def test_catalog_free_connectors_outnumber_paid_ones():
-    free = sum(1 for m in BUILTIN_CONNECTORS if m.tier == "free")
-    assert free > catalog_size() // 2
 
 
 def test_phone_snapshot_matches_the_catalog():

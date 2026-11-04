@@ -16,10 +16,10 @@ function clone(m: ConnectorManifest): ConnectorManifest {
   return JSON.parse(JSON.stringify(m)) as ConnectorManifest;
 }
 
-test('the first-party catalogue includes ten connectors', () => {
+test('the first-party external catalogue contains only GitHub plus the local files runtime', () => {
   assert.deepEqual(
     BUILTIN_CONNECTORS.map((m) => m.id).sort(),
-    ['anthropic', 'discord', 'files', 'github', 'google-drive', 'notion', 'ollama', 'openai', 'slack', 'telegram'],
+    ['files', 'github'],
   );
 });
 
@@ -32,8 +32,8 @@ test('every builtin manifest validates cleanly', () => {
 test('every builtin loads into the registry and exposes its tools', () => {
   const registry = new ConnectorRegistry();
   for (const manifest of BUILTIN_CONNECTORS) registry.load(manifest);
-  assert.equal(registry.list().length, 10);
-  assert.equal(registry.listTools().length, 21);
+  assert.equal(registry.list().length, 2);
+  assert.equal(registry.listTools().length, 5);
 });
 
 test('the JSON schema accepts the namespaced tool ids the validator requires', () => {
@@ -52,7 +52,7 @@ test('the local files connector is offline and requires no credentials', () => {
 });
 
 test('read and write operations use separate capabilities', () => {
-  for (const id of ['files', 'github', 'slack', 'notion', 'discord', 'telegram', 'google-drive']) {
+  for (const id of ['files', 'github']) {
     const manifest = BUILTIN_CONNECTORS.find((m) => m.id === id);
     assert.ok(manifest, id);
     const capabilities = new Set(manifest.tools.map((tool) => tool.capability));
@@ -69,7 +69,7 @@ test('network tools require explicit egress and wildcard hosts are rejected', ()
   assert.match(errors, /wildcards/);
   assert.match(errors, /declared but no tool uses it/);
   assert.match(errors, /namespaced under/);
-  const noEgress = clone(BUILTIN_CONNECTORS.find((m) => m.id === 'slack')!);
+  const noEgress = clone(BUILTIN_CONNECTORS.find((m) => m.id === 'github')!);
   noEgress.egress = [];
   assert.match(validateManifest(noEgress).join('\n'), /egress list is empty/);
 });

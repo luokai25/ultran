@@ -161,11 +161,12 @@
         <button id="connectors-back" class="icon-btn" aria-label="Back">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
         </button>
-        <h2>Tools &amp; Connectors</h2>
+        <div class="connector-brand-heading"><h2>GitHub</h2><small>ULTRON CONNECTOR · 01</small></div>
         <span id="connectors-count" class="panel-count"></span>
-        <button id="connectors-refresh" class="ghost" type="button">Refresh status</button>
+        <button id="connectors-refresh" class="ghost" type="button">Refresh</button>
       </header>
-      <div class="panel-tools">
+      <div class="panel-tools github-panel-tools">
+        <section class="github-intro"><div class="github-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.4a9.7 9.7 0 0 0-3.07 18.9c.49.09.66-.21.66-.47v-1.68c-2.7.59-3.27-1.15-3.27-1.15-.44-1.12-1.08-1.42-1.08-1.42-.88-.6.07-.59.07-.59.97.07 1.48 1 1.48 1 .86 1.48 2.26 1.05 2.81.8.09-.63.34-1.05.61-1.29-2.15-.24-4.41-1.08-4.41-4.8 0-1.06.38-1.92 1-2.6-.1-.25-.44-1.23.1-2.56 0 0 .82-.26 2.67.99a9.3 9.3 0 0 1 4.86 0c1.85-1.25 2.67-.99 2.67-.99.54 1.33.2 2.31.1 2.56.62.68 1 1.54 1 2.6 0 3.73-2.26 4.55-4.42 4.79.35.3.66.88.66 1.78v2.64c0 .26.18.56.67.47A9.7 9.7 0 0 0 12 2.4Z"/></svg></div><div><strong>One connection. Carefully built.</strong><p>Give ULTRON controlled access to your repositories. Start read-only, then approve each change when it matters.</p></div></section>
         <input id="connectors-search" type="search" inputmode="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search services or actions" aria-label="Search connectors" />
         <div id="connectors-tiers" class="chips" role="group" aria-label="Plan"></div>
         <div id="connectors-chips" class="chips" role="group" aria-label="Category"></div>
@@ -175,10 +176,10 @@
           <p id="permission-description">Checking your backend grants. The local catalogue remains available while we check.</p>
         </section>
         <div id="composio-health" class="composio-health" data-state="loading" role="status" aria-live="polite">
-          <span>COMPOSIO</span><strong id="composio-health-label">Checking connection</strong>
-          <small id="composio-health-detail">OAuth availability is checked separately from connector permissions.</small>
+          <span>GITHUB ACCOUNT</span><strong id="composio-health-label">Checking connection</strong>
+          <small id="composio-health-detail">Checking GitHub authorization and repository access.</small>
         </div>
-        <small class="panel-status">Active OAuth connections are available to Ultron Prime. Write, delete, execute and admin actions wait for your approval.</small>
+        <small class="panel-status">Repository reads are limited to the connected account. Issue creation and future write operations require explicit approval.</small>
         <section id="composio-approvals" class="approval-panel" hidden aria-label="Pending tool approvals">
           <h3>Agent action approvals</h3>
           <p>Review the exact action and arguments before an agent can change or send anything.</p>

@@ -1586,3 +1586,26 @@ button {
 .attachment-chip .attachment-snippet {
   display: none;
 }
+
+/* Focused first connector: GitHub. The marketplace stays intentionally small. */
+#connectors-panel .github-panel-tools > #connectors-search,
+#connectors-panel .github-panel-tools > #connectors-tiers,
+#connectors-panel .github-panel-tools > #connectors-chips { display: none !important; }
+.connector-brand-heading { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.connector-brand-heading h2 { margin:0; }
+.connector-brand-heading small { color:var(--muted); font-size:10px; letter-spacing:.14em; font-weight:800; }
+.github-intro { display:flex; align-items:center; gap:14px; padding:16px; margin:4px 0 14px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
+.github-intro > div:last-child { min-width:0; }
+.github-intro strong { display:block; font-size:15px; letter-spacing:-.02em; }
+.github-intro p { margin:5px 0 0; color:var(--muted); font-size:12px; line-height:1.55; }
+.github-mark,.github-card-mark { display:grid; place-items:center; flex:0 0 auto; border:1px solid rgba(255,255,255,.16); border-radius:15px; background:#17191d; color:#fff; font-weight:900; letter-spacing:-.08em; }
+.github-mark { width:52px; height:52px; border-radius:17px; }
+.github-mark svg { width:31px; height:31px; fill:currentColor; }
+.github-card-mark { width:40px; height:40px; border-radius:13px; font-size:13px; }
+.github-detail-title { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.github-detail-title h2 { margin:0; }
+.github-detail-mark { width:44px; height:44px; }
+.github-capability-list { display:grid; gap:8px; margin:10px 0 16px; }
+.github-capability-row { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font-size:13px; }
+.github-capability-check { display:grid; place-items:center; width:22px; height:22px; border-radius:50%; color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent); font-weight:900; }
+.github-approval-note { padding:12px; border-left:2px solid var(--accent); border-radius:0 10px 10px 0; background:color-mix(in srgb,var(--accent) 6%,transparent); color:var(--muted); font-size:12px; line-height:1.55; }

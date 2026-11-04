@@ -125,7 +125,9 @@ export function initConnectors(deps: Deps): void {
     root.setAttribute("aria-label", `${entry.name}, ${entry.tier}, ${AUTH_LABEL[entry.auth]}`);
 
     const head = el("div", "conn-head");
-    head.append(el("span", "conn-name", entry.name));
+    const mark = el("span", "github-card-mark", "GH");
+    mark.setAttribute("aria-hidden", "true");
+    head.append(mark, el("span", "conn-name", entry.name));
     if (enabled.has(entry.id)) head.append(el("span", "conn-on", "On"));
     if (oauthConnected.has(entry.id.replace(/-/g, "_"))) head.append(el("span", "conn-on", "Connected"));
     root.append(head, el("p", "conn-desc", entry.description));
@@ -259,9 +261,9 @@ export function initConnectors(deps: Deps): void {
       if (!panelOpen || generation !== refreshGeneration) return;
       if (configured.configured !== true) {
         composioHealth.dataset.state = "disconnected";
-        composioHealthLabel.textContent = "Not configured";
-        composioHealthDetail.textContent = "Composio is not configured on this backend. Add its key to the private server environment, never to the APK.";
-        statusEl.textContent = "Composio is not configured on the backend. Set ULTRON_COMPOSIO_API_KEY in the private server .env, then restart the API. Never add this key to the APK.";
+        composioHealthLabel.textContent = "GitHub authorization unavailable";
+        composioHealthDetail.textContent = "The secure authorization service is not configured on this backend. GitHub cannot be connected until the server-side integration is configured.";
+        statusEl.textContent = "GitHub authorization is not configured on the backend. No credentials were stored on this device.";
         statusEl.dataset.tone = "warn";
         return;
       }
@@ -273,12 +275,12 @@ export function initConnectors(deps: Deps): void {
         if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
       }
       composioHealth.dataset.state = "ready";
-      composioHealthLabel.textContent = "Connected";
-      composioHealthDetail.textContent = oauthConnected.size + (oauthConnected.size === 1 ? " active account" : " active accounts") + " available. Write actions remain approval-gated.";
+      composioHealthLabel.textContent = "GitHub connected";
+      composioHealthDetail.textContent = oauthConnected.size ? "GitHub account authorized. Repository reads are available; writes remain approval-gated." : "The authorization service is reachable, but no active GitHub account was found.";
     } catch {
       if (!panelOpen || generation !== refreshGeneration) return;
       composioHealth.dataset.state = "error";
-      composioHealthLabel.textContent = "Disconnected";
+      composioHealthLabel.textContent = "GitHub not connected";
       composioHealthDetail.textContent = "Composio could not be reached. Existing connections are not shown as active until the service responds.";
     }
   }
@@ -367,10 +369,15 @@ export function initConnectors(deps: Deps): void {
     const toolkit = entry.id.replace(/-/g, "_");
     const oauthOn = oauthConnected.has(toolkit);
 
+    const titleRow = el("div", "github-detail-title");
+    const detailMark = el("span", "github-card-mark github-detail-mark", "GH");
+    detailMark.setAttribute("aria-hidden", "true");
+    titleRow.append(detailMark);
     const title = el("h2", undefined, entry.name);
     title.id = "connector-detail-title";
+    titleRow.append(title);
     detailEl.setAttribute("aria-labelledby", title.id);
-    detailEl.append(title);
+    detailEl.append(titleRow);
     detailEl.append(el("p", "conn-detail-desc", entry.description));
 
     const meta = el("div", "conn-meta");
@@ -379,10 +386,15 @@ export function initConnectors(deps: Deps): void {
     meta.append(el("span", "badge", AUTH_LABEL[entry.auth]));
     detailEl.append(meta);
 
-    detailEl.append(el("div", "drawer-label", `Actions (${entry.actions.length})`));
-    const actions = el("div", "conn-actions");
-    for (const a of entry.actions) actions.append(el("code", "action", a));
+    detailEl.append(el("div", "drawer-label", "AVAILABLE CAPABILITIES"));
+    const actions = el("div", "github-capability-list");
+    for (const a of entry.actions) {
+      const row = el("div", "github-capability-row");
+      row.append(el("span", "github-capability-check", "✓"), el("span", undefined, a));
+      actions.append(row);
+    }
     detailEl.append(actions);
+    detailEl.append(el("p", "github-approval-note", "Security model: repository data is read through the connected account. Any operation that changes GitHub requires a separate approval showing the exact repository and action."));
 
     const note = el("small", "conn-note");
     const buttons = el("div", "sheet-actions");

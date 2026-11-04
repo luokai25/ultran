@@ -30,6 +30,9 @@ test("quiet layer maintains a monochrome palette and supports narrow devices and
   assert.match(css, /max-width:\s*390px/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
+  assert.match(css, /active-identity-button \{ display: inline-flex/);
+  assert.match(css, /active-identity-button \{ display: inline-flex !important/);
+  assert.match(css, /\[hidden\].*display: none !important/);
   assert.match(css, /overscroll-behavior/);
 });
 

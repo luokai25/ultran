@@ -26,7 +26,7 @@
         </div>
         <div class="topbar-actions">
           <button id="global-search-open" class="icon-btn global-search-open" type="button" aria-label="Search Ultron" title="Search"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg></button>
-          <button id="chat-model-button" class="chat-model-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-model-menu"><span class="chat-model-indicator"></span><span id="chat-model-label">Choose model</span><span aria-hidden="true">⌄</span></button>
+          <button id="chat-model-button" class="chat-model-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-model-menu"><span class="chat-model-indicator"></span><span id="chat-model-label">Choose model</span><span aria-hidden="true">⌄</span></button><button id="active-identity-button" class="active-identity-button" type="button" aria-label="Change active agent identity">ULTRON</button>
           <span class="topbar-presence"><i></i> LOCAL FIRST</span>
           <button id="new-btn" class="icon-btn new-trigger" aria-label="New conversation">
             <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -84,52 +84,35 @@
         <p id="voice-status" class="voice-status" role="status" aria-live="polite" hidden></p>
         <p class="footnote"><span class="footnote-lock">◆</span> Private by design · Review actions before they run.</p>
       </footer>
-      <section id="agents-screen" class="feature-screen" aria-label="AI agents" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">YOUR AI TEAM</span><h1>Agents</h1><p>Your agents, ready to work.</p></div><button id="agents-workspace-open" class="gold-button" type="button">Open workspace <span aria-hidden="true">↗</span></button></header>
-        <div class="feature-filters" role="group" aria-label="Agent filter"><button class="filter-chip is-selected" type="button" data-agent-filter="all">All</button><button class="filter-chip" type="button" data-agent-filter="active">Active</button><button class="filter-chip" type="button" data-agent-filter="local">Local-first</button></div>
-        <div class="agent-cards">
-          <article class="agent-card" data-agent-kind="local"><div class="agent-avatar agent-avatar-ultron" aria-label="Ultron orb"></div><div class="agent-card-copy"><h2>Ultron Assistant</h2><span class="agent-status"><i></i> Ready</span><p>Your personal AI assistant</p></div><span class="card-chevron">›</span></article>
-          <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-code"><span>&lt;/&gt;</span></div><div class="agent-card-copy"><h2>Code Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Help plan, review and debug code</p></div><span class="card-chevron">›</span></article>
-          <article class="agent-card" data-agent-kind="active"><div class="agent-avatar agent-avatar-web"><span>◎</span></div><div class="agent-card-copy"><h2>Research Agent</h2><span class="agent-status agent-status-idle"><i></i> Available</span><p>Research and organize information</p></div><span class="card-chevron">›</span></article>
+      <section id="agent-identities-screen" class="feature-screen" aria-label="Agents and identities" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">ONE BRAIN · DISTINCT IDENTITIES</span><h1>Agents &amp; Identities</h1><p>ULTRON is the operating identity. The imported model is its reasoning brain.</p></div><button id="identity-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
+        <div id="identity-cards" class="identity-cards">
+          <button class="identity-card is-active" data-identity="ultron" type="button"><span class="identity-symbol">✳</span><span><strong>ULTRON</strong><small>Primary personal intelligence</small></span><i>Active</i></button>
+
         </div>
-        <div class="feature-callout"><span class="callout-icon">✳</span><div><strong>Tasks stay under your control</strong><p>Review permissions and approve write-capable actions before they run.</p></div></div>
-      </section>
-      <section id="worlds-screen" class="feature-screen" aria-label="Worlds" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">EXPLORE THE IMPOSSIBLE</span><h1>Worlds</h1><p>Places to imagine, build, and explore.</p></div></header>
-        <button class="world-hero" id="world-lou-open" type="button"><span class="world-art world-art-castle" aria-hidden="true"><i></i><b></b></span><span class="world-copy"><span class="feature-eyebrow">FEATURED WORLD</span><strong>Lou World</strong><small>A god-like sandbox concept, ready to explore as a creative prompt.</small><span class="gold-link">Start imagining <b>→</b></span></span></button>
-        <div class="world-grid"><button class="world-tile" type="button" data-world-prompt="Help me design a rich fantasy realm with kingdoms, magic systems, and ancient ruins."><span class="world-art world-art-fantasy" aria-hidden="true">✧</span><strong>Fantasy Realm</strong><small>Magic and myth</small></button><button class="world-tile" type="button" data-world-prompt="Help me design a believable sci-fi universe with planets, factions, and advanced technology."><span class="world-art world-art-space" aria-hidden="true">◉</span><strong>Sci-Fi Universe</strong><small>Beyond the stars</small></button></div>
-        <p class="feature-disclaimer">World cards open a creative session with Ultron. They do not claim a playable game is installed.</p>
-      </section>
-      <section id="luonix-screen" class="feature-screen" aria-label="Luonix feed" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">WATCH · CREATE · SHARE</span><h1>Luonix</h1><p>A home for short-form ideas and media.</p></div><button id="luonix-create" class="gold-button" type="button">Create <span aria-hidden="true">＋</span></button></header>
-        <div class="feature-filters" role="group" aria-label="Luonix feed"><button class="filter-chip is-selected" type="button" data-feed-filter="for-you">For You</button><button class="filter-chip" type="button" data-feed-filter="following">Following</button><button class="filter-chip" type="button" data-feed-filter="trending">Trending</button></div>
-        <article class="luonix-preview"><div class="luonix-art" aria-hidden="true"><span class="luonix-play">▶</span><span class="luonix-art-label">YOUR NEXT IDEA STARTS HERE</span></div><div class="luonix-post-meta"><div class="mini-avatar">U</div><div><strong>Ultron Studio</strong><small>Sample preview · stored on this screen only</small></div><button class="like-button" type="button" aria-pressed="false" aria-label="Like preview">♡</button></div><p class="luonix-caption">Make something worth sharing. Your media and publishing tools will appear here when configured.</p></article>
-        <div class="feature-callout"><span class="callout-icon">＋</span><div><strong>Create a post</strong><p>Choose a photo or video from your gallery to prepare a local draft.</p><button id="luonix-draft-btn" class="text-action" type="button">Prepare a draft</button></div></div>
-      </section>
-      <section id="more-screen" class="feature-screen" aria-label="More Ultron features" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">ULTRON</span><h1>More</h1><p>Your tools, privacy, and personal space.</p></div></header>
-        <button id="more-connectors-btn" class="more-row" type="button"><span class="more-icon">⌘</span><span><strong>Tools &amp; Connectors</strong><small>Connect services and review permissions</small></span><b>›</b></button>
-        <button id="more-vault-btn" class="more-row" type="button"><span class="more-icon">◎</span><span><strong>Mind Map</strong><small>Your Obsidian-style knowledge vault across every chat</small></span><b>›</b></button>
-        <button id="more-settings-btn" class="more-row" type="button"><span class="more-icon">⚙</span><span><strong>Settings</strong><small>Account, local AI, runtime and privacy</small></span><b>›</b></button>
-        <div class="vault-privacy-card"><div class="vault-shield">♙</div><h2>Your data stays yours</h2><p>Ultron keeps local-first features and permissions visible. Sensitive actions require your approval. No files are represented as encrypted until encrypted storage is implemented and verified.</p></div>
-        <p class="feature-version">ULTRON · PERSONAL AI SYSTEM</p>
+        <div class="identity-visual-section"><span class="section-eyebrow">ULTRON IDENTITY</span><div id="themes" class="themes" role="group" aria-label="Ultron visual identity"></div></div>
+        <div class="identity-program-grid" aria-label="ULTRON programmed intelligence systems">
+          <article><strong>01 · Cognition &amp; planning</strong><p>Intent recognition, task classification, complexity routing, dependency-aware plans, continuation and completion checks.</p></article>
+          <article><strong>02 · Memory &amp; context</strong><p>Conversation continuity, semantic knowledge retrieval, relevance ranking, confidence, source tracking and contradiction handling.</p></article>
+          <article><strong>03 · Tools &amp; permissions</strong><p>Tool relevance checks, explicit-intent detection, approval gates, scoped execution and untrusted-output isolation.</p></article>
+          <article><strong>04 · Quality &amp; truth</strong><p>Draft validation, evidence checks, failure reporting, uncertainty handling and verification of claimed actions.</p></article>
+          <article><strong>05 · Adaptation &amp; efficiency</strong><p>Model-aware context budgets, minimal inference passes, bounded retries and device-capability awareness.</p></article>
+          <article><strong>06 · Communication</strong><p>Stable ULTRON voice, language matching, proportional detail, accessibility and sensitive-topic handling.</p></article>
+        </div>
+        <div class="identity-brain-link"><span class="identity-brain-pulse"></span><div><strong>ULTRON control layer → reasoning brain</strong><small id="identity-brain-status">ULTRON directs the selected local or connected model.</small></div></div>
+        <label class="identity-editor"><span id="identity-editor-label">ULTRON operating preferences</span><textarea id="identity-details" rows="7" placeholder="Add personal preferences and operating context. Core ULTRON policies remain protected…"></textarea></label>
+        <p class="feature-disclaimer">ULTRON runs a programmed orchestration layer around the selected reasoning model. Custom preferences cannot override its core policies, permissions, or approval gates.</p>
+        <button id="identity-save" class="gold-button" type="button">Save identity details</button>
       </section>
       <section id="vault-screen" class="feature-screen mindmap-screen" aria-label="Combined knowledge mind map" hidden>
-        <header class="feature-head"><div><span class="feature-eyebrow">YOUR SECOND BRAIN · LOCAL</span><h1>Mind Map</h1><p>One connected knowledge graph from every conversation.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to More">‹</button></header>
-        <div class="mindmap-toolbar"><span id="mindmap-stats">Combining all sessions…</span><button id="mindmap-refresh" class="ghost" type="button">Rebuild map</button></div>
+        <header class="feature-head"><div><span class="feature-eyebrow">YOUR SECOND BRAIN · LOCAL</span><h1>Mind Map</h1><p>One connected knowledge graph from every conversation.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
+        <div class="mindmap-toolbar"><span id="mindmap-stats">Combining all sessions…</span><input id="mindmap-search" type="search" inputmode="search" placeholder="Find a person, project or idea…" aria-label="Search mind map" /><button id="mindmap-refresh" class="ghost" type="button">Rebuild map</button></div>
         <div class="mindmap-canvas-wrap"><svg id="mindmap-canvas" class="mindmap-canvas" viewBox="0 0 900 650" role="img" aria-label="Interactive knowledge map of all conversations"></svg><div id="mindmap-empty" class="mindmap-empty" hidden>Start chatting. Ultron will continuously organise topics, decisions, projects and ideas from every session here.</div></div>
-        <div class="mindmap-legend"><span><i class="mindmap-dot project"></i>Projects</span><span><i class="mindmap-dot topic"></i>Topics</span><span><i class="mindmap-dot decision"></i>Decisions</span><span><i class="mindmap-dot session"></i>Sessions</span></div>
+        <div class="mindmap-legend"><span><i class="mindmap-dot project"></i>Projects</span><span><i class="mindmap-dot topic"></i>Topics &amp; concepts</span><span><i class="mindmap-dot decision"></i>Decisions</span><span><i class="mindmap-dot session"></i>Sessions</span><span><i class="mindmap-dot person"></i>People</span><span><i class="mindmap-dot preference"></i>Preferences</span></div>
         <div class="mindmap-detail" id="mindmap-detail"><strong>Knowledge vault</strong><p>Choose a node to inspect its linked conversations and source messages.</p></div>
         <div class="mindmap-footer"><span id="mindmap-organizer">Waiting for the selected model…</span><button id="mindmap-export" class="ghost" type="button">Export Obsidian Markdown</button></div>
       </section>
-      <nav class="bottom-nav" aria-label="Main navigation">
-        <button id="nav-chat" class="nav-item" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.8A2.8 2.8 0 0 1 7.8 3h8.4A2.8 2.8 0 0 1 19 5.8v7.4a2.8 2.8 0 0 1-2.8 2.8H11l-4.8 4v-4.2a2.8 2.8 0 0 1-1.2-2.3z"/></svg><span>Chats</span></button>
-        <button id="nav-agents" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="12" rx="3"/><path d="M9 11h.01M15 11h.01M9 15h6M12 3v3M3 10h2M19 10h2"/></svg><span>Agents</span></button>
-        <button id="nav-worlds" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(-24 12 12)"/><path d="M12 5v14"/></svg><span>Worlds</span></button>
-        <button id="nav-luonix" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5a1.5 1.5 0 0 1 2.3-1.28l10.2 6.3a2.9 2.9 0 0 1 0 4.96l-10.2 6.3A1.5 1.5 0 0 1 7 19.5z"/></svg><span>Luonix</span></button>
-        <button id="nav-more" class="nav-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="5" height="5" rx="1"/><rect x="15" y="4" width="5" height="5" rx="1"/><rect x="4" y="15" width="5" height="5" rx="1"/><rect x="15" y="15" width="5" height="5" rx="1"/></svg><span>More</span></button>
-        <button id="nav-connectors" class="nav-item nav-compat" type="button" hidden><span>Connect</span></button><button id="nav-settings" class="nav-item nav-compat" type="button" hidden><span>Settings</span></button>
-      </nav>
+      <nav class="bottom-nav" aria-label="Main navigation"><button id="nav-chat" class="nav-item" type="button" aria-current="page" hidden>Chats</button><button id="nav-connectors" class="nav-item nav-compat" type="button" hidden><span>Connect</span></button><button id="nav-settings" class="nav-item nav-compat" type="button" hidden><span>Settings</span></button></nav>
     </div>
 
     <div id="scrim" class="scrim" hidden></div>
@@ -149,9 +132,11 @@
       <nav id="history" class="history" aria-label="Recent conversations"></nav>
       <div class="drawer-foot">
         <button id="workspace-btn" class="drawer-link" type="button"><span aria-hidden="true">▦</span>Agent Workspace</button>
+        <button id="drawer-identities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>Agents &amp; Identities</button>
+        <button id="drawer-mindmap" class="drawer-link" type="button"><span aria-hidden="true">◎</span>Mind Map</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
-          Connectors
+          Tools &amp; Connectors
         </button>
         <button id="settings-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
@@ -165,8 +150,9 @@
         <button id="connectors-back" class="icon-btn" aria-label="Back">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
         </button>
-        <h2>Connectors</h2>
+        <h2>Tools &amp; Connectors</h2>
         <span id="connectors-count" class="panel-count"></span>
+        <button id="connectors-refresh" class="ghost" type="button">Refresh status</button>
       </header>
       <div class="panel-tools">
         <input id="connectors-search" type="search" inputmode="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search services or actions" aria-label="Search connectors" />
@@ -277,10 +263,6 @@
             <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the current on-device text inference engine. Image, video and audio generation require additional native engines and decoders.</small>
           </section>
         </section>
-        <div class="field">
-          <span>Ultron identity</span>
-          <div id="themes" class="themes" role="group" aria-label="Theme"></div>
-        </div>
 
         <div class="sheet-actions">
           <button id="test-btn" class="ghost" type="button">Test backend</button>

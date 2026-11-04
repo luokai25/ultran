@@ -62,17 +62,17 @@ test("plasma orb identity stays aligned across web, Android generator, and adapt
 });
 
 
-test("reference-inspired five-tab mobile navigation and feature screens are present", async () => {
+test("single-chat shell keeps tools and memory available from the drawer", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  for (const id of ["nav-chat", "nav-agents", "nav-worlds", "nav-luonix", "nav-more", "agents-screen", "worlds-screen", "luonix-screen", "more-screen", "vault-screen"]) {
-    assert.ok(html.includes(`id=\"${id}\"`), `missing reference UI section: ${id}`);
+  for (const id of ["nav-chat", "agent-identities-screen", "vault-screen", "drawer-identities", "drawer-mindmap", "connectors-btn", "settings-btn"]) {
+    assert.ok(html.includes(`id=\"${id}\"`), `missing drawer destination: ${id}`);
   }
-  assert.match(main, /showFeatureScreen\(\"agents-screen\", navAgentsButton\)/);
-  assert.match(main, /showFeatureScreen\(\"worlds-screen\", navWorldsButton\)/);
-  assert.match(main, /showFeatureScreen\(\"luonix-screen\", navLuonixButton\)/);
-  assert.match(main, /showFeatureScreen\(\"more-screen\", navMoreButton\)/);
-  assert.match(html, /No files are represented as encrypted until encrypted storage is implemented and verified/);
+  for (const id of ["agents-screen", "worlds-screen", "luonix-screen", "more-screen", "nav-agents", "nav-worlds", "nav-luonix", "nav-more"]) {
+    assert.ok(!html.includes(`id=\"${id}\"`), `retired destination still exists: ${id}`);
+  }
+  assert.match(main, /showFeatureScreen\(\"agent-identities-screen\"/);
+  assert.match(main, /showFeatureScreen\(\"vault-screen\"/);
 });
 
 
@@ -160,4 +160,72 @@ test("version 3 keeps one red theme and retains native capability entry points",
   assert.ok(html.includes('id="ultron-runtime-download"'));
   assert.ok(mark.includes("ultron-core"));
   assert.ok(mark.includes("#ff304b"));
+});
+
+test("chat is the only primary surface and retired Worlds, Luonix, Agents, and More screens are removed", async () => {
+  const html = await read("index.html");
+  const main = await read("src/main.ts");
+  for (const retired of ["agents-screen", "worlds-screen", "luonix-screen", "more-screen", "nav-agents", "nav-worlds", "nav-luonix", "nav-more"]) {
+    assert.doesNotMatch(html, new RegExp(`id=\\"${retired}\\"`), `${retired} must not ship as a destination`);
+  }
+  assert.match(html, /id="nav-chat"/);
+  assert.match(html, /id="drawer-identities"/);
+  assert.match(html, /id="drawer-mindmap"/);
+  assert.match(html, /id="connectors-btn"/);
+  assert.match(html, /id="settings-btn"/);
+  assert.match(main, /showFeatureScreen\("agent-identities-screen"/);
+  assert.match(main, /showFeatureScreen\("vault-screen"/);
+});
+
+test("ULTRON is the only active identity and its programmed brain is separate from the imported model", async () => {
+  const [identity, brain, main, html] = await Promise.all([read("src/agent-identities.ts"), read("src/ultron-brain.ts"), read("src/main.ts"), read("index.html")]);
+  assert.match(identity, /active: "ultron"/);
+  assert.match(html, /data-identity="ultron"/);
+  assert.doesNotMatch(html, /data-identity="(?:jarvis|luokai)"/);
+  assert.match(brain, /ULTRON PROGRAMMED IDENTITY RUNTIME/);
+  assert.match(brain, /classifyUltronTask/);
+  assert.match(brain, /createUltronPlan/);
+  assert.match(brain, /rankUltronMemory/);
+  assert.match(brain, /assessUltronTool/);
+  assert.match(brain, /validateUltronDraft/);
+  assert.match(main, /buildUltronBrainContract/);
+  assert.match(main, /resolveIdentityPrompt\(identityState\)/);
+  assert.match(main, /identityState\.customInstructions/);
+});
+
+test("mind map combines semantic memory nodes and relationships with conversation-derived nodes", async () => {
+  const map = await read("src/mind-map.ts");
+  const main = await read("src/main.ts");
+  assert.match(map, /type MemoryGraph/);
+  assert.match(map, /memory\?\.nodes/);
+  assert.match(map, /memory\?\.edges/);
+  assert.match(map, /confidence\?: number/);
+  assert.match(main, /buildMindMap\(store\.conversations,semanticGraph\)/);
+});
+
+test("active identity is visible beside the brain selector and opens the identity switcher", async () => {
+  const html = await read("index.html");
+  const main = await read("src/main.ts");
+  assert.match(html, /id="active-identity-button"/);
+  assert.match(main, /activeIdentityButton\.textContent = activeProfile\.name/);
+  assert.match(main, /activeIdentityButton\.addEventListener\("click"/);
+});
+
+test("mind map export preserves graph confidence and semantic relationships", async () => {
+  const map = await read("src/mind-map.ts");
+  assert.match(map, /## Relationships/);
+  assert.match(map, /confidence \$\{node\.confidence/);
+  assert.match(map, /edge\.relation/);
+  assert.match(map, /ULTRON Shared Mind Map/);
+});
+
+
+test("the existing ULTRON identity appearance control lives in Agents & Identities", async () => {
+  const html = await read("index.html");
+  const identityStart = html.indexOf('id="agent-identities-screen"');
+  const themePicker = html.indexOf('id="themes"');
+  const settingsStart = html.indexOf('id="settings-sheet"');
+  assert.ok(identityStart >= 0 && themePicker > identityStart);
+  assert.match(html.slice(identityStart, themePicker), /ULTRON IDENTITY/);
+  assert.ok(settingsStart < 0 || themePicker < settingsStart || !html.slice(settingsStart).includes('id="themes"'));
 });

@@ -223,3 +223,29 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 #chat-attach-btn{display:inline-flex;align-items:center;cursor:pointer;user-select:none}
 
 .attachment-snippet{display:block;max-width:220px;overflow:hidden;color:rgba(232,229,220,.68);font-size:9px;line-height:1.35;white-space:normal}
+
+/* Single-chat navigation: secondary destinations live in the three-line drawer. */
+.bottom-nav .nav-item[hidden]{display:none!important}
+.identity-cards{display:grid;gap:10px;margin:18px 0}
+.identity-card{display:flex;align-items:center;gap:14px;width:100%;padding:15px;border:1px solid var(--line,#343039);border-radius:16px;background:rgba(255,255,255,.025);color:inherit;text-align:left;min-height:76px}
+.identity-card.is-active{border-color:var(--accent,#e52d41);background:rgba(229,45,65,.09)}
+.identity-symbol{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:rgba(229,45,65,.13);font-size:22px;color:#ff7180}
+.identity-card span:nth-child(2){display:grid;gap:4px;flex:1}.identity-card small,.identity-brain-link small{color:var(--muted,#9b969f);font-size:12px}.identity-card i{font-size:11px;color:#ff7180;font-style:normal}
+.identity-brain-link{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line,#343039);border-radius:14px;margin:14px 0 18px}.identity-brain-link div{display:grid;gap:4px}.identity-brain-pulse{width:10px;height:10px;border-radius:50%;background:#ff7180;box-shadow:0 0 14px #ff304b}
+.identity-editor{display:grid;gap:9px;margin:14px 0}.identity-editor span{font-size:13px;font-weight:650}.identity-editor textarea{width:100%;resize:vertical;min-height:140px;padding:13px;border:1px solid var(--line,#343039);border-radius:13px;background:#100e12;color:inherit;font:inherit;line-height:1.5}
+#connectors-refresh{margin-left:auto;min-height:36px;padding:7px 10px;font-size:11px;white-space:nowrap}
+#connectors-refresh:disabled{opacity:.6}
+/* Chat is the entire primary product surface; secondary tools are drawer destinations. */
+.bottom-nav{display:none!important}
+.mindmap-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#mindmap-search{flex:1 1 150px;min-width:0;max-width:260px;padding:9px 11px;border:1px solid var(--line,#343039);border-radius:11px;background:#100e12;color:inherit;font:inherit;font-size:12px}
+.mindmap-dot.person{background:#d5a65d}.mindmap-dot.preference{background:#a99be8}
+.identity-visual-section{padding:13px 14px;margin:14px 0;border:1px solid var(--line,#343039);border-radius:15px;background:rgba(255,255,255,.02)}
+.active-identity-button{min-height:34px;max-width:72px;padding:0 9px;border:1px solid rgba(255,113,128,.35);border-radius:999px;background:rgba(229,45,65,.10);color:#ff9aa5;font-size:10px;font-weight:750;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-actions{gap:6px}
+@media(max-width:430px){.active-identity-button{max-width:58px;padding:0 7px}.topbar-presence{display:none}}
+.identity-program-grid{display:grid;grid-template-columns:1fr;gap:9px;margin:16px 0}
+.identity-program-grid article{padding:13px;border:1px solid var(--line,#343039);border-radius:13px;background:rgba(255,255,255,.022)}
+.identity-program-grid article strong{font-size:12px;color:#ff8792;letter-spacing:.01em}
+.identity-program-grid article p{margin:6px 0 0;color:var(--muted,#a7a0aa);font-size:12px;line-height:1.5}
+@media(min-width:600px){.identity-program-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

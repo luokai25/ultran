@@ -222,17 +222,17 @@ test("WhatsApp handoff never sends or taps automatically", () => {
 
 test("mobile navigation is fully wired and respects phone accessibility zoom", async () => {
   const experience = await read("src/experience.css");
-  for (const id of ["nav-chat", "nav-agents", "nav-connectors", "nav-settings"]) {
+  for (const id of ["nav-chat", "nav-connectors", "nav-settings"]) {
     assert.equal((html.match(new RegExp(`id="${id}"`, "g")) ?? []).length, 1);
     assert.ok(main.includes(`#${id}`));
   }
   assert.match(main, /navChatButton\.addEventListener/);
-  assert.match(main, /navAgentsButton\.addEventListener/);
   assert.match(main, /navConnectorsButton\.addEventListener/);
   assert.match(main, /navSettingsButton\.addEventListener/);
   assert.match(main, /#settings-close-btn/);
   assert.match(html, /id="settings-close-btn"/);
   assert.match(experience, /\.bottom-nav/);
+  assert.match(experience, /bottom-nav\{display:none!important\}/);
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));
@@ -494,4 +494,21 @@ test("chat image attachments stay compact and never expand to their source dimen
 test("sent attachment badges remain compact and hide extracted text previews", () => {
   assert.match(styles, /\.message-attachment\s*\{[^}]*max-height:\s*68px;[^}]*overflow:\s*hidden/s);
   assert.match(styles, /\.message-attachment \.attachment-snippet\s*\{[^}]*display:\s*none/s);
+});
+
+test("Termux bootstrap patches the blocked Dialog host only to a SHA-256-identical Debian mirror", async () => {
+  const script = await readFile(new URL("../android/termux-upstream/build-ultron-bootstrap.sh", import.meta.url), "utf8");
+  assert.ok(script.includes("ftp.debian.org/debian/pool/main/d/dialog"));
+  assert.match(script, /62bdf59057d4f760a1cc2217827f07887b4a3eebf694c25eacd4803d2171cdc6/);
+  assert.match(script, /refusing to use an unverified mirror/);
+});
+
+
+test("connector refreshes run concurrently, discard stale panel responses and bound connection requests", async () => {
+  const connectors = await read("src/connectors-ui.ts");
+  assert.match(connectors, /Promise\.allSettled\(\[refreshEnabled\(\), refreshOAuthConnections\(\), refreshApprovals\(\)\]\)/);
+  assert.match(connectors, /generation !== refreshGeneration/);
+  assert.match(connectors, /refreshInFlight\?\.generation === generation/);
+  assert.match(connectors, /}, 20_000\)/);
+  assert.match(connectors, /}, 15_000\)/);
 });

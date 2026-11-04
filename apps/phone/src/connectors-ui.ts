@@ -73,6 +73,7 @@ export function initConnectors(deps: Deps): void {
   const tiersEl = need<HTMLElement>("#connectors-tiers");
   const countEl = need<HTMLElement>("#connectors-count");
   const moreBtn = need<HTMLButtonElement>("#connectors-more");
+  const refreshButton = need<HTMLButtonElement>("#connectors-refresh");
   const statusEl = need<HTMLElement>("#connectors-status");
   const permissionOverview = need<HTMLElement>("#permission-overview");
   const permissionCount = need<HTMLElement>("#permission-count");
@@ -92,6 +93,9 @@ export function initConnectors(deps: Deps): void {
   let oauthConnected = new Set<string>();
   let remoteKnown = false;
   let detailReturnFocus: HTMLElement | null = null;
+  let panelOpen = false;
+  let refreshGeneration = 0;
+  let refreshInFlight: { generation: number; promise: Promise<void> } | null = null;
 
   const setPermissionOverview = (state: "loading" | "empty" | "ready" | "error", count: number | null, description: string): void => {
     permissionOverview.dataset.state = state;
@@ -192,6 +196,7 @@ export function initConnectors(deps: Deps): void {
   }
 
   async function refreshEnabled(): Promise<void> {
+    const generation = refreshGeneration;
     if (!deps.linked()) {
       setPermissionOverview("empty", 0, "No permissions are granted. Ultron can browse the local connector catalogue, and asks only when you enable a capability.");
       remoteKnown = false;
@@ -206,6 +211,7 @@ export function initConnectors(deps: Deps): void {
       const res = await deps.api("/v1/connectors/enabled/list", {}, 8_000);
       if (!res.ok) throw new Error(String(res.status));
       const body: unknown = await res.json();
+      if (!panelOpen || generation !== refreshGeneration) return;
       if (
         typeof body !== "object" ||
         body === null ||
@@ -222,6 +228,7 @@ export function initConnectors(deps: Deps): void {
       const capabilityCount = CATALOG.filter((entry) => enabled.has(entry.id)).reduce((sum, entry) => sum + entry.actions.length, 0);
       setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} actions are available across ${enabled.size} enabled connectors. Write-capable actions still require your approval.` : "No permissions are granted. Your catalogue is ready; enable only the services and actions you need.");
     } catch {
+      if (!panelOpen || generation !== refreshGeneration) return;
       // Never present a stale "On" badge as current backend state after a failed
       // refresh. The catalog remains browsable, but connection state is unknown.
       remoteKnown = false;
@@ -234,6 +241,7 @@ export function initConnectors(deps: Deps): void {
   }
 
   async function refreshOAuthConnections(): Promise<void> {
+    const generation = refreshGeneration;
     oauthConnected = new Set();
     if (!deps.linked()) {
       composioHealth.dataset.state = "disconnected";
@@ -248,6 +256,7 @@ export function initConnectors(deps: Deps): void {
       const status = await deps.api("/v1/connectors/composio/status", {}, 8_000);
       if (!status.ok) throw new Error("Composio status endpoint returned " + status.status);
       const configured = (await status.json()) as { configured?: boolean };
+      if (!panelOpen || generation !== refreshGeneration) return;
       if (configured.configured !== true) {
         composioHealth.dataset.state = "disconnected";
         composioHealthLabel.textContent = "Not configured";
@@ -259,6 +268,7 @@ export function initConnectors(deps: Deps): void {
       const response = await deps.api("/v1/connectors/composio/connections", {}, 12_000);
       if (!response.ok) throw new Error("Composio connections endpoint returned " + response.status);
       const body = (await response.json()) as { connections?: Array<{ toolkit?: string; status?: string }> };
+      if (!panelOpen || generation !== refreshGeneration) return;
       for (const account of body.connections ?? []) {
         if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
       }
@@ -266,6 +276,7 @@ export function initConnectors(deps: Deps): void {
       composioHealthLabel.textContent = "Connected";
       composioHealthDetail.textContent = oauthConnected.size + (oauthConnected.size === 1 ? " active account" : " active accounts") + " available. Write actions remain approval-gated.";
     } catch {
+      if (!panelOpen || generation !== refreshGeneration) return;
       composioHealth.dataset.state = "error";
       composioHealthLabel.textContent = "Disconnected";
       composioHealthDetail.textContent = "Composio could not be reached. Existing connections are not shown as active until the service responds.";
@@ -274,6 +285,7 @@ export function initConnectors(deps: Deps): void {
 
 
   async function refreshApprovals(): Promise<void> {
+    const generation = refreshGeneration;
     approvalList.replaceChildren();
     approvalPanel.hidden = true;
     if (!deps.linked()) return;
@@ -291,6 +303,7 @@ export function initConnectors(deps: Deps): void {
           capabilities?: string[];
         }>;
       };
+      if (!panelOpen || generation !== refreshGeneration) return;
       const approvals = body.approvals ?? [];
       if (approvals.length === 0) return;
       approvalPanel.hidden = false;
@@ -416,7 +429,7 @@ export function initConnectors(deps: Deps): void {
           act.disabled = false;
           return;
         } else if (entry.auth === "none") {
-          const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/${on ? "disable" : "enable"}`, { method: "POST" });
+          const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/${on ? "disable" : "enable"}`, { method: "POST" }, 15_000);
           if (!res.ok) throw new Error(`${res.status}`);
         } else {
           const value = keyInput?.value.trim() ?? "";
@@ -432,7 +445,7 @@ export function initConnectors(deps: Deps): void {
           const res = await deps.api("/v1/connectors/connect", {
             method: "POST",
             body: JSON.stringify({ connector_id: entry.id, api_key: value, plan: entry.tier }),
-          });
+          }, 20_000);
           if (!res.ok) throw new Error(`${res.status}`);
         }
         await refreshEnabled();
@@ -465,7 +478,7 @@ export function initConnectors(deps: Deps): void {
       off.addEventListener("click", async () => {
         off.disabled = true;
         try {
-          const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/disable`, { method: "POST" });
+          const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/disable`, { method: "POST" }, 15_000);
           if (!res.ok) throw new Error(`${res.status}`);
           await refreshEnabled();
           closeDetail();
@@ -486,21 +499,43 @@ export function initConnectors(deps: Deps): void {
 
   /* ---------------- open / close ---------------- */
 
+  function refreshAll(): Promise<void> {
+    const generation = refreshGeneration;
+    if (refreshInFlight?.generation === generation) return refreshInFlight.promise;
+    refreshButton.disabled = true;
+    refreshButton.textContent = "Checking…";
+    const promise = Promise.allSettled([refreshEnabled(), refreshOAuthConnections(), refreshApprovals()]).then(() => {
+      if (panelOpen && generation === refreshGeneration) render();
+    }).finally(() => {
+      if (refreshInFlight?.promise !== promise) return;
+      refreshInFlight = null;
+      if (generation === refreshGeneration) {
+        refreshButton.disabled = false;
+        refreshButton.textContent = "Refresh status";
+      }
+    });
+    refreshInFlight = { generation, promise };
+    return promise;
+  }
+
   function open(): void {
     deps.closeDrawer();
+    panelOpen = true;
+    refreshGeneration++;
     panel.hidden = false;
     document.body.dataset.panel = "connectors";
-    void refreshEnabled();
-    void refreshOAuthConnections().then(render);
-    void refreshApprovals();
+    void refreshAll();
   }
 
   function close(): void {
+    panelOpen = false;
+    refreshGeneration++;
     closeDetail();
     panel.hidden = true;
     delete document.body.dataset.panel;
   }
 
+  refreshButton.addEventListener("click", () => void refreshAll());
   need<HTMLButtonElement>("#connectors-btn").addEventListener("click", open);
   need<HTMLButtonElement>("#connectors-back").addEventListener("click", close);
   detailWrap.addEventListener("click", (event) => {

@@ -51,6 +51,24 @@ for old, new in replacements:
 path.write_text(source)
 PY
 
+# The upstream Invisible Island host returns HTTP 403 from GitHub's build
+# runners. Use Debian's mirrored copy of the exact upstream release archive;
+# its SHA-256 remains pinned in Termux's package recipe and is unchanged.
+python3 - "$source_dir/packages/dialog/build.sh" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+old = 'TERMUX_PKG_SRCURL="https://invisible-island.net/archives/dialog/dialog-${TERMUX_PKG_VERSION}.tgz"'
+new = 'TERMUX_PKG_SRCURL="https://ftp.debian.org/debian/pool/main/d/dialog/dialog_${TERMUX_PKG_VERSION}.orig.tar.gz"'
+if source.count(old) != 1:
+    raise SystemExit("Expected exactly one pinned Dialog source URL; refusing unsafe mirror patch")
+if 'TERMUX_PKG_SHA256=62bdf59057d4f760a1cc2217827f07887b4a3eebf694c25eacd4803d2171cdc6' not in source:
+    raise SystemExit("Dialog upstream SHA-256 changed; refusing to use an unverified mirror")
+path.write_text(source.replace(old, new, 1))
+PY
+
 build_args=(--architectures aarch64,x86_64)
 if [[ -n "$EXTRA_PACKAGES" ]]; then
     build_args+=(--add "$EXTRA_PACKAGES")

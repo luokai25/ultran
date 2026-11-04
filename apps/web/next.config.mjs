@@ -4,6 +4,7 @@ const nextConfig = {
   transpilePackages: ['@ultron/ui', '@ultron/connectors'],
   experimental: {
     typedRoutes: true,
+    cpus: 1,
   },
 };
 

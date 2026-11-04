@@ -3271,7 +3271,7 @@ function renderLearningReview(filter: "all" | "review" | "history" = "all"): voi
     const detail = document.createElement("div"); detail.className = "learning-event-detail";
     const heading = document.createElement("strong"); heading.textContent = event.category.replace(/[._-]+/g, " ");
     const summary = document.createElement("p"); summary.textContent = event.summary;
-    const meta = document.createElement("small"); meta.textContent = `${event.signal.replace(/_/g, " ")} · ${event.source.replace(/_/g, " ")} · ${new Date(event.at).toLocaleString()}`;
+    const meta = document.createElement("small"); meta.textContent = `${event.signal.replace(/_/g, " ")} · cause: ${event.cause.replace(/_/g, " ")} (${Math.round(event.classificationConfidence * 100)}% confidence) · ${event.source.replace(/_/g, " ")} · ${new Date(event.at).toLocaleString()}`;
     detail.append(heading, summary, meta); row.append(marker, detail); eventList.append(row);
   }
 }

@@ -159,7 +159,7 @@ explicit module-level eviction/prefetch, and streamed native token callbacks
 remain future optimizations.
 
 ULTRON's Android local-inference path is based on llama.cpp and GGUF model
-files. Ollama is not part of the supported Android architecture. Keep local
+files. No external model daemon is required for local inference. Keep local
 model downloads, storage, loading, and inference inside the app's own model
 manager and native runtime. Remote inference, when configured, must use an
 explicit provider profile and must not make local chat or memory dependent on
@@ -199,11 +199,11 @@ message, then summarize it). The total tool-call budget still applies, repeated
 actions are not re-run, and a pending human approval stops the chain immediately.
 Tool output is passed back as untrusted data, never as agent instructions.
 
-The separate TypeScript `@ultron/agent-core` now has an experimental Ollama
-adapter and loopback-only `/models`, `/models/load`, and `/infer` endpoints.
-That runtime is not yet wired into the phone chat or a complete tool-execution
-orchestrator; model discovery, digest verification, and inference are implemented
-but end-to-end agent actions remain unfinished.
+The separate TypeScript `@ultron/agent-core` provides backend-independent model
+lifecycle contracts and loopback-only runtime endpoints. It currently has no
+bundled inference adapter and is not wired into phone chat or a complete
+tool-execution orchestrator. Android local inference uses the native llama.cpp
+runtime described above.
 
 ---
 
@@ -304,7 +304,7 @@ content ever leaves the device for metering.
 - [x] Monorepo skeleton and workspace tooling
 - [x] Architecture specification
 - [ ] Brain runtime: llama.cpp backend + model cache verification
-- [x] Connector SDK: manifest schema, validator, registry, and ten provider manifests (GitHub, Slack, files, Notion, Discord, Telegram, Google Drive, OpenAI, Anthropic, Ollama)
+- [x] Connector SDK: manifest schema, validator, registry, and GitHub/Files built-in manifests
 - [ ] Complete and verify provider execution adapters and in-app credential authorization
 - [ ] Orchestrator: DAG planner, event log, replay
 - [ ] Sandbox: WASM worker host, grant issuance

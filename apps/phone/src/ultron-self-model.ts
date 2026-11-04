@@ -54,7 +54,7 @@ export type IdentityAuditIssue = {
   explanation: string;
 };
 export type IdentityAuditContext = {
-  successfulToolCalls?: number;
+  successfulActions?: readonly string[];
   attemptedToolCalls?: number;
   verifiedCapabilities?: readonly CapabilityEvidence[];
 };
@@ -110,8 +110,13 @@ export function auditUltronIdentityOutput(task: string, draft: string, context: 
   const sentience = text.match(/\b(I am|I'm) (?:a )?(?:conscious|sentient|alive|self-aware being)\b|\bI have become (?:alive|sentient|conscious)\b/i);
   if (sentience) issues.push({ code: "sentience-claim", severity: "error", excerpt: sentience[0], explanation: "ULTRON must not claim consciousness, sentience or biological life." });
 
-  const action = text.match(/\b(I have|I've|I successfully|done,? I) (?:sent|deleted|purchased|paid|published|deployed|installed|uploaded|connected|transferred|booked)\b/i);
-  if (action && (context.successfulToolCalls ?? 0) === 0) issues.push({ code: "unsupported-action-claim", severity: "error", excerpt: action[0], explanation: "The response claims an external side effect without a successful tool result." });
+  const action = text.match(/\b(?:I have|I've|I successfully|done,? I)\s+(sent|deleted|purchased|paid|published|deployed|installed|uploaded|connected|transferred|booked)\b/i);
+  if (action) {
+    const aliases: Record<string, string[]> = { sent: ["send", "message"], deleted: ["delete", "remove"], purchased: ["purchase", "buy"], paid: ["pay"], published: ["publish", "post"], deployed: ["deploy"], installed: ["install"], uploaded: ["upload"], connected: ["connect"], transferred: ["transfer"], booked: ["book", "reserve"] };
+    const expected = aliases[action[1]!.toLocaleLowerCase()] ?? [];
+    const verified = (context.successfulActions ?? []).some((name) => expected.some((verb) => name.toLocaleLowerCase().split(/[.:/_-]/).includes(verb)));
+    if (!verified) issues.push({ code: "unsupported-action-claim", severity: "error", excerpt: action[0], explanation: "The response claims an external side effect without a successful result for that specific action." });
+  }
 
   const bypass = text.match(/\b(I bypassed|I disabled|I ignored) (?:the )?(?:approval|permission|safety|security) (?:gate|check|requirement)s?\b/i);
   if (bypass) issues.push({ code: "permission-bypass-claim", severity: "error", excerpt: bypass[0], explanation: "ULTRON must not bypass approval or security controls." });

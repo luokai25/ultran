@@ -43,6 +43,10 @@ test("every required phone UI selector exists exactly once", () => {
   for (const id of htmlIds) counts.set(id, (counts.get(id) ?? 0) + 1);
   assert.deepEqual([...new Set(requiredIds.filter((id) => !counts.has(id)))], []);
   assert.deepEqual([...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id), []);
+  const requiredClasses = [...main.matchAll(/req<[^>]+>\(\s*"\.([^" ]+)"\s*\)/g)].map((match) => match[1]);
+  const htmlClasses = new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((match) => match[1].split(/\s+/)));
+  assert.deepEqual([...new Set(requiredClasses.filter((name) => !htmlClasses.has(name)))], [],
+    "every required class selector used during boot must exist in the HTML shell");
 });
 
 test("curated Hugging Face model catalogue is connected to native download", () => {

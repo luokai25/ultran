@@ -230,7 +230,7 @@ const themesEl = req<HTMLElement>("#themes");
 
 req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
 req<HTMLElement>("#drawer-mark").innerHTML = markSvg(20);
-req<HTMLElement>(".agent-avatar-ultron").innerHTML = markSvg(38);
+req<HTMLElement>(".identity-symbol").innerHTML = markSvg(38);
 const favicon = document.createElement("link");
 favicon.rel = "icon";
 favicon.href = markDataUrl();

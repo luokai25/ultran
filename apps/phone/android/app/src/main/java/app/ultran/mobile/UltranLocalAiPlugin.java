@@ -45,6 +45,7 @@ public class UltranLocalAiPlugin extends Plugin {
     // a file can never be replaced or removed while native code is reading it.
     private final ExecutorService inferenceExecutor = Executors.newSingleThreadExecutor();
     private volatile String loadedModelPath;
+    private volatile String loadedProjectorPath;
     private volatile int loadedContextTokens;
     private volatile boolean loadedLargeModelMode;
     private static final long MAX_MODEL_BYTES = 256L * 1024L * 1024L * 1024L;
@@ -137,6 +138,74 @@ public class UltranLocalAiPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("models", models);
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void pickProjector(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        startActivityForResult(call, intent, "handleProjectorPicked");
+    }
+
+    @ActivityCallback
+    private void handleProjectorPicked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result == null || result.getResultCode() != android.app.Activity.RESULT_OK ||
+                result.getData() == null || result.getData().getData() == null) {
+            call.resolve(new JSObject().put("cancelled", true));
+            return;
+        }
+        Uri uri = result.getData().getData();
+        inferenceExecutor.execute(() -> {
+            File partial = null;
+            try {
+                String name = safeModelName(queryDisplayName(uri));
+                File directory = new File(getContext().getFilesDir(), "projectors");
+                if (!directory.exists() && !directory.mkdirs() && !directory.isDirectory()) {
+                    throw new IllegalStateException("Could not create the private projector directory.");
+                }
+                File destination = new File(directory, name);
+                if (destination.getAbsolutePath().equals(loadedProjectorPath)) {
+                    throw new IllegalStateException("Unload the active model before replacing its projector.");
+                }
+                long reported = querySize(uri);
+                StatFs storage = new StatFs(directory.getAbsolutePath());
+                long available = storage.getAvailableBytes();
+                if (reported > MAX_MODEL_BYTES || (reported > 0 && reported > available)) {
+                    throw new IllegalStateException("The projector exceeds Ultran's safety limit or available storage.");
+                }
+                partial = new File(directory, name + ".partial");
+                long copied = 0;
+                try (InputStream input = getContext().getContentResolver().openInputStream(uri);
+                     FileOutputStream output = new FileOutputStream(partial)) {
+                    if (input == null) throw new IllegalStateException("Could not open the selected projector.");
+                    byte[] buffer = new byte[1024 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        copied += read;
+                        if (copied > MAX_MODEL_BYTES || copied > available) {
+                            throw new IllegalStateException("The projector exceeds available device storage.");
+                        }
+                        output.write(buffer, 0, read);
+                    }
+                    output.getFD().sync();
+                }
+                if (reported > 0 && copied != reported) throw new IllegalStateException("The projector copy was incomplete.");
+                if (copied < 1024L * 1024L) throw new IllegalStateException("The selected file is too small to be a GGUF projector.");
+                try (RandomAccessFile header = new RandomAccessFile(partial, "r")) {
+                    byte[] magic = new byte[4]; header.readFully(magic);
+                    if (magic[0] != 'G' || magic[1] != 'G' || magic[2] != 'U' || magic[3] != 'F') {
+                        throw new IllegalStateException("This file does not have a valid GGUF header.");
+                    }
+                }
+                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not finalize the projector import.");
+                call.resolve(new JSObject().put("cancelled", false).put("name", name).put("sizeBytes", copied));
+            } catch (Exception error) {
+                if (partial != null && partial.exists()) partial.delete();
+                call.reject(error.getMessage() == null ? "Projector import failed." : error.getMessage(), error);
+            }
+        });
     }
 
     @PluginMethod
@@ -545,13 +614,30 @@ public class UltranLocalAiPlugin extends Plugin {
             call.reject(error.getMessage());
             return;
         }
+        String projectorName = call.getString("projectorName", "");
+        File projector = null;
+        if (projectorName != null && !projectorName.isEmpty()) {
+            try {
+                projectorName = safeModelName(projectorName);
+                projector = new File(new File(getContext().getFilesDir(), "projectors"), projectorName);
+            } catch (Exception error) {
+                call.reject(error.getMessage());
+                return;
+            }
+            if (!projector.isFile() || projector.length() < 1024 * 1024) {
+                call.reject("Import a valid mmproj GGUF projector before loading it.");
+                return;
+            }
+        }
+        String requestedProjectorPath = projector == null ? "" : projector.getAbsolutePath();
         File model = new File(modelDirectory(), name);
         if (!model.isFile() || model.length() < 1024 * 1024) {
             call.reject("Import a valid GGUF model before loading it.");
             return;
         }
 
-        if (model.getAbsolutePath().equals(loadedModelPath)) {
+        if (model.getAbsolutePath().equals(loadedModelPath) &&
+                requestedProjectorPath.equals(loadedProjectorPath == null ? "" : loadedProjectorPath)) {
             call.resolve(new JSObject().put("loaded", true).put("name", name).put("contextTokens", loadedContextTokens > 0 ? loadedContextTokens : 2048).put("device", "CPU").put("memoryMapped", true).put("largeModelMode", loadedLargeModelMode));
             return;
         }
@@ -593,6 +679,7 @@ public class UltranLocalAiPlugin extends Plugin {
                     return;
                 }
                 loadedModelPath = model.getAbsolutePath();
+                loadedProjectorPath = requestedProjectorPath.isEmpty() ? null : requestedProjectorPath;
                 loadedContextTokens = contextTokens;
                 loadedLargeModelMode = aggressiveLazyLoading;
                 JSObject response = new JSObject();
@@ -737,6 +824,7 @@ public class UltranLocalAiPlugin extends Plugin {
         inferenceExecutor.execute(() -> {
             NativeLlama.nativeUnloadModel();
             loadedModelPath = null;
+            loadedProjectorPath = null;
             loadedContextTokens = 0;
             loadedLargeModelMode = false;
             call.resolve(new JSObject().put("loaded", false));

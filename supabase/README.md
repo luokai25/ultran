@@ -10,7 +10,7 @@ This Supabase project is a private, single-owner backend for the ULTRON Android 
 - The `ultron-private` Storage bucket is private. Object paths must begin with the owner's Auth UUID.
 - pgvector is enabled. The initial embedding columns use 384 dimensions; the embedding model is recorded separately. Generation models remain model-agnostic and run locally or on a separately configured inference host.
 - Provider credentials must never be stored in plaintext in these tables or shipped in the APK. `credential_ref` is an opaque reference for a server-side secret store.
-- Tool permissions default to `deny`; tool execution must still require the app's approval gate.
+- ULTRON may create, version and run owner-scoped cloud workflow tools and skills autonomously. Android device actions, external communications, payments and destructive operations retain their explicit action policies.
 
 ## Single-owner security
 
@@ -43,19 +43,11 @@ The SQL files in `migrations/` are the source-controlled migration history for t
 
 ## Autonomous capability loop
 
-The `ultron-capabilities` Edge Function is deployed with JWT verification enabled. The Android client calls it through its authenticated Supabase session. The function validates the user and singleton `ultron_instance` row, then performs database operations under that user's RLS context; it does not use a service-role key.
+The `ultron-runtime` Edge Function is the default operational runtime for reusable tools and skills. It is deployed with JWT verification enabled and uses the authenticated owner's session and RLS context. It supports versioned ULTRON-authored workflows, public HTTP requests, owner-scoped database operations, semantic memory search, skill management and tool execution history.
 
-The capability tables persist agent-loop checkpoints, versioned generated tool source, capability proposals and append-only audit events. ULTRON may create non-executable tool drafts, submit them for review and propose database migrations, Edge Functions, connectors, policy changes and runtime upgrades. Source versions are fingerprinted and immutable after submission.
+The `ultron-capabilities` Edge Function and `ultron_generated_tools` tables remain as a legacy archive for Python source drafts, infrastructure proposals, checkpoints and historical audit records. New operational tools must use `ultron_tool_specs` and the Supabase-native workflow runtime; new skills use `ultron_skills`. The phone's capability console shows both the legacy records and the active cloud tool/skill registries.
 
-A saved draft is not an executable tool. The existing generated-tool policy and isolated-worker lifecycle must review and attest the exact source hash before activation. Database DDL, Edge Function deployment, permission changes and other infrastructure mutations remain proposals until the owner explicitly approves them. Never expose a service-role or secret key to Android, and never execute model-generated SQL directly against production.
-
-The phone's Realtime subscription includes agent runs, generated tool versions, capability proposals and capability events. The Edge Function also provides owner-facing approval and disable operations; approval actions are deliberately excluded from the model's tool catalogue.
-
-
-### Generated-tool language support
-
-Generated tool drafts currently accept **Python only**, matching the existing `review_generated_source` AST policy and the isolated-worker contract (`def run(payload)`). TypeScript and JavaScript are rejected until their own static policies and worker isolation adapters exist. Do not widen the database constraint merely to accept source that the runtime cannot safely review or execute. Capability events are required writes: a capability mutation is reported successful only after its audit event is stored.
-
+ULTRON can author Supabase public-schema code through `database.ddl`, backed by `ultron_apply_schema_change`, and call its own Postgres functions through `database.rpc`. Schema authoring supports creating and altering ULTRON-owned tables, views, indexes and invoker SQL functions. Destructive DROP/TRUNCATE operations and SECURITY DEFINER functions are not part of the autonomous schema path. Every applied schema statement records a hash and preview in the capability event history.
 
 ## Supabase-first tool and skill architecture (2026-11-04)
 

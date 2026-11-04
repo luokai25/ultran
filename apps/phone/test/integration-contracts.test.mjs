@@ -345,7 +345,7 @@ test("background intent detector distinguishes questions, explicit actions, and 
   for (const action of ["Build the APK", "Please run the tests", "Continue improving Ultran", "Go ahead and fix it"]) {
     assert.equal(detector(action), true, action);
   }
-  for (const negated of ["Do not run the tests", "Never install packages"]) {
+  for (const negated of ["Do not run the tests", "Never install packages", "Don't continue working", "I don't want you to build the APK"]) {
     assert.equal(detector(negated), false, negated);
   }
 });

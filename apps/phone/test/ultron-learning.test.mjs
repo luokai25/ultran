@@ -196,10 +196,37 @@ test('learning review shows cause and confidence instead of presenting every neg
 
 test('runtime learning requires recurring evidence before creating proposals and correlates tool outcomes', () => {
   const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /selectIndependentLearningEvidence/);
   assert.match(main, /independent\.length < 2/);
-  assert.match(main, /correlationId \?\? event\.id/);
   assert.match(main, /Repeated \$\{causeLabel\} observations/);
   assert.match(main, /cause\?: import\("\.\/ultron-learning\.js"\)\.LearningCause/);
   assert.match(main, /"tool_execution", convo\.id/);
   assert.match(main, /"verification_gap", convo\.id/);
+});
+
+
+test('recurrence evidence counts distinct conversations, not repeated reports from one conversation', () => {
+  const base = { signal:'tool_failure', cause:'tool_execution', category:'runtime', summary:'Tool failed.', severity:'medium', source:'runtime', evidenceIds:[] };
+  const sameTask = [
+    { ...base, id:'event-a01', at:1_000, correlationId:'task-same' },
+    { ...base, id:'event-a02', at:2_000, correlationId:'task-same' },
+  ];
+  assert.equal(learning.selectIndependentLearningEvidence(sameTask, { category:'runtime', cause:'tool_execution', now:3_000 }).length, 1);
+  const separateTasks = [...sameTask, { ...base, id:'event-a03', at:2_500, correlationId:'task-other' }];
+  const evidence = learning.selectIndependentLearningEvidence(separateTasks, { category:'runtime', cause:'tool_execution', now:3_000 });
+  assert.equal(evidence.length, 2);
+  assert.equal(evidence.map((event) => event.id).join(','), 'event-a02,event-a03');
+});
+
+test('recurrence evidence excludes success, mismatched causes, future and expired events', () => {
+  const base = { cause:'verification_gap', category:'draft', summary:'Needs verification.', severity:'medium', source:'runtime', evidenceIds:[] };
+  const events = [
+    { ...base, id:'event-b01', at:90_000_000, signal:'verification_failure', correlationId:'task-1' },
+    { ...base, id:'event-b02', at:91_000_000, signal:'user_success', correlationId:'task-2' },
+    { ...base, id:'event-b03', at:92_000_000, signal:'verification_failure', cause:'reasoning_error', correlationId:'task-3' },
+    { ...base, id:'event-b04', at:200_000_000, signal:'verification_failure', correlationId:'task-4' },
+    { ...base, id:'event-b05', at:1_000, signal:'verification_failure', correlationId:'task-5' },
+  ];
+  const evidence = learning.selectIndependentLearningEvidence(events, { category:'draft', cause:'verification_gap', now:100_000_000, windowDays:1 });
+  assert.equal(evidence.map((event) => event.id).join(','), 'event-b01');
 });

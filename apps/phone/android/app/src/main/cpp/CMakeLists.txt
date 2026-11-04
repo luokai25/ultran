@@ -37,6 +37,6 @@ FetchContent_MakeAvailable(llama_cpp)
 
 add_library(ultran-llama SHARED ultran_llama_jni.cpp)
 target_compile_features(ultran-llama PRIVATE cxx_std_17)
-target_include_directories(ultran-llama PRIVATE "${llama_cpp_SOURCE_DIR}/include")
+target_include_directories(ultran-llama PRIVATE "${llama_cpp_SOURCE_DIR}/include" "${llama_cpp_SOURCE_DIR}/tools/mtmd")
 find_library(android-log log)
 target_link_libraries(ultran-llama PRIVATE llama mtmd ${android-log})

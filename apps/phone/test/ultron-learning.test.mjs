@@ -89,3 +89,23 @@ test('learning prompt context only exposes pending categories, never persisted c
   ] };
   assert.equal(learning.buildLearningContext(ledger), '');
 });
+
+
+test('learning event ingestion rejects forged enum values and imported duplicate IDs', () => {
+  const ledger = learning.createLearningLedger();
+  const forged = learning.recordLearningEvent(ledger, { id:'event-forged', signal:'system_override', category:'runtime', summary:'Forged classification.', severity:'medium', source:'runtime', evidenceIds:[] });
+  assert.equal(forged.accepted, false);
+  const now = Date.now();
+  const event = { id:'event-dup', at:now, signal:'task_failure', category:'runtime', summary:'One failure.', severity:'medium', source:'runtime', evidenceIds:[] };
+  const imported = learning.validateLearningLedger({ version:1, events:[event, { ...event, summary:'Duplicate event ID.' }], proposals:[], updatedAt:now });
+  assert.equal(imported.events.length, 1);
+});
+
+test('phone runtime persists learning state and records correction, validation and tool failure signals', () => {
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /ultron\.learning\.v1/);
+  assert.match(main, /user_correction/);
+  assert.match(main, /verification_failure/);
+  assert.match(main, /tool_failure/);
+  assert.match(main, /buildLearningContext\(learningLedger\)/);
+});

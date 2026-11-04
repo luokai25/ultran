@@ -210,6 +210,27 @@ export type UltronLedgerStep = UltronPlanStep & { dependsOn: string[]; status: U
 export type UltronTaskLedger = { id: string; task: string; profile: UltronTaskProfile; createdAt: number; updatedAt: number; status: "active" | "blocked" | "completed" | "failed"; steps: UltronLedgerStep[]; constraints: string[]; approvedActions: string[] };
 export type UltronLedgerEvent = { ok: boolean; ledger: UltronTaskLedger; reason?: string };
 
+/** Carries only bounded unfinished work into an explicit continuation turn. */
+export function buildUltronContinuationConstraints(previous?: Partial<UltronTaskLedger> | null): string[] {
+  if (!previous || previous.status === "completed" || !Array.isArray(previous.steps)) return [];
+  const priorId = typeof previous.id === "string" ? previous.id.replace(/[\u0000-\u001f]/g, " ").slice(0, 96) : "previous-task";
+  const constraints = [`Continue prior task ledger ${priorId} (status: ${previous.status ?? "unknown"}).`];
+  for (const step of previous.steps) {
+    if (!step || step.status === "completed" || step.status === "skipped") continue;
+    const id = typeof step.id === "string" ? step.id.replace(/[\u0000-\u001f]/g, " ").slice(0, 96) : "unknown-step";
+    const objective = typeof step.objective === "string" ? step.objective.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 300) : "Unspecified objective";
+    constraints.push(`Carry forward unfinished step ${id} [${step.status ?? "unknown"}]: ${objective}`);
+    if (constraints.length >= 9) break;
+  }
+  if (Array.isArray(previous.constraints)) {
+    for (const item of previous.constraints) {
+      if (typeof item === "string" && item.trim()) constraints.push(item.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 400));
+      if (constraints.length >= 40) break;
+    }
+  }
+  return constraints.slice(0, 40);
+}
+
 /** Creates a resumable execution ledger with explicit dependency edges. */
 export function createUltronTaskLedger(id: string, task: string, constraints: string[] = [], profile: UltronTaskProfile = classifyUltronTask(task)): UltronTaskLedger {
   const plan = createUltronPlan(task, profile);

@@ -266,6 +266,7 @@ export function mergeCloudWorkspace(
         messages[existingIndex] = remoteMessage;
       }
     });
+    messages.sort((left, right) => (left.sequenceNo ?? Number.MAX_SAFE_INTEGER) - (right.sequenceNo ?? Number.MAX_SAFE_INTEGER));
     merged.set(cloud.id, {
       ...existing,
       title: remoteIsNewer ? cloud.title : existing.title,

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { ConnectorRegistry, type ConnectorManifest } from '@ultron/connectors';
 import { BrainRuntime } from '../brain/runtime.js';
-import { OllamaBackend } from '../brain/ollama-backend.js';
+import type { BrainBackend, InferenceRequest, LoadOptions, ModelHandle, ModelRef, Token } from '../brain/types.js';
 import { InMemoryGrantStore } from '../sandbox/grants.js';
 import { ToolSandbox } from '../sandbox/sandbox.js';
 import { UsageLedger } from '../monetization/ledger.js';
@@ -10,52 +10,47 @@ import { PolicyGate } from '../monetization/policy-gate.js';
 import { Orchestrator } from './orchestrator.js';
 
 const digest = 'a'.repeat(64);
-const modelRef = { id: 'test-model', backend: 'ollama' as const, sha256: digest, contextWindow: 4096 };
+const modelRef: ModelRef = { id: 'test-model', backend: 'llama.cpp', sha256: digest, contextWindow: 4096 };
 
-function jsonResponse(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
+class FakeBackend implements BrainBackend {
+  readonly kind = 'llama.cpp' as const;
+  constructor(private readonly options: { invalidArgs?: boolean } = {}) {}
+  async load(ref: ModelRef, _opts: LoadOptions = {}): Promise<ModelHandle> {
+    return { ref: { ...ref }, loadedAt: Date.now(), tokensIn: 0, tokensOut: 0 };
+  }
+  async *infer(_handle: ModelHandle, request: InferenceRequest): AsyncIterable<Token> {
+    const system = request.system ?? '';
+    const prompt = request.prompt;
+    let content: string;
+    if (system.includes('MODE: PLAN')) {
+      content = JSON.stringify({ steps: [{
+        id: 'step-1',
+        candidates: ['demo.echo'],
+        dependsOn: [],
+        description: 'Echo the requested text using the demo tool',
+      }] });
+    } else if (system.includes('MODE: ACT')) {
+      content = JSON.stringify({
+        toolId: 'demo.echo',
+        args: this.options.invalidArgs ? { text: 'hello', options: { mode: 42 } } : { text: 'hello' },
+      });
+    } else if (prompt.includes('Actual outcomes:')) {
+      content = prompt.includes('No human-approval resolver is configured')
+        ? 'The task was not executed because approval was unavailable.'
+        : 'The demo tool completed successfully and returned hello.';
+    } else {
+      content = 'The task is complete.';
+    }
+    yield { text: content, done: true, index: 0 };
+  }
+  async embed(_handle: ModelHandle, texts: string[]): Promise<Float32Array[]> {
+    return texts.map(() => Float32Array.from([0.1, 0.2]));
+  }
+  async unload(_handle: ModelHandle): Promise<void> {}
 }
 
 function makeBrain(options: { invalidArgs?: boolean } = {}) {
-  const backend = new OllamaBackend({
-    fetcher: async (input, init) => {
-      const url = String(input);
-      if (url.endsWith('/api/tags')) return jsonResponse({ models: [{ name: modelRef.id, digest }] });
-      const request = JSON.parse(String(init?.body ?? '{}')) as {
-        messages?: Array<{ role: string; content: string }>;
-      };
-      const system = request.messages?.find((message) => message.role === 'system')?.content ?? '';
-      const prompt = request.messages?.find((message) => message.role === 'user')?.content ?? '';
-      let content: string;
-      if (system.includes('MODE: PLAN')) {
-        content = JSON.stringify({ steps: [{
-          id: 'step-1',
-          candidates: ['demo.echo'],
-          dependsOn: [],
-          description: 'Echo the requested text using the demo tool',
-        }] });
-      } else if (system.includes('MODE: ACT')) {
-        content = JSON.stringify({
-          toolId: 'demo.echo',
-          args: options.invalidArgs ? { text: 'hello', options: { mode: 42 } } : { text: 'hello' },
-        });
-      } else if (prompt.includes('Actual outcomes:')) {
-        content = prompt.includes('No human-approval resolver is configured')
-          ? 'The task was not executed because approval was unavailable.'
-          : 'The demo tool completed successfully and returned hello.';
-      } else {
-        content = 'The task is complete.';
-      }
-      const line = JSON.stringify({ message: { content }, done: true }) + '\n';
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode(line));
-          controller.close();
-        },
-      });
-      return new Response(stream, { status: 200, headers: { 'content-type': 'application/x-ndjson' } });
-    },
-  });
+  const backend = new FakeBackend(options);
   const brain = new BrainRuntime({ backends: [backend] });
   return { brain, backend };
 }

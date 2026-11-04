@@ -2331,7 +2331,7 @@ async function submit(raw: string): Promise<void> {
   const finalProfile = classifyUltronTask(text);
   const validation = validateUltronDraft(text, result.content, finalProfile);
   for (const issue of validation.issues) ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });
-  const identityIssues = auditUltronIdentityOutput(text, result.content, { successfulToolCalls: result.tool_calls?.filter((call) => call.ok).length ?? 0, attemptedToolCalls: result.tool_calls?.length ?? 0 });
+  const identityIssues = auditUltronIdentityOutput(text, result.content, { successfulActions: result.tool_calls?.filter((call) => call.ok).map((call) => `${call.connector}.${call.action}`) ?? [], attemptedToolCalls: result.tool_calls?.length ?? 0 });
   for (const issue of summarizeIdentityAudit(identityIssues)) ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
   const message: Message = { role: "assistant", content: result.content };
   activeAssistantMessage = message;

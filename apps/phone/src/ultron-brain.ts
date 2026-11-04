@@ -67,7 +67,7 @@ export function classifyUltronTask(task: string, options: { continuation?: boole
   else if (research) intent = "research";
   else if (creation) intent = "creation";
   else if (!text || /^(hi|hello|hey|مرحبا|اهلا|أهلا|سلام)[!. ]*$/i.test(text)) intent = "conversation";
-  else if (!PATTERNS.question.test(text)) intent = "question";
+  else if (!options.continuation && !PATTERNS.question.test(text)) intent = "question";
   if (critical) reasons.push("The request contains a high-impact domain or irreversible operation.");
   if (high) reasons.push("The request may affect external systems, accounts, money, or private data.");
   if (multi) reasons.push("The request has multiple steps, substantial context, or attached material.");
@@ -207,12 +207,11 @@ export class UltronDecisionTrace {
 
 export type UltronStepStatus = "pending" | "ready" | "running" | "blocked" | "completed" | "failed" | "skipped";
 export type UltronLedgerStep = UltronPlanStep & { dependsOn: string[]; status: UltronStepStatus; attempts: number; resultSummary?: string; evidence?: string; updatedAt: number };
-export type UltronTaskLedger = { id: string; task: string; createdAt: number; updatedAt: number; status: "active" | "blocked" | "completed" | "failed"; steps: UltronLedgerStep[]; constraints: string[]; approvedActions: string[] };
+export type UltronTaskLedger = { id: string; task: string; profile: UltronTaskProfile; createdAt: number; updatedAt: number; status: "active" | "blocked" | "completed" | "failed"; steps: UltronLedgerStep[]; constraints: string[]; approvedActions: string[] };
 export type UltronLedgerEvent = { ok: boolean; ledger: UltronTaskLedger; reason?: string };
 
 /** Creates a resumable execution ledger with explicit dependency edges. */
-export function createUltronTaskLedger(id: string, task: string, constraints: string[] = []): UltronTaskLedger {
-  const profile = classifyUltronTask(task);
+export function createUltronTaskLedger(id: string, task: string, constraints: string[] = [], profile: UltronTaskProfile = classifyUltronTask(task)): UltronTaskLedger {
   const plan = createUltronPlan(task, profile);
   const steps: UltronLedgerStep[] = plan.map((step, index) => ({
     ...step,
@@ -221,7 +220,7 @@ export function createUltronTaskLedger(id: string, task: string, constraints: st
     attempts: 0,
     updatedAt: Date.now(),
   }));
-  return { id, task, createdAt: Date.now(), updatedAt: Date.now(), status: "active", steps, constraints: constraints.slice(0, 40), approvedActions: [] };
+  return { id, task, profile, createdAt: Date.now(), updatedAt: Date.now(), status: "active", steps, constraints: constraints.slice(0, 40), approvedActions: [] };
 }
 
 /** Finds the next runnable step. Blocked or failed prerequisites never get skipped silently. */
@@ -334,5 +333,5 @@ export function findUltronMemoryConflicts(facts: readonly UltronMemoryFact[]): A
 /** Compact execution contract for the reasoning model; ledger state remains authoritative. */
 export function buildUltronLedgerPrompt(ledger: UltronTaskLedger): string {
   const steps = ledger.steps.map((step, index) => `${index + 1}. ${step.id} [${step.status}]${step.dependsOn.length ? ` after ${step.dependsOn.join(", ")}` : ""}: ${step.objective}`).join("\n");
-  return ["ULTRON TASK LEDGER (execution checklist, not permission to bypass tools):", `Task ID: ${ledger.id}; status: ${ledger.status}.`, `Constraints: ${ledger.constraints.join("; ") || "Use the current request and existing project decisions."}`, steps, "Respect dependency order. Mark nothing complete unless the corresponding work or evidence actually exists. If blocked, preserve completed steps and state the blocker."].join("\n");
+  return ["ULTRON TASK LEDGER (execution checklist, not permission to bypass tools):", `Task ID: ${ledger.id}; status: ${ledger.status}.`, `Task profile: intent=${ledger.profile.intent}; risk=${ledger.profile.risk}; depth=${ledger.profile.depth}; verification=${ledger.profile.requiresVerification}.`, `Constraints: ${ledger.constraints.join("; ") || "Use the current request and existing project decisions."}`, steps, "Respect dependency order. Mark nothing complete unless the corresponding work or evidence actually exists. If blocked, preserve completed steps and state the blocker."].join("\n");
 }

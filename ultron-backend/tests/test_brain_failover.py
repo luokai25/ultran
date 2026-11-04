@@ -10,7 +10,6 @@ from ultron_backend.brain import (
     BrainRuntime,
     EchoBackend,
     FailoverBackend,
-    OllamaBackend,
     OpenAICompatBackend,
 )
 from ultron_backend.config import Settings
@@ -207,19 +206,18 @@ def test_failed_half_open_probe_reopens_the_breaker():
 
 def test_runtime_chain_ends_at_echo_floor():
     rt = BrainRuntime.from_settings(
-        Settings(brain_backend="ollama", brain_fallbacks=("openai",), brain_retries=0)
+        Settings(brain_backend="openai", brain_fallbacks=(), brain_retries=0)
     )
     assert isinstance(rt.backend, FailoverBackend)
-    assert [b.name for b in rt.backend.backends] == ["ollama", "openai", "echo"]
+    assert [b.name for b in rt.backend.backends] == ["openai", "echo"]
 
 
 def test_runtime_survives_every_model_runtime_being_down():
     rt = BrainRuntime.from_settings(
         Settings(
-            brain_backend="ollama",
-            brain_endpoint="http://127.0.0.1:1",
+            brain_backend="openai",
             brain_openai_endpoint="http://127.0.0.1:1",
-            brain_fallbacks=("openai",),
+            brain_fallbacks=(),
             brain_retries=0,
             brain_timeout_s=0.2,
         )
@@ -232,8 +230,8 @@ def test_runtime_survives_every_model_runtime_being_down():
 
 
 def test_no_fallbacks_keeps_a_plain_backend():
-    rt = BrainRuntime.from_settings(Settings(brain_backend="ollama"))
-    assert isinstance(rt.backend, OllamaBackend)
+    rt = BrainRuntime.from_settings(Settings(brain_backend="openai"))
+    assert isinstance(rt.backend, OpenAICompatBackend)
     assert "chain" not in rt.stats()
 
 

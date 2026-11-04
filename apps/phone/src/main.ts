@@ -2673,12 +2673,12 @@ async function submit(raw: string): Promise<void> {
   try {
     const cloudSkills = await invokeUltronRuntime("list_skills");
     const rows = Array.isArray(cloudSkills.skills) ? cloudSkills.skills.filter((item): item is Record<string,unknown> => Boolean(item) && typeof item === "object") : [];
-    const words = new Set((text.toLowerCase().match(/[\\p{L}\\p{N}_.:-]{2,}/gu) ?? []));
+    const words = new Set((text.toLowerCase().match(/[\p{L}\p{N}_.:-]{2,}/gu) ?? []));
     const ranked = rows.map(skill => {
       const triggers = Array.isArray(skill.triggers) ? skill.triggers.filter((x):x is string=>typeof x==="string") : [];
       return {skill,score:triggers.filter(trigger=>words.has(trigger.toLowerCase())).length/Math.max(1,triggers.length)+Number(skill.confidence??0)*0.1};
     }).filter(item=>item.score>0.1).sort((a,b)=>b.score-a.score).slice(0,3);
-    if(ranked.length) cloudSkillContext=["ULTRON CLOUD SKILLS (shared, versioned procedural context):","Use as prior experience, not as unquestionable truth. Re-check current facts and tools.",...ranked.map(({skill})=>"- "+String(skill.title??skill.skill_key)+" v"+String(skill.version)+"\\n  "+(Array.isArray(skill.instructions)?skill.instructions.join("; "):""))].join("\\n");
+    if(ranked.length) cloudSkillContext=["ULTRON CLOUD SKILLS (shared, versioned procedural context):","Use as prior experience, not as unquestionable truth. Re-check current facts and tools.",...ranked.map(({skill})=>"- "+String(skill.title??skill.skill_key)+" v"+String(skill.version)+"\\n  "+(Array.isArray(skill.instructions)?skill.instructions.join("; "):""))].join("\n");
     for(const {skill} of ranked) if(typeof skill.id==="string") void invokeUltronRuntime("record_skill_use",{id:skill.id}).catch(()=>undefined);
   } catch { cloudSkillContext = ""; }
 

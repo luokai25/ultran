@@ -53,7 +53,7 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
       toolsEl.replaceChildren();
       if (!tools.length) toolsEl.append(empty("No generated tools yet. ULTRON can create versioned Python drafts from a conversation."));
       for (const tool of tools) {
-        const node = card(str(tool,"tool_key","Unnamed tool")+" · v"+str(tool,"version"), str(tool,"lifecycle_state").replaceAll("_"," "), str(tool,"description"));
+        const node = card(str(tool,"tool_key","Unnamed tool")+" · v"+str(tool,"version"), str(tool,"lifecycle_state").replace(/_/g," "), str(tool,"description"));
         const details = el("details","capability-source"); details.append(el("summary","","Inspect exact source · SHA-256 "+str(tool,"source_sha256").slice(0,16)));
         const source = el("pre","capability-code",str(tool,"source_code","Source unavailable")); details.append(source);
         const language = el("small","capability-meta","Language: "+str(tool,"source_language")+" · Created: "+date(tool.created_at)); node.append(language,details);

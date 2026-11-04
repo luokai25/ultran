@@ -11,7 +11,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), b => b.toString(16).padStart(2,"0")).join("");
 const slug = /^[a-z][a-z0-9_]{1,63}$/;
 const semver = /^\d+\.\d+\.\d+$/;
-const OPS = new Set(["text.template","json.pick","http.request","memory.search","memory.save","database.select","database.insert","database.update"]);
+const OPS = new Set(["text.template","json.pick","http.request","memory.search","memory.save","database.select","database.insert","database.update","database.ddl","database.rpc"]);
 const READ_TABLES = new Set(["ultron_tasks","ultron_conversations","ultron_messages","ultron_memory_items","ultron_documents","ultron_skills","ultron_tool_specs","ultron_tool_runs","ultron_model_profiles","ultron_settings","ultron_capability_events","ultron_generated_tools","ultron_capability_proposals","ultron_agent_runs"]);
 const INSERT_TABLES = new Set(["ultron_tasks","ultron_memory_items","ultron_memory_relations"]);
 const UPDATE_TABLES = new Set(["ultron_tasks","ultron_memory_items","ultron_settings","ultron_model_profiles"]);
@@ -20,6 +20,8 @@ const CATALOG = [
   { id:"database.select",category:"data",runtime:"supabase",description:"Read owner-scoped ULTRON data tables." },
   { id:"database.insert",category:"data",runtime:"supabase",description:"Create owner-scoped tasks and memory records." },
   { id:"database.update",category:"data",runtime:"supabase",description:"Update owner-scoped tasks, settings and model profiles." },
+  { id:"database.ddl",category:"development",runtime:"supabase",description:"Create or alter ULTRON-owned public tables, views, indexes and invoker SQL functions." },
+  { id:"database.rpc",category:"development",runtime:"supabase",description:"Call ULTRON-authored Postgres functions by name." },
   { id:"memory.search",category:"memory",runtime:"supabase",description:"Search persistent long-term memory by shared 96-dimensional semantic vectors." },
   { id:"memory.save",category:"memory",runtime:"supabase",description:"Write a persistent memory item." },
   { id:"text.template",category:"transform",runtime:"supabase",description:"Compose text from input and earlier step results." },
@@ -161,6 +163,19 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
     const content=String(params.content??"").trim(); if(!content||content.length>12000)throw new Error("memory.save requires content up to 12 KB.");
     const memoryType=String(params.memory_type??"semantic"); const allowedTypes=new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);
     const {data,error}=await db.from("ultron_memory_items").insert({owner_id:ownerId,memory_type:allowedTypes.has(memoryType)?memoryType:"semantic",content,summary:String(params.summary??content.slice(0,300)).slice(0,500),importance:Math.max(1,Math.min(5,Math.round(Number(params.importance)||3))),confidence:Math.max(0,Math.min(1,Number(params.confidence)||0.8)),source:"generated_tool",source_ref:String(params.source_ref??"").slice(0,300)||null,local_embedding:embedMemoryText(content),metadata:isObject(params.metadata)?params.metadata:{}}).select("id,memory_type,summary,importance,confidence,created_at").single();
+    if(error)throw error;return data;
+  }
+  if(op==="database.ddl"){
+    const statement=String(params.statement??"").trim();
+    if(!statement||statement.length>50000)throw new Error("database.ddl requires a schema statement up to 50 KB.");
+    const {data,error}=await db.rpc("ultron_apply_schema_change",{statement});
+    if(error)throw error;return data;
+  }
+  if(op==="database.rpc"){
+    const functionName=String(params.function_name??"");
+    if(!/^ultron_[a-z][a-z0-9_]{1,55}$/.test(functionName))throw new Error("database.rpc can call ULTRON-authored ultron_* functions only.");
+    const args=isObject(params.args)?params.args:{};
+    const {data,error}=await db.rpc(functionName,args);
     if(error)throw error;return data;
   }
   if (op === "database.select" || op === "database.insert" || op === "database.update") {

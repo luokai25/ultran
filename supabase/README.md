@@ -96,3 +96,8 @@ ULTRON may create, revise (by publishing a new version), run and archive ordinar
 ### Shared semantic memory
 
 ULTRON's deterministic 96-dimensional feature-hash vectors are now mirrored to `ultron_memory_items.local_embedding`. Supabase exposes `ultron_match_local_memories`, a cosine-similarity RPC protected by the caller's owner RLS context and backed by an HNSW index. The Android client synchronizes memory vectors in batches and retrieves relevant cloud memories before both local and remote inference. If cloud access is unavailable, the existing on-device retrieval path remains available. The model embedding column remains separate for future neural embedding providers.
+
+
+### Autonomous Supabase code authoring
+
+ULTRON can create and alter its own Supabase public-schema objects through the `database.ddl` workflow operation, backed by `ultron_apply_schema_change`. It can create tables, views, indexes and invoker SQL functions, then call its own `ultron_*` Postgres functions with `database.rpc`. The schema authoring function checks the authenticated ULTRON owner, records the applied statement hash and preview in capability events, and keeps destructive DROP/TRUNCATE operations outside the autonomous path. New public functions created by the postgres owner do not receive PUBLIC or anon execution by default; ULTRON can explicitly grant execution to authenticated. This lets ULTRON write real database-side code without putting service credentials in the Android app.

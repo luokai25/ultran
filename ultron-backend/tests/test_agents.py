@@ -867,3 +867,5 @@ def test_chat_exposes_supabase_runtime_for_self_authored_tools_and_skills(monkey
     assert "runtime.tool.create" in system_prompt
     assert "runtime.tool.run" in system_prompt
     assert "skills.cloud.save" in system_prompt
+    assert "database.ddl" in system_prompt
+    assert "database.rpc" in system_prompt

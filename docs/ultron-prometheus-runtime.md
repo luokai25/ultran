@@ -6,7 +6,7 @@ This document records the implementation boundary for ULTRON'\''s self-improving
 
 1. A candidate is parsed and reviewed by `generated_tool_policy.py`. The supported language is intentionally small: one `run(payload)` function, no imports, attribute access, filesystem, network, dynamic evaluation, or ambient authority.
 2. The candidate is fingerprinted by tool id, semantic version, and exact source SHA-256.
-3. The worker adapter stages the reviewed bytes. Staging is not execution.
+3. The content-addressed artifact store stages source and a review manifest with private file permissions. The worker adapter may then stage the reviewed bytes. Staging is not execution.
 4. A separate worker supervisor starts a restricted worker and returns an attestation tied to tool id, version, source hash, isolation profile, network setting, and ambient-credential setting.
 5. ULTRON requires an exact human approval fingerprint.
 6. The MCP manifest is hot-registered in the in-memory connector registry. Generated source is never imported by the trusted API process.

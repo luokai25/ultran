@@ -12,6 +12,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from ..connectors.registry import ConnectorRegistry, mcp_connector_id
+from .generated_tool_artifacts import GeneratedToolArtifactStore
 from .generated_tool_registry import (
     GeneratedToolCandidate,
     GeneratedToolRegistrationError,
@@ -62,6 +63,7 @@ class ToolLifecycleRecord:
     state: ToolLifecycleState = ToolLifecycleState.REVIEWED
     worker: WorkerReadiness | None = None
     failure: str | None = None
+    staged_artifact: str | None = None
 
 
 class GeneratedToolLifecycle:
@@ -73,9 +75,11 @@ class GeneratedToolLifecycle:
         self,
         registry: ConnectorRegistry,
         worker: GeneratedToolWorkerAdapter,
+        artifact_store: GeneratedToolArtifactStore | None = None,
     ) -> None:
         self._registry = registry
         self._worker = worker
+        self._artifact_store = artifact_store
         self._records: dict[str, ToolLifecycleRecord] = {}
 
     def review(self, candidate: GeneratedToolCandidate) -> ToolLifecycleRecord:
@@ -90,7 +94,10 @@ class GeneratedToolLifecycle:
     def stage(self, fingerprint: str) -> ToolLifecycleRecord:
         record = self._get(fingerprint, ToolLifecycleState.REVIEWED)
         try:
-            # The adapter stages bytes only. It must not execute them here.
+            # Both the local artifact store and worker adapter stage bytes only.
+            # Neither is permitted to execute source during this transition.
+            if self._artifact_store is not None:
+                record.staged_artifact = str(self._artifact_store.stage(record.reviewed))
             self._worker.stage(record.reviewed)
             record.state = ToolLifecycleState.STAGED
             return record

@@ -193,3 +193,12 @@ test('learning review shows cause and confidence instead of presenting every neg
   assert.match(main, /cause: \${event\.cause\.replace/);
   assert.match(main, /classificationConfidence \* 100/);
 });
+
+test('runtime learning requires recurring evidence before creating proposals and correlates tool outcomes', () => {
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /related\.length < 2/);
+  assert.match(main, /Repeated \$\{causeLabel\} observations/);
+  assert.match(main, /cause\?: import\("\.\/ultron-learning\.js"\)\.LearningCause/);
+  assert.match(main, /"tool_execution", convo\.id/);
+  assert.match(main, /"verification_gap", convo\.id/);
+});

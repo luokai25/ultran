@@ -25,9 +25,9 @@ default, and your agent stops working when the network does.
 
 Ultron inverts the default:
 
-- **Local inference is preferred.** The Python control plane tries a local
-  Ollama model by default and falls back to a deterministic Echo responder when
-  no model is available. The Android APK does not bundle model weights.
+- **Local inference is preferred.** Android uses the bundled llama.cpp runtime
+  to run compatible GGUF models directly from private app storage. Model weights
+  are downloaded or imported by the owner and are not bundled in the APK.
 - **Tools are sandboxed.** Every side effect happens in an isolated worker
   under a signed, expiring capability grant.
 - **The cloud is a service, not a dependency.** Sync, marketplace, and billing
@@ -41,9 +41,9 @@ Ultron treats the selected LLM as a replaceable reasoning engine, not as the
 entire agent. A shared capability contract supplies task-aware planning
 standards, bounded context and memory, truthfulness rules, untrusted-output
 handling, tool permissions, and a separate review pass for complex or high-impact
-answers. The phone's on-device and Ollama paths use the same policy shape; the
-Python agent backend applies it across Echo, local models, and configured
-hosted providers.
+answers. The phone's on-device and configured hosted-model paths use the same policy
+shape. Model providers remain replaceable without changing memory, planning,
+permission, or tool-execution contracts.
 
 The orchestration layer owns tool discovery, argument validation, approval
 gates, execution limits, audit events, and result synthesis. Switching brains
@@ -158,21 +158,12 @@ with 1B–3B Q4 models before testing larger checkpoints. GPU acceleration,
 explicit module-level eviction/prefetch, and streamed native token callbacks
 remain future optimizations.
 
-A local Ollama-compatible runtime is also supported as an optional bridge.
-Configure its localhost or private-LAN address in Settings → Local model
-endpoint. The app can list installed Ollama models and request a model pull by
-name, then use that model directly through the configured endpoint. Inference
-goes directly from the app to that runtime, not through the Ultron backend.
-The Ollama host must allow the app origin through its CORS configuration, and
-the endpoint should remain on localhost or a trusted private network.
-
-For hosted agents, Composio and shared workspaces, the optional Python control
-plane can still run separately. Set ULTRON_BRAIN_BACKEND=ollama and
-ULTRON_BRAIN_MODEL=llama3.1:8b before starting the backend. It listens on
-127.0.0.1:8080 by default. To reach it from a phone, set ULTRON_HOST=0.0.0.0
-and connect using the computer's LAN IP, but only on a trusted network and
-with firewall access limited to your devices. Do not expose this development
-backend directly to the public internet.
+ULTRON's Android local-inference path is based on llama.cpp and GGUF model
+files. Ollama is not part of the supported Android architecture. Keep local
+model downloads, storage, loading, and inference inside the app's own model
+manager and native runtime. Remote inference, when configured, must use an
+explicit provider profile and must not make local chat or memory dependent on
+network access.
 
 ### Connect Google and other services through Composio
 

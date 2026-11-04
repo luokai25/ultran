@@ -52,7 +52,7 @@ let syncTimer: number | undefined;
 let syncInFlight = false;
 let syncQueued: LocalConversationForSync[] | null = null;
 
-type IdMap = { conversations: Record<string, string>; messages: Record<string, string>; messageTimes: Record<string, string> };
+type IdMap = { conversations: Record<string, string>; messages: Record<string, string>; messageTimes: Record<string, string>; memories: Record<string, string> };
 
 function readIdMap(): IdMap {
   try {
@@ -61,9 +61,10 @@ function readIdMap(): IdMap {
       conversations: value.conversations ?? {},
       messages: value.messages ?? {},
       messageTimes: value.messageTimes ?? {},
+      memories: value.memories ?? {},
     };
   } catch {
-    return { conversations: {}, messages: {}, messageTimes: {} };
+    return { conversations: {}, messages: {}, messageTimes: {}, memories: {} };
   }
 }
 
@@ -337,6 +338,7 @@ export function subscribeCloudWorkspace(onChange: () => void): () => void {
       .channel('ultron-private-workspace')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_conversations', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_messages', filter: `owner_id=eq.${ownerId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_memory_items', filter: `owner_id=eq.${ownerId}` }, onChange)
       .subscribe();
     unsubscribeChannel = () => { void cloudClient.removeChannel(channel); };
   }).catch((error) => console.warn('[ULTRON realtime]', error));
@@ -363,4 +365,161 @@ export async function deleteCloudConversation(localConversationId: string): Prom
     .eq('id', cloudId)
     .eq('owner_id', session.user.id);
   if (error) throw error;
+}
+
+export type CloudMemoryRecord = {
+  id: string;
+  text: string;
+  kind: string;
+  source: string;
+  confidence: number;
+  updatedAt: number;
+  accessedAt: number;
+  accessCount: number;
+  tier: string;
+  vector: number[];
+  fingerprint: string;
+};
+
+const syncedMemoryFingerprints = new Map<string, string>();
+let memorySyncTimer: number | undefined;
+let settingsSyncTimer: number | undefined;
+
+function memoryFingerprint(record: CloudMemoryRecord): string {
+  return stableFingerprint({
+    text: record.text,
+    kind: record.kind,
+    source: record.source,
+    confidence: record.confidence,
+    updatedAt: record.updatedAt,
+  });
+}
+
+export async function pullCloudMemories(): Promise<Array<{
+  id: string;
+  text: string;
+  kind: string;
+  source: string;
+  confidence: number;
+  updatedAt: number;
+}>> {
+  const session = await getCloudSession();
+  if (!session) return [];
+  const { data, error } = await cloudClient
+    .from('ultron_memory_items')
+    .select('id,memory_type,content,summary,confidence,source,metadata,updated_at')
+    .is('archived_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(2000);
+  if (error) throw error;
+
+  const idMap = readIdMap();
+  const memories = (data ?? []).map((row) => {
+    const metadata = row.metadata && typeof row.metadata === 'object'
+      ? row.metadata as Record<string, unknown>
+      : {};
+    const localId = typeof metadata.local_memory_id === 'string'
+      ? metadata.local_memory_id
+      : `cloud_${row.id}`;
+    idMap.memories[localId] = row.id;
+    return {
+      id: localId,
+      text: row.content,
+      kind: row.memory_type,
+      source: row.source ?? 'cloud',
+      confidence: Number(row.confidence ?? 0.8),
+      updatedAt: new Date(row.updated_at).getTime(),
+    };
+  });
+  writeIdMap(idMap);
+  return memories;
+}
+
+export async function syncCloudMemories(records: CloudMemoryRecord[]): Promise<void> {
+  const session = await getCloudSession();
+  if (!session) return;
+  const idMap = readIdMap();
+  const allowedTypes = new Set(['identity', 'preference', 'fact', 'episodic', 'semantic', 'goal', 'decision', 'procedure', 'relationship']);
+
+  for (const record of records) {
+    if (!record.text.trim()) continue;
+    const cloudId = idMap.memories[record.id] ?? uuid();
+    idMap.memories[record.id] = cloudId;
+    const fingerprint = memoryFingerprint(record);
+    if (syncedMemoryFingerprints.get(record.id) === fingerprint) continue;
+    const memoryType = allowedTypes.has(record.kind) ? record.kind : 'semantic';
+    const updatedAt = new Date(record.updatedAt).toISOString();
+    writeIdMap(idMap);
+    const { error } = await cloudClient.from('ultron_memory_items').upsert({
+      id: cloudId,
+      owner_id: session.user.id,
+      memory_type: memoryType,
+      content: record.text.slice(0, 900),
+      summary: record.text.slice(0, 240),
+      importance: record.tier === 'hot' ? 5 : record.tier === 'warm' ? 3 : 1,
+      confidence: record.confidence,
+      source: record.source.slice(0, 120),
+      metadata: {
+        local_memory_id: record.id,
+        tier: record.tier,
+        access_count: record.accessCount,
+        accessed_at: record.accessedAt,
+        fingerprint: record.fingerprint,
+      },
+      updated_at: updatedAt,
+      archived_at: null,
+    }, { onConflict: 'id' });
+    if (error) throw error;
+    syncedMemoryFingerprints.set(record.id, fingerprint);
+  }
+}
+
+export function rememberCloudMemories(records: CloudMemoryRecord[]): void {
+  for (const record of records) syncedMemoryFingerprints.set(record.id, memoryFingerprint(record));
+}
+
+export function scheduleCloudMemorySync(records: CloudMemoryRecord[], onError?: (error: unknown) => void): void {
+  if (memorySyncTimer) window.clearTimeout(memorySyncTimer);
+  memorySyncTimer = window.setTimeout(() => {
+    void syncCloudMemories(records).catch((error) => {
+      console.warn('[ULTRON cloud memory sync]', error);
+      onError?.(error);
+    });
+  }, 1600);
+}
+
+export async function pullCloudSetting(settingKey: string): Promise<unknown | null> {
+  const session = await getCloudSession();
+  if (!session) return null;
+  const { data, error } = await cloudClient
+    .from('ultron_settings')
+    .select('setting_value')
+    .eq('setting_key', settingKey)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.setting_value ?? null;
+}
+
+export function scheduleCloudSetting(
+  settingKey: string,
+  settingValue: unknown,
+  onError?: (error: unknown) => void,
+): void {
+  if (settingsSyncTimer) window.clearTimeout(settingsSyncTimer);
+  settingsSyncTimer = window.setTimeout(() => {
+    void (async () => {
+      const session = await getCloudSession();
+      if (!session) return;
+      const { error } = await cloudClient.from('ultron_settings').upsert({
+        owner_id: session.user.id,
+        setting_key: settingKey,
+        setting_value: settingValue,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'owner_id,setting_key' });
+      if (error) throw error;
+    })().catch((error) => {
+      console.warn('[ULTRON cloud settings sync]', error);
+      onError?.(error);
+    });
+  }, 900);
 }

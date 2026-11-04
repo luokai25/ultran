@@ -2161,6 +2161,9 @@ function typewriter(target: HTMLElement, text: string, onDone: () => void): () =
 async function submit(raw: string): Promise<void> {
   const text = raw.trim() || (pendingAttachments.length ? "Please inspect the attached file(s) and help me understand them." : "");
   if (!text || busy) return;
+  if (/\b(actually|i meant|that is not what i asked|not what i asked|you misunderstood|wrong answer|you got that wrong|correction)\b|(?:مش ده اللي طلبته|ده مش قصدي|أقصد|قصدي|إجابتك غلط|فهمتني غلط)/i.test(text)) {
+    recordLearningObservation("user_correction", "user-correction", "The user explicitly corrected the previous answer or task interpretation.", "high", "user_feedback");
+  }
 
   let convo = active();
   if (!convo) {

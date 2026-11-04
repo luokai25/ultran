@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Mapping
 
 _TRUTHY = {"1", "true", "yes", "on"}
-_VALID_BRAINS = {"echo", "ollama", "openai"}
+_VALID_BRAINS = {"echo", "openai"}
 
 
 def _flag(value: str | None, default: bool = False) -> bool:
@@ -61,8 +61,7 @@ class Settings:
     data_dir: Path = Path(".ultron-data")
     credential_encryption_key: str = ""
     brain_backend: str = "echo"
-    brain_endpoint: str = "http://127.0.0.1:11434"
-    brain_model: str = "llama3.1:8b"
+    brain_model: str = "default"
     brain_timeout_s: float = 30.0
     #: Self-hosted OpenAI-compatible server (llama.cpp, LM Studio, vLLM).
     brain_openai_endpoint: str = "http://127.0.0.1:1234"
@@ -137,9 +136,8 @@ class Settings:
             api_prefix=e.get("ULTRON_API_PREFIX", "/v1"),
             data_dir=Path(e.get("ULTRON_DATA_DIR", ".ultron-data")),
             credential_encryption_key=e.get("ULTRON_CREDENTIAL_ENCRYPTION_KEY", ""),
-            brain_backend=e.get("ULTRON_BRAIN_BACKEND", "ollama").strip().lower(),
-            brain_endpoint=e.get("ULTRON_BRAIN_ENDPOINT", "http://127.0.0.1:11434"),
-            brain_model=e.get("ULTRON_BRAIN_MODEL", "llama3.1:8b"),
+            brain_backend=e.get("ULTRON_BRAIN_BACKEND", "echo").strip().lower(),
+            brain_model=e.get("ULTRON_BRAIN_MODEL", "default"),
             brain_timeout_s=_float(e.get("ULTRON_BRAIN_TIMEOUT_S"), 30.0),
             brain_openai_endpoint=e.get("ULTRON_BRAIN_OPENAI_ENDPOINT", "http://127.0.0.1:1234"),
             brain_openai_api_key=e.get("ULTRON_BRAIN_OPENAI_API_KEY", ""),

@@ -68,9 +68,9 @@ def test_cors_origins_are_configurable_and_fall_back_when_blank():
 
 def test_capabilities_reports_the_workspace(client):
     body = client.get("/v1/capabilities").json()
-    assert body["connectors"]["total"] >= 70
+    assert body["connectors"]["total"] == 1
     assert body["theme"] == "golden-black"
-    assert "ollama" in body["enabled_connectors"]
+    assert "ollama" not in body["enabled_connectors"]
 
 
 def test_workspace_header_scopes_the_request(client):
@@ -90,14 +90,14 @@ def test_openapi_schema_is_served(client):
 
 def test_connector_marketplace_lists_connectors(client):
     body = client.get("/v1/connectors").json()
-    assert len(body) >= 70
+    assert len(body) == 1
     assert {"id", "name", "category", "tier", "actions"} <= set(body[0])
 
 
 def test_connectors_can_be_filtered_by_category(client):
-    body = client.get("/v1/connectors", params={"category": "ai"}).json()
+    body = client.get("/v1/connectors", params={"category": "source-control"}).json()
     assert body
-    assert all(c["category"] == "ai" for c in body)
+    assert all(c["category"] == "source-control" for c in body)
 
 
 def test_connectors_can_be_searched(client):
@@ -114,7 +114,7 @@ def test_connector_stats_summarise_the_catalog(client):
 def test_a_single_connector_can_be_read(client):
     body = client.get("/v1/connectors/github").json()
     assert body["name"] == "GitHub"
-    assert "commit" in body["actions"]
+    assert "list_repos" in body["actions"]
 
 
 def test_an_unknown_connector_is_a_404(client):
@@ -127,7 +127,7 @@ def test_enabling_a_connector_is_idempotent(client):
     assert client.post("/v1/connectors/slack/enable").status_code == 204
     assert client.post("/v1/connectors/slack/enable").status_code == 204
     enabled = client.get("/v1/connectors/enabled/list").json()["enabled"]
-    assert "slack" in enabled
+    assert "github" in enabled
 
 
 def test_connecting_a_connector_stores_a_masked_credential(client):
@@ -177,7 +177,7 @@ def test_invoking_an_enabled_connector_succeeds(client):
     client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
     resp = client.post(
         "/v1/connectors/invoke",
-        json={"connector_id": "slack", "action": "post_message", "payload": {"text": "hi"}},
+        json={"connector_id": "slack", "action": "list_repos", "payload": {"text": "hi"}},
     )
     assert resp.status_code == 200
     assert resp.json()["ok"] is True

@@ -264,6 +264,11 @@ export function mergeCloudWorkspace(
         messages.push(remoteMessage);
       } else if (remoteIsNewer) {
         messages[existingIndex] = remoteMessage;
+      } else {
+        messages[existingIndex] = {
+          ...messages[existingIndex]!,
+          sequenceNo: remoteMessage.sequenceNo,
+        };
       }
     });
     messages.sort((left, right) => (left.sequenceNo ?? Number.MAX_SAFE_INTEGER) - (right.sequenceNo ?? Number.MAX_SAFE_INTEGER));

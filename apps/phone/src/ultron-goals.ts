@@ -30,7 +30,7 @@ export type UltronGoalGraph = {
   objective: string;
   createdAt: number;
   updatedAt: number;
-  status: "active" | "blocked" | "completed" | "failed";
+  status: "active" | "blocked" | "completed" | "failed" | "cancelled";
   goals: UltronGoal[];
   hardConstraints: string[];
   revision: number;
@@ -49,7 +49,8 @@ export function createUltronGoalGraph(
   hardConstraints: readonly string[] = [],
 ): UltronGoalGraph {
   const timestamp = now();
-  const goals = steps.map((step, index): UltronGoal => ({
+  const normalizedSteps = steps.length ? [...steps] : [{ id: "understand", objective: "Clarify the objective and define a verifiable outcome.", kind: "understand" as const, completionSignal: "The objective and success criteria are explicit." }];
+  const goals = normalizedSteps.map((step, index): UltronGoal => ({
     id: step.id,
     title: step.kind.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase()),
     objective: step.objective,
@@ -69,23 +70,43 @@ export function createUltronGoalGraph(
 export function validateUltronGoalGraph(graph: UltronGoalGraph): GoalGraphValidation {
   const errors: string[] = [];
   const ids = new Set<string>();
+  if (!graph.id?.trim()) errors.push("The goal graph has no identifier.");
+  if (!graph.objective?.trim()) errors.push("The goal graph has no objective.");
+  if (!Number.isInteger(graph.revision) || graph.revision < 1) errors.push("The goal graph revision must be a positive integer.");
+  if (!graph.goals.length) errors.push("The goal graph must contain at least one goal.");
   for (const goal of graph.goals) {
-    if (!goal.id.trim()) errors.push("A goal has an empty identifier.");
+    if (!goal.id?.trim()) errors.push("A goal has an empty identifier.");
     if (ids.has(goal.id)) errors.push(`Duplicate goal identifier: ${goal.id}.`);
     ids.add(goal.id);
     if (!goal.objective.trim()) errors.push(`Goal ${goal.id} has no objective.`);
-    if (!goal.completionCriteria.length) errors.push(`Goal ${goal.id} has no completion criteria.`);
+    if (!goal.completionCriteria.length || goal.completionCriteria.some((item) => !item.trim())) errors.push(`Goal ${goal.id} has missing or empty completion criteria.`);
+    if (!Number.isFinite(goal.priority)) errors.push(`Goal ${goal.id} has an invalid priority.`);
+    if (!Number.isInteger(goal.attempts) || goal.attempts < 0) errors.push(`Goal ${goal.id} has an invalid attempt count.`);
+    if (!Array.isArray(goal.dependsOn)) errors.push(`Goal ${goal.id} has an invalid dependency list.`);
   }
   for (const goal of graph.goals) {
     if (goal.parentId && !graph.goals.some((item) => item.id === goal.parentId)) errors.push(`Goal ${goal.id} references missing parent ${goal.parentId}.`);
+    if (new Set(goal.dependsOn).size !== goal.dependsOn.length) errors.push(`Goal ${goal.id} contains duplicate dependencies.`);
     for (const dependency of goal.dependsOn) if (!ids.has(dependency)) errors.push(`Goal ${goal.id} references missing dependency ${dependency}.`);
     if (goal.dependsOn.includes(goal.id)) errors.push(`Goal ${goal.id} depends on itself.`);
   }
+  const byId = new Map(graph.goals.map((goal) => [goal.id, goal]));
+  const parentVisiting = new Set<string>();
+  const parentVisited = new Set<string>();
+  const visitParent = (id: string): void => {
+    if (parentVisited.has(id)) return;
+    if (parentVisiting.has(id)) { errors.push(`Parent hierarchy cycle detected at ${id}.`); return; }
+    parentVisiting.add(id);
+    const parent = byId.get(id)?.parentId;
+    if (parent && byId.has(parent)) visitParent(parent);
+    parentVisiting.delete(id);
+    parentVisited.add(id);
+  };
+  for (const goal of graph.goals) visitParent(goal.id);
 
   const visiting = new Set<string>();
   const visited = new Set<string>();
   const topologicalOrder: string[] = [];
-  const byId = new Map(graph.goals.map((goal) => [goal.id, goal]));
   const visit = (id: string): void => {
     if (visited.has(id)) return;
     if (visiting.has(id)) { errors.push(`Dependency cycle detected at ${id}.`); return; }
@@ -141,9 +162,11 @@ export function transitionUltronGoal(
     ...(details.blocker ? { blocker: details.blocker.slice(0, 500) } : {}),
     updatedAt: now(),
   } : { ...item });
-  const status = goals.every((item) => item.status === "completed" || item.status === "cancelled") ? "completed"
-    : goals.some((item) => item.status === "blocked") ? "blocked"
-      : goals.some((item) => item.status === "failed") ? "failed" : "active";
+  const allTerminal = goals.every((item) => item.status === "completed" || item.status === "cancelled");
+  const status = allTerminal && goals.every((item) => item.status === "cancelled") ? "cancelled"
+    : allTerminal ? "completed"
+      : goals.some((item) => item.status === "blocked") ? "blocked"
+        : goals.some((item) => item.status === "failed") ? "failed" : "active";
   return { ok: true, graph: { ...graph, goals, status, revision: graph.revision + 1, updatedAt: now() } };
 }
 

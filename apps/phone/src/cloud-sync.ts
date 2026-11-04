@@ -1,4 +1,4 @@
-import { mergeCloudWorkspace, type CloudAttachment, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
+import { mergeCloudWorkspace, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
 export { mergeCloudWorkspace, type CloudAttachment, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
 import { createClient, type Session } from '@supabase/supabase-js';
 import { Capacitor, registerPlugin } from '@capacitor/core';

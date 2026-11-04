@@ -21,6 +21,7 @@ import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolve
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace } from "./ultron-brain";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
+import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -200,6 +201,8 @@ const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string): string {
   const profile = classifyUltronTask(task);
   const plan = createUltronPlan(task, profile);
+  const goalGraph = createUltronGoalGraph(`goal-${Date.now().toString(36)}`, task, plan);
+  const goalPrompt = profile.depth === "instant" ? "" : buildUltronGoalPrompt(goalGraph);
   const ledger = profile.depth === "deep" || profile.depth === "critical" ? createUltronTaskLedger(`turn-${Date.now().toString(36)}`, task) : null;
   ultronDecisionTrace.record({ phase: "classify", code: profile.intent, detail: `risk=${profile.risk}; depth=${profile.depth}; tool=${profile.toolDecision}` });
   ultronDecisionTrace.record({ phase: "plan", code: "plan-created", detail: `${plan.length} bounded steps` });
@@ -217,7 +220,7 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {

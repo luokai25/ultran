@@ -206,7 +206,11 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
-  const cognitiveProfile = analyzeCognitiveProfile(task, { continuation: profile.intent === "continuation", hasAttachments: task.includes("[Attachment:") });
+  const cognitiveProfile = analyzeCognitiveProfile(task, {
+    continuation: profile.intent === "continuation" || /\b(continue|carry on|resume|pick up where|keep going)\b|(?:استمر|كمل|تابع)/i.test(task),
+    priorCorrection: /\b(correction|i meant|not .{1,35} but|actually,? i)\b|(?:قصدي|أقصد|مش قصدي|لا أقصد)/i.test(task),
+    hasAttachments: task.includes("[Attachment:"),
+  });
   const cognition = cognitiveProfile.mode === "direct" ? "" : buildCognitiveInstructions(cognitiveProfile);
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
   const memoryContext = buildUltronMemoryContext(memoryMatches);

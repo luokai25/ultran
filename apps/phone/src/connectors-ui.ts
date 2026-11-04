@@ -274,9 +274,9 @@ export function initConnectors(deps: Deps): void {
       for (const account of body.connections ?? []) {
         if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
       }
-      composioHealth.dataset.state = "ready";
-      composioHealthLabel.textContent = "GitHub connected";
-      composioHealthDetail.textContent = oauthConnected.size ? "GitHub account authorized. Repository reads are available; writes remain approval-gated." : "The authorization service is reachable, but no active GitHub account was found.";
+      composioHealth.dataset.state = oauthConnected.size ? "ready" : "disconnected";
+      composioHealthLabel.textContent = oauthConnected.size ? "GitHub connected" : "Awaiting GitHub sign-in";
+      composioHealthDetail.textContent = oauthConnected.size ? "GitHub account authorized. Repository reads are available; writes remain approval-gated." : "The authorization service is reachable, but no active GitHub account was found. Connect your account to continue.";
     } catch {
       if (!panelOpen || generation !== refreshGeneration) return;
       composioHealth.dataset.state = "error";

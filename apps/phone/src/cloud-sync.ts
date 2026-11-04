@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export type CloudAttachment = {
   id: string;
@@ -35,8 +36,41 @@ const SUPABASE_KEY =
   import.meta.env.VITE_ULTRON_SUPABASE_PUBLISHABLE_KEY ??
   'sb_publishable_OuRYpP7YP76xv4mfUgd_ng_NF4nWVoV';
 
+type UltronSecureStoragePlugin = {
+  get(options: { key: string }): Promise<{ value: string | null }>;
+  set(options: { key: string; value: string }): Promise<{ stored: boolean }>;
+  remove(options: { key: string }): Promise<{ removed: boolean }>;
+};
+
+const NativeSecureStorage = registerPlugin<UltronSecureStoragePlugin>('UltronSecureStorage');
+
+const secureSessionStorage = {
+  async getItem(key: string): Promise<string | null> {
+    if (Capacitor.getPlatform() === 'android') {
+      const result = await NativeSecureStorage.get({ key });
+      return result.value;
+    }
+    return window.localStorage.getItem(key);
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    if (Capacitor.getPlatform() === 'android') {
+      await NativeSecureStorage.set({ key, value });
+      return;
+    }
+    window.localStorage.setItem(key, value);
+  },
+  async removeItem(key: string): Promise<void> {
+    if (Capacitor.getPlatform() === 'android') {
+      await NativeSecureStorage.remove({ key });
+      return;
+    }
+    window.localStorage.removeItem(key);
+  },
+};
+
 export const cloudClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
+    storage: secureSessionStorage,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,

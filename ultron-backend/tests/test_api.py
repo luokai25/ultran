@@ -124,8 +124,8 @@ def test_an_unknown_connector_is_a_404(client):
 
 
 def test_enabling_a_connector_is_idempotent(client):
-    assert client.post("/v1/connectors/slack/enable").status_code == 204
-    assert client.post("/v1/connectors/slack/enable").status_code == 204
+    assert client.post("/v1/connectors/github/enable").status_code == 204
+    assert client.post("/v1/connectors/github/enable").status_code == 204
     enabled = client.get("/v1/connectors/enabled/list").json()["enabled"]
     assert "github" in enabled
 
@@ -133,7 +133,7 @@ def test_enabling_a_connector_is_idempotent(client):
 def test_connecting_a_connector_stores_a_masked_credential(client):
     resp = client.post(
         "/v1/connectors/connect",
-        json={"connector_id": "slack", "api_key": KEY, "plan": "free"},
+        json={"connector_id": "github", "api_key": KEY, "plan": "free"},
     )
     assert resp.status_code == 201
     body = resp.json()
@@ -150,59 +150,59 @@ def test_connecting_an_unknown_connector_is_a_404(client):
 
 
 def test_connecting_twice_with_the_same_key_is_a_409(client):
-    payload = {"connector_id": "slack", "api_key": KEY}
+    payload = {"connector_id": "github", "api_key": KEY}
     client.post("/v1/connectors/connect", json=payload)
     assert client.post("/v1/connectors/connect", json=payload).status_code == 409
 
 
 def test_a_short_api_key_is_rejected(client):
-    resp = client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": "x"})
+    resp = client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": "x"})
     assert resp.status_code == 422
 
 
 def test_the_credential_list_never_returns_secrets(client):
-    client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
+    client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": KEY})
     resp = client.get("/v1/connectors/credentials/list")
     assert KEY not in resp.text
-    assert resp.json()[0]["connector_id"] == "slack"
+    assert resp.json()[0]["connector_id"] == "github"
 
 
 def test_revoking_a_credential_removes_it(client):
-    client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
-    assert client.delete("/v1/connectors/credentials/slack").status_code == 204
+    client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": KEY})
+    assert client.delete("/v1/connectors/credentials/github").status_code == 204
     assert client.get("/v1/connectors/credentials/list").json() == []
 
 
 def test_invoking_an_enabled_connector_succeeds(client):
-    client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
+    client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": KEY})
     resp = client.post(
         "/v1/connectors/invoke",
-        json={"connector_id": "slack", "action": "list_repos", "payload": {"text": "hi"}},
+        json={"connector_id": "github", "action": "list_repos", "payload": {"text": "hi"}},
     )
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
 
 def test_invoking_an_undeclared_action_is_a_422(client):
-    client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
+    client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": KEY})
     resp = client.post(
-        "/v1/connectors/invoke", json={"connector_id": "slack", "action": "nuke"}
+        "/v1/connectors/invoke", json={"connector_id": "github", "action": "nuke"}
     )
     assert resp.status_code == 422
 
 
 def test_invoking_a_disabled_connector_is_a_404(client):
     resp = client.post(
-        "/v1/connectors/invoke", json={"connector_id": "slack", "action": "post_message"}
+        "/v1/connectors/invoke", json={"connector_id": "github", "action": "list_repos"}
     )
     assert resp.status_code == 404
 
 
 def test_the_audit_log_records_invocations(client):
-    client.post("/v1/connectors/connect", json={"connector_id": "slack", "api_key": KEY})
+    client.post("/v1/connectors/connect", json={"connector_id": "github", "api_key": KEY})
     client.post(
         "/v1/connectors/invoke",
-        json={"connector_id": "slack", "action": "post_message"},
+        json={"connector_id": "github", "action": "list_repos"},
     )
     body = client.get("/v1/connectors/audit/log").json()
     assert body["entries"]

@@ -245,6 +245,25 @@ function writeJson(key: string, value: unknown): void {
 
 const learningLedger: LearningLedger = validateLearningLedger(readJson<unknown>(LEARNING_KEY, createLearningLedger()));
 const saveLearningLedger = (): void => writeJson(LEARNING_KEY, learningLedger);
+function recordLearningObservation(signal: "user_correction" | "task_failure" | "tool_failure" | "verification_failure" | "user_success" | "repeated_friction", category: string, summary: string, severity: "low" | "medium" | "high" | "critical", source: "user_feedback" | "runtime" | "test" | "tool_result"): void {
+  const eventId = `learn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const recorded = recordLearningEvent(learningLedger, { id: eventId, signal, category, summary, severity, source, evidenceIds: [] });
+  if (!recorded.accepted) return;
+  Object.assign(learningLedger, recorded.ledger);
+  const proposalId = `improve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const proposed = proposeLearningImprovement(learningLedger, {
+    id: proposalId,
+    title: `Address ${category}`,
+    hypothesis: `Add a focused regression test for ${category}, then adjust the responsible runtime path without weakening existing permission or safety checks.`,
+    category,
+    evidenceIds: [eventId],
+    impact: severity === "critical" || severity === "high" ? 0.9 : 0.65,
+    confidence: 0.72,
+    risk: 0.25,
+  });
+  if (proposed.accepted) Object.assign(learningLedger, proposed.ledger);
+  saveLearningLedger();
+}
 
 const storedIdentityState = readJson<Partial<IdentityState> & { overrides?: { ultron?: string } }>(IDENTITY_STORAGE_KEY, {});
 const identityState: IdentityState = { ...DEFAULT_IDENTITY_STATE, ...storedIdentityState, active: "ultron", customInstructions: storedIdentityState.customInstructions ?? storedIdentityState.overrides?.ultron ?? "" };
@@ -2336,37 +2355,18 @@ async function submit(raw: string): Promise<void> {
 
   const finalProfile = classifyUltronTask(text);
   const validation = validateUltronDraft(text, result.content, finalProfile);
-  for (const [index, issue] of validation.issues.entries()) {
+  for (const issue of validation.issues) {
     ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });
-    if (issue.severity === "info") continue;
-    const eventId = `learn-${Date.now().toString(36)}-${index}`;
-    const recorded = recordLearningEvent(learningLedger, {
-      id: eventId,
-      signal: "verification_failure",
-      category: issue.code,
-      summary: issue.message,
-      severity: issue.severity === "error" ? "high" : "medium",
-      source: "runtime",
-      evidenceIds: [],
-    });
-    if (!recorded.accepted) continue;
-    Object.assign(learningLedger, recorded.ledger);
-    const proposalId = `improve-${Date.now().toString(36)}-${index}`;
-    const proposed = proposeLearningImprovement(learningLedger, {
-      id: proposalId,
-      title: `Address ${issue.code}`,
-      hypothesis: `Add a focused regression test for ${issue.code}, then adjust the responsible validation or response path without weakening existing safety checks.`,
-      category: issue.code,
-      evidenceIds: [eventId],
-      impact: issue.severity === "error" ? 0.9 : 0.65,
-      confidence: 0.72,
-      risk: 0.25,
-    });
-    if (proposed.accepted) Object.assign(learningLedger, proposed.ledger);
-    saveLearningLedger();
+    if (issue.severity !== "info") recordLearningObservation("verification_failure", issue.code, issue.message, issue.severity === "error" ? "high" : "medium", "runtime");
   }
   const identityIssues = auditUltronIdentityOutput(text, result.content, { successfulActions: result.tool_calls?.filter((call) => call.ok).map((call) => `${call.connector}.${call.action}`) ?? [], attemptedToolCalls: result.tool_calls?.length ?? 0 });
-  for (const issue of summarizeIdentityAudit(identityIssues)) ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
+  for (const issue of summarizeIdentityAudit(identityIssues)) {
+    ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
+    recordLearningObservation("verification_failure", "identity-audit", issue, "high", "runtime");
+  }
+  for (const call of result.tool_calls ?? []) {
+    if (!call.ok) recordLearningObservation("tool_failure", `tool.${call.connector}.${call.action}`, `Tool ${call.connector}.${call.action} returned a failure result.`, "medium", "tool_result");
+  }
   const message: Message = { role: "assistant", content: result.content };
   activeAssistantMessage = message;
   if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));

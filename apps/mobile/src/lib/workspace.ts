@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
+import type { Json, Tables, TablesInsert } from './database.types';
 import { supabase } from './supabase';
 
 export type UltronConversation = {
@@ -8,6 +9,8 @@ export type UltronConversation = {
   last_message_at: string | null;
   updated_at: string;
 };
+
+export type UltronModelProfile = Tables<'ultron_model_profiles'>;
 
 export type UltronMemory = {
   id: string;
@@ -80,7 +83,7 @@ export async function listMemories(limit = 50) {
   return (data ?? []) as UltronMemory[];
 }
 
-export async function saveSetting(settingKey: string, settingValue: unknown) {
+export async function saveSetting(settingKey: string, settingValue: Json) {
   const { error } = await supabase.from('ultron_settings').upsert(
     {
       setting_key: settingKey,
@@ -165,4 +168,52 @@ export async function saveUserMessage(conversationId: string, content: string) {
 
   if (updateError) throw updateError;
   return data as UltronMessage;
+}
+
+export async function createMemory(
+  memory: Omit<TablesInsert<'ultron_memory_items'>, 'owner_id'>,
+) {
+  const { data, error } = await supabase
+    .from('ultron_memory_items')
+    .insert(memory)
+    .select('id,memory_type,content,summary,importance,confidence,created_at')
+    .single();
+
+  if (error) throw error;
+  return data as UltronMemory;
+}
+
+export async function saveModelProfile(
+  profile: Omit<TablesInsert<'ultron_model_profiles'>, 'owner_id'>,
+) {
+  const { data, error } = await supabase
+    .from('ultron_model_profiles')
+    .upsert(profile, { onConflict: 'owner_id,provider,model_id' })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data as UltronModelProfile;
+}
+
+export async function listModelProfiles() {
+  const { data, error } = await supabase
+    .from('ultron_model_profiles')
+    .select('*')
+    .order('priority', { ascending: true })
+    .order('display_name', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as UltronModelProfile[];
+}
+
+export async function listRecentTasks(limit = 30) {
+  const { data, error } = await supabase
+    .from('ultron_tasks')
+    .select('id,title,description,task_type,status,priority,scheduled_at,started_at,completed_at,result,error_message,metadata,created_at,updated_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data ?? [];
 }

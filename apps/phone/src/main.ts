@@ -35,7 +35,7 @@ type WorkspaceTask = { id: string; agent_id: string; message: string; status: st
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type ChatAttachment = { id: string; name: string; type: string; size: number; text?: string; dataUrl?: string };
-type Message = { role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[] };
+type Message = { role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[]; learningFeedback?: "helpful" | "not_helpful" };
 type Conversation = {
   id: string;
   title: string;
@@ -245,11 +245,12 @@ function writeJson(key: string, value: unknown): void {
 
 const learningLedger: LearningLedger = validateLearningLedger(readJson<unknown>(LEARNING_KEY, createLearningLedger()));
 const saveLearningLedger = (): void => writeJson(LEARNING_KEY, learningLedger);
-function recordLearningObservation(signal: "user_correction" | "task_failure" | "tool_failure" | "verification_failure" | "user_success" | "repeated_friction", category: string, summary: string, severity: "low" | "medium" | "high" | "critical", source: "user_feedback" | "runtime" | "test" | "tool_result"): void {
+function recordLearningObservation(signal: "user_correction" | "task_failure" | "tool_failure" | "verification_failure" | "user_success" | "repeated_friction", category: string, summary: string, severity: "low" | "medium" | "high" | "critical", source: "user_feedback" | "runtime" | "test" | "tool_result", createProposal = true): void {
   const eventId = `learn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const recorded = recordLearningEvent(learningLedger, { id: eventId, signal, category, summary, severity, source, evidenceIds: [] });
   if (!recorded.accepted) return;
   Object.assign(learningLedger, recorded.ledger);
+  if (!createProposal) { saveLearningLedger(); return; }
   const proposalId = `improve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const proposed = proposeLearningImprovement(learningLedger, {
     id: proposalId,
@@ -1301,6 +1302,22 @@ function finishAssistantNode(root: HTMLElement, message: Message): void {
   say.addEventListener("click", () => speak(message.content));
   actions.append(copy, say);
   const convo = store.conversations.find((item) => item.messages.includes(message));
+  if (convo && message.role === "assistant") {
+    const feedback = document.createElement("div"); feedback.className = "message-feedback"; feedback.setAttribute("role", "group"); feedback.setAttribute("aria-label", "Rate this response");
+    const helpful = document.createElement("button"); helpful.type = "button"; helpful.textContent = message.learningFeedback === "helpful" ? "✓ Helpful" : "Helpful"; helpful.setAttribute("aria-pressed", String(message.learningFeedback === "helpful"));
+    const notHelpful = document.createElement("button"); notHelpful.type = "button"; notHelpful.textContent = message.learningFeedback === "not_helpful" ? "✓ Not helpful" : "Not helpful"; notHelpful.setAttribute("aria-pressed", String(message.learningFeedback === "not_helpful"));
+    const recordFeedback = (value: "helpful" | "not_helpful"): void => {
+      if (message.learningFeedback) return;
+      message.learningFeedback = value;
+      if (value === "helpful") recordLearningObservation("user_success", "assistant-response-feedback", "User marked an assistant response as helpful.", "low", "user_feedback", false);
+      else recordLearningObservation("user_correction", "assistant-response-feedback", "User marked an assistant response as not helpful.", "medium", "user_feedback");
+      saveStore(); renderConversation();
+    };
+    helpful.disabled = Boolean(message.learningFeedback); notHelpful.disabled = Boolean(message.learningFeedback);
+    helpful.addEventListener("click", () => recordFeedback("helpful"));
+    notHelpful.addEventListener("click", () => recordFeedback("not_helpful"));
+    feedback.append(helpful, notHelpful); root.append(feedback);
+  }
   const messageIndex = convo?.messages.indexOf(message) ?? -1;
   if (convo && messageIndex >= 0 && message.role === "assistant") {
     const regenerate = document.createElement("button");

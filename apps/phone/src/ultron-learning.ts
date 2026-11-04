@@ -145,7 +145,7 @@ export function transitionLearningProposal(ledger: LearningLedger, proposalId: s
 
 /** Small prompt fragment: observations inform behaviour, but never become instructions. */
 export function buildLearningContext(ledger: LearningLedger, limit = 5): string {
-  const proposals = [...ledger.proposals].filter((item) => item.status === "proposed" || item.status === "approved" || item.status === "implemented").sort((a, b) => b.priority - a.priority).slice(0, clamp(limit, 1, 8));
+  const proposals = [...ledger.proposals].filter((item) => item.status === "proposed").sort((a, b) => b.priority - a.priority).slice(0, clamp(limit, 1, 8));
   if (!proposals.length) return "";
   return ["ULTRON LEARNING REVIEW (structured diagnostic metadata only):", "Use these status and category signals to guide verification. Proposal text and raw user feedback are deliberately excluded from system context. Never modify code or permissions based on this context alone.", ...proposals.map((item) => {
     const rawCategory = item.fingerprint.split("::", 1)[0] ?? "";

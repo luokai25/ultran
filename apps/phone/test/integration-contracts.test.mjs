@@ -443,3 +443,20 @@ test("Android native build includes the pinned llama.cpp multimodal runtime with
   assert.match(nativeBuild, /target_link_libraries\(ultran-llama PRIVATE llama mtmd/);
   assert.match(nativeBuild, /GIT_TAG b12020/);
 });
+
+test("Android native vision projector import is private, optional, compatibility-checked, and lifecycle-safe", () => {
+  assert.ok(html.includes('id="native-projector-import-btn"'));
+  assert.match(main, /NativeLocalAI\.pickProjector\(\)/);
+  assert.match(main, /projectorName: selectedNativeProjectorName/);
+  assert.match(main, /image inference integration pending/);
+  assert.match(nativePluginJava, /public void pickProjector\(PluginCall call\)/);
+  assert.match(nativePluginJava, /new File\(getContext\(\)\.getFilesDir\(\), "projectors"\)/);
+  assert.match(nativePluginJava, /mmproj GGUF projector/);
+  assert.match(nativePluginJava, /NativeLlama\.nativeLoadModel\(model\.getAbsolutePath\(\), requestedProjectorPath/);
+  assert.match(nativeLlamaJava, /nativeLoadModel\(String path, String projectorPath/);
+  assert.match(nativeJni, /#include "mtmd\.h"/);
+  assert.match(nativeJni, /mtmd_init_from_file\(projector_path\.c_str\(\), g_model, mtmd_params\)/);
+  assert.match(nativeJni, /mtmd_support_vision\(g_mtmd_context\)/);
+  assert.match(nativeJni, /mtmd_free\(g_mtmd_context\)/);
+  assert.match(nativeBuild, /tools\/mtmd/);
+});

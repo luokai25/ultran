@@ -74,3 +74,68 @@ test('continuations and corrections become explicit cognitive state signals', ()
   assert.ok(corrected.signals.includes('correction'));
   assert.equal(continued.needsCompletionAudit, true);
 });
+
+
+test('adaptive reasoning escalates only after repeated verified failures in the same task class', () => {
+  const baseline = cognition.analyzeCognitiveProfile('Hello');
+  const now = 1_000_000_000;
+  const history = [
+    { taskClass:'implementation', status:'verified_failure', verified:true, confidence:.9, at:now - 3_000 },
+    { taskClass:'implementation', status:'verified_failure', verified:true, confidence:.88, at:now - 2_000 },
+    { taskClass:'implementation', status:'verified_success', verified:true, confidence:.95, at:now - 1_000 },
+    { taskClass:'research', status:'verified_failure', verified:true, confidence:.99, at:now },
+    { taskClass:'implementation', status:'verified_failure', verified:false, confidence:1, at:now },
+    { taskClass:'implementation', status:'verified_failure', verified:true, confidence:.5, at:now },
+  ];
+  const result = cognition.calibrateReasoningDepth(baseline, history, 'implementation', now);
+  assert.equal(result.adjustment, 'escalated');
+  assert.equal(result.sampleCount, 3);
+  assert.equal(result.failureCount, 2);
+  assert.equal(result.profile.mode, 'deliberate');
+  assert.equal(result.profile.reasoningPasses, 3);
+  assert.equal(result.profile.needsCompletionAudit, true);
+});
+
+test('adaptive reasoning ignores confidence-only, unverified, stale and cross-class signals', () => {
+  const baseline = cognition.analyzeCognitiveProfile('Hello');
+  const now = 1_000_000_000;
+  const result = cognition.calibrateReasoningDepth(baseline, [
+    { taskClass:'implementation', status:'verified_failure', verified:false, confidence:1, at:now },
+    { taskClass:'implementation', status:'verified_failure', verified:true, confidence:.7, at:now },
+    { taskClass:'research', status:'verified_failure', verified:true, confidence:.99, at:now },
+    { taskClass:'implementation', status:'verified_failure', verified:true, confidence:.99, at:now - 100 * 86_400_000 },
+  ], 'implementation', now);
+  assert.equal(result.adjustment, 'baseline');
+  assert.equal(result.sampleCount, 0);
+  assert.equal(result.profile.reasoningPasses, baseline.reasoningPasses);
+});
+
+test('sustained verified success clears escalation without reducing baseline reasoning depth', () => {
+  const baseline = cognition.analyzeCognitiveProfile('Hello');
+  const now = 1_000_000_000;
+  const history = Array.from({ length:5 }, (_, index) => ({ taskClass:'question', status:'verified_success', verified:true, confidence:.95, at:now - index * 1_000 }));
+  const result = cognition.calibrateReasoningDepth(baseline, history, 'question', now);
+  assert.equal(result.adjustment, 'recovered');
+  assert.equal(result.profile.reasoningPasses, baseline.reasoningPasses);
+});
+
+test('runtime feeds verified outcome history into task-class reasoning calibration', () => {
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /calibrateReasoningDepth\(cognitiveProfile/);
+  assert.match(main, /outcome\." \+ profile\.intent/);
+  assert.match(main, /outcome\." \+ finalProfile\.intent/);
+  assert.match(main, /calibrationContext/);
+});
+
+test('adaptive reasoning counts one outcome per conversation correlation', () => {
+  const baseline = cognition.analyzeCognitiveProfile('Hello');
+  const now = 1_000_000_000;
+  const history = [
+    { id:'a', correlationId:'same-chat', taskClass:'implementation', status:'verified_failure', verified:true, confidence:.9, at:now - 2_000 },
+    { id:'b', correlationId:'same-chat', taskClass:'implementation', status:'verified_failure', verified:true, confidence:.9, at:now - 1_000 },
+    { id:'c', correlationId:'other-chat', taskClass:'implementation', status:'verified_failure', verified:true, confidence:.9, at:now },
+  ];
+  const result = cognition.calibrateReasoningDepth(baseline, history, 'implementation', now);
+  assert.equal(result.sampleCount, 2);
+  assert.equal(result.adjustment, 'baseline');
+});

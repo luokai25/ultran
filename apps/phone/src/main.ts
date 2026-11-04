@@ -22,7 +22,7 @@ import { prepareTelemetrySpeech } from "./ultron-voice";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
-import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
+import { buildCognitiveInstructions, analyzeCognitiveProfile, calibrateReasoningDepth } from "./ultron-cognition";
 import { createUltronCheckpoint, validateUltronCheckpoint, buildUltronCheckpointPrompt, type Checkpoint } from "./ultron-state";
 import { emptyKnowledgeState, validateKnowledgeState, buildKnowledgePrompt, type KnowledgeState } from "./ultron-knowledge-state";
 import { captureExplicitKnowledge } from "./ultron-knowledge-capture";
@@ -233,12 +233,15 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
     priorCorrection: /\b(correction|i meant|not .{1,35} but|actually,? i)\b|(?:قصدي|أقصد|مش قصدي|لا أقصد)/i.test(task),
     hasAttachments: task.includes("[Attachment:"),
   });
-  const cognition = cognitiveProfile.mode === "direct" ? "" : buildCognitiveInstructions(cognitiveProfile);
-  ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
+  const calibration = calibrateReasoningDepth(cognitiveProfile, learningLedger.events.filter((event) => event.category === ("outcome." + profile.intent)).map((event) => ({ taskClass: "outcome." + profile.intent, id: event.id, correlationId: event.correlationId, status: event.signal === "user_success" ? "verified_success" as const : "verified_failure" as const, verified: event.signal === "user_success" || (event.signal === "task_failure" && ["reasoning_error", "tool_execution", "verification_gap", "incomplete_result"].includes(event.cause)), confidence: event.classificationConfidence, at: event.at })), "outcome." + profile.intent);
+  const calibratedProfile = calibration.profile;
+  const cognition = calibratedProfile.mode === "direct" ? "" : buildCognitiveInstructions(calibratedProfile);
+  const calibrationContext = calibration.adjustment === "baseline" ? "" : ["ULTRON REASONING CALIBRATION:", calibration.reason, "Comparable verified outcomes: " + calibration.sampleCount + "; failures: " + calibration.failureCount + "; successes: " + calibration.successCount + ".", "Use the increased verification effort only for this task class. Never treat model confidence as outcome evidence."].join("\n");
+  ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: calibratedProfile.mode + "; passes=" + calibratedProfile.reasoningPasses + "; calibration=" + calibration.adjustment });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const learningContext = buildLearningContext(learningLedger);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, calibrationContext, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -2523,7 +2526,10 @@ async function submit(raw: string): Promise<void> {
     if (started.ok) executionLedger = started.ledger;
   }
   for (const call of result.tool_calls ?? []) {
-    if (!call.ok && call.approval_required !== true) recordLearningObservation("tool_failure", `tool.${call.connector}.${call.action}`, `Tool ${call.connector}.${call.action} returned a failure result.`, "medium", "tool_result", true, "tool_execution", convo.id);
+    if (!call.ok && call.approval_required !== true) {
+      recordLearningObservation("tool_failure", `tool.${call.connector}.${call.action}`, `Tool ${call.connector}.${call.action} returned a failure result.`, "medium", "tool_result", true, "tool_execution", convo.id);
+      recordLearningObservation("task_failure", "outcome." + finalProfile.intent, "A tool execution failure occurred during this task class.", "medium", "runtime", false, "tool_execution", convo.id);
+    }
   }
   const message: Message = { role: "assistant", content: result.content };
   activeAssistantMessage = message;
@@ -2562,9 +2568,11 @@ async function submit(raw: string): Promise<void> {
   });
   ultronDecisionTrace.record({ phase: "validate", code: `outcome-${outcome.status}`, detail: `${outcome.cause}; confidence=${outcome.confidence.toFixed(2)}` });
   if (outcome.shouldRecord && outcome.cause === "positive_strategy") {
-    recordLearningObservation("user_success", `verified.${finalProfile.intent}`, "A runtime outcome was supported by successful execution evidence and passed validation.", "low", "runtime", false, "positive_strategy", convo.id);
+    recordLearningObservation("user_success", "outcome." + finalProfile.intent, "A runtime outcome was supported by successful execution evidence and passed validation.", "low", "runtime", false, "positive_strategy", convo.id);
   } else if (outcome.shouldRecord && outcome.cause === "permission_boundary") {
     recordLearningObservation("verification_failure", "permission-boundary", "A requested operation was blocked by an explicit approval or permission boundary.", "medium", "runtime", false, "permission_boundary", convo.id);
+  } else if (outcome.shouldRecord && ["reasoning_error", "tool_execution", "verification_gap", "incomplete_result"].includes(outcome.cause)) {
+    recordLearningObservation("task_failure", "outcome." + finalProfile.intent, "A verified " + outcome.cause.replace(/_/g, " ") + " occurred in this task class.", "medium", "runtime", false, outcome.cause, convo.id);
   }
   ultronDecisionTrace.record({ phase: "validate", code: `task-ledger-${executionLedger.status}`, detail: `${executionLedger.steps.filter((step) => step.status === "completed").length}/${executionLedger.steps.length} steps completed with evidence` });
   mindMap=buildMindMap(store.conversations,semanticGraph);writeJson(MINDMAP_KEY,mindMap);

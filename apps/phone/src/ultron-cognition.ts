@@ -31,6 +31,80 @@ export type CognitiveProfile = {
   stopWhen: string[];
 };
 export type EvidenceKind = "user_statement" | "project_file" | "tool_result" | "official_source" | "secondary_source" | "model_inference" | "memory";
+export type VerifiedReasoningOutcome = {
+  taskClass: string;
+  id?: string;
+  correlationId?: string;
+  status: "verified_success" | "verified_failure";
+  verified: boolean;
+  confidence: number;
+  at: number;
+};
+export type AdaptiveReasoningDecision = {
+  profile: CognitiveProfile;
+  sampleCount: number;
+  failureCount: number;
+  successCount: number;
+  adjustment: "baseline" | "escalated" | "recovered";
+  reason: string;
+};
+
+/**
+ * Calibrates effort from independently verified outcomes only. Model confidence,
+ * fluent answers, user silence and unverified tool starts are deliberately ignored.
+ * Adaptation can restore the task's baseline, but never downgrade it.
+ */
+export function calibrateReasoningDepth(
+  baseline: CognitiveProfile,
+  history: readonly VerifiedReasoningOutcome[],
+  taskClass: string,
+  now = Date.now(),
+): AdaptiveReasoningDecision {
+  const cutoff = now - 90 * 86_400_000;
+  const independent = new Map<string, VerifiedReasoningOutcome>();
+  for (const item of history) {
+    if (item.taskClass !== taskClass || item.verified !== true
+      || (item.status !== "verified_success" && item.status !== "verified_failure")
+      || !Number.isFinite(item.at) || item.at < cutoff || item.at > now
+      || !Number.isFinite(item.confidence) || item.confidence < 0.75) continue;
+    const key = item.correlationId || item.id || ("outcome-at-" + item.at);
+    const previous = independent.get(key);
+    if (!previous || item.at > previous.at) independent.set(key, item);
+  }
+  const samples = [...independent.values()].sort((a, b) => b.at - a.at).slice(0, 12);
+  const failureCount = samples.filter((item) => item.status === "verified_failure").length;
+  const successCount = samples.length - failureCount;
+  const failureRate = samples.length ? failureCount / samples.length : 0;
+  let adjustment: AdaptiveReasoningDecision["adjustment"] = "baseline";
+  let extraPasses = 0;
+  let reason = "No sufficiently strong outcome pattern; retain the task's original reasoning budget.";
+
+  if (samples.length >= 3 && failureCount >= 2 && failureRate >= 0.3) {
+    extraPasses = failureRate >= 0.5 ? 2 : 1;
+    adjustment = "escalated";
+    reason = "Verified failures in " + failureCount + " of " + samples.length + " recent comparable tasks justify additional checking.";
+  } else if (samples.length >= 5 && successCount >= 5 && failureCount === 0) {
+    adjustment = "recovered";
+    reason = "A sustained verified-success record clears any learned escalation; baseline effort is preserved.";
+  }
+
+  const modeRank: Record<CognitiveMode, number> = { direct: 0, deliberate: 1, investigative: 1, critical: 2 };
+  const currentRank = modeRank[baseline.mode];
+  const targetRank = Math.min(2, currentRank + (extraPasses > 0 ? 1 : 0));
+  const mode: CognitiveMode = targetRank >= 2 ? "critical" : targetRank === 1
+    ? (baseline.mode === "investigative" ? "investigative" : "deliberate") : baseline.mode;
+  const profile: CognitiveProfile = {
+    ...baseline,
+    mode,
+    reasoningPasses: Math.min(4, baseline.reasoningPasses + extraPasses),
+    needsEvidence: baseline.needsEvidence || extraPasses > 0,
+    needsCounterexampleCheck: baseline.needsCounterexampleCheck || extraPasses > 0,
+    needsCompletionAudit: baseline.needsCompletionAudit || extraPasses > 0,
+    signals: extraPasses > 0 ? unique([...baseline.signals, "uncertainty"]) : baseline.signals,
+  };
+  return { profile, sampleCount: samples.length, failureCount, successCount, adjustment, reason };
+}
+
 export type CognitiveEvidence = {
   id: string;
   claim: string;

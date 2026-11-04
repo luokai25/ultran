@@ -99,7 +99,8 @@ def test_tools_call_runs_a_read_tool(server):
     result = response["result"]
     assert result["isError"] is False
     payload = json.loads(result["content"][0]["text"])
-    assert len(payload) == 3
+    assert len(payload) == 1
+    assert payload[0]["id"] == "github"
 
 
 def test_tools_call_unknown_tool_is_an_error_result(server):

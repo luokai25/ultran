@@ -2114,10 +2114,13 @@ type LocalToolRequest =
   | { tool: "capabilities.submit_tool"; id: string; source_sha256: string }
   | { tool: "capabilities.create_proposal"; proposal_kind: "tool_activation" | "edge_function" | "database_migration" | "connector" | "policy_change" | "runtime_upgrade"; title: string; description: string; artifact: Record<string, unknown>; risk_level: "low" | "medium" | "high" | "critical" }
   | { tool: "capabilities.checkpoint_run"; id?: string; goal: string; phase: string; iteration: number; iteration_limit: number; checkpoint: Record<string, unknown>; status?: "queued" | "running" | "waiting_approval" | "paused" | "completed" | "failed" | "cancelled"; tokens_used?: number; token_budget?: number; result?: Record<string, unknown>; error_message?: string }
-  | { tool: "runtime.catalog" | "runtime.tools.list" | "skills.cloud.list" }
+  | { tool: "runtime.catalog" }
+  | { tool: "runtime.tools.list" }
+  | { tool: "skills.cloud.list" }
   | { tool: "runtime.tool.create"; tool_key: string; version: string; title: string; description: string; input_schema: Record<string, unknown>; workflow: Array<Record<string, unknown>> }
   | { tool: "runtime.tool.run"; tool_key: string; input: Record<string, unknown> }
-  | { tool: "runtime.tool.archive" | "skills.cloud.archive"; id: string }
+  | { tool: "runtime.tool.archive"; id: string }
+  | { tool: "skills.cloud.archive"; id: string }
   | { tool: "skills.cloud.save"; skill_key: string; version: string; title: string; description: string; triggers: string[]; instructions: string[]; evidence: Record<string, unknown>; confidence: number; verified_runs: number; status: "provisional" | "active" };
 type LocalToolFollowup = { request: string; result: string };
 
@@ -2300,7 +2303,7 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
       const triggers=Array.isArray(parsed.triggers)?parsed.triggers.filter((x):x is string=>typeof x==="string").slice(0,20):[];
       const instructions=Array.isArray(parsed.instructions)?parsed.instructions.filter((x):x is string=>typeof x==="string").slice(0,16):[];
       if(!/^[a-z][a-z0-9_]{1,63}$/.test(skill_key)||!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version)||!title||title.length>140||description.length>800||instructions.length<2||instructions.some(x=>!x.trim()||x.length>1000))return null;
-      return {tool:"skills.cloud.save",skill_key,version,title,description,triggers,instructions,evidence:parsed.evidence&&typeof parsed.evidence==="object"&&!Array.isArray(parsed.evidence)?parsed.evidence as Record<string,unknown>:{},confidence:Number.isFinite(Number(parsed.confidence))?Math.max(0,Math.min(1,Number(parsed.confidence))):0.7,verified_runs:Number.isInteger(parsed.verified_runs)?Math.max(0,Number(parsed.verified_runs)):0,status:parsed.status==="provisional"?"provisional":"active"};
+      return {tool:"skills.cloud.save",skill_key,version,title,description,triggers,instructions,evidence:parsed.evidence&&typeof parsed.evidence==="object"&&!Array.isArray(parsed.evidence)?parsed.evidence as Record<string,unknown>:{},confidence:Number.isFinite(Number(parsed.confidence))?Math.max(0,Math.min(1,Number(parsed.confidence))):0.7,verified_runs:Number.isInteger(Number(parsed.verified_runs))?Math.max(0,Number(parsed.verified_runs)):0,status:parsed.status==="provisional"?"provisional":"active"};
     }
     return null;
   } catch { return null; }
@@ -2312,7 +2315,8 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
     try {
       const actionMap: Record<string,string> = {"runtime.catalog":"catalog","runtime.tools.list":"list_tools","runtime.tool.create":"create_tool","runtime.tool.run":"run_tool","runtime.tool.archive":"archive_tool","skills.cloud.list":"list_skills","skills.cloud.save":"save_skill","skills.cloud.archive":"archive_skill"};
       const payload={...request} as Record<string,unknown>; delete payload.tool;
-      const result=await invokeUltronRuntime(actionMap[request.tool],payload);
+      const action=actionMap[request.tool]; if(!action) throw new Error("Unknown ULTRON runtime action.");
+      const result=await invokeUltronRuntime(action,payload);
       return "ULTRON Supabase runtime result (authoritative):\\n"+JSON.stringify(result);
     } catch(error) { return "ULTRON Supabase runtime failed: "+(error instanceof Error?error.message:"unknown error"); }
   }

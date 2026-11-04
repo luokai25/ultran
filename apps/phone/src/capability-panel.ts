@@ -44,9 +44,9 @@ export function initCapabilityPanel(invoke: Invoke, runtimeInvoke: RuntimeInvoke
     try {
       const [data,cloudToolsResult,toolRunsResult,cloudSkillsResult] = await Promise.all([
         invoke("list") as Promise<CapabilityData>,
-        runtimeInvoke("list_tools").catch(error=>({runtime_error:String(error)})),
-        runtimeInvoke("list_tool_runs").catch(error=>({runtime_error:String(error)})),
-        runtimeInvoke("list_skills").catch(error=>({runtime_error:String(error)}))
+        runtimeInvoke("list_tools").catch(error=>({runtime_error:String(error)} as Record<string,unknown>)),
+        runtimeInvoke("list_tool_runs").catch(error=>({runtime_error:String(error)} as Record<string,unknown>)),
+        runtimeInvoke("list_skills").catch(error=>({runtime_error:String(error)} as Record<string,unknown>))
       ]);
       const tools = asRows(data.tools), proposals = asRows(data.proposals), runs = asRows(data.runs), events = asRows(data.events);
       const cloudTools=asRows(cloudToolsResult.tools), toolRuns=asRows(toolRunsResult.runs), cloudSkills=asRows(cloudSkillsResult.skills);

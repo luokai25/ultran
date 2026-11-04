@@ -18,7 +18,7 @@ import { initConnectors } from "./connectors-ui";
 import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
-import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
+import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
@@ -2229,15 +2229,7 @@ async function submit(raw: string): Promise<void> {
     .map((item) => `\n\n[Image attached: ${item.name}. Background task submissions currently accept text only, so the image bytes are not sent in background mode.]`).join("")).slice(0, 16_000);
   const continuation = /\b(continue|carry on|resume|pick up where|keep going|go on)\b|(?:استمر|كمل|تابع)/i.test(text);
   const taskProfile = classifyUltronTask(text, { continuation });
-  const previousLedger = convo.executionLedger;
-  const inheritedConstraints = continuation && previousLedger && Array.isArray(previousLedger.steps) && previousLedger.status !== "completed"
-    ? [
-        `Continue prior task ledger ${previousLedger.id} (status: ${previousLedger.status}).`,
-        ...previousLedger.steps.filter((step) => step.status !== "completed" && step.status !== "skipped").slice(0, 8)
-          .map((step) => `Carry forward unfinished step ${step.id} [${step.status}]: ${step.objective}`),
-        ...previousLedger.constraints.slice(0, 20),
-      ].slice(0, 40)
-    : [];
+  const inheritedConstraints = continuation ? buildUltronContinuationConstraints(convo.executionLedger) : [];
   let executionLedger = createUltronTaskLedger(`task-${convo.id}-${Date.now().toString(36)}`, text.slice(0, 4000), inheritedConstraints, taskProfile);
   const understandStart = transitionUltronLedger(executionLedger, "understand", "running");
   if (understandStart.ok) {

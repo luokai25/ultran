@@ -79,3 +79,30 @@ test('goal prompt exposes dependency and evidence requirements', () => {
   assert.match(prompt, /after understand/);
   assert.match(prompt, /concrete evidence/);
 });
+
+
+test('an empty plan becomes a concrete clarification goal instead of a stuck empty graph', () => {
+  const graph = goals.createUltronGoalGraph('g8', 'Clarify request', []);
+  assert.equal(graph.goals.length, 1);
+  assert.equal(graph.goals[0].id, 'understand');
+  assert.equal(goals.validateUltronGoalGraph(graph).valid, true);
+});
+
+test('goal graph validation detects parent cycles and duplicate dependencies', () => {
+  const graph = goals.createUltronGoalGraph('g9', 'Build', plan);
+  graph.goals[0].parentId = 'reason';
+  graph.goals[1].parentId = 'understand';
+  assert.ok(goals.validateUltronGoalGraph(graph).errors.some(error => error.includes('Parent hierarchy cycle')));
+  graph.goals[0].parentId = undefined;
+  graph.goals[1].parentId = undefined;
+  graph.goals[2].dependsOn = ['reason', 'reason'];
+  assert.ok(goals.validateUltronGoalGraph(graph).errors.some(error => error.includes('duplicate dependencies')));
+});
+
+test('cancelling every goal does not misreport the graph as completed', () => {
+  let graph = goals.createUltronGoalGraph('g10', 'Optional task', [{ id:'optional', objective:'Optional', kind:'understand' }]);
+  const result = goals.transitionUltronGoal(graph, 'optional', 'cancelled');
+  assert.equal(result.ok, true);
+  assert.equal(result.graph.status, 'cancelled');
+  assert.equal(goals.getReadyUltronGoals(result.graph).length, 0);
+});

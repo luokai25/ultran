@@ -64,7 +64,7 @@ type WorkspaceTask = { id: string; agent_id: string; message: string; status: st
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type ChatAttachment = { id: string; name: string; type: string; size: number; text?: string; dataUrl?: string };
-type Message = { role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[]; learningFeedback?: "helpful" | "not_helpful" };
+type Message = { id?: string; role: Role; content: string; attachments?: ChatAttachment[]; tools?: ToolCall[]; learningFeedback?: "helpful" | "not_helpful" };
 type Conversation = {
   id: string;
   title: string;
@@ -605,6 +605,9 @@ const saveStore = (): void => {
   for (const convo of store.conversations) {
     if (convo.executionLedger) convo.cognitiveCheckpoint = createUltronCheckpoint(convo.id, convo.executionLedger);
     convo.knowledgeState = validateKnowledgeState(convo.knowledgeState ?? emptyKnowledgeState());
+    for (const message of convo.messages) {
+      if (!message.id) message.id = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    }
   }
   writeJson(STORE_KEY, store);
   scheduleCloudSync(store.conversations, (error) => {

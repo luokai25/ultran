@@ -433,3 +433,13 @@ test("ordinary conversation is the default and native Stop interrupts llama.cpp 
   assert.match(nativeLlamaJava, /nativeResetGenerationCancellation/);
   assert.match(nativePluginJava, /NativeLlama\.nativeResetGenerationCancellation\(\)/);
 });
+
+
+test("Android native build includes the pinned llama.cpp multimodal runtime without CLI tools", () => {
+  assert.match(nativeBuild, /LLAMA_BUILD_MTMD ON CACHE BOOL/);
+  assert.match(nativeBuild, /MTMD_VIDEO OFF CACHE BOOL/);
+  assert.match(nativeBuild, /LLAMA_SUBPROCESS OFF CACHE BOOL/);
+  assert.match(nativeBuild, /LLAMA_BUILD_TOOLS OFF CACHE BOOL/);
+  assert.match(nativeBuild, /target_link_libraries\(ultran-llama PRIVATE llama mtmd/);
+  assert.match(nativeBuild, /GIT_TAG b12020/);
+});

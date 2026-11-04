@@ -110,7 +110,7 @@ export function proposeLearningImprovement(ledger: LearningLedger, input: {
   const now = input.now ?? Date.now();
   if (!Number.isFinite(now) || now <= 0 || now > Date.now() + 60_000) return reject("Proposal timestamp is invalid.");
   const key = fingerprint(input.category, input.title);
-  const prior = ledger.proposals.find((proposal) => proposal.fingerprint === key && proposal.status !== "rejected");
+  const prior = ledger.proposals.find((proposal) => proposal.fingerprint === key && proposal.status !== "rejected" && proposal.status !== "verified");
   if (prior) {
     const recurrence = Math.min(1, prior.recurrence + 0.15);
     const updated = { ...prior, recurrence, impact: Math.max(prior.impact, input.impact), confidence: Math.max(prior.confidence, input.confidence), risk: Math.max(prior.risk, input.risk), priority: calculateLearningPriority(Math.max(prior.impact, input.impact), recurrence, Math.max(prior.confidence, input.confidence), Math.max(prior.risk, input.risk)), evidenceIds: [...new Set([...prior.evidenceIds, ...input.evidenceIds])].slice(-8), updatedAt: now };

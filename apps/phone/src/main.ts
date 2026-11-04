@@ -17,7 +17,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
 import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
-import { buildPresenceIdentityPrompt, selectCommunicationMode, evaluatePresenceEvent, shouldSpeakPresence, type PresenceEventKind } from "./ultron-presence";
+import { buildPresenceIdentityPrompt, selectCommunicationMode, evaluatePresenceEvent, shouldSpeakPresence, createPresenceDeliveryGate, type PresenceEventKind } from "./ultron-presence";
 import { prepareTelemetrySpeech } from "./ultron-voice";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
@@ -134,6 +134,7 @@ const workspaceStats = req<HTMLElement>("#workspace-stats");
 let workspacePoll: number | undefined;
 let proactivePoll: number | undefined;
 const taskStatusSnapshot = new Map<string, string>();
+const presenceDeliveryGate = createPresenceDeliveryGate({ cooldownMs: 12_000, maxEntries: 256 });
 const workspaceTeamBuilder = req<HTMLElement>("#workspace-team-builder");
 const workspaceTeamAgents = req<HTMLElement>("#workspace-team-agents");
 const workspaceTeamObjective = req<HTMLTextAreaElement>("#workspace-team-objective");
@@ -998,7 +999,7 @@ async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
     const detail = task.message.slice(0, 110) + (finished ? " completed successfully." : failed ? " · " + task.status + (task.error ? ": " + task.error.slice(0, 160) : ".") : task.status === "retrying" ? " is being retried." : " has started.");
     const eventKind: PresenceEventKind = finished ? "task_completed" : failed ? "task_failed" : "task_started";
     const recommendation = evaluatePresenceEvent({ id: `${task.id}-${task.status}-${task.updated_at}`, kind: eventKind, title: task.message.slice(0, 100), detail: task.error?.slice(0, 220) || detail, occurredAt: Date.now(), severity: failed ? "warning" : "info" }, { proactiveUpdates: settings.proactiveUpdates === true, voiceEnabled: settings.voice, quietHours: false, quietMode: false });
-    if (!recommendation) continue;
+    if (!recommendation || !presenceDeliveryGate.claim(recommendation)) continue;
     if (Capacitor.getPlatform() === "android") {
       try {
         await NativeCompanion.notify({title: recommendation.title, body: recommendation.message});

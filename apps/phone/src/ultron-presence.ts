@@ -228,6 +228,46 @@ export function anticipateNextStep(input: {
   return null;
 }
 
+/**
+ * Deduplicates event delivery and applies a small interruption budget.
+ * Critical alerts bypass the cooldown, but never bypass event-id deduplication.
+ * State is intentionally in-memory: after a process restart, the UI/task snapshot
+ * remains the source of truth and old events are not replayed automatically.
+ */
+export type PresenceDeliveryGate = {
+  claim(recommendation: PresenceRecommendation, now?: number): boolean;
+  clear(): void;
+};
+
+export function createPresenceDeliveryGate(options: { cooldownMs?: number; maxEntries?: number } = {}): PresenceDeliveryGate {
+  const cooldownMs = Math.max(0, Math.min(10 * 60_000, options.cooldownMs ?? 12_000));
+  const maxEntries = Math.max(16, Math.min(2048, Math.floor(options.maxEntries ?? 256)));
+  const delivered = new Map<string, number>();
+  let lastNonCriticalDelivery = Number.NEGATIVE_INFINITY;
+
+  return {
+    claim(recommendation, now = Date.now()) {
+      if (!recommendation.id || !Number.isFinite(now)) return false;
+      if (delivered.has(recommendation.id)) return false;
+      const critical = recommendation.priority === "critical";
+      if (!critical && now - lastNonCriticalDelivery < cooldownMs) return false;
+
+      delivered.set(recommendation.id, now);
+      if (!critical) lastNonCriticalDelivery = now;
+      while (delivered.size > maxEntries) {
+        const oldest = delivered.keys().next().value;
+        if (oldest === undefined) break;
+        delivered.delete(oldest);
+      }
+      return true;
+    },
+    clear() {
+      delivered.clear();
+      lastNonCriticalDelivery = Number.NEGATIVE_INFINITY;
+    },
+  };
+}
+
 /** Speech policy: voice is for meaningful events, not for reading every response aloud. */
 export function shouldSpeakPresence(recommendation: PresenceRecommendation, settings: PresenceSettings): boolean {
   if (!settings.voiceEnabled || !settings.proactiveUpdates || settings.quietMode || !recommendation.speak) return false;

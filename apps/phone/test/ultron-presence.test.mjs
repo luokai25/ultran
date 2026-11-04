@@ -8,7 +8,7 @@ function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const js = ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 });
   const module = { exports: {} };
-  vm.runInNewContext(js, { module, exports: module.exports, Date, Math, Number, String, Array, Object, Set, RegExp, Boolean, JSON, require: (id) => dependencies[id] ?? require(id) });
+  vm.runInNewContext(js, { module, exports: module.exports, Date, Math, Number, String, Array, Object, Set, Map, RegExp, Boolean, JSON, require: (id) => dependencies[id] ?? require(id) });
   return module.exports;
 }
 const presence = load('../src/ultron-presence.ts');
@@ -85,4 +85,27 @@ test('Android UI exposes independent proactive and spoken-telemetry controls', (
   assert.match(main, /voiceUpdatesToggle\.disabled = !settings\.proactiveUpdates/);
   assert.match(main, /prepareTelemetrySpeech\(recommendation\.message, 420\)/);
   assert.doesNotMatch(main, /if \(settings\.voice\) \{\s*if \(Capacitor\.getPlatform\(\)/);
+});
+
+test('presence delivery gate deduplicates events and limits routine interruptions', () => {
+  const gate = presence.createPresenceDeliveryGate({ cooldownMs: 1000, maxEntries: 16 });
+  const routine = { id: 'routine-1', priority: 'normal' };
+  assert.equal(gate.claim(routine, 1000), true);
+  assert.equal(gate.claim(routine, 1001), false);
+  assert.equal(gate.claim({ id: 'routine-2', priority: 'high' }, 1500), false);
+  assert.equal(gate.claim({ id: 'routine-2', priority: 'high' }, 2000), true);
+  assert.equal(gate.claim({ id: 'critical-1', priority: 'critical' }, 2001), true);
+  assert.equal(gate.claim({ id: 'routine-3', priority: 'normal' }, 2002), false);
+  assert.equal(gate.claim({ id: 'routine-3', priority: 'normal' }, 3000), true);
+  gate.clear();
+  assert.equal(gate.claim(routine, 3001), true);
+});
+
+test('presence delivery gate bounds its deduplication memory', () => {
+  const gate = presence.createPresenceDeliveryGate({ cooldownMs: 0, maxEntries: 16 });
+  for (let i = 0; i < 40; i++) {
+    assert.equal(gate.claim({ id: 'event-' + i, priority: 'normal' }, i * 2), true);
+  }
+  assert.equal(gate.claim({ id: 'event-39', priority: 'normal' }, 100), false);
+  assert.equal(gate.claim({ id: 'event-0', priority: 'normal' }, 102), true);
 });

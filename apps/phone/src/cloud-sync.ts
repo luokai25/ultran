@@ -10,6 +10,7 @@ export type CloudAttachment = {
 };
 
 export type CloudMessage = {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   attachments?: CloudAttachment[];
@@ -190,8 +191,14 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
         size: Number(part.size ?? 0),
         ...(typeof part.text === 'string' ? { text: part.text } : {}),
       }));
+    const metadata = row.metadata && typeof row.metadata === 'object'
+      ? row.metadata as Record<string, unknown>
+      : {};
+    const localMessageId = typeof metadata.local_message_id === 'string'
+      ? metadata.local_message_id
+      : `cloud_${row.id}`;
     const list = grouped.get(row.conversation_id) ?? [];
-    list.push({ role: row.role, content: row.content, ...(attachments.length ? { attachments } : {}) });
+    list.push({ id: localMessageId, role: row.role, content: row.content, ...(attachments.length ? { attachments } : {}) });
     grouped.set(row.conversation_id, list);
   }
 
@@ -203,9 +210,13 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
       : `cloud_${row.id}`;
     idMap.conversations[localId] = row.id;
     const messages = grouped.get(row.id) ?? [];
-    messages.forEach((_message, index) => {
-      const localKey = `${localId}:${index}`;
-      const sourceRow = (messageRows ?? []).filter((item) => item.conversation_id === row.id)[index];
+    const sourceRows = (messageRows ?? []).filter((item) =>
+      item.conversation_id === row.id && (item.role === 'user' || item.role === 'assistant'),
+    );
+    messages.forEach((message, index) => {
+      const localMessageId = message.id ?? `cloud_${sourceRows[index]?.id ?? index}`;
+      const localKey = `${localId}:${localMessageId}`;
+      const sourceRow = sourceRows[index];
       if (sourceRow) {
         idMap.messages[localKey] = sourceRow.id;
         idMap.messageTimes[localKey] = sourceRow.created_at;
@@ -239,15 +250,21 @@ export function mergeCloudWorkspace(
       continue;
     }
     const remoteIsNewer = cloud.updatedAt > existing.updatedAt;
-    const count = Math.max(existing.messages.length, cloud.messages.length);
-    const messages: CloudMessage[] = [];
-    for (let index = 0; index < count; index += 1) {
-      const localMessage = existing.messages[index];
-      const remoteMessage = cloud.messages[index];
-      if (localMessage && remoteMessage) messages.push(remoteIsNewer ? remoteMessage : localMessage);
-      else if (localMessage) messages.push(localMessage);
-      else if (remoteMessage) messages.push(remoteMessage);
-    }
+    const messages = [...existing.messages];
+    const messageIndexes = new Map<string, number>();
+    messages.forEach((message, index) => {
+      messageIndexes.set(message.id ?? `local-index-${index}`, index);
+    });
+    cloud.messages.forEach((remoteMessage, index) => {
+      const key = remoteMessage.id ?? `remote-index-${index}`;
+      const existingIndex = messageIndexes.get(key);
+      if (existingIndex === undefined) {
+        messageIndexes.set(key, messages.length);
+        messages.push(remoteMessage);
+      } else if (remoteIsNewer) {
+        messages[existingIndex] = remoteMessage;
+      }
+    });
     merged.set(cloud.id, {
       ...existing,
       title: remoteIsNewer ? cloud.title : existing.title,
@@ -266,7 +283,7 @@ function markSynced(conversations: LocalConversationForSync[]): void {
     );
     conversation.messages.forEach((message, index) => {
       syncedMessageFingerprints.set(
-        `${conversation.id}:${index}`,
+        `${conversation.id}:${message.id ?? index}`,
         stableFingerprint({ role: message.role, content: message.content, attachments: message.attachments ?? [] }),
       );
     });
@@ -304,7 +321,8 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
 
     for (let index = 0; index < conversation.messages.length; index += 1) {
       const message = conversation.messages[index]!;
-      const key = `${conversation.id}:${index}`;
+      const localMessageId = message.id ?? `local-index-${index}`;
+      const key = `${conversation.id}:${localMessageId}`;
       const fingerprint = stableFingerprint({
         role: message.role,
         content: message.content,
@@ -332,7 +350,7 @@ export async function syncCloudWorkspace(conversations: LocalConversationForSync
         role: message.role,
         content: message.content,
         parts,
-        metadata: { local_message_index: index, local_conversation_id: conversation.id },
+        metadata: { local_message_id: localMessageId, local_message_index: index, local_conversation_id: conversation.id },
         created_at: createdAt,
         status: 'complete',
       }, { onConflict: 'id' });

@@ -81,7 +81,7 @@ test("Termux runtime download verifies the published checksum before installatio
 
 test("brain-independent capability policy is applied to native and connected brains", () => {
   assert.match(main, /from "\.\/capability-kernel"/);
-  assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp", executionLedger\)/);
+  assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp", executionLedger(?:, convo\.cognitiveCheckpoint)?\)/);
   assert.match(main, /buildCapabilityPrompt\(task,/);
   assert.match(main, /localModelReply\(convo, undefined, reply\.body, turnController\.signal/);
   assert.match(main, /executionLedger\?: UltronTaskLedger/);

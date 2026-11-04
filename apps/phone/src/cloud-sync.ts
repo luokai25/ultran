@@ -161,19 +161,30 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
   }
 
   const idMap = readIdMap();
-  return rows.map((row) => {
+  const pulled = rows.map((row) => {
     const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata as Record<string, unknown> : {};
     const localId = typeof metadata.local_conversation_id === 'string'
       ? metadata.local_conversation_id
       : `cloud_${row.id}`;
     idMap.conversations[localId] = row.id;
+    const messages = grouped.get(row.id) ?? [];
+    messages.forEach((_message, index) => {
+      const localKey = `${localId}:${index}`;
+      const sourceRow = (messageRows ?? []).filter((item) => item.conversation_id === row.id)[index];
+      if (sourceRow) {
+        idMap.messages[localKey] = sourceRow.id;
+        idMap.messageTimes[localKey] = sourceRow.created_at;
+      }
+    });
     return {
       id: localId,
       title: row.title,
       updatedAt: new Date(row.last_message_at ?? row.updated_at).getTime(),
-      messages: grouped.get(row.id) ?? [],
+      messages,
     };
   });
+  writeIdMap(idMap);
+  return pulled;
 }
 
 export function mergeCloudWorkspace(
@@ -332,4 +343,17 @@ export function subscribeCloudWorkspace(onChange: () => void): () => void {
 
 export function rememberCloudWorkspace(conversations: LocalConversationForSync[]): void {
   markSynced(conversations);
+}
+
+export async function deleteCloudConversation(localConversationId: string): Promise<void> {
+  const session = await getCloudSession();
+  if (!session) return;
+  const cloudId = readIdMap().conversations[localConversationId];
+  if (!cloudId) return;
+  const { error } = await cloudClient
+    .from('ultron_conversations')
+    .update({ status: 'deleted' })
+    .eq('id', cloudId)
+    .eq('owner_id', session.user.id);
+  if (error) throw error;
 }

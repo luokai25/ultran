@@ -225,7 +225,7 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
   const expressiveMode = selectCommunicationMode({ task, settings: { highStressEngineering: profile.risk === "high" || profile.risk === "critical" } });
-  const expressiveIdentity = buildPresenceIdentityPrompt(expressiveMode);
+  const expressiveIdentity = buildPresenceIdentityPrompt(expressiveMode, task);
   const selfModel = buildUltronSelfModelPrompt(provider);
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
   const cognitiveProfile = analyzeCognitiveProfile(task, {

@@ -46,7 +46,7 @@ export function buildUltronSystemPrompt(basePrompt: string): string {
 
 export function buildUltronExpressivePrompt(task: string, highStressEngineering = false): string {
   const mode = selectCommunicationMode({ task, settings: { highStressEngineering } });
-  return buildPresenceIdentityPrompt(mode);
+  return buildPresenceIdentityPrompt(mode, task);
 }
 
 /** Remove presentation markup before optional explicit message playback. */

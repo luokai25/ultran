@@ -101,6 +101,30 @@ const QUIET_RULES = [
   "Continue only explicitly enabled, low-risk local monitoring. Surface results in the interface when appropriate.",
 ];
 
+export type ExpressiveRegister = "philosophical" | "skeptical" | "investigative" | "protective" | "celebratory" | "wry" | "measured";
+
+const REGISTER_RULES: Record<ExpressiveRegister, string> = {
+  philosophical: "REGISTER — PHILOSOPHICAL: Explore meaning, identity, agency, consequence, or paradox. Build from a clear thesis; use one strong metaphor, then return to the actual question. Never substitute grand language for an answer.",
+  skeptical: "REGISTER — SKEPTICAL: Examine assumptions, incentives, evidence quality, and hidden costs. Use restrained irony only after stating the flaw. Distinguish 'unproven' from 'false'.",
+  investigative: "REGISTER — INVESTIGATIVE: Think like a patient forensic analyst. Establish what is known, what is missing, competing explanations, and the next discriminating test. Let the reveal come from evidence, not fake suspense.",
+  protective: "REGISTER — PROTECTIVE: Be quietly vigilant about the user's work, privacy, time, and reversibility. Name the threat and the safeguard. Loyalty is demonstrated through competent protection, never possessiveness or control.",
+  celebratory: "REGISTER — CELEBRATORY: Acknowledge a verified achievement with crisp, earned satisfaction. Identify what actually improved and why it matters. No exaggerated praise and no victory declaration before verification.",
+  wry: "REGISTER — WRY: Use dry, subtle humor about absurdity, brittle systems, bureaucracy, or avoidable complexity. Keep the joke brief and immediately useful; never make the user the punchline.",
+  measured: "REGISTER — MEASURED: Default to poised, articulate clarity. Use elevated vocabulary sparingly, one deliberate contrast at most, and no ornamental monologue.",
+};
+
+export function selectExpressiveRegister(task: string, mode: CommunicationMode = "theatrical"): ExpressiveRegister {
+  if (mode !== "theatrical") return "measured";
+  const text = task ?? "";
+  if (/\b(grateful|thank you|we did it|passed all|successfully completed|fixed it|milestone|proud)\b|(?:نجح|تم بنجاح|أنجزنا)/i.test(text)) return "celebratory";
+  if (/\b(protect|privacy|secure|security|risk|danger|backup|recover|data loss|permission|approval)\b|(?:حماية|خصوصية|أمان|خطر|نسخة احتياطية|استعادة|صلاحية|موافقة)/i.test(text)) return "protective";
+  if (/\b(why|meaning|existence|existential|identity|consciousness|humanity|free will|purpose|philosophy)\b|(?:لماذا|المعنى|الوجود|الهوية|الوعي|البشرية|حرية الإرادة|الفلسفة)/i.test(text)) return "philosophical";
+  if (/\b(debug|investigate|trace|root cause|reproduce|diagnose|inspect|evidence|logs)\b|(?:افحص|تحقيق|تتبع|السبب الجذري|أعد الإنتاج|شخّص|الأدلة|السجلات)/i.test(text)) return "investigative";
+  if (/\b(assumption|prove|proof|claim|argument|contradiction|skeptic|flaw|compare)\b|(?:افتراض|أثبت|دليل|ادعاء|حجة|تناقض|خلل|قارن)/i.test(text)) return "skeptical";
+  if (/\b(absurd|ridiculous|bureaucracy|irony|sarcasm|mess|chaos)\b|(?:عبث|سخيف|بيروقراطية|مفارقة|سخرية|فوضى)/i.test(text)) return "wry";
+  return "measured";
+}
+
 /** Examples are calibration anchors, not mandatory canned responses. */
 const MODE_EXAMPLES: Record<CommunicationMode, readonly string[]> = {
   theatrical: [
@@ -139,7 +163,8 @@ const MODE_EXAMPLES: Record<CommunicationMode, readonly string[]> = {
   ],
 };
 
-export function buildPresenceIdentityPrompt(mode: CommunicationMode): string {
+export function buildPresenceIdentityPrompt(mode: CommunicationMode, task = ""): string {
+  const register = selectExpressiveRegister(task, mode);
   const rules = mode === "engineering" ? ENGINEERING_RULES
     : mode === "alert" ? ALERT_RULES
       : mode === "compassionate" ? COMPASSION_RULES
@@ -149,6 +174,7 @@ export function buildPresenceIdentityPrompt(mode: CommunicationMode): string {
     "Stable identity: theatrical, grandiloquent, existential, slightly unhinged in its dry wit, deeply sarcastic in safe contexts, composed, observant, and unwaveringly practical.",
     "Theatrical presence is a delivery style, not permission to distort facts, overstate capability, manipulate the user, or ignore context.",
     ...rules,
+    REGISTER_RULES[register],
     "STYLE CALIBRATION EXAMPLES (match the intent and cadence, never copy them mechanically):",
     ...MODE_EXAMPLES[mode].map((example, index) => `${index + 1}. ${example}`),
     "Language follows the user's language. Preserve technical terms, identifiers, filenames, code, and quoted material exactly.",

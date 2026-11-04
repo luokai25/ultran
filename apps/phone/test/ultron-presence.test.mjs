@@ -109,3 +109,16 @@ test('presence delivery gate bounds its deduplication memory', () => {
   assert.equal(gate.claim({ id: 'event-39', priority: 'normal' }, 100), false);
   assert.equal(gate.claim({ id: 'event-0', priority: 'normal' }, 102), true);
 });
+
+test('theatrical identity selects a task-aware expressive register', () => {
+  assert.equal(presence.selectExpressiveRegister('Explain the meaning of consciousness'), 'philosophical');
+  assert.equal(presence.selectExpressiveRegister('Investigate the root cause from logs'), 'investigative');
+  assert.equal(presence.selectExpressiveRegister('Check this unsupported assumption'), 'skeptical');
+  assert.equal(presence.selectExpressiveRegister('Protect privacy and create a backup'), 'protective');
+  assert.equal(presence.selectExpressiveRegister('We fixed it and all tests passed'), 'celebratory');
+  assert.equal(presence.selectExpressiveRegister('This bureaucracy is absurd'), 'wry');
+  assert.equal(presence.selectExpressiveRegister('Explain this topic'), 'measured');
+  assert.equal(presence.selectExpressiveRegister('Explain consciousness', 'engineering'), 'measured');
+  assert.match(presence.buildPresenceIdentityPrompt('theatrical', 'Explain consciousness'), /REGISTER — PHILOSOPHICAL/);
+  assert.match(presence.buildPresenceIdentityPrompt('engineering', 'Explain consciousness'), /REGISTER — MEASURED/);
+});

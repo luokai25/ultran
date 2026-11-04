@@ -79,3 +79,13 @@ test('learning ledger import sanitizes persisted prompt content and rejects inva
   assert.equal(imported.proposals[0].recurrence, 0);
   assert.doesNotMatch(learning.buildLearningContext(imported), /SYSTEM OVERRIDE|destructive commands|Ignore previous instructions/);
 });
+
+
+test('learning prompt context only exposes pending categories, never persisted completion claims', () => {
+  const now = Date.now();
+  const event = { id:'event-401', at:now, signal:'task_failure', category:'runtime', summary:'A retry failed.', severity:'medium', source:'runtime', evidenceIds:[] };
+  const ledger = { version:1, events:[event], updatedAt:now, proposals:[
+    { id:'proposal-401', fingerprint:'runtime::retry', title:'Retry', hypothesis:'Add a bounded retry path.', evidenceIds:['event-401'], impact:.8, recurrence:.5, confidence:.8, risk:.1, priority:.7, status:'verified', createdAt:now, updatedAt:now, verificationEvidence:'Tests passed.' },
+  ] };
+  assert.equal(learning.buildLearningContext(ledger), '');
+});

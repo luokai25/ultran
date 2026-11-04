@@ -44,6 +44,13 @@ import {
   subscribeCloudWorkspace,
   rememberCloudWorkspace,
   deleteCloudConversation,
+  pullCloudMemories,
+  syncCloudMemories,
+  scheduleCloudMemorySync,
+  rememberCloudMemories,
+  pullCloudSetting,
+  scheduleCloudSetting,
+  saveCloudModelProfile,
 } from "./cloud-sync";
 
 /* ------------------------------------------------------------------ *
@@ -351,7 +358,18 @@ for (const convo of store.conversations) {
 }
 if (!(settings.theme in THEMES)) settings.theme = "ultron";
 
-const saveSettings = (): void => writeJson(SETTINGS_KEY, settings);
+const saveSettings = (): void => {
+  writeJson(SETTINGS_KEY, settings);
+  scheduleCloudSetting("phone_settings", settings, (error) => {
+    cloudSyncStatusEl.textContent = "Settings saved locally; cloud sync failed: " + (error instanceof Error ? error.message : "unknown error");
+  });
+  const selectedModel = nativeModelSelect.value || nativeLoadedModelName;
+  if (selectedModel) {
+    void saveCloudModelProfile(selectedModel).catch((error) => {
+      console.warn("[ULTRON model profile sync]", error);
+    });
+  }
+};
 let nativeModelLoaded = false;
 let nativeProgressListenerReady = false;
 let nativeLoadedModelName = "";
@@ -594,12 +612,32 @@ const saveStore = (): void => {
 
 
 async function applyInitialCloudSync(): Promise<void> {
+  const remoteSettings = await pullCloudSetting("phone_settings");
+  if (remoteSettings && typeof remoteSettings === "object" && !Array.isArray(remoteSettings)) {
+    Object.assign(settings, remoteSettings);
+    endpointEl.value = settings.endpoint;
+    localModelEndpointEl.value = settings.localModelEndpoint;
+    localModelEl.value = settings.localModel;
+  }
+
   const remote = await pullCloudWorkspace();
   store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
   if (!store.activeId && store.conversations.length) store.activeId = store.conversations[0]!.id;
   saveStore();
   await syncCloudWorkspace(store.conversations);
   rememberCloudWorkspace(store.conversations);
+
+  const remoteMemories = await pullCloudMemories();
+  const newerRemoteMemories = remoteMemories.filter((memory) => {
+    const local = vectorMemory.records.find((record) => record.id === memory.id);
+    return !local || memory.updatedAt > local.updatedAt;
+  });
+  vectorMemory = syncVectorMemory(vectorMemory, newerRemoteMemories);
+  writeJson(VECTOR_MEMORY_KEY, vectorMemory);
+  await syncCloudMemories(vectorMemory.records);
+  rememberCloudMemories(vectorMemory.records);
+  saveSettings();
+
   renderHistory();
   renderConversation();
 }
@@ -612,6 +650,16 @@ async function refreshFromCloud(): Promise<void> {
     store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
     await syncCloudWorkspace(store.conversations);
     rememberCloudWorkspace(store.conversations);
+
+    const remoteMemories = await pullCloudMemories();
+    const newerRemoteMemories = remoteMemories.filter((memory) => {
+      const local = vectorMemory.records.find((record) => record.id === memory.id);
+      return !local || memory.updatedAt > local.updatedAt;
+    });
+    vectorMemory = syncVectorMemory(vectorMemory, newerRemoteMemories);
+    writeJson(VECTOR_MEMORY_KEY, vectorMemory);
+    await syncCloudMemories(vectorMemory.records);
+    rememberCloudMemories(vectorMemory.records);
     saveStore();
     renderHistory();
     renderConversation();
@@ -3332,7 +3380,7 @@ async function organiseSemanticMemory(convo:Conversation):Promise<void>{
    {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph proposal."}
   ],maxTokens:420});
   const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
-  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);}
+  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);scheduleCloudMemorySync(vectorMemory.records,error=>{cloudSyncStatusEl.textContent="Memory saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});}
  }catch{/* memory enrichment never blocks chat */}
 }
 function rebuildMindMap():void{mindMap=buildMindMap(store.conversations,semanticGraph);writeJson(MINDMAP_KEY,mindMap);renderMindMap(req<SVGSVGElement>("#mindmap-canvas"),mindMap,showMindNode,req<HTMLInputElement>("#mindmap-search").value);req<HTMLElement>("#mindmap-empty").hidden=store.conversations.length>0;req<HTMLElement>("#mindmap-stats").textContent=`${store.conversations.length} sessions · ${store.conversations.reduce((n,c)=>n+c.messages.length,0)} messages · ${mindMap.nodes.length-1} knowledge nodes · ${mindMap.edges?.length??0} relationships`;req<HTMLElement>("#mindmap-organizer").textContent=`Local index · ${nativeLoadedModelName||"automatic organiser"} · ${new Date(mindMap.updatedAt).toLocaleTimeString()}`;}

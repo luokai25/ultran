@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="./src/experience.css" />
     <link rel="stylesheet" href="./src/finish.css" />
     <link rel="stylesheet" href="./src/learning.css" />
+    <link rel="stylesheet" href="./src/design-system.css" />
   </head>
   <body>
     <div id="app">
@@ -122,7 +123,23 @@
         <section class="learning-section"><div class="learning-section-head"><div><span class="section-eyebrow">OBSERVATION LOG</span><h2>Recent signals</h2></div><span id="learning-event-count" class="learning-count"></span></div><div id="learning-events" class="learning-events"></div></section>
         <p class="feature-disclaimer">A proposal is not a code change. “Record external implementation” only records that you changed something elsewhere. Verification requires test or runtime evidence that you provide.</p>
       </section>
-      <nav class="bottom-nav" aria-label="Main navigation"><button id="nav-chat" class="nav-item" type="button" aria-current="page" hidden>Chats</button><button id="nav-connectors" class="nav-item nav-compat" type="button" hidden><span>Connect</span></button><button id="nav-settings" class="nav-item nav-compat" type="button" hidden><span>Settings</span></button></nav>
+      <nav class="bottom-nav" aria-label="Main navigation">
+        <button id="nav-chat" class="nav-item" type="button" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chats</span>
+        </button>
+        <button id="nav-models" class="nav-item" type="button" aria-label="Models">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></svg><span>Models</span>
+        </button>
+        <button id="nav-vault" class="nav-item" type="button" aria-label="Memory">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2m10 8h-2M12 22v-2M2 12h2"/></svg><span>Memory</span>
+        </button>
+        <button id="nav-connectors" class="nav-item" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V4m8 3V4M6 7h12v4a6 6 0 0 1-12 0V7Zm6 10v3m-4 0h8"/></svg><span>Tools</span>
+        </button>
+        <button id="nav-settings" class="nav-item" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.2 2.1-2 2-2.1-1.2-.2-.1a8 8 0 0 1-2 .8l-.1.2-.5 2.2h-2.8l-.5-2.2-.1-.2a8 8 0 0 1-2-.8l-.2.1-2.1 1.2-2-2 1.2-2.1.1-.2a8 8 0 0 1-.8-2l-.2-.1L2.4 12v-2.8l2.2-.5.2-.1a8 8 0 0 1 .8-2l-.1-.2-1.2-2.1 2-2 2.1 1.2.2.1a8 8 0 0 1 2-.8l.1-.2.5-2.2H14l.5 2.2.1.2a8 8 0 0 1 2 .8l.2-.1 2.1-1.2 2 2-1.2 2.1-.1.2a8 8 0 0 1 .8 2l.2.1 2.2.5V12l-2.2.5-.2.1a8 8 0 0 1-.8 2Z"/></svg><span>Settings</span>
+        </button>
+      </nav>
     </div>
 
     <div id="scrim" class="scrim" hidden></div>

@@ -19,6 +19,7 @@ export type CloudConversation = {
   title: string;
   updatedAt: number;
   messages: CloudMessage[];
+  deleted?: boolean;
 };
 
 export type LocalConversationForSync = CloudConversation & {
@@ -128,7 +129,6 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
   const { data: rows, error: conversationError } = await cloudClient
     .from('ultron_conversations')
     .select('id,title,status,metadata,updated_at,last_message_at')
-    .neq('status', 'deleted')
     .order('updated_at', { ascending: false })
     .limit(200);
   if (conversationError) throw conversationError;
@@ -182,6 +182,7 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
       title: row.title,
       updatedAt: new Date(row.last_message_at ?? row.updated_at).getTime(),
       messages,
+      deleted: row.status === 'deleted',
     };
   });
   writeIdMap(idMap);
@@ -194,6 +195,10 @@ export function mergeCloudWorkspace(
 ): LocalConversationForSync[] {
   const merged = new Map(local.map((conversation) => [conversation.id, conversation]));
   for (const cloud of remote) {
+    if (cloud.deleted) {
+      merged.delete(cloud.id);
+      continue;
+    }
     const existing = merged.get(cloud.id);
     if (!existing) {
       merged.set(cloud.id, cloud);

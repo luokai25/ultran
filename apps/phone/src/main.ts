@@ -1695,6 +1695,10 @@ function toolRequestMatchesUserIntent(request: LocalToolRequest, userText: strin
   if (!text) return false;
   const asksQuestion = /^(?:what|why|when|where|who|which|how|explain|describe|define|tell me about|can you explain|could you explain)\b/i.test(text);
   if (asksQuestion) return false;
+  const actionWords = "run|execute|install|download|build|compile|test|debug|fix|continue|proceed|carry on|keep working|go ahead|search|open|send|delete|remove|cancel|launch|start|compose|prepare|draft|read|load";
+  const negated = new RegExp("\\b(?:do not|don't|dont|never|avoid|without)\\s+(?:" + actionWords + ")\\b", "i").test(text)
+    || new RegExp("\\b(?:don't|do not|dont)\\s+(?:want|need)\\s+you\\s+to\\s+(?:" + actionWords + ")\\b", "i").test(text);
+  if (negated) return false;
   const matches = (pattern: RegExp): boolean => pattern.test(text);
   switch (request.tool) {
     case "skills.search":

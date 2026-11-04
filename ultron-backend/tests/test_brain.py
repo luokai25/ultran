@@ -116,7 +116,7 @@ def test_echo_gives_a_concrete_plan_per_intent(intent):
     assert len(reply.content) > 40
 
 
-# ---------------------------------------------------------- ollama backend
+# ------------------------------------------------ openai-compatible backend
 
 
 class _StubResponse:

@@ -574,16 +574,16 @@ public class UltranLocalAiPlugin extends Plugin {
                         ? 1024 : 2048;
                 final boolean aggressiveLazyLoading = memory.availMem <= 0 || modelSetSize(model) > (long) (memory.availMem * 0.70);
                 int contextTokens = preferredContext;
-                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                String error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), "", contextTokens, aggressiveLazyLoading);
                 // If model mapping succeeds but the KV cache is too large, retry with
                 // a smaller context. Do not hide corrupt-model or architecture errors.
                 if (error != null && error.contains("context cache") && contextTokens > 512) {
                     contextTokens = contextTokens > 1024 ? 1024 : 512;
-                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), "", contextTokens, aggressiveLazyLoading);
                 }
                 if (error != null && error.contains("context cache") && contextTokens > 512) {
                     contextTokens = 512;
-                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), contextTokens, aggressiveLazyLoading);
+                    error = NativeLlama.nativeLoadModel(model.getAbsolutePath(), "", contextTokens, aggressiveLazyLoading);
                 }
                 if (error != null && !error.isEmpty()) {
                     loadedModelPath = null;

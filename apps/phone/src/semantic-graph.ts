@@ -20,7 +20,7 @@ When useful, propose incremental updates as one JSON object with schema:
 {"nodes":[{"id":"stable-kebab-id","label":"Short name","kind":"concept|project|decision|person|preference|session","summary":"Evidence-grounded summary","sources":["conversation-id"],"confidence":0.0}],"edges":[{"id":"stable-edge-id","from":"node-id","to":"node-id","relation":"supports|part_of|depends_on|prefers|decided|contradicts|related_to","sources":["conversation-id"],"confidence":0.0}]}
 Only include durable, useful facts supported by this session. Include source conversation IDs. Do not invent graph IDs for absent nodes; use stable descriptive IDs. Do not output a proposal unless asked to organise memory.`;
 }
-export function mergeGraphProposal(current: SemanticGraph, raw: string, model: string): SemanticGraph {
+export function mergeGraphProposal(current: SemanticGraph, raw: string, model: string, now = Date.now()): SemanticGraph {
   const cleaned = raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
   if (a < 0 || b <= a) return current;
@@ -39,12 +39,119 @@ export function mergeGraphProposal(current: SemanticGraph, raw: string, model: s
     if (!sourceIds.length || !Number.isFinite(confidence) || confidence < 0.72 || containsSensitiveMemoryMaterial(memoryText)) continue;
     const kind = ["concept","project","decision","person","preference","session"].includes(item.kind) ? item.kind : "concept";
     const old = nodes.get(item.id);
-    nodes.set(item.id, { id:item.id, label:item.label.slice(0,100), kind, summary:item.summary.slice(0,700), sources:[...new Set([...(old?.sources??[]),...sourceIds])], updatedBy:model, confidence:Math.max(0,Math.min(1,confidence)) });
+    const importedBy = (item as unknown as { updatedBy?: unknown }).updatedBy;
+    const updatedBy = model === "cloud-sync" && typeof importedBy === "string" && importedBy.trim()
+      ? importedBy.replace(/[\\u0000-\\u001f]/g, " ").slice(0, 120)
+      : model;
+    nodes.set(item.id, { id:item.id, label:item.label.slice(0,100), kind, summary:item.summary.slice(0,700), sources:[...new Set([...(old?.sources??[]),...sourceIds])], updatedBy, confidence:Math.max(0,Math.min(1,confidence)) });
   }
   const edges = new Map(current.edges.map(e => [e.id,e]));
   for (const item of proposal.edges.slice(0,80)) {
     if (!item || typeof item.id!=="string" || !/^[a-z0-9][a-z0-9_-]{1,99}$/i.test(item.id) || typeof item.from!=="string" || typeof item.to!=="string" || !nodes.has(item.from) || !nodes.has(item.to) || item.from===item.to || typeof item.relation!=="string" || !Array.isArray(item.sources)) continue;
-    const old=edges.get(item.id); edges.set(item.id,{id:item.id,from:item.from,to:item.to,relation:item.relation.slice(0,60),sources:[...new Set([...(old?.sources??[]),...item.sources.filter(x=>typeof x==="string").slice(0,20)])],updatedBy:model,confidence:Math.max(0,Math.min(1,Number(item.confidence)||0.5))});
+    const old=edges.get(item.id);
+    const importedBy = (item as unknown as { updatedBy?: unknown }).updatedBy;
+    const updatedBy = model === "cloud-sync" && typeof importedBy === "string" && importedBy.trim()
+      ? importedBy.replace(/[\\u0000-\\u001f]/g, " ").slice(0, 120)
+      : model;
+    edges.set(item.id,{id:item.id,from:item.from,to:item.to,relation:item.relation.slice(0,60),sources:[...new Set([...(old?.sources??[]),...item.sources.filter(x=>typeof x==="string").slice(0,20)])],updatedBy,confidence:Math.max(0,Math.min(1,Number(item.confidence)||0.5))});
   }
-  return {version:1,updatedAt:Date.now(),nodes:[...nodes.values()].slice(-2000),edges:[...edges.values()].slice(-5000)};
+  return {version:1,updatedAt:now,nodes:[...nodes.values()].slice(-2000),edges:[...edges.values()].slice(-5000)};
+}
+
+
+export type RemoteGraphMerge = {
+  graph: SemanticGraph;
+  valid: boolean;
+  shouldUpload: boolean;
+};
+
+function graphContentFingerprint(graph: SemanticGraph): string {
+  return JSON.stringify({
+    nodes: [...graph.nodes].sort((a, b) => a.id.localeCompare(b.id)),
+    edges: [...graph.edges].sort((a, b) => a.id.localeCompare(b.id)),
+  });
+}
+
+/**
+ * Merge a remote snapshot without manufacturing updates for identical data.
+ * Remote provenance is retained, local-only records are never discarded, and
+ * a stale/incomplete cloud snapshot is flagged for a corrective upload.
+ */
+export function mergeRemoteGraphState(current: SemanticGraph, value: unknown, now = Date.now()): RemoteGraphMerge {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { graph: current, valid: false, shouldUpload: false };
+  }
+  const remote = value as Partial<SemanticGraph>;
+  if (remote.version !== 1 || !Array.isArray(remote.nodes) || !Array.isArray(remote.edges)) {
+    return { graph: current, valid: false, shouldUpload: false };
+  }
+
+  const rawUpdatedAt = Number(remote.updatedAt);
+  const remoteUpdatedAt = Number.isFinite(rawUpdatedAt)
+    ? Math.max(0, Math.min(now + 300_000, rawUpdatedAt))
+    : 0;
+  const remoteIsNewer = remoteUpdatedAt > current.updatedAt;
+  const remoteNodes = remote.nodes.filter((node): node is GraphNode =>
+    Boolean(node) && typeof node === "object" && typeof node.id === "string",
+  );
+  const remoteEdges = remote.edges.filter((edge): edge is GraphEdge =>
+    Boolean(edge) && typeof edge === "object" && typeof edge.id === "string",
+  );
+  const localNodeIds = new Set(current.nodes.map((node) => node.id));
+  const localEdgeIds = new Set(current.edges.map((edge) => edge.id));
+  const incomingNodes = remoteNodes.filter((node) => remoteIsNewer || !localNodeIds.has(node.id));
+  const incomingEdges = remoteEdges.filter((edge) => remoteIsNewer || !localEdgeIds.has(edge.id));
+
+  let merged = current;
+  for (let index = 0; index < incomingNodes.length; index += 40) {
+    merged = mergeGraphProposal(
+      merged,
+      JSON.stringify({ nodes: incomingNodes.slice(index, index + 40), edges: [] }),
+      "cloud-sync",
+      now,
+    );
+  }
+  for (let index = 0; index < incomingEdges.length; index += 80) {
+    merged = mergeGraphProposal(
+      merged,
+      JSON.stringify({ nodes: [], edges: incomingEdges.slice(index, index + 80) }),
+      "cloud-sync",
+      now,
+    );
+  }
+
+  const contentChanged = graphContentFingerprint(merged) !== graphContentFingerprint(current);
+  const updatedAt = Math.max(current.updatedAt, remoteUpdatedAt, contentChanged ? now : 0);
+  const graph = contentChanged || updatedAt !== current.updatedAt
+    ? { ...merged, updatedAt }
+    : current;
+
+  // Normalize the remote snapshot with the same validation rules. If it is
+  // incomplete or contains rejected records, the corrected graph must be sent.
+  let normalizedRemote: SemanticGraph = EMPTY_GRAPH;
+  for (let index = 0; index < remoteNodes.length; index += 40) {
+    normalizedRemote = mergeGraphProposal(
+      normalizedRemote,
+      JSON.stringify({ nodes: remoteNodes.slice(index, index + 40), edges: [] }),
+      "cloud-sync",
+      now,
+    );
+  }
+  for (let index = 0; index < remoteEdges.length; index += 80) {
+    normalizedRemote = mergeGraphProposal(
+      normalizedRemote,
+      JSON.stringify({ nodes: [], edges: remoteEdges.slice(index, index + 80) }),
+      "cloud-sync",
+      now,
+    );
+  }
+  const remoteWasSanitized =
+    normalizedRemote.nodes.length !== remoteNodes.length ||
+    normalizedRemote.edges.length !== remoteEdges.length;
+  const shouldUpload =
+    remoteWasSanitized ||
+    graphContentFingerprint(normalizedRemote) !== graphContentFingerprint(graph) ||
+    remoteUpdatedAt < graph.updatedAt;
+
+  return { graph, valid: true, shouldUpload };
 }

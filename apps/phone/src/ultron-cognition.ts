@@ -71,7 +71,6 @@ export function analyzeCognitiveProfile(
   options: { continuation?: boolean; hasAttachments?: boolean; priorCorrection?: boolean } = {},
 ): CognitiveProfile {
   const text = task.trim();
-  const lower = text.toLocaleLowerCase();
   const signals: CognitiveSignal[] = [];
   if (/\b(it|that|there|the other one|the usual|same as before)\b/i.test(text) && text.length < 120) signals.push("ambiguity");
   if (/\b(and|also|plus|both|all of|compare|versus|vs\.)\b|،| و /i.test(text)) signals.push("multiple_objectives");
@@ -88,7 +87,7 @@ export function analyzeCognitiveProfile(
   const complex = signals.some((signal) => ["multiple_objectives", "dependencies", "attachments", "correction"].includes(signal));
   const investigative = signals.includes("external_facts") || signals.includes("uncertainty");
   const mode: CognitiveMode = severe ? "critical" : complex ? "deliberate" : investigative ? "investigative" : "direct";
-  const reasoningPasses = mode === "direct" ? 1 : mode === "investigative" ? 2 : mode === "deliberate" ? 2 : 3;
+  const reasoningPasses = mode === "direct" ? 1 : 2;
   return {
     mode,
     signals: unique(signals),

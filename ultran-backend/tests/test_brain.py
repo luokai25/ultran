@@ -178,6 +178,39 @@ def test_ollama_streams_ndjson_tokens_and_reports_final_usage():
     assert client.calls[0][2]["stream"] is True
 
 
+def test_ollama_streams_image_payloads_to_vision_models():
+    import json
+    client = _StreamingClient([
+        json.dumps({"message": {"content": "A cat"}, "done": True}),
+    ])
+    image = "data:image/png;base64,Y2F0"
+    chunks = []
+    OllamaBackend("http://h", client=client).complete_stream(
+        [BrainMessage("user", "Describe this image", images=[image])],
+        model="llava", temperature=0.2, on_token=chunks.append,
+    )
+    assert client.calls[0][2]["messages"][0]["images"] == ["Y2F0"]
+    assert chunks == ["A cat"]
+
+
+def test_openai_compatible_streams_multimodal_image_content():
+    import json
+    client = _StreamingClient([
+        "data: " + json.dumps({"choices": [{"delta": {"content": "A cat"}, "finish_reason": "stop"}]}),
+        "data: [DONE]",
+    ])
+    image = "data:image/png;base64,Y2F0"
+    chunks = []
+    OpenAICompatBackend("http://h", client=client).complete_stream(
+        [BrainMessage("user", "Describe this image", images=[image])],
+        model="vision-model", temperature=0.2, on_token=chunks.append,
+    )
+    content = client.calls[0][2]["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Describe this image"}
+    assert content[1] == {"type": "image_url", "image_url": {"url": image}}
+    assert chunks == ["A cat"]
+
+
 def test_openai_compatible_streams_sse_deltas_and_usage():
     import json
     client = _StreamingClient([

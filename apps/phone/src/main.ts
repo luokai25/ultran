@@ -20,9 +20,10 @@ import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOIC
 import { buildPresenceIdentityPrompt, selectCommunicationMode, evaluatePresenceEvent, shouldSpeakPresence, createPresenceDeliveryGate, type PresenceEventKind } from "./ultron-presence";
 import { prepareTelemetrySpeech } from "./ultron-voice";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
-import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
+import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile, calibrateReasoningDepth } from "./ultron-cognition";
+import { buildVectorMemoryContext, createVectorMemoryStore, retrieveVectorMemory, syncVectorMemory, validateVectorMemoryStore } from "./ultron-vector-memory";
 import { createUltronCheckpoint, validateUltronCheckpoint, buildUltronCheckpointPrompt, type Checkpoint } from "./ultron-state";
 import { emptyKnowledgeState, validateKnowledgeState, buildKnowledgePrompt, type KnowledgeState } from "./ultron-knowledge-state";
 import { captureExplicitKnowledge } from "./ultron-knowledge-capture";
@@ -211,6 +212,7 @@ const STORE_KEY = "ultron.chat.v1";
 const SETTINGS_KEY = "ultron.settings.v1";
 const PROJECTOR_KEY = "ultron.native-projector.v1";
 const LEARNING_KEY = "ultron.learning.v1";
+const VECTOR_MEMORY_KEY = "ultron.vector-memory.v1";
 
 const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): string {
@@ -221,8 +223,13 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   const ledger = executionLedger ?? (profile.depth === "deep" || profile.depth === "critical" ? createUltronTaskLedger(`turn-${Date.now().toString(36)}`, task) : null);
   ultronDecisionTrace.record({ phase: "classify", code: profile.intent, detail: `risk=${profile.risk}; depth=${profile.depth}; tool=${profile.toolDecision}` });
   ultronDecisionTrace.record({ phase: "plan", code: "plan-created", detail: `${plan.length} bounded steps` });
-  const memoryMatches = rankUltronMemory(task, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(",") })), profile.depth === "instant" ? 2 : 6);
-  if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
+  const memoryResult = retrieveVectorMemory(vectorMemory, task, profile.depth === "instant" ? 2 : 6);
+  vectorMemory = memoryResult.store;
+  const memoryMatches = memoryResult.matches;
+  if (memoryMatches.length) {
+    ultronDecisionTrace.record({ phase: "memory", code: "vector-context-ranked", detail: `${memoryMatches.length} entries across ${new Set(memoryMatches.map((match) => match.tier)).size} memory tiers` });
+    writeJson(VECTOR_MEMORY_KEY, vectorMemory);
+  }
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
   const expressiveMode = selectCommunicationMode({ task, settings: { highStressEngineering: profile.risk === "high" || profile.risk === "critical" } });
   const expressiveIdentity = buildPresenceIdentityPrompt(expressiveMode, task);
@@ -238,7 +245,7 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   const cognition = calibratedProfile.mode === "direct" ? "" : buildCognitiveInstructions(calibratedProfile);
   const calibrationContext = calibration.adjustment === "baseline" ? "" : ["ULTRON REASONING CALIBRATION:", calibration.reason, "Comparable verified outcomes: " + calibration.sampleCount + "; failures: " + calibration.failureCount + "; successes: " + calibration.successCount + ".", "Use the increased verification effort only for this task class. Never treat model confidence as outcome evidence."].join("\n");
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: calibratedProfile.mode + "; passes=" + calibratedProfile.reasoningPasses + "; calibration=" + calibration.adjustment });
-  const memoryContext = buildUltronMemoryContext(memoryMatches);
+  const memoryContext = buildVectorMemoryContext(memoryMatches);
   const learningContext = buildLearningContext(learningLedger);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
   return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, calibrationContext, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
@@ -3171,6 +3178,8 @@ function closeSheet(): void {
 const MINDMAP_KEY="ultron.mindmap.v1";let mindMap:MindMap=readJson<MindMap>(MINDMAP_KEY,{updatedAt:0,nodes:[]});
 const SEMANTIC_GRAPH_KEY="ultron.semantic-graph.v1";
 let semanticGraph:SemanticGraph=readJson<SemanticGraph>(SEMANTIC_GRAPH_KEY,EMPTY_GRAPH);
+let vectorMemory = validateVectorMemoryStore(readJson(VECTOR_MEMORY_KEY, createVectorMemoryStore()));
+vectorMemory = syncVectorMemory(vectorMemory, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(","), updatedAt: semanticGraph.updatedAt })));
 function sharedGraphPrompt(conversationId:string):string{return "\\n\\n"+graphPrompt(semanticGraph,nativeLoadedModelName||"active brain",conversationId);}
 async function organiseSemanticMemory(convo:Conversation):Promise<void>{
  if(!nativeModelLoaded||Capacitor.getPlatform()!=="android"||!convo.messages.length)return;
@@ -3181,7 +3190,7 @@ async function organiseSemanticMemory(convo:Conversation):Promise<void>{
    {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph proposal."}
   ],maxTokens:420});
   const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
-  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);}
+  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);}
  }catch{/* memory enrichment never blocks chat */}
 }
 function rebuildMindMap():void{mindMap=buildMindMap(store.conversations,semanticGraph);writeJson(MINDMAP_KEY,mindMap);renderMindMap(req<SVGSVGElement>("#mindmap-canvas"),mindMap,showMindNode,req<HTMLInputElement>("#mindmap-search").value);req<HTMLElement>("#mindmap-empty").hidden=store.conversations.length>0;req<HTMLElement>("#mindmap-stats").textContent=`${store.conversations.length} sessions · ${store.conversations.reduce((n,c)=>n+c.messages.length,0)} messages · ${mindMap.nodes.length-1} knowledge nodes · ${mindMap.edges?.length??0} relationships`;req<HTMLElement>("#mindmap-organizer").textContent=`Local index · ${nativeLoadedModelName||"automatic organiser"} · ${new Date(mindMap.updatedAt).toLocaleTimeString()}`;}

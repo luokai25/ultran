@@ -3451,7 +3451,9 @@ navChatButton.addEventListener("click", () => {
 navModelsButton.addEventListener("click", () => {
   closeOtherSurfaces();
   setActiveNavigation(navModelsButton);
-  void openChatModelMenu();
+  // Reuse the visible model button's click path so the document-level
+  // outside-click handler recognises this as an intentional open action.
+  chatModelButton.click();
 });
 navVaultButton.addEventListener("click", () => {
   showFeatureScreen("vault-screen", navVaultButton);

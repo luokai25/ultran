@@ -633,7 +633,13 @@ function mergeRemoteSemanticGraph(value: unknown): void {
   const localEdgeIds = new Set(semanticGraph.edges.map((edge) => edge.id));
   const nodes = remoteNodes.filter((node) => remoteIsNewer || !localNodeIds.has(node.id));
   const edges = remoteEdges.filter((edge) => remoteIsNewer || !localEdgeIds.has(edge.id));
-  const merged = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges }), "cloud-sync");
+  let merged = semanticGraph;
+  for (let index = 0; index < nodes.length; index += 40) {
+    merged = mergeGraphProposal(merged, JSON.stringify({ nodes: nodes.slice(index, index + 40), edges: [] }), "cloud-sync");
+  }
+  for (let index = 0; index < edges.length; index += 80) {
+    merged = mergeGraphProposal(merged, JSON.stringify({ nodes: [], edges: edges.slice(index, index + 80) }), "cloud-sync");
+  }
   semanticGraph = { ...merged, updatedAt: Math.max(semanticGraph.updatedAt, remoteUpdatedAt) };
   writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);
   rememberCloudSetting("semantic_graph", value);

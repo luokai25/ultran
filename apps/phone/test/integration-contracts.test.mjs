@@ -487,4 +487,6 @@ test("chat image attachments stay compact and never expand to their source dimen
   assert.match(styles, /\.attachment-thumb\s*\{[^}]*width:\s*56px;[^}]*height:\s*56px;[^}]*object-fit:\s*cover/s);
   assert.match(styles, /\.attachment-chip\s*\{[^}]*max-width:\s*min\(100%, 320px\)/s);
   assert.match(styles, /\.attachment-preview\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(styles, /\.attachment-chip\s*\{[^}]*max-height:\s*68px;[^}]*overflow:\s*hidden/s);
+  assert.match(styles, /\.attachment-chip \.attachment-snippet\s*\{[^}]*display:\s*none/s);
 });

@@ -578,7 +578,9 @@ button {
   gap: 8px;
   width: fit-content;
   max-width: min(100%, 320px);
+  max-height: 68px;
   min-width: 0;
+  overflow: hidden;
   padding: 5px 7px;
   border: 1px solid var(--hairline);
   border-radius: 12px;
@@ -1569,3 +1571,8 @@ button {
   background: color-mix(in srgb, var(--gold) 12%, transparent);
 }
 #sms-btn { color: var(--ink-soft); }
+
+/* Pending file chips show the filename, not a tall text excerpt. */
+.attachment-chip .attachment-snippet {
+  display: none;
+}

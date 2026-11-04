@@ -10,6 +10,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
@@ -59,7 +60,7 @@ public final class UltronSecureStoragePlugin extends Plugin {
         }
         String encoded = preferences().getString(key, null);
         if (encoded == null) {
-            call.resolve(new JSObject().put("value", (String) null));
+            call.resolve(new JSObject().put("value", JSONObject.NULL));
             return;
         }
         try {

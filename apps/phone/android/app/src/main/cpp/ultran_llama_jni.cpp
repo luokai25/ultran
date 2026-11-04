@@ -11,12 +11,14 @@
 #include <unistd.h>
 #include <vector>
 #include "llama.h"
+#include "mtmd.h"
 
 namespace {
 std::mutex g_mutex;
 std::atomic<bool> g_cancel_requested{false};
 llama_model *g_model = nullptr;
 llama_context *g_context = nullptr;
+mtmd_context *g_mtmd_context = nullptr;
 bool g_backend_initialized = false;
 uint32_t g_context_tokens = 2048;
 uint64_t g_last_prompt_tokens = 0;
@@ -25,6 +27,10 @@ double g_last_prompt_ms = 0.0;
 double g_last_generation_ms = 0.0;
 
 void release_model() {
+    if (g_mtmd_context) {
+        mtmd_free(g_mtmd_context);
+        g_mtmd_context = nullptr;
+    }
     if (g_context) {
         llama_free(g_context);
         g_context = nullptr;
@@ -162,7 +168,7 @@ Java_app_ultran_mobile_NativeLlama_nativeVersion(JNIEnv *env, jclass) {
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath, jint requested_context, jboolean aggressive_lazy_loading) {
+Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring jpath, jstring jprojector_path, jint requested_context, jboolean aggressive_lazy_loading) {
     std::lock_guard<std::mutex> lock(g_mutex);
     const std::string path = java_string(env, jpath);
     if (path.empty()) return env->NewStringUTF("Model path is empty.");
@@ -195,6 +201,23 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
     if (!g_context) {
         release_model();
         return env->NewStringUTF("The model weights were mapped, but even the reduced context cache could not fit in memory. Close other apps or choose a smaller model.");
+    }
+
+    const std::string projector_path = java_string(env, jprojector_path);
+    if (!projector_path.empty()) {
+        mtmd_context_params mtmd_params = mtmd_context_params_default();
+        mtmd_params.use_gpu = false;
+        mtmd_params.n_threads = threads;
+        mtmd_params.warmup = false;
+        g_mtmd_context = mtmd_init_from_file(projector_path.c_str(), g_model, mtmd_params);
+        if (!g_mtmd_context) {
+            release_model();
+            return env->NewStringUTF("The projector could not be loaded with this model. Check that it is a compatible mmproj GGUF file.");
+        }
+        if (!mtmd_support_vision(g_mtmd_context)) {
+            release_model();
+            return env->NewStringUTF("This projector does not provide image input for the selected model.");
+        }
     }
     return env->NewStringUTF("");
 }

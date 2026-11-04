@@ -3,7 +3,8 @@ import { CURATED_MODELS } from "./model-library";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
 import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
-import { invokeUltronCapabilities } from "./capability-cloud";\nimport { initCapabilityPanel } from "./capability-panel";
+import { invokeUltronCapabilities } from "./capability-cloud";
+import { initCapabilityPanel } from "./capability-panel";
 /**
  * Ultron phone client - a conversation console.
  *

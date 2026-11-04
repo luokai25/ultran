@@ -81,7 +81,7 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
         if (proposal.status === "pending") {
           const actions=el("div","capability-actions");
           for(const decision of ["approved","rejected"] as const) actions.append(button(decision==="approved"?"Approve proposal":"Reject proposal","capability-action "+(decision==="rejected"?"capability-danger":"capability-approve"),async()=>{
-            const phrase=decision==="approved"?"REVIEW ULTRON CHANGE":"REJECT ULTRON CHANGE";
+            const phrase="REVIEW ULTRON CHANGE";
             if(!window.confirm((decision==="approved"?"Approve":"Reject")+" this exact proposal?\n\n"+str(proposal,"title")))return;
             try { await invoke("resolve_proposal",{id:proposal.id,artifact_sha256:proposal.artifact_sha256,decision,owner_confirmation:true,confirmation_phrase:phrase}); feedback.textContent="Proposal "+decision+". Approval records a decision; it does not silently apply production changes."; await refresh(true); }
             catch(error){feedback.textContent="Proposal decision failed: "+String(error);}

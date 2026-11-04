@@ -171,6 +171,7 @@ function WorkspaceScreen({
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const router = useRouter();
 
   const refresh = useCallback(async () => {
@@ -203,7 +204,7 @@ function WorkspaceScreen({
         { event: '*', schema: 'public', table: 'ultron_memory_items', filter: `owner_id=eq.${session.user.id}` },
         () => void refresh(),
       )
-      .subscribe();
+      .subscribe((status) => setRealtimeConnected(status === 'SUBSCRIBED'));
 
     return () => {
       void supabase.removeChannel(channel);
@@ -295,7 +296,7 @@ function WorkspaceScreen({
         <Text style={styles.backendTitle}>BACKEND STATUS</Text>
         <StatusLine label="Authentication" value="Owner session active" />
         <StatusLine label="Database" value="Connected" />
-        <StatusLine label="Realtime sync" value="Subscribed" />
+        <StatusLine label="Realtime sync" value={realtimeConnected ? "Connected" : "Connecting / offline"} />
         <StatusLine label="Memory store" value={loading ? 'Checking…' : 'Ready'} />
       </View>
 

@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="./src/workspace.css" />
     <link rel="stylesheet" href="./src/experience.css" />
     <link rel="stylesheet" href="./src/finish.css" />
+    <link rel="stylesheet" href="./src/learning.css" />
   </head>
   <body>
     <div id="app">
@@ -112,6 +113,15 @@
         <div class="mindmap-detail" id="mindmap-detail"><strong>Knowledge vault</strong><p>Choose a node to inspect its linked conversations and source messages.</p></div>
         <div class="mindmap-footer"><span id="mindmap-organizer">Waiting for the selected model…</span><button id="mindmap-export" class="ghost" type="button">Export Obsidian Markdown</button></div>
       </section>
+      <section id="learning-screen" class="feature-screen learning-screen" aria-label="ULTRON learning review" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">ADAPTATION · EVIDENCE · HUMAN CONTROL</span><h1>Learning Review</h1><p>Inspect what ULTRON noticed, what it proposes to improve, and what has actually been verified.</p></div><button id="learning-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
+        <div class="learning-safety-note"><span aria-hidden="true">◆</span><p>ULTRON records diagnostic metadata only. It cannot rewrite its own code, change permissions, or mark an improvement verified without your explicit review and evidence.</p></div>
+        <div id="learning-stats" class="learning-stats" aria-live="polite"></div>
+        <div class="learning-toolbar"><div class="learning-filters" role="group" aria-label="Filter learning records"><button type="button" data-learning-filter="all" aria-pressed="true">All</button><button type="button" data-learning-filter="review" aria-pressed="false">Needs review</button><button type="button" data-learning-filter="history" aria-pressed="false">History</button></div><button id="learning-refresh" class="ghost" type="button">Refresh</button></div>
+        <section class="learning-section"><div class="learning-section-head"><div><span class="section-eyebrow">IMPROVEMENT PIPELINE</span><h2>Proposals</h2></div><span id="learning-proposal-count" class="learning-count"></span></div><div id="learning-proposals" class="learning-proposals"></div></section>
+        <section class="learning-section"><div class="learning-section-head"><div><span class="section-eyebrow">OBSERVATION LOG</span><h2>Recent signals</h2></div><span id="learning-event-count" class="learning-count"></span></div><div id="learning-events" class="learning-events"></div></section>
+        <p class="feature-disclaimer">A proposal is not a code change. “Record external implementation” only records that you changed something elsewhere. Verification requires test or runtime evidence that you provide.</p>
+      </section>
       <nav class="bottom-nav" aria-label="Main navigation"><button id="nav-chat" class="nav-item" type="button" aria-current="page" hidden>Chats</button><button id="nav-connectors" class="nav-item nav-compat" type="button" hidden><span>Connect</span></button><button id="nav-settings" class="nav-item nav-compat" type="button" hidden><span>Settings</span></button></nav>
     </div>
 
@@ -134,6 +144,7 @@
         <button id="workspace-btn" class="drawer-link" type="button"><span aria-hidden="true">▦</span>Agent Workspace</button>
         <button id="drawer-identities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>Agents &amp; Identities</button>
         <button id="drawer-mindmap" class="drawer-link" type="button"><span aria-hidden="true">◎</span>Mind Map</button>
+        <button id="drawer-learning" class="drawer-link" type="button"><span aria-hidden="true">⌁</span>Learning Review</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
           Tools &amp; Connectors

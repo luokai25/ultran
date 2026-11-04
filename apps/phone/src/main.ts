@@ -1537,9 +1537,11 @@ function backgroundRequestNeedsTools(userText: string): boolean {
   // Questions stay on the normal model path unless the user clearly asks us to
   // perform an action in the same turn.
   const asksQuestion = /^(?:what|why|when|where|who|which|how|explain|describe|define|tell me about|can you explain|could you explain)\b/i.test(text);
-  const explicitAction = /\b(?:please\s+)?(?:create|build|write|edit|rewrite|update|delete|remove|send|compose|open|launch|install|download|import|export|convert|generate|run|execute|search|look up|find|fetch|connect|disconnect|schedule|book|purchase|summari[sz]e this|analy[sz]e this|review this|test|debug|fix|deploy|commit|push|continue|proceed|carry on|keep working|go ahead)\b/i.test(text)
+  const actionWords = "create|build|write|edit|rewrite|update|delete|remove|send|compose|open|launch|install|download|import|export|convert|generate|run|execute|search|look up|find|fetch|connect|disconnect|schedule|book|purchase|test|debug|fix|deploy|commit|push|continue|proceed|carry on|keep working|go ahead|perform";
+  const explicitAction = new RegExp("\\b(?:please\\s+)?" + actionWords + "\\b", "i").test(text)
     || /\b(?:i need you to|i want you to|do this for me|carry out|take care of|perform)\b/i.test(text);
-  const negated = /\b(?:do not|don't|dont|never|avoid|without)\s+(?:run|execute|install|download|build|compile|test|debug|fix|search|open|send|delete|remove|continue|proceed|carry on|keep working|go ahead)\b/i.test(text);
+  const negated = new RegExp("\\b(?:do not|don't|dont|never|avoid|without)\\s+(?:" + actionWords + ")\\b", "i").test(text)
+    || new RegExp("\\b(?:don't|do not|dont)\\s+(?:want|need)\\s+you\\s+to\\s+(?:" + actionWords + ")\\b", "i").test(text);
   return explicitAction && !negated && !asksQuestion;
 }
 

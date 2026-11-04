@@ -2215,7 +2215,7 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
       const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
       const source_code = typeof parsed.source_code === "string" ? parsed.source_code : "";
       const source_language = parsed.source_language, input_schema = parsed.input_schema;
-      if (!/^[a-z][a-z0-9_]{1,47}$/.test(tool_key) || !/^\\d+\\.\\d+\\.\\d+$/.test(version) || !description || description.length > 500 || !source_code.trim() || new TextEncoder().encode(source_code).byteLength > 32768 || !["python","typescript","javascript"].includes(String(source_language)) || !input_schema || typeof input_schema !== "object" || Array.isArray(input_schema) || (input_schema as Record<string, unknown>).type !== "object") return null;
+      if (!/^[a-z][a-z0-9_]{1,47}$/.test(tool_key) || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version) || !description || description.length > 500 || !source_code.trim() || new TextEncoder().encode(source_code).byteLength > 32768 || !["python","typescript","javascript"].includes(String(source_language)) || !input_schema || typeof input_schema !== "object" || Array.isArray(input_schema) || (input_schema as Record<string, unknown>).type !== "object") return null;
       return { tool: "capabilities.save_tool_draft", tool_key, version, description, input_schema: input_schema as Record<string, unknown>, source_code, source_language: source_language as "python" | "typescript" | "javascript" };
     }
     if (parsed.tool === "capabilities.submit_tool" && typeof parsed.id === "string" && typeof parsed.source_sha256 === "string") {

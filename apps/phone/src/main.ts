@@ -20,6 +20,7 @@ import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOIC
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace } from "./ultron-brain";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
+import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -205,6 +206,7 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   const memoryMatches = rankUltronMemory(task, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(",") })), profile.depth === "instant" ? 2 : 6);
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
+  const selfModel = buildUltronSelfModelPrompt(provider);
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
   const cognitiveProfile = analyzeCognitiveProfile(task, {
     continuation: profile.intent === "continuation" || /\b(continue|carry on|resume|pick up where|keep going)\b|(?:استمر|كمل|تابع)/i.test(task),
@@ -215,7 +217,7 @@ function buildCapabilityPrompt(task: string, provider: string): string {
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: `${cognitiveProfile.mode}; ${cognitiveProfile.signals.length} signals` });
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, brain, cognition, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, ledgerPrompt, memoryContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -2326,6 +2328,8 @@ async function submit(raw: string): Promise<void> {
   const finalProfile = classifyUltronTask(text);
   const validation = validateUltronDraft(text, result.content, finalProfile);
   for (const issue of validation.issues) ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });
+  const identityIssues = auditUltronIdentityOutput(text, result.content, { successfulToolCalls: result.tool_calls?.filter((call) => call.ok).length ?? 0, attemptedToolCalls: result.tool_calls?.length ?? 0 });
+  for (const issue of summarizeIdentityAudit(identityIssues)) ultronDecisionTrace.record({ phase: "validate", code: "identity-audit", detail: issue });
   const message: Message = { role: "assistant", content: result.content };
   activeAssistantMessage = message;
   if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));

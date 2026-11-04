@@ -104,7 +104,7 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
     assert.match(html, new RegExp(`id="${id}"`), `missing model switcher control ${id}`);
   }
   assert.match(main, /async function openChatModelMenu\(/);
-  assert.match(main, /NativeLocalAI\.loadModel\(\{ name: model\.name \}\)/);
+  assert.match(main, /NativeLocalAI\.loadModel\(\{ name: model\.name, projectorName: selectedNativeProjectorName \|\| undefined \}\)/);
   assert.match(main, /NativeLocalAI\.unloadModel\(\)/);
   assert.match(css, /\.chat-model-menu\[hidden\]\{display:none!important\}/);
   assert.match(css, /\.chat-model-button\[data-ready="true"\]/);

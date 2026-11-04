@@ -48,6 +48,7 @@ type NativeLocalAIPlugin = {
   listModels(): Promise<{ models: NativeModel[] }>;
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
   pickProjector(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
+  listProjectors(): Promise<{ projectors: Array<{ name: string; sizeBytes: number; loaded?: boolean }> }>;
   loadModel(options: { name: string; projectorName?: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
   generate(options: { messages: Array<{ role: Role | "system"; content: string; images?: string[] }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
   cancelGeneration(): Promise<{ cancelled: boolean }>;
@@ -154,8 +155,10 @@ const androidBatteryAccessButton = req<HTMLButtonElement>("#android-battery-acce
 const androidAppSettingsButton = req<HTMLButtonElement>("#android-app-settings");
 const endpointEl = req<HTMLInputElement>("#endpoint");
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
+const nativeProjectorSelect = req<HTMLSelectElement>("#native-projector-select");
 const nativeProjectorButton = req<HTMLButtonElement>("#native-projector-import-btn");
 let selectedNativeProjectorName = "";
+let projectorSelectionInitialized = false;
 const nativeModelStatus = req<HTMLElement>("#native-model-status");
 const deviceProfileEl = req<HTMLElement>("#device-profile");
 const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
@@ -190,6 +193,7 @@ document.head.append(favicon);
 
 const STORE_KEY = "ultran.chat.v1";
 const SETTINGS_KEY = "ultran.settings.v1";
+const PROJECTOR_KEY = "ultran.native-projector.v1";
 
 function buildCapabilityPrompt(task: string, provider: string): string {
   return buildUltranSystemPrompt(buildBaseCapabilityPrompt(task, provider));
@@ -282,7 +286,34 @@ async function refreshNativeModels(): Promise<void> {
       });
       nativeProgressListenerReady = true;
     }
-    const [status, listed] = await Promise.all([NativeLocalAI.getStatus(), NativeLocalAI.listModels()]);
+    const [status, listed, projectorList] = await Promise.all([
+      NativeLocalAI.getStatus(),
+      NativeLocalAI.listModels(),
+      NativeLocalAI.listProjectors(),
+    ]);
+    const availableProjectors = projectorList.projectors ?? [];
+    const savedProjector = readJson<string>(PROJECTOR_KEY, "__auto__");
+    const requestedProjector = projectorSelectionInitialized
+      ? selectedNativeProjectorName
+      : savedProjector === "__auto__" ? availableProjectors[0]?.name ?? "" : savedProjector;
+    nativeProjectorSelect.replaceChildren();
+    const textOnlyOption = document.createElement("option");
+    textOnlyOption.value = "";
+    textOnlyOption.textContent = "Text-only model (no projector)";
+    nativeProjectorSelect.appendChild(textOnlyOption);
+    for (const projector of availableProjectors) {
+      const option = document.createElement("option");
+      option.value = projector.name;
+      option.textContent = projector.name + " · " + formatBytes(projector.sizeBytes);
+      nativeProjectorSelect.appendChild(option);
+    }
+    selectedNativeProjectorName = availableProjectors.some((item) => item.name === requestedProjector)
+      ? requestedProjector
+      : "";
+    nativeProjectorSelect.value = selectedNativeProjectorName;
+    projectorSelectionInitialized = true;
+    nativeProjectorSelect.disabled = availableProjectors.length === 0;
+    writeJson(PROJECTOR_KEY, selectedNativeProjectorName);
     void NativeLocalAI.getDeviceProfile().then(renderDeviceProfile).catch(() => {
       deviceProfileEl.textContent = "Device capability details are unavailable in this app build.";
     });
@@ -345,8 +376,11 @@ async function importNativeProjector(): Promise<void> {
     const imported = await NativeLocalAI.pickProjector();
     if (imported.cancelled) return;
     selectedNativeProjectorName = imported.name || "";
-    nativeModelStatus.textContent = "Imported projector " + selectedNativeProjectorName + " · " + formatBytes(imported.sizeBytes || 0) + ". Load a compatible vision model with this projector selected.";
-    nativeProjectorButton.textContent = selectedNativeProjectorName ? "Projector: " + selectedNativeProjectorName : "Import vision projector";
+    projectorSelectionInitialized = true;
+    writeJson(PROJECTOR_KEY, selectedNativeProjectorName);
+    await refreshNativeModels();
+    nativeProjectorSelect.value = selectedNativeProjectorName;
+    nativeModelStatus.textContent = "Imported projector " + selectedNativeProjectorName + " · " + formatBytes(imported.sizeBytes || 0) + ". Select a compatible vision model and load it to enable image understanding.";
   } catch (error) {
     nativeModelStatus.dataset.tone = "bad";
     nativeModelStatus.textContent = nativeFailureMessage("Projector import failed", error);
@@ -2786,7 +2820,7 @@ async function openChatModelMenu(): Promise<void> {
           nativeModelStatus.textContent = `Loading ${model.name}…`;
           chatModelStatus.textContent = `Loading ${model.name} into memory…`;
           try {
-            const result = await NativeLocalAI.loadModel({ name: model.name });
+            const result = await NativeLocalAI.loadModel({ name: model.name, projectorName: selectedNativeProjectorName || undefined });
             nativeModelLoaded = result.loaded;
             nativeLoadedModelName = result.name;
             nativeModelSelect.value = result.name;
@@ -3092,6 +3126,14 @@ req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () =>
 renderCuratedModels();
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
 nativeProjectorButton.addEventListener("click", () => void importNativeProjector());
+nativeProjectorSelect.addEventListener("change", () => {
+  selectedNativeProjectorName = nativeProjectorSelect.value;
+  projectorSelectionInitialized = true;
+  writeJson(PROJECTOR_KEY, selectedNativeProjectorName);
+  nativeModelStatus.textContent = selectedNativeProjectorName
+    ? "Selected vision projector " + selectedNativeProjectorName + ". Load a compatible model to use image attachments."
+    : "Text-only mode selected. Image attachments require a compatible mmproj projector.";
+});
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
 nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());
 nativeModelBenchmarkButton.addEventListener("click", () => void runNativeModelBenchmark());

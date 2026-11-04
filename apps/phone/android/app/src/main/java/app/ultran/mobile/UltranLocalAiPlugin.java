@@ -32,6 +32,7 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
@@ -139,6 +140,25 @@ public class UltranLocalAiPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("models", models);
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void listProjectors(PluginCall call) {
+        JSArray projectors = new JSArray();
+        File directory = new File(getContext().getFilesDir(), "projectors");
+        File[] files = directory.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".gguf"));
+        if (files != null) {
+            Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+            for (File file : files) {
+                if (!file.isFile() || file.length() < 1024L * 1024L) continue;
+                JSObject item = new JSObject();
+                item.put("name", file.getName());
+                item.put("sizeBytes", file.length());
+                item.put("loaded", file.getAbsolutePath().equals(loadedProjectorPath));
+                projectors.put(item);
+            }
+        }
+        call.resolve(new JSObject().put("projectors", projectors));
     }
 
     @PluginMethod

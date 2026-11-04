@@ -466,6 +466,14 @@ test("Android native vision projector import is private, optional, compatibility
   assert.ok(nativeJni.includes("jobjectArray jimages"));
   assert.ok(nativeJni.includes("exceeds the 2 MB native vision limit"));
   assert.ok(nativePluginJava.includes('optJSONArray("images")'));
+  assert.ok(nativePluginJava.includes("listProjectors"));
+  assert.ok(nativePluginJava.includes('new File(getContext().getFilesDir(), "projectors")'));
+  assert.ok(main.includes("NativeLocalAI.listProjectors()"));
+  assert.ok(html.includes('id="native-projector-select"'));
+  assert.ok(main.includes('req<HTMLSelectElement>("#native-projector-select")'));
+  assert.ok(main.includes("nativeProjectorSelect.addEventListener(\"change\""));
+  assert.ok(main.includes('const PROJECTOR_KEY = "ultran.native-projector.v1"'));
+  assert.ok(main.includes("writeJson(PROJECTOR_KEY, selectedNativeProjectorName)"));
   assert.ok(nativePluginJava.includes("Base64.decode"));
   assert.ok(nativePluginJava.includes("imageArray"));
   assert.ok(nativeLlamaJava.includes("byte[][] images"));

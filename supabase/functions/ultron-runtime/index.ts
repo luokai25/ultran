@@ -20,7 +20,7 @@ const CATALOG = [
   { id:"database.select",category:"data",runtime:"supabase",description:"Read owner-scoped ULTRON data tables." },
   { id:"database.insert",category:"data",runtime:"supabase",description:"Create owner-scoped tasks and memory records." },
   { id:"database.update",category:"data",runtime:"supabase",description:"Update owner-scoped tasks, settings and model profiles." },
-  { id:"memory.search",category:"memory",runtime:"supabase",description:"Search persistent long-term memory." },
+  { id:"memory.search",category:"memory",runtime:"supabase",description:"Search persistent long-term memory by shared 96-dimensional semantic vectors." },
   { id:"memory.save",category:"memory",runtime:"supabase",description:"Write a persistent memory item." },
   { id:"text.template",category:"transform",runtime:"supabase",description:"Compose text from input and earlier step results." },
   { id:"json.pick",category:"transform",runtime:"supabase",description:"Select a value from JSON input or earlier results." },
@@ -33,6 +33,16 @@ const CATALOG = [
   { id:"cloud.skills",category:"skills",runtime:"supabase",description:"Versioned skills created, revised and reused by ULTRON." },
   { id:"cloud.tool_registry",category:"tools",runtime:"supabase",description:"Create, version, run, inspect and archive ULTRON-authored workflow tools." },
 ];
+const MEMORY_STOP = new Set("the a an and or but if then than this that these those with from into about for to of in on at by as is are was were be been it its i me my we our you your what why how when where which can could should would do does did have has had please help want need make build create use using now next continue more same all every also just very really".split(" "));
+function memoryHash(value: string): number { let h=2166136261; for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619); return h>>>0; }
+function embedMemoryText(text: string): number[] {
+  const tokens=(text.toLocaleLowerCase().match(/[\p{L}\p{N}_-]{2,}/gu)??[]).filter(term=>!MEMORY_STOP.has(term)).slice(0,240);
+  const vector=Array.from({length:96},()=>0);
+  const features=[...tokens,...tokens.slice(0,-1).map((token,index)=>token+"_"+tokens[index+1])];
+  for(const feature of features){const value=memoryHash(feature),index=value%96;vector[index]=(vector[index]??0)+((value&0x100)===0?1:-1);}
+  const norm=Math.sqrt(vector.reduce((sum,value)=>sum+value*value,0));
+  return norm?vector.map(value=>value/norm):vector;
+}
 function getPath(value: unknown, path: string): unknown {
   const parts = path.replace(/^\$\.?/,"").split(".").filter(Boolean);
   let current: unknown = value;
@@ -144,13 +154,13 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
   if (op === "memory.search") {
     const query = String(params.query ?? "").trim();
     if (!query) throw new Error("memory.search requires a query.");
-    const {data,error}=await db.from("ultron_memory_items").select("id,memory_type,content,summary,importance,confidence,source,source_ref,metadata,created_at").is("archived_at",null).ilike("content","%"+query.replace(/[%_]/g," ")+"%").order("importance",{ascending:false}).limit(Math.min(20,Math.max(1,Number(params.limit)||8)));
+    const {data,error}=await db.rpc("ultron_match_local_memories",{query_embedding:embedMemoryText(query),match_count:Math.min(20,Math.max(1,Number(params.limit)||8)),min_similarity:0.08});
     if(error)throw error;return data;
   }
   if (op === "memory.save") {
     const content=String(params.content??"").trim(); if(!content||content.length>12000)throw new Error("memory.save requires content up to 12 KB.");
     const memoryType=String(params.memory_type??"semantic"); const allowedTypes=new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);
-    const {data,error}=await db.from("ultron_memory_items").insert({owner_id:ownerId,memory_type:allowedTypes.has(memoryType)?memoryType:"semantic",content,summary:String(params.summary??content.slice(0,300)).slice(0,500),importance:Math.max(1,Math.min(5,Math.round(Number(params.importance)||3))),confidence:Math.max(0,Math.min(1,Number(params.confidence)||0.8)),source:"generated_tool",source_ref:String(params.source_ref??"").slice(0,300)||null,metadata:isObject(params.metadata)?params.metadata:{}}).select("id,memory_type,summary,importance,confidence,created_at").single();
+    const {data,error}=await db.from("ultron_memory_items").insert({owner_id:ownerId,memory_type:allowedTypes.has(memoryType)?memoryType:"semantic",content,summary:String(params.summary??content.slice(0,300)).slice(0,500),importance:Math.max(1,Math.min(5,Math.round(Number(params.importance)||3))),confidence:Math.max(0,Math.min(1,Number(params.confidence)||0.8)),source:"generated_tool",source_ref:String(params.source_ref??"").slice(0,300)||null,local_embedding:embedMemoryText(content),metadata:isObject(params.metadata)?params.metadata:{}}).select("id,memory_type,summary,importance,confidence,created_at").single();
     if(error)throw error;return data;
   }
   if (op === "database.select" || op === "database.insert" || op === "database.update") {
@@ -192,6 +202,12 @@ Deno.serve(async (req: Request) => {
     const raw=await req.text();if(new TextEncoder().encode(raw).byteLength>100000)return reply({error:"payload_too_large"},413);
     const body:unknown=JSON.parse(raw);if(!isObject(body)||typeof body.action!=="string")return reply({error:"invalid_request"},400);
     const owner_id=user.id, action=body.action;
+    if(action==="search_memory"){
+      const vector=Array.isArray(body.query_embedding)?body.query_embedding.map(Number):embedMemoryText(String(body.query??""));
+      if(vector.length!==96||vector.some(value=>!Number.isFinite(value)))return reply({error:"query_embedding_must_have_96_finite_values"},400);
+      const {data,error}=await db.rpc("ultron_match_local_memories",{query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))});
+      if(error)throw error;return reply({ok:true,matches:data});
+    }
     if(action==="catalog")return reply({ok:true,tools:CATALOG,workflow_operations:CATALOG.filter(x=>OPS.has(x.id))});
     if(action==="list_tools"){
       const {data,error}=await db.from("ultron_tool_specs").select("id,tool_key,version,title,description,input_schema,workflow,workflow_sha256,lifecycle_state,created_by,run_count,last_run_at,last_run_status,created_at,updated_at").order("updated_at",{ascending:false}).limit(100);

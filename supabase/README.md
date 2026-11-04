@@ -91,3 +91,8 @@ The previous `ultron_generated_tools` Python-source draft lifecycle remains for 
 ### Autonomy model
 
 ULTRON may create, revise (by publishing a new version), run and archive ordinary workflow tools and skills without a separate approval step. The capability console displays these tools, their workflow source, version hash, run counts, last-run status, execution input/output, failures and shared skills. Phone-only operations continue to execute on Android; Supabase-native workflows execute in the cloud. External communications, payments and destructive data operations retain their existing explicit confirmation behavior.
+
+
+### Shared semantic memory
+
+ULTRON's deterministic 96-dimensional feature-hash vectors are now mirrored to `ultron_memory_items.local_embedding`. Supabase exposes `ultron_match_local_memories`, a cosine-similarity RPC protected by the caller's owner RLS context and backed by an HNSW index. The Android client synchronizes memory vectors in batches and retrieves relevant cloud memories before both local and remote inference. If cloud access is unavailable, the existing on-device retrieval path remains available. The model embedding column remains separate for future neural embedding providers.

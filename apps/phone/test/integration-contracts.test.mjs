@@ -81,8 +81,17 @@ test("Termux runtime download verifies the published checksum before installatio
 
 test("brain-independent capability policy is applied to native and connected brains", () => {
   assert.match(main, /from "\.\/capability-kernel"/);
-  assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp"\)/);
+  assert.match(main, /buildCapabilityPrompt\(text, "on-device llama\.cpp", executionLedger\)/);
   assert.match(main, /buildCapabilityPrompt\(task,/);
+  assert.match(main, /localModelReply\(convo, undefined, reply\.body, turnController\.signal/);
+  assert.match(main, /executionLedger\?: UltronTaskLedger/);
+  assert.match(main, /createUltronTaskLedger\(`task-\$\{convo\.id\}/);
+  assert.match(main, /const understandDone = transitionUltronLedger\(understandStart\.ledger, "understand", "completed"/);
+  assert.match(main, /convo\.executionLedger = executionLedger/);
+  assert.match(main, /nextUltronLedgerStep\(executionLedger\)/);
+  assert.match(main, /steps: executionLedger\.steps\.map/);
+  assert.ok(main.includes("successfulToolCalls.find((call) => /verify|check|test|inspect|read|status/i.test(call.action)"));
+  assert.match(main, /sideEffectVerified: call\.ok && finalProfile\.intent === "external_action"/);
   assert.match(main, /shouldVerifyDraft\(text\)/);
   assert.match(main, /shouldVerifyDraft\(task\)/);
   assert.match(main, /reviewLocalDraft\(task, content\)/);

@@ -411,6 +411,7 @@ function memoryFingerprint(record: CloudMemoryRecord): string {
     source: record.source,
     confidence: record.confidence,
     updatedAt: record.updatedAt,
+    vector: record.vector,
   });
 }
 
@@ -463,6 +464,7 @@ export async function syncCloudMemories(records: CloudMemoryRecord[]): Promise<v
   if (!session) return;
   const idMap = readIdMap();
   const allowedTypes = new Set(['identity', 'preference', 'fact', 'episodic', 'semantic', 'goal', 'decision', 'procedure', 'relationship']);
+  const pending: Array<{ localId: string; fingerprint: string; row: Record<string, unknown> }> = [];
 
   for (const record of records) {
     if (!record.text.trim()) continue;
@@ -471,29 +473,37 @@ export async function syncCloudMemories(records: CloudMemoryRecord[]): Promise<v
     const fingerprint = memoryFingerprint(record);
     if (syncedMemoryFingerprints.get(record.id) === fingerprint) continue;
     const memoryType = allowedTypes.has(record.kind) ? record.kind : 'semantic';
-    const updatedAt = new Date(record.updatedAt).toISOString();
-    writeIdMap(idMap);
-    const { error } = await cloudClient.from('ultron_memory_items').upsert({
-      id: cloudId,
-      owner_id: session.user.id,
-      memory_type: memoryType,
-      content: record.text.slice(0, 900),
-      summary: record.text.slice(0, 240),
-      importance: record.tier === 'hot' ? 5 : record.tier === 'warm' ? 3 : 1,
-      confidence: record.confidence,
-      source: record.source.slice(0, 120),
-      metadata: {
-        local_memory_id: record.id,
-        tier: record.tier,
-        access_count: record.accessCount,
-        accessed_at: record.accessedAt,
-        fingerprint: record.fingerprint,
+    pending.push({
+      localId: record.id,
+      fingerprint,
+      row: {
+        id: cloudId,
+        owner_id: session.user.id,
+        memory_type: memoryType,
+        content: record.text.slice(0, 900),
+        summary: record.text.slice(0, 240),
+        importance: record.tier === 'hot' ? 5 : record.tier === 'warm' ? 3 : 1,
+        confidence: record.confidence,
+        source: record.source.slice(0, 120),
+        local_embedding: record.vector,
+        metadata: {
+          local_memory_id: record.id,
+          tier: record.tier,
+          access_count: record.accessCount,
+          accessed_at: record.accessedAt,
+          fingerprint: record.fingerprint,
+        },
+        updated_at: new Date(record.updatedAt).toISOString(),
+        archived_at: null,
       },
-      updated_at: updatedAt,
-      archived_at: null,
-    }, { onConflict: 'id' });
+    });
+  }
+  writeIdMap(idMap);
+  for (let offset = 0; offset < pending.length; offset += 100) {
+    const batch = pending.slice(offset, offset + 100);
+    const { error } = await cloudClient.from('ultron_memory_items').upsert(batch.map((item) => item.row), { onConflict: 'id' });
     if (error) throw error;
-    syncedMemoryFingerprints.set(record.id, fingerprint);
+    for (const item of batch) syncedMemoryFingerprints.set(item.localId, item.fingerprint);
   }
 }
 

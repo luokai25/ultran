@@ -71,3 +71,18 @@ test('voice backend status is honest about local neural availability', () => {
   assert.equal(persona.ULTRON_VOICE.profile.pitchShiftSemitones, -1.25);
   assert.match(persona.ULTRON_PERSONALITY_PROMPT, /voice is an event and telemetry channel/i);
 });
+
+test('Android UI exposes independent proactive and spoken-telemetry controls', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const personaSource = fs.readFileSync(new URL('../src/ultron-persona.ts', import.meta.url), 'utf8');
+  assert.equal((html.match(/id="proactive-updates-toggle"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="voice-updates-toggle"/g) ?? []).length, 1);
+  assert.match(html, /will not automatically read ordinary chat replies aloud/i);
+  assert.match(main, /evaluatePresenceEvent\(/);
+  assert.match(main, /shouldSpeakPresence\(/);
+  assert.match(personaSource, /Voice is an event and telemetry channel/);
+  assert.match(main, /voiceUpdatesToggle\.disabled = !settings\.proactiveUpdates/);
+  assert.match(main, /prepareTelemetrySpeech\(recommendation\.message, 420\)/);
+  assert.doesNotMatch(main, /if \(settings\.voice\) \{\s*if \(Capacitor\.getPlatform\(\)/);
+});

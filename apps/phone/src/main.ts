@@ -165,6 +165,9 @@ const sheetWrap = req<HTMLElement>("#sheet-wrap");
 const androidAccessStatus = req<HTMLElement>("#android-access-status");
 const androidBatteryAccessButton = req<HTMLButtonElement>("#android-battery-access");
 const androidAppSettingsButton = req<HTMLButtonElement>("#android-app-settings");
+const proactiveUpdatesToggle = req<HTMLInputElement>("#proactive-updates-toggle");
+const voiceUpdatesToggle = req<HTMLInputElement>("#voice-updates-toggle");
+const presenceSettingsStatus = req<HTMLElement>("#presence-settings-status");
 const endpointEl = req<HTMLInputElement>("#endpoint");
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeProjectorSelect = req<HTMLSelectElement>("#native-projector-select");
@@ -1011,7 +1014,6 @@ async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
 
 async function enableProactiveUpdates(): Promise<void> {
   if (!settings.proactiveUpdates) {
-    if (!baseUrl()) { voiceStatus("Connect your task backend in Settings before enabling proactive updates."); return; }
     if (Capacitor.getPlatform() === "android") {
       const permission = await NativeCompanion.requestNotificationPermission();
       if (!permission.granted) {
@@ -1041,7 +1043,7 @@ async function enableProactiveUpdates(): Promise<void> {
     proactivePoll = window.setInterval(() => {
       if (settings.proactiveUpdates && baseUrl()) void refreshWorkspace().catch(() => undefined);
     }, 30000);
-    voiceStatus("Proactive updates enabled. Android checks in the background on an OS-managed schedule (at least every 15 minutes); checks are faster while Ultron is open.");
+    voiceStatus(baseUrl() ? "Proactive updates enabled. Local events are handled as they occur; remote task checks follow Android's OS-managed schedule." : "Proactive updates enabled. Local runtime events can be surfaced; connect a backend to monitor remote tasks.");
   } else {
     if (Capacitor.getPlatform() === "android") { try { await NativeCompanion.stopTaskMonitor(); } catch { /* already stopped */ } }
     voiceStatus("Proactive task updates paused.");
@@ -3130,6 +3132,10 @@ async function openChatModelMenu(): Promise<void> {
 function openSheet(): void {
   closeDrawer();
   endpointEl.value = settings.endpoint;
+  proactiveUpdatesToggle.checked = settings.proactiveUpdates === true;
+  voiceUpdatesToggle.checked = settings.voice;
+  voiceUpdatesToggle.disabled = !settings.proactiveUpdates;
+  presenceSettingsStatus.textContent = "Voice backend: Android speech-engine fallback. Offline availability depends on the installed voice; ULTRON's dedicated local neural model is not installed yet.";
   localModelEndpointEl.value = settings.localModelEndpoint;
   localModelEl.value = settings.localModel;
   setNote("Optional backend for hosted agents and remote connectors. Native GGUF inference runs directly on this Android device.");
@@ -3463,6 +3469,23 @@ req<HTMLButtonElement>("#identity-save").addEventListener("click", () => {
   window.setTimeout(() => { button.textContent = "Save identity details"; }, 1400);
 });
 
+proactiveUpdatesToggle.addEventListener("change", () => {
+  void enableProactiveUpdates().then(() => {
+    proactiveUpdatesToggle.checked = settings.proactiveUpdates === true;
+    voiceUpdatesToggle.disabled = !settings.proactiveUpdates;
+    if (!settings.proactiveUpdates) { settings.voice = false; voiceUpdatesToggle.checked = false; saveSettings(); }
+  }).catch(error => { proactiveUpdatesToggle.checked = settings.proactiveUpdates === true; voiceStatus(error instanceof Error ? error.message : "Could not change proactive updates.", true); });
+});
+voiceUpdatesToggle.addEventListener("change", () => {
+  settings.voice = voiceUpdatesToggle.checked;
+  saveSettings();
+  if (settings.voice && Capacitor.getPlatform() === "android" && baseUrl()) {
+    void NativeCompanion.startTaskMonitor({endpoint: baseUrl(), speakUpdates: true}).catch(error => console.warn("Could not enable background spoken updates", error));
+  } else if (!settings.voice && Capacitor.getPlatform() === "android" && baseUrl() && settings.proactiveUpdates) {
+    void NativeCompanion.startTaskMonitor({endpoint: baseUrl(), speakUpdates: false}).catch(() => undefined);
+  }
+  voiceStatus(settings.voice ? "Spoken telemetry enabled. Only important proactive events will be spoken." : "Spoken telemetry paused.");
+});
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#vault-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#mindmap-refresh").addEventListener("click", rebuildMindMap);

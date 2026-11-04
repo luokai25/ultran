@@ -1,5 +1,6 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { fetchAllPages } from './cloud-pagination';
 
 export type CloudAttachment = {
   id: string;
@@ -171,13 +172,34 @@ export async function pullCloudWorkspace(): Promise<CloudConversation[]> {
   if (!rows?.length) return [];
 
   const conversationIds = rows.map((row) => row.id);
-  const { data: messageRows, error: messageError } = await cloudClient
-    .from('ultron_messages')
-    .select('id,conversation_id,role,content,parts,metadata,created_at,sequence_no')
-    .in('conversation_id', conversationIds)
-    .order('sequence_no', { ascending: true })
-    .limit(5000);
-  if (messageError) throw messageError;
+  type CloudMessageRow = {
+    id: string;
+    conversation_id: string;
+    role: string;
+    content: string;
+    parts: unknown;
+    metadata: unknown;
+    created_at: string;
+    sequence_no: number;
+  };
+  const messageRows: CloudMessageRow[] = [];
+  // Keep each IN clause small and page below PostgREST's default row cap.
+  for (let index = 0; index < conversationIds.length; index += 100) {
+    const conversationBatch = conversationIds.slice(index, index + 100);
+    const batchRows = await fetchAllPages(async (from, to) => {
+      const { data, error } = await cloudClient
+        .from('ultron_messages')
+        .select('id,conversation_id,role,content,parts,metadata,created_at,sequence_no')
+        .in('conversation_id', conversationBatch)
+        .order('conversation_id', { ascending: true })
+        .order('sequence_no', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }, 500);
+    messageRows.push(...batchRows);
+  }
 
   const grouped = new Map<string, CloudMessage[]>();
   for (const row of messageRows ?? []) {
@@ -472,13 +494,17 @@ export async function pullCloudMemories(): Promise<Array<{
 }>> {
   const session = await getCloudSession();
   if (!session) return [];
-  const { data, error } = await cloudClient
-    .from('ultron_memory_items')
-    .select('id,memory_type,content,summary,confidence,source,metadata,updated_at')
-    .is('archived_at', null)
-    .order('updated_at', { ascending: false })
-    .limit(2000);
-  if (error) throw error;
+  const data = await fetchAllPages(async (from, to) => {
+    const { data: page, error } = await cloudClient
+      .from('ultron_memory_items')
+      .select('id,memory_type,content,summary,confidence,source,metadata,updated_at')
+      .is('archived_at', null)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  }, 500);
 
   const idMap = readIdMap();
   const memories = (data ?? []).map((row) => {

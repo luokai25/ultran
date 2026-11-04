@@ -55,3 +55,39 @@ The phone's Realtime subscription includes agent runs, generated tool versions, 
 ### Generated-tool language support
 
 Generated tool drafts currently accept **Python only**, matching the existing `review_generated_source` AST policy and the isolated-worker contract (`def run(payload)`). TypeScript and JavaScript are rejected until their own static policies and worker isolation adapters exist. Do not widen the database constraint merely to accept source that the runtime cannot safely review or execute. Capability events are required writes: a capability mutation is reported successful only after its audit event is stored.
+
+
+## Supabase-first tool and skill architecture (2026-11-04)
+
+ULTRON uses a shared two-runtime model. Supabase is the default for capabilities that benefit from persistent state, cross-model access, internet connectivity, or server-side execution. Android remains the default for capabilities that require the phone, local files, local inference, or offline operation.
+
+### Placement catalogue
+
+| Capability family | Default location | Reason / implementation |
+| --- | --- | --- |
+| Long-term memory, semantic search, memory relations and knowledge graph | Supabase | Shared across every model and device; Postgres + pgvector + Realtime |
+| Conversations, task ledger, agent checkpoints, run history and settings | Supabase | Durable state, resumable work and cross-session continuity |
+| Skills and learned procedures | Supabase | Versioned shared library; phone caches and injects relevant skills into local and remote model context |
+| Reusable ULTRON-authored workflow tools | Supabase Edge Function | Versioned declarative workflows run through `ultron-runtime`; execution records go to `ultron_tool_runs` |
+| Public internet APIs and web retrieval | Supabase Edge Function | Cloud connectivity works even when the phone model is local; use `http.request` workflow steps |
+| Owner-scoped database operations | Supabase | Postgres is the authoritative persistent data layer |
+| OAuth connectors and third-party integrations | Supabase / connector gateway | Provider credentials and sessions belong in the server-side connector layer; tool definitions stay shared |
+| Document indexing, embeddings and search | Supabase | Store document metadata/chunks and vector indexes centrally; upload content only when intended |
+| Background orchestration and resumable plans | Supabase | Durable task/run state; use queues or a worker for work beyond Edge Function limits |
+| File creation, archive operations and project coding | Android by default; cloud worker when available | Native file access and Termux-compatible tools are local; heavy server-side conversion needs a dedicated worker |
+| Local GGUF model download, loading and inference | Android | Hardware-aware, offline-capable and no cloud GPU dependency |
+| Voice, microphone, notifications, app launch, phone actions and device controls | Android | Requires native Android APIs and device permissions |
+| Local project checkout, shell commands, Git and build tools | Android | Operates on the phone's approved workspace; cloud repository operations can later use a connector |
+| Model-independent identity, reasoning policy and tool contracts | Shared code + Supabase configuration | Same contracts across local and remote models |
+
+### Cloud workflow runtime
+
+`ultron-runtime` is a JWT-verified Supabase Edge Function. It stores and runs versioned ULTRON-authored workflow tools. A tool is a JSON workflow, not a Python process. Supported operations are `http.request`, `database.select`, `database.insert`, `database.update`, `memory.search`, `memory.save`, `text.template` and `json.pick`. Workflow tools can be created, versioned, listed, executed and archived by ULTRON. Public HTTP calls are supported; authenticated provider APIs should use the connector gateway rather than embedding credentials in workflow definitions.
+
+The `ultron_skills` table stores versioned agent-created and evidence-distilled skills. The phone loads relevant cloud skills before inference, records usage, and syncs verified local distillations back to Supabase. The `ultron_tool_specs` table stores versioned active workflows. Both tables have owner-scoped RLS and Realtime. Execution history is stored in `ultron_tool_runs` and shown in the capability console.
+
+The previous `ultron_generated_tools` Python-source draft lifecycle remains for compatibility and inspection. It is not the default creation path and does not execute Python. New operational tools should use `ultron_tool_specs` and the Supabase-native workflow runtime.
+
+### Autonomy model
+
+ULTRON may create, revise (by publishing a new version), run and archive ordinary workflow tools and skills without a separate approval step. The capability console displays these tools, their workflow source, version hash, run counts, last-run status, execution input/output, failures and shared skills. Phone-only operations continue to execute on Android; Supabase-native workflows execute in the cloud. External communications, payments and destructive data operations retain their existing explicit confirmation behavior.

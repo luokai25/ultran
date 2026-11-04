@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Row = Record<string, unknown>;
 type CapabilityData = { ok?: boolean; runs?: Row[]; tools?: Row[]; proposals?: Row[]; events?: Row[]; counts?: Record<string, number>; instance?: string };
+type RuntimeInvoke = (action: string, payload?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 type Invoke = (action: string, payload?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 const asRows = (value: unknown): Row[] => Array.isArray(value) ? value.filter((item): item is Row => Boolean(item) && typeof item === "object") : [];
@@ -20,7 +21,7 @@ function card(title: string, meta: string, description: string): HTMLElement {
   node.append(top, el("p", "capability-card-description", description)); return node;
 }
 
-export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): void {
+export function initCapabilityPanel(invoke: Invoke, runtimeInvoke: RuntimeInvoke, client: SupabaseClient): void {
   const root = document.querySelector<HTMLElement>("#capabilities-screen");
   if (!root) return;
   const connection = root.querySelector<HTMLElement>("#capability-connection")!;
@@ -30,6 +31,9 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
   const proposalsEl = root.querySelector<HTMLElement>("#capability-proposals")!;
   const runsEl = root.querySelector<HTMLElement>("#capability-runs")!;
   const eventsEl = root.querySelector<HTMLElement>("#capability-events")!;
+  const cloudToolsEl = root.querySelector<HTMLElement>("#capability-cloud-tools")!;
+  const toolRunsEl = root.querySelector<HTMLElement>("#capability-tool-runs")!;
+  const cloudSkillsEl = root.querySelector<HTMLElement>("#capability-cloud-skills")!;
   let loading = false;
   let channel: ReturnType<typeof client.channel> | undefined;
 
@@ -38,8 +42,14 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
     loading = true;
     if (!quiet) feedback.textContent = "Refreshing private capability records…";
     try {
-      const data = await invoke("list") as CapabilityData;
+      const [data,cloudToolsResult,toolRunsResult,cloudSkillsResult] = await Promise.all([
+        invoke("list") as Promise<CapabilityData>,
+        runtimeInvoke("list_tools").catch(error=>({runtime_error:String(error)})),
+        runtimeInvoke("list_tool_runs").catch(error=>({runtime_error:String(error)})),
+        runtimeInvoke("list_skills").catch(error=>({runtime_error:String(error)}))
+      ]);
       const tools = asRows(data.tools), proposals = asRows(data.proposals), runs = asRows(data.runs), events = asRows(data.events);
+      const cloudTools=asRows(cloudToolsResult.tools), toolRuns=asRows(toolRunsResult.runs), cloudSkills=asRows(cloudSkillsResult.skills);
       connection.textContent = "Connected · " + String(data.instance ?? "ULTRON owner instance") + " · authenticated owner session";
       stats.replaceChildren();
       for (const [label, value] of [["TOOLS", tools.length], ["PROPOSALS", proposals.length], ["AGENT RUNS", runs.length], ["EVENTS", events.length]] as const) {
@@ -49,6 +59,9 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
       root.querySelector("#capability-proposal-count")!.textContent = String(proposals.length);
       root.querySelector("#capability-run-count")!.textContent = String(runs.length);
       root.querySelector("#capability-event-count")!.textContent = String(events.length);
+      root.querySelector("#capability-cloud-tool-count")!.textContent=String(cloudTools.length);
+      root.querySelector("#capability-tool-run-count")!.textContent=String(toolRuns.length);
+      root.querySelector("#capability-cloud-skill-count")!.textContent=String(cloudSkills.length);
 
       toolsEl.replaceChildren();
       if (!tools.length) toolsEl.append(empty("No generated tools yet. ULTRON can create versioned Python drafts from a conversation."));
@@ -70,6 +83,45 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
         }));
         if (actions.childElementCount) node.append(actions);
         toolsEl.append(node);
+      }
+
+      cloudToolsEl.replaceChildren();
+      if(!cloudTools.length) cloudToolsEl.append(empty("No cloud workflow tools yet. ULTRON can author a workflow and run it immediately."));
+      for(const tool of cloudTools){
+        const node=card(str(tool,"title",str(tool,"tool_key"))+" · v"+str(tool,"version"),str(tool,"lifecycle_state"),str(tool,"description"));
+        node.append(el("small","capability-meta","Runs: "+String(tool.run_count??0)+" · Last: "+date(tool.last_run_at)+" · "+str(tool,"last_run_status","not run")+" · SHA-256 "+str(tool,"workflow_sha256").slice(0,16)));
+        const detail=el("details","capability-source");detail.append(el("summary","","Inspect workflow definition"));detail.append(el("pre","capability-workflow",JSON.stringify(tool.workflow??[],null,2)));node.append(detail);
+        const actions=el("div","capability-actions");
+        if(tool.lifecycle_state==="active")actions.append(button("Run tool","capability-action capability-tool-run",async()=>{
+          const raw=window.prompt("Input JSON for "+str(tool,"tool_key")+" (use {} if no input is required):","{}");if(raw===null)return;
+          let input:Record<string,unknown>;try{const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("Input must be a JSON object.");input=parsed;}catch(error){feedback.textContent="Invalid tool input: "+String(error);return;}
+          feedback.textContent="Running "+str(tool,"tool_key")+" in Supabase…";
+          try{const result=await runtimeInvoke("run_tool",{tool_key:tool.tool_key,input});feedback.textContent="Tool result: "+JSON.stringify(result).slice(0,1800);await refresh(true);}catch(error){feedback.textContent="Tool run failed: "+String(error);}
+        }));
+        if(tool.lifecycle_state!=="archived")actions.append(button("Archive","capability-action capability-danger",async()=>{
+          if(!window.confirm("Archive "+str(tool,"tool_key")+" v"+str(tool,"version")+"?"))return;
+          try{await runtimeInvoke("archive_tool",{id:tool.id});feedback.textContent="Cloud tool archived.";await refresh(true);}catch(error){feedback.textContent="Archive failed: "+String(error);}
+        }));
+        node.append(actions);cloudToolsEl.append(node);
+      }
+      toolRunsEl.replaceChildren();
+      if(!toolRuns.length)toolRunsEl.append(empty("No cloud tool executions yet."));
+      for(const run of toolRuns){
+        const meta=run.metadata&&typeof run.metadata==="object"?run.metadata as Row:{};
+        const node=card(str(run,"tool_key","Tool run"),str(run,"status"),run.error_message?str(run,"error_message"):"Run "+String(run.id??"")+" · "+date(run.finished_at??run.requested_at));
+        node.append(el("small","capability-meta","Requested "+date(run.requested_at)+" · Finished "+date(run.finished_at)+" · Version "+str(meta,"version","unknown")));
+        const detail=el("details","capability-source");detail.append(el("summary","","Inspect execution input and output"));detail.append(el("pre","capability-workflow",JSON.stringify({input:run.input,output:run.output,error:run.error_message,metadata:run.metadata},null,2)));node.append(detail);toolRunsEl.append(node);
+      }
+      cloudSkillsEl.replaceChildren();
+      if(!cloudSkills.length)cloudSkillsEl.append(empty("No shared cloud skills yet. ULTRON can create and improve versioned skills from its work."));
+      for(const skill of cloudSkills){
+        const node=card(str(skill,"title",str(skill,"skill_key"))+" · v"+str(skill,"version"),str(skill,"status"),str(skill,"description"));
+        node.append(el("small","capability-meta","Confidence "+String(skill.confidence??0)+" · Verified runs "+String(skill.verified_runs??0)+" · Uses "+String(skill.usage_count??0)+" · "+date(skill.updated_at)));
+        const detail=el("details","capability-source");detail.append(el("summary","","Inspect skill instructions"));detail.append(el("pre","capability-workflow",JSON.stringify({triggers:skill.triggers,instructions:skill.instructions,evidence:skill.evidence},null,2)));node.append(detail);
+        const actions=el("div","capability-actions");actions.append(button("Archive skill","capability-action capability-danger",async()=>{
+          if(!window.confirm("Archive skill "+str(skill,"skill_key")+" v"+str(skill,"version")+"?"))return;
+          try{await runtimeInvoke("archive_skill",{id:skill.id});feedback.textContent="Cloud skill archived.";await refresh(true);}catch(error){feedback.textContent="Archive failed: "+String(error);}
+        }));node.append(actions);cloudSkillsEl.append(node);
       }
 
       proposalsEl.replaceChildren();
@@ -121,6 +173,9 @@ export function initCapabilityPanel(invoke: Invoke, client: SupabaseClient): voi
       .on("postgres_changes",{event:"*",schema:"public",table:"ultron_capability_proposals"},()=>void refresh(true))
       .on("postgres_changes",{event:"*",schema:"public",table:"ultron_agent_runs"},()=>void refresh(true))
       .on("postgres_changes",{event:"*",schema:"public",table:"ultron_capability_events"},()=>void refresh(true))
+      .on("postgres_changes",{event:"*",schema:"public",table:"ultron_tool_specs"},()=>void refresh(true))
+      .on("postgres_changes",{event:"*",schema:"public",table:"ultron_tool_runs"},()=>void refresh(true))
+      .on("postgres_changes",{event:"*",schema:"public",table:"ultron_skills"},()=>void refresh(true))
       .subscribe();
   }).catch(()=>{});
   window.addEventListener("pagehide",()=>{if(channel)void client.removeChannel(channel);},{once:true});

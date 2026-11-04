@@ -7,8 +7,8 @@ import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
  * Ultron phone client - a conversation console.
  *
  * Local-first: conversations live on the device. Android can run GGUF models
- * through the bundled llama.cpp native runtime; an optional Ollama endpoint or
- * Ultron control plane can be configured for local-network or hosted tools.
+ * through the bundled llama.cpp native runtime; an optional Ultron control
+ * plane can be configured for remote tools and explicitly approved actions.
  * Nothing is sent anywhere until the user explicitly configures a connection.
  */
 
@@ -169,6 +169,8 @@ const newBtn = req<HTMLButtonElement>("#new-btn");
 const navChatButton = req<HTMLButtonElement>("#nav-chat");
 const navConnectorsButton = req<HTMLButtonElement>("#nav-connectors");
 const navSettingsButton = req<HTMLButtonElement>("#nav-settings");
+const navModelsButton = req<HTMLButtonElement>("#nav-models");
+const navVaultButton = req<HTMLButtonElement>("#nav-vault");
 const chatModelButton = req<HTMLButtonElement>("#chat-model-button");
 const activeIdentityButton = req<HTMLButtonElement>("#active-identity-button");
 const globalSearchOpen=req<HTMLButtonElement>("#global-search-open");
@@ -3539,19 +3541,8 @@ function setActiveNavigation(active: HTMLButtonElement): void {
   document.querySelectorAll<HTMLButtonElement>(".nav-item").forEach((button) => {
     const selected = button === active;
     button.classList.toggle("is-active", selected);
-    if (selected) {
-      button.setAttribute("aria-current", "page");
-      button.style.color = "#ff3345";
-      button.style.backgroundColor = "rgba(225,29,46,.12)";
-      button.style.borderColor = "rgba(225,29,46,.22)";
-      button.style.boxShadow = "inset 0 2px 0 rgba(225,29,46,.8)";
-    } else {
-      button.removeAttribute("aria-current");
-      button.style.removeProperty("color");
-      button.style.removeProperty("background-color");
-      button.style.removeProperty("border-color");
-      button.style.removeProperty("box-shadow");
-    }
+    if (selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
 }
 
@@ -3589,21 +3580,30 @@ navChatButton.addEventListener("click", () => {
   hideFeatureScreens();
   setActiveNavigation(navChatButton);
 });
+navModelsButton.addEventListener("click", () => {
+  closeOtherSurfaces();
+  setActiveNavigation(navModelsButton);
+  void openChatModelMenu();
+});
+navVaultButton.addEventListener("click", () => {
+  showFeatureScreen("vault-screen", navVaultButton);
+  rebuildMindMap();
+});
 navConnectorsButton.addEventListener("click", () => {
   hideFeatureScreens();
   closeWorkspace();
   if (!sheetWrap.hidden) closeSheet();
-  setActiveNavigation(navChatButton);
+  setActiveNavigation(navConnectorsButton);
   connectorsButton.click();
 });
 navSettingsButton.addEventListener("click", () => {
   hideFeatureScreens();
   closeWorkspace();
   connectorsBackButton.click();
-  setActiveNavigation(navChatButton);
+  setActiveNavigation(navSettingsButton);
   openSheet();
 });
-connectorsButton.addEventListener("click", () => setActiveNavigation(navChatButton));
+connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
 connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 setActiveNavigation(navChatButton);
 renderIdentitySettings();
@@ -3613,7 +3613,7 @@ req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
 newBtn.addEventListener("click", newConversation);
 req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation);
-req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); openSheet(); });
+req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navSettingsButton); openSheet(); });
 const identityScreenButton = req<HTMLButtonElement>("#drawer-identities");
 const mindMapDrawerButton = req<HTMLButtonElement>("#drawer-mindmap");
 const learningDrawerButton = req<HTMLButtonElement>("#drawer-learning");

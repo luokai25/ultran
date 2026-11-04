@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
-    "lint": "echo lint pending",
+    "lint": "node test/shell-lint.test.mjs",
     "test": "node --test test/*.test.mjs",
     "clean": "rm -rf dist android/app/src/main/assets/public",
     "cap:sync": "cap sync android",

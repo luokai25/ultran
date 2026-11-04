@@ -621,12 +621,18 @@ function mergeRemoteSemanticGraph(value: unknown): void {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;
   const remote = value as Partial<SemanticGraph>;
   if (remote.version !== 1 || !Array.isArray(remote.nodes) || !Array.isArray(remote.edges)) return;
+  const remoteNodes = remote.nodes.filter((node): node is SemanticGraph["nodes"][number] =>
+    Boolean(node) && typeof node === "object" && typeof node.id === "string",
+  );
+  const remoteEdges = remote.edges.filter((edge): edge is SemanticGraph["edges"][number] =>
+    Boolean(edge) && typeof edge === "object" && typeof edge.id === "string",
+  );
   const remoteUpdatedAt = Number(remote.updatedAt) || 0;
   const remoteIsNewer = remoteUpdatedAt > semanticGraph.updatedAt;
   const localNodeIds = new Set(semanticGraph.nodes.map((node) => node.id));
   const localEdgeIds = new Set(semanticGraph.edges.map((edge) => edge.id));
-  const nodes = remote.nodes.filter((node) => remoteIsNewer || !localNodeIds.has(node.id));
-  const edges = remote.edges.filter((edge) => remoteIsNewer || !localEdgeIds.has(edge.id));
+  const nodes = remoteNodes.filter((node) => remoteIsNewer || !localNodeIds.has(node.id));
+  const edges = remoteEdges.filter((edge) => remoteIsNewer || !localEdgeIds.has(edge.id));
   const merged = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges }), "cloud-sync");
   semanticGraph = { ...merged, updatedAt: Math.max(semanticGraph.updatedAt, remoteUpdatedAt) };
   writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);
@@ -641,6 +647,7 @@ async function applyInitialCloudSync(): Promise<void> {
   const remoteSettings = await pullCloudSetting("phone_settings");
   if (remoteSettings && typeof remoteSettings === "object" && !Array.isArray(remoteSettings)) {
     Object.assign(settings, remoteSettings);
+    rememberCloudSetting("phone_settings", remoteSettings);
     endpointEl.value = settings.endpoint;
     localModelEndpointEl.value = settings.localModelEndpoint;
     localModelEl.value = settings.localModel;

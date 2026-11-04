@@ -1,0 +1,45 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const html = readFileSync(resolve(root, "index.html"), "utf8");
+const css = readFileSync(resolve(root, "src/design-system.css"), "utf8");
+const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
+
+function element(id) {
+  const match = html.match(new RegExp(`<[^>]+\\bid="${id}"[^>]*>`));
+  assert.ok(match, `missing shell element #${id}`);
+  return match[0];
+}
+
+// Legacy component styles assign display:flex to these full-screen surfaces.
+// The global hidden rule must win so they cannot silently cover the app.
+assert.match(css, /\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*;/);
+for (const id of ["connectors-panel", "sheet-wrap", "global-search", "chat-model-menu", "workspace-panel"]) {
+  assert.match(element(id), /\shidden(?:\s|>)/, `#${id} must start hidden`);
+}
+
+// Every primary navigation destination must exist and have an explicit action.
+const navigation = {
+  "nav-chat": "navChatButton.addEventListener",
+  "nav-models": "navModelsButton.addEventListener",
+  "nav-vault": "navVaultButton.addEventListener",
+  "nav-connectors": "navConnectorsButton.addEventListener",
+  "nav-settings": "navSettingsButton.addEventListener",
+};
+for (const [id, handler] of Object.entries(navigation)) {
+  element(id);
+  assert.ok(main.includes(handler), `missing click handler for #${id}`);
+}
+
+// A missing required node aborts module evaluation before any interaction works.
+// Keep the required DOM references aligned with the shipped HTML shell.
+const requiredIds = [...main.matchAll(/req<[^>]+>\("#([^"]+)"\)/g)].map((match) => match[1]);
+const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
+for (const id of new Set(requiredIds)) {
+  assert.ok(htmlIds.has(id), `main.ts requires #${id}, but index.html does not provide it`);
+}
+
+console.log(`ULTRON shell checks passed: ${new Set(requiredIds).size} required nodes, 5 navigation handlers, hidden overlays protected.`);

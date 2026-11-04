@@ -587,7 +587,9 @@ const saveStore = (): void => {
     convo.knowledgeState = validateKnowledgeState(convo.knowledgeState ?? emptyKnowledgeState());
   }
   writeJson(STORE_KEY, store);
-  scheduleCloudSync(store.conversations);
+  scheduleCloudSync(store.conversations, (error) => {
+    cloudSyncStatusEl.textContent = "Connected, but synchronization failed: " + (error instanceof Error ? error.message : "unknown error");
+  });
 };
 
 
@@ -608,6 +610,7 @@ async function refreshFromCloud(): Promise<void> {
   try {
     const remote = await pullCloudWorkspace();
     store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
+    await syncCloudWorkspace(store.conversations);
     rememberCloudWorkspace(store.conversations);
     saveStore();
     renderHistory();

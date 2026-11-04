@@ -404,6 +404,7 @@ export function subscribeCloudWorkspace(onChange: () => void): () => void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_conversations', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_messages', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_memory_items', filter: `owner_id=eq.${ownerId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_settings', filter: `owner_id=eq.${ownerId}` }, onChange)
       .subscribe();
     unsubscribeChannel = () => { void cloudClient.removeChannel(channel); };
   }).catch((error) => console.warn('[ULTRON realtime]', error));
@@ -448,7 +449,8 @@ export type CloudMemoryRecord = {
 
 const syncedMemoryFingerprints = new Map<string, string>();
 let memorySyncTimer: number | undefined;
-let settingsSyncTimer: number | undefined;
+const settingsSyncTimers = new Map<string, number>();
+const syncedSettingFingerprints = new Map<string, string>();
 
 function memoryFingerprint(record: CloudMemoryRecord): string {
   return stableFingerprint({
@@ -565,13 +567,21 @@ export async function pullCloudSetting(settingKey: string): Promise<unknown | nu
   return data?.setting_value ?? null;
 }
 
+export function rememberCloudSetting(settingKey: string, settingValue: unknown): void {
+  syncedSettingFingerprints.set(settingKey, stableFingerprint(settingValue));
+}
+
 export function scheduleCloudSetting(
   settingKey: string,
   settingValue: unknown,
   onError?: (error: unknown) => void,
 ): void {
-  if (settingsSyncTimer) window.clearTimeout(settingsSyncTimer);
-  settingsSyncTimer = window.setTimeout(() => {
+  const fingerprint = stableFingerprint(settingValue);
+  if (syncedSettingFingerprints.get(settingKey) === fingerprint) return;
+  const previousTimer = settingsSyncTimers.get(settingKey);
+  if (previousTimer) window.clearTimeout(previousTimer);
+  const timer = window.setTimeout(() => {
+    settingsSyncTimers.delete(settingKey);
     void (async () => {
       const session = await getCloudSession();
       if (!session) return;
@@ -582,11 +592,13 @@ export function scheduleCloudSetting(
         updated_at: new Date().toISOString(),
       }, { onConflict: 'owner_id,setting_key' });
       if (error) throw error;
+      syncedSettingFingerprints.set(settingKey, fingerprint);
     })().catch((error) => {
       console.warn('[ULTRON cloud settings sync]', error);
       onError?.(error);
     });
   }, 900);
+  settingsSyncTimers.set(settingKey, timer);
 }
 
 export async function saveCloudModelProfile(modelId: string, displayName = modelId): Promise<void> {

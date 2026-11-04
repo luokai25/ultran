@@ -290,7 +290,15 @@ export function admitUltronMemoryFact(fact: UltronMemoryFact, existing: readonly
  */
 export function activeUltronMemoryFacts(facts: readonly UltronMemoryFact[], now = Date.now()): UltronMemoryFact[] {
   const eligible = facts.filter((fact) => fact.sensitivity !== "sensitive" && (!fact.expiresAt || fact.expiresAt > now));
-  const superseded = new Set(eligible.map((fact) => fact.supersedes).filter((id): id is string => Boolean(id)));
+  const byId = new Map(eligible.map((fact) => [fact.id, fact]));
+  const superseded = new Set<string>();
+  for (const replacement of eligible) {
+    if (!replacement.supersedes) continue;
+    const prior = byId.get(replacement.supersedes);
+    if (!prior) continue;
+    const sameKey = (prior.key ?? prior.id) === (replacement.key ?? replacement.id);
+    if (sameKey && replacement.observedAt > prior.observedAt) superseded.add(prior.id);
+  }
   return eligible.filter((fact) => !superseded.has(fact.id));
 }
 

@@ -117,7 +117,7 @@ def test_registry_stats_separate_builtin_from_mcp(wired):
     registry, _, _ = wired
     stats = registry.stats()
     assert stats["mcp"] == 1
-    assert stats["builtin"] >= 70
+    assert stats["builtin"] == 1
     assert stats["mcp_tools"] >= 5
     assert stats["total"] == stats["builtin"] + stats["mcp"]
 
@@ -211,7 +211,7 @@ def test_registry_requires_enablement_before_invoking(wired):
 def test_registry_routes_a_builtin_connector_to_the_sandbox(wired):
     """The legacy path must be untouched by the MCP wiring."""
     registry, _, _ = wired
-    registry.enable("ws", "arxiv")
+    registry.enable("ws", "github")
 
     class FakeSandbox:
         def __init__(self):
@@ -222,16 +222,16 @@ def test_registry_routes_a_builtin_connector_to_the_sandbox(wired):
             return "sandbox-result"
 
     sandbox = FakeSandbox()
-    result = registry.invoke("ws", "arxiv", "search", {"q": "x"}, sandbox=sandbox)
+    result = registry.invoke("ws", "github", "list_repos", {}, sandbox=sandbox)
     assert result == "sandbox-result"
-    assert sandbox.calls == [("ws", "arxiv", "search", {"q": "x"})]
+    assert sandbox.calls == [("ws", "github", "list_repos", {})]
 
 
 def test_registry_requires_a_sandbox_for_builtin_connectors(wired):
     registry, _, _ = wired
     registry.enable("ws", "arxiv")
     with pytest.raises(ValidationFailed, match="sandbox"):
-        registry.invoke("ws", "arxiv", "search", {})
+        registry.invoke("ws", "github", "list_repos", {})
 
 
 def test_registry_requires_a_gateway_for_mcp_connectors():

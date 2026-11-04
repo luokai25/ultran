@@ -9,11 +9,15 @@ export const ULTRON_LEARNING_VERSION = "1.0.0" as const;
 
 export type LearningSignal = "user_correction" | "task_failure" | "tool_failure" | "verification_failure" | "user_success" | "repeated_friction";
 export type LearningSeverity = "low" | "medium" | "high" | "critical";
+export type LearningCause = "intent_mismatch" | "reasoning_error" | "tool_execution" | "permission_boundary" | "verification_gap" | "incomplete_result" | "positive_strategy" | "unknown";
 export type ProposalStatus = "observed" | "proposed" | "approved" | "implemented" | "verified" | "rejected";
 export type LearningEvent = {
   id: string;
   at: number;
   signal: LearningSignal;
+  cause: LearningCause;
+  classificationConfidence: number;
+  correlationId?: string;
   category: string;
   summary: string;
   severity: LearningSeverity;
@@ -42,6 +46,18 @@ export type LearningDecision = { accepted: boolean; ledger: LearningLedger; reas
 
 const MAX_EVENTS = 120;
 const MAX_PROPOSALS = 60;
+const LEARNING_CAUSES: LearningCause[] = ["intent_mismatch", "reasoning_error", "tool_execution", "permission_boundary", "verification_gap", "incomplete_result", "positive_strategy", "unknown"];
+
+/** Classify only what the event source actually establishes; weak feedback stays unknown. */
+export function classifyLearningCause(signal: LearningSignal, source: LearningEvent["source"], explicitCause?: LearningCause): { cause: LearningCause; confidence: number } {
+  if (explicitCause && LEARNING_CAUSES.includes(explicitCause)) return { cause: explicitCause, confidence: explicitCause === "unknown" ? 0.25 : 0.9 };
+  if (signal === "tool_failure" && source === "tool_result") return { cause: "tool_execution", confidence: 0.98 };
+  if (signal === "verification_failure") return { cause: "verification_gap", confidence: 0.95 };
+  if (signal === "user_success") return { cause: "positive_strategy", confidence: 0.95 };
+  if (signal === "task_failure") return { cause: "incomplete_result", confidence: 0.65 };
+  if (signal === "user_correction" || signal === "repeated_friction") return { cause: "unknown", confidence: 0.25 };
+  return { cause: "unknown", confidence: 0.2 };
+}
 const clean = (value: string, max: number): string => value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const validId = (value: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,95}$/.test(value);
@@ -67,7 +83,10 @@ export function validateLearningLedger(value: unknown): LearningLedger {
     const event = raw as Partial<LearningEvent>;
     if (!validId(event.id ?? "") || seenEventIds.has(event.id ?? "") || !Number.isFinite(event.at) || (event.at as number) <= 0 || typeof event.summary !== "string" || typeof event.category !== "string" || !signals.includes(event.signal as LearningSignal) || !severities.includes(event.severity as LearningSeverity) || !sources.includes(event.source as LearningEvent["source"]) || !Array.isArray(event.evidenceIds)) return [];
     seenEventIds.add(event.id!);
-    return [{ id: event.id!, at: event.at!, signal: event.signal!, category: clean(event.category, 48).toLowerCase(), summary: clean(event.summary, 240), severity: event.severity!, source: event.source!, evidenceIds: event.evidenceIds.filter((id): id is string => typeof id === "string" && validId(id)).slice(0, 8) }];
+    const inferred = classifyLearningCause(event.signal!, event.source!, LEARNING_CAUSES.includes(event.cause as LearningCause) ? event.cause as LearningCause : undefined);
+    const confidence = typeof event.classificationConfidence === "number" && Number.isFinite(event.classificationConfidence) ? clamp(event.classificationConfidence, 0, 1) : inferred.confidence;
+    const correlationId = typeof event.correlationId === "string" && validId(event.correlationId) ? event.correlationId : undefined;
+    return [{ id: event.id!, at: event.at!, signal: event.signal!, cause: inferred.cause, classificationConfidence: confidence, ...(correlationId ? { correlationId } : {}), category: clean(event.category, 48).toLowerCase(), summary: clean(event.summary, 240), severity: event.severity!, source: event.source!, evidenceIds: event.evidenceIds.filter((id): id is string => typeof id === "string" && validId(id)).slice(0, 8) }];
   }).slice(-MAX_EVENTS);
   const eventIds = new Set(events.map((event) => event.id));
   const seenProposalIds = new Set<string>();
@@ -84,14 +103,18 @@ export function validateLearningLedger(value: unknown): LearningLedger {
 }
 
 /** Records concise outcome metadata, rejecting raw prompt-sized or malformed events. */
-export function recordLearningEvent(ledger: LearningLedger, input: Omit<LearningEvent, "at" | "summary" | "category"> & { at?: number; summary: string; category: string }): LearningDecision {
+export function recordLearningEvent(ledger: LearningLedger, input: Omit<LearningEvent, "at" | "summary" | "category" | "cause" | "classificationConfidence"> & { at?: number; summary: string; category: string; cause?: LearningCause; classificationConfidence?: number }): LearningDecision {
   const reject = (reason: string): LearningDecision => ({ accepted: false, ledger, reason });
   if (!validId(input.id) || ledger.events.some((event) => event.id === input.id)) return reject("Event ID is invalid or already exists.");
   if (!( ["user_correction", "task_failure", "tool_failure", "verification_failure", "user_success", "repeated_friction"] as string[]).includes(input.signal) || !( ["low", "medium", "high", "critical"] as string[]).includes(input.severity) || !( ["user_feedback", "runtime", "test", "tool_result"] as string[]).includes(input.source)) return reject("Learning event classification is invalid.");
   if (!Number.isFinite(input.at ?? Date.now()) || (input.at ?? Date.now()) <= 0 || (input.at ?? Date.now()) > Date.now() + 60_000) return reject("Event timestamp is invalid.");
   if (!input.summary.trim() || input.summary.length > 500 || !input.category.trim() || input.category.length > 64) return reject("Learning events require a short category and summary; raw conversation content is not accepted.");
   if (!Array.isArray(input.evidenceIds) || input.evidenceIds.length > 8 || input.evidenceIds.some((id) => !validId(id))) return reject("Evidence references are malformed or exceed the limit.");
-  const event: LearningEvent = { ...input, at: input.at ?? Date.now(), summary: clean(input.summary, 240), category: clean(input.category, 48).toLowerCase(), evidenceIds: [...new Set(input.evidenceIds)] };
+  if (input.cause !== undefined && !LEARNING_CAUSES.includes(input.cause)) return reject("Learning cause classification is invalid.");
+  if (input.classificationConfidence !== undefined && (!Number.isFinite(input.classificationConfidence) || input.classificationConfidence < 0 || input.classificationConfidence > 1)) return reject("Classification confidence must be between 0 and 1.");
+  if (input.correlationId !== undefined && !validId(input.correlationId)) return reject("Correlation ID is malformed.");
+  const inferred = classifyLearningCause(input.signal, input.source, input.cause);
+  const event: LearningEvent = { ...input, cause: inferred.cause, classificationConfidence: input.classificationConfidence ?? inferred.confidence, at: input.at ?? Date.now(), summary: clean(input.summary, 240), category: clean(input.category, 48).toLowerCase(), evidenceIds: [...new Set(input.evidenceIds)] };
   const events = [...ledger.events, event].slice(-MAX_EVENTS);
   const next = { ...ledger, events, updatedAt: Date.now() };
   return { accepted: true, ledger: next, reason: "Outcome metadata recorded without storing the original prompt or private payload." };

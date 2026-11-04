@@ -22,6 +22,7 @@ import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, 
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { createUltronCheckpoint, validateUltronCheckpoint, buildUltronCheckpointPrompt, type Checkpoint } from "./ultron-state";
+import { emptyKnowledgeState, validateKnowledgeState, buildKnowledgePrompt, type KnowledgeState } from "./ultron-knowledge-state";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
 import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, selectIndependentLearningEvidence, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
@@ -46,6 +47,7 @@ type Conversation = {
   messages: Message[];
   executionLedger?: UltronTaskLedger;
   cognitiveCheckpoint?: Checkpoint;
+  knowledgeState?: KnowledgeState;
 };
 type ThemeId = "ultron";
 type Settings = { endpoint: string; localModelEndpoint: string; localModel: string; voice: boolean; proactiveUpdates?: boolean; theme: ThemeId };
@@ -227,7 +229,7 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const learningContext = buildLearningContext(learningLedger);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -301,6 +303,7 @@ const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;
+  convo.knowledgeState = validateKnowledgeState(convo.knowledgeState ?? emptyKnowledgeState());
   if (!convo.cognitiveCheckpoint && convo.executionLedger) convo.cognitiveCheckpoint = createUltronCheckpoint(convo.id, convo.executionLedger);
 }
 if (!(settings.theme in THEMES)) settings.theme = "ultron";
@@ -538,6 +541,7 @@ async function deleteNativeModel(): Promise<void> {
 const saveStore = (): void => {
   for (const convo of store.conversations) {
     if (convo.executionLedger) convo.cognitiveCheckpoint = createUltronCheckpoint(convo.id, convo.executionLedger);
+    convo.knowledgeState = validateKnowledgeState(convo.knowledgeState ?? emptyKnowledgeState());
   }
   writeJson(STORE_KEY, store);
 };

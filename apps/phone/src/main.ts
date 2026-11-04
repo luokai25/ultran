@@ -3670,7 +3670,6 @@ navSettingsButton.addEventListener("click", () => {
 connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
 connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 setActiveNavigation(navChatButton);
-renderIdentitySettings();
 globalSearchOpen.addEventListener("click",()=>{closeDrawer();openGlobalSearch();});req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!globalSearch.hidden)closeGlobalSearch();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
@@ -3701,6 +3700,7 @@ function renderIdentitySettings(): void {
   const brain = nativeLoadedModelName || settings.localModel || "No local model selected";
   req<HTMLElement>("#identity-brain-status").textContent = `Reasoning brain: ${brain}. ULTRON directs this model and validates its output.`;
 }
+renderIdentitySettings();
 function renderLearningReview(filter: "all" | "review" | "history" = "all"): void {
   const stats = req<HTMLElement>("#learning-stats");
   const proposalList = req<HTMLElement>("#learning-proposals");

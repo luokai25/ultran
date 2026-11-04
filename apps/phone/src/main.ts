@@ -50,6 +50,7 @@ import {
   rememberCloudMemories,
   pullCloudSetting,
   scheduleCloudSetting,
+  rememberCloudSetting,
   saveCloudModelProfile,
   registerCloudDevice,
 } from "./cloud-sync";
@@ -616,6 +617,25 @@ const saveStore = (): void => {
 };
 
 
+function mergeRemoteSemanticGraph(value: unknown): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const remote = value as Partial<SemanticGraph>;
+  if (remote.version !== 1 || !Array.isArray(remote.nodes) || !Array.isArray(remote.edges)) return;
+  const remoteUpdatedAt = Number(remote.updatedAt) || 0;
+  const remoteIsNewer = remoteUpdatedAt > semanticGraph.updatedAt;
+  const localNodeIds = new Set(semanticGraph.nodes.map((node) => node.id));
+  const localEdgeIds = new Set(semanticGraph.edges.map((edge) => edge.id));
+  const nodes = remote.nodes.filter((node) => remoteIsNewer || !localNodeIds.has(node.id));
+  const edges = remote.edges.filter((edge) => remoteIsNewer || !localEdgeIds.has(edge.id));
+  const merged = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges }), "cloud-sync");
+  semanticGraph = { ...merged, updatedAt: Math.max(semanticGraph.updatedAt, remoteUpdatedAt) };
+  writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);
+  rememberCloudSetting("semantic_graph", value);
+  scheduleCloudSetting("semantic_graph", semanticGraph, (error) => {
+    cloudSyncStatusEl.textContent = "Knowledge graph saved locally; cloud sync failed: " + (error instanceof Error ? error.message : "unknown error");
+  });
+}
+
 async function applyInitialCloudSync(): Promise<void> {
   saveStore();
   const remoteSettings = await pullCloudSetting("phone_settings");
@@ -626,6 +646,7 @@ async function applyInitialCloudSync(): Promise<void> {
     localModelEl.value = settings.localModel;
   }
 
+  mergeRemoteSemanticGraph(await pullCloudSetting("semantic_graph"));
   const remote = await pullCloudWorkspace();
   store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
   if (!store.activeId && store.conversations.length) store.activeId = store.conversations[0]!.id;
@@ -652,6 +673,7 @@ async function refreshFromCloud(): Promise<void> {
   if (cloudRefreshInFlight) return;
   cloudRefreshInFlight = true;
   try {
+    mergeRemoteSemanticGraph(await pullCloudSetting("semantic_graph"));
     const remote = await pullCloudWorkspace();
     store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
     await syncCloudWorkspace(store.conversations);
@@ -3388,7 +3410,7 @@ async function organiseSemanticMemory(convo:Conversation):Promise<void>{
    {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph proposal."}
   ],maxTokens:420});
   const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
-  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);scheduleCloudMemorySync(vectorMemory.records,error=>{cloudSyncStatusEl.textContent="Memory saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});}
+  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);scheduleCloudSetting("semantic_graph",semanticGraph,error=>{cloudSyncStatusEl.textContent="Knowledge graph saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});scheduleCloudMemorySync(vectorMemory.records,error=>{cloudSyncStatusEl.textContent="Memory saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});}
  }catch{/* memory enrichment never blocks chat */}
 }
 function rebuildMindMap():void{mindMap=buildMindMap(store.conversations,semanticGraph);writeJson(MINDMAP_KEY,mindMap);renderMindMap(req<SVGSVGElement>("#mindmap-canvas"),mindMap,showMindNode,req<HTMLInputElement>("#mindmap-search").value);req<HTMLElement>("#mindmap-empty").hidden=store.conversations.length>0;req<HTMLElement>("#mindmap-stats").textContent=`${store.conversations.length} sessions · ${store.conversations.reduce((n,c)=>n+c.messages.length,0)} messages · ${mindMap.nodes.length-1} knowledge nodes · ${mindMap.edges?.length??0} relationships`;req<HTMLElement>("#mindmap-organizer").textContent=`Local index · ${nativeLoadedModelName||"automatic organiser"} · ${new Date(mindMap.updatedAt).toLocaleTimeString()}`;}

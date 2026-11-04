@@ -363,7 +363,7 @@ async function loadNativeModel(): Promise<void> {
   try {
     const result = await NativeLocalAI.loadModel({ name, projectorName: selectedNativeProjectorName || undefined });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · vision projector " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · projector initialized (image inference integration pending): " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {

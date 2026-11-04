@@ -75,6 +75,47 @@ test('a successful read-only tool cannot verify an external side effect', () => 
   assert.equal(result.cause, 'unknown');
 });
 
+
+test('an external action remains incomplete while its tracked verification step is pending', () => {
+  const actionPlan = [
+    { id:'step-understand', objective:'Understand request', kind:'understand' },
+    { id:'step-act', objective:'Perform action', kind:'act' },
+    { id:'step-verify', objective:'Verify action result', kind:'verify' },
+    { id:'step-deliver', objective:'Deliver result', kind:'deliver' },
+  ];
+  const result = evaluateUltronOutcome({
+    ...base,
+    plan: actionPlan,
+    tools: [{ id:'tool-123', ok:true, sideEffectVerified:true }],
+    steps: [
+      { id:'step-understand', status:'completed', evidenceId:'evidence-understand' },
+      { id:'step-act', status:'completed', evidenceId:'evidence-act' },
+      { id:'step-verify', status:'pending' },
+      { id:'step-deliver', status:'pending' },
+    ],
+  });
+  assert.equal(result.status, 'partial');
+  assert.equal(result.cause, 'incomplete_result');
+});
+
+test('a fully evidenced task ledger can establish a verified outcome', () => {
+  const simplePlan = [
+    { id:'step-understand', objective:'Understand request', kind:'understand' },
+    { id:'step-answer', objective:'Answer request', kind:'deliver' },
+  ];
+  const result = evaluateUltronOutcome({
+    ...base,
+    profile: { intent:'question', requiresVerification:false },
+    plan: simplePlan,
+    steps: [
+      { id:'step-understand', status:'completed', evidenceId:'evidence-understand' },
+      { id:'step-answer', status:'completed', evidenceId:'evidence-answer' },
+    ],
+  });
+  assert.equal(result.status, 'verified_success');
+  assert.equal(result.cause, 'positive_strategy');
+});
+
 test('a successful tool alone never proves a non-action task was completed', () => {
   const result = evaluateUltronOutcome({
     ...base,

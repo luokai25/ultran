@@ -150,3 +150,46 @@ test('assistant response feedback is stored once and helpful signals do not crea
   assert.match(main, /if \(message\.learningFeedback\) return/);
   assert.match(main, /"user_success".*"assistant-response-feedback".*false/);
 });
+
+
+test('learning cause classification separates observed failures from uncertain user feedback', () => {
+  const correction = learning.classifyLearningCause('user_correction', 'user_feedback');
+  assert.deepEqual({ ...correction }, { cause:'unknown', confidence:.25 });
+  const negativeRating = learning.classifyLearningCause('user_correction', 'user_feedback');
+  assert.equal(negativeRating.cause, 'unknown');
+  assert.equal(learning.classifyLearningCause('tool_failure', 'tool_result').cause, 'tool_execution');
+  assert.equal(learning.classifyLearningCause('verification_failure', 'runtime').cause, 'verification_gap');
+  assert.equal(learning.classifyLearningCause('user_success', 'user_feedback').cause, 'positive_strategy');
+  assert.notEqual(correction.cause, 'reasoning_error');
+});
+
+test('learning events persist bounded cause confidence and optional correlation without retaining conversation content', () => {
+  let ledger = learning.createLearningLedger();
+  const saved = learning.recordLearningEvent(ledger, {
+    id:'event-cause-01', signal:'user_correction', category:'response',
+    summary:'User corrected the response objective.', severity:'medium',
+    source:'user_feedback', evidenceIds:[], correlationId:'conversation-01',
+    cause:'intent_mismatch', classificationConfidence:.78,
+  });
+  assert.equal(saved.accepted, true);
+  ledger = saved.ledger;
+  assert.equal(ledger.events[0].cause, 'intent_mismatch');
+  assert.equal(ledger.events[0].classificationConfidence, .78);
+  assert.equal(ledger.events[0].correlationId, 'conversation-01');
+  assert.equal(learning.recordLearningEvent(ledger, {
+    id:'event-cause-02', signal:'user_correction', category:'response',
+    summary:'Correction.', severity:'low', source:'user_feedback',
+    evidenceIds:[], cause:'invented_cause',
+  }).accepted, false);
+  assert.equal(learning.recordLearningEvent(ledger, {
+    id:'event-cause-03', signal:'user_correction', category:'response',
+    summary:'Correction.', severity:'low', source:'user_feedback',
+    evidenceIds:[], classificationConfidence:1.5,
+  }).accepted, false);
+});
+
+test('learning review shows cause and confidence instead of presenting every negative signal as a diagnosis', () => {
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /cause: \${event\.cause\.replace/);
+  assert.match(main, /classificationConfidence \* 100/);
+});

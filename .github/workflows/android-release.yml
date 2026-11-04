@@ -216,6 +216,7 @@ jobs:
           for ABI in arm64-v8a x86_64; do
             unzip -l "$APK" | grep -q "lib/$ABI/libultran-llama.so"
             unzip -l "$APK" | grep -q "lib/$ABI/libllama.so"
+            unzip -l "$APK" | grep -q "lib/$ABI/libmtmd.so"
           done
 
           SIZE=$(stat -c%s "$APK")

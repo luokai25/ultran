@@ -61,19 +61,23 @@ export function validateLearningLedger(value: unknown): LearningLedger {
   const severities: LearningSeverity[] = ["low", "medium", "high", "critical"];
   const sources: LearningEvent["source"][] = ["user_feedback", "runtime", "test", "tool_result"];
   const statuses: ProposalStatus[] = ["observed", "proposed", "approved", "implemented", "verified", "rejected"];
+  const seenEventIds = new Set<string>();
   const events = candidate.events.flatMap((raw): LearningEvent[] => {
     if (!raw || typeof raw !== "object") return [];
     const event = raw as Partial<LearningEvent>;
-    if (!validId(event.id ?? "") || !Number.isFinite(event.at) || (event.at as number) <= 0 || typeof event.summary !== "string" || typeof event.category !== "string" || !signals.includes(event.signal as LearningSignal) || !severities.includes(event.severity as LearningSeverity) || !sources.includes(event.source as LearningEvent["source"]) || !Array.isArray(event.evidenceIds)) return [];
+    if (!validId(event.id ?? "") || seenEventIds.has(event.id ?? "") || !Number.isFinite(event.at) || (event.at as number) <= 0 || typeof event.summary !== "string" || typeof event.category !== "string" || !signals.includes(event.signal as LearningSignal) || !severities.includes(event.severity as LearningSeverity) || !sources.includes(event.source as LearningEvent["source"]) || !Array.isArray(event.evidenceIds)) return [];
+    seenEventIds.add(event.id!);
     return [{ id: event.id!, at: event.at!, signal: event.signal!, category: clean(event.category, 48).toLowerCase(), summary: clean(event.summary, 240), severity: event.severity!, source: event.source!, evidenceIds: event.evidenceIds.filter((id): id is string => typeof id === "string" && validId(id)).slice(0, 8) }];
   }).slice(-MAX_EVENTS);
   const eventIds = new Set(events.map((event) => event.id));
+  const seenProposalIds = new Set<string>();
   const proposals = candidate.proposals.flatMap((raw): ImprovementProposal[] => {
     if (!raw || typeof raw !== "object") return [];
     const proposal = raw as Partial<ImprovementProposal>;
-    if (!validId(proposal.id ?? "") || typeof proposal.fingerprint !== "string" || typeof proposal.title !== "string" || typeof proposal.hypothesis !== "string" || !statuses.includes(proposal.status as ProposalStatus) || !Array.isArray(proposal.evidenceIds) || !Number.isFinite(proposal.createdAt) || !Number.isFinite(proposal.updatedAt) || ![proposal.impact, proposal.recurrence, proposal.confidence, proposal.risk, proposal.priority].every((score) => typeof score === "number" && Number.isFinite(score))) return [];
+    if (!validId(proposal.id ?? "") || seenProposalIds.has(proposal.id ?? "") || typeof proposal.fingerprint !== "string" || typeof proposal.title !== "string" || typeof proposal.hypothesis !== "string" || !statuses.includes(proposal.status as ProposalStatus) || !Array.isArray(proposal.evidenceIds) || !Number.isFinite(proposal.createdAt) || !Number.isFinite(proposal.updatedAt) || ![proposal.impact, proposal.recurrence, proposal.confidence, proposal.risk, proposal.priority].every((score) => typeof score === "number" && Number.isFinite(score))) return [];
     const evidenceIds = proposal.evidenceIds.filter((id): id is string => typeof id === "string" && eventIds.has(id)).slice(0, 8);
     if (!evidenceIds.length) return [];
+    seenProposalIds.add(proposal.id!);
     return [{ id: proposal.id!, fingerprint: clean(proposal.fingerprint, 180), title: clean(proposal.title, 120), hypothesis: clean(proposal.hypothesis, 500), evidenceIds, impact: clamp(proposal.impact!, 0, 1), recurrence: clamp(proposal.recurrence!, 0, 1), confidence: clamp(proposal.confidence!, 0, 1), risk: clamp(proposal.risk!, 0, 1), priority: clamp(proposal.priority!, 0, 1), status: proposal.status!, createdAt: proposal.createdAt!, updatedAt: proposal.updatedAt!, ...(typeof proposal.approvalFingerprint === "string" ? { approvalFingerprint: clean(proposal.approvalFingerprint, 240) } : {}), ...(typeof proposal.verificationEvidence === "string" ? { verificationEvidence: clean(proposal.verificationEvidence, 500) } : {}) }];
   }).slice(-MAX_PROPOSALS);
   return { version: 1, events, proposals, updatedAt: Number.isFinite(candidate.updatedAt) ? Number(candidate.updatedAt) : Date.now() };
@@ -83,6 +87,7 @@ export function validateLearningLedger(value: unknown): LearningLedger {
 export function recordLearningEvent(ledger: LearningLedger, input: Omit<LearningEvent, "at" | "summary" | "category"> & { at?: number; summary: string; category: string }): LearningDecision {
   const reject = (reason: string): LearningDecision => ({ accepted: false, ledger, reason });
   if (!validId(input.id) || ledger.events.some((event) => event.id === input.id)) return reject("Event ID is invalid or already exists.");
+  if (!( ["user_correction", "task_failure", "tool_failure", "verification_failure", "user_success", "repeated_friction"] as string[]).includes(input.signal) || !( ["low", "medium", "high", "critical"] as string[]).includes(input.severity) || !( ["user_feedback", "runtime", "test", "tool_result"] as string[]).includes(input.source)) return reject("Learning event classification is invalid.");
   if (!Number.isFinite(input.at ?? Date.now()) || (input.at ?? Date.now()) <= 0 || (input.at ?? Date.now()) > Date.now() + 60_000) return reject("Event timestamp is invalid.");
   if (!input.summary.trim() || input.summary.length > 500 || !input.category.trim() || input.category.length > 64) return reject("Learning events require a short category and summary; raw conversation content is not accepted.");
   if (!Array.isArray(input.evidenceIds) || input.evidenceIds.length > 8 || input.evidenceIds.some((id) => !validId(id))) return reject("Evidence references are malformed or exceed the limit.");

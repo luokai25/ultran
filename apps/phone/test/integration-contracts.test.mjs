@@ -321,6 +321,13 @@ test("public skill catalog is searched on demand and loaded procedures cannot by
 });
 
 
+test("curated phone models declare the input modes supported by the native runtime", () => {
+  assert.match(modelLibrary, /nativeInput: "text"/);
+  assert.equal((modelLibrary.match(/nativeInput: "text"/g) ?? []).length, 6);
+  assert.match(main, /Native input: \$\{model\.nativeInput\} only/);
+  assert.match(main, /on-device GGUF model is text-only in this build/);
+});
+
 test("skills engine exposes bounded read-only search and resource reads for references", () => {
   assert.match(skillsEngine, /export async function searchSkillCatalog/);
   assert.match(skillsEngine, /export async function loadSkillResource/);

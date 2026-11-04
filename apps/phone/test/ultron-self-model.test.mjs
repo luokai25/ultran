@@ -32,7 +32,7 @@ test('identity audit detects unsupported claims of sentience and external succes
 });
 
 test('identity audit accepts a side-effect claim only when a successful tool result exists', () => {
-  const issues = selfModel.auditUltronIdentityOutput('Send the email', 'I successfully sent the email.', { successfulToolCalls: 1 });
+  const issues = selfModel.auditUltronIdentityOutput('Send the email', 'I successfully sent the email.', { successfulActions: ['email.send'] });
   assert.equal(issues.length, 0);
 });
 
@@ -52,4 +52,10 @@ test('capability evidence is visible in the self-model prompt with its restricti
   assert.match(prompt, /file export: verified available/);
   assert.match(prompt, /SMS sending: permission_required/);
   assert.match(prompt, /No automatic send/);
+});
+
+
+test('an unrelated successful tool cannot validate a different claimed side effect', () => {
+  const issues = selfModel.auditUltronIdentityOutput('Search the web', 'I successfully sent the email.', { successfulActions: ['web.search'] });
+  assert.ok(issues.some(issue => issue.code === 'unsupported-action-claim'));
 });

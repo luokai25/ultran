@@ -109,3 +109,34 @@ test('phone runtime persists learning state and records correction, validation a
   assert.match(main, /tool_failure/);
   assert.match(main, /buildLearningContext\(learningLedger\)/);
 });
+
+
+test('a verified improvement can be proposed again when the same failure recurs', () => {
+  let ledger = learning.createLearningLedger();
+  ledger = learning.recordLearningEvent(ledger, { id:'event-501', signal:'task_failure', category:'runtime', summary:'The same runtime failure happened.', severity:'high', source:'runtime', evidenceIds:[] }).ledger;
+  let proposal = learning.proposeLearningImprovement(ledger, { id:'proposal-501', title:'Improve runtime recovery', hypothesis:'Add a regression test and bounded recovery path for this repeated runtime failure.', category:'runtime', evidenceIds:['event-501'], impact:.8, confidence:.9, risk:.2 });
+  ledger = proposal.ledger;
+  const token = `ultron-learning:${proposal.proposal.id}:${proposal.proposal.fingerprint}`;
+  ledger = learning.approveLearningProposal(ledger, proposal.proposal.id, token, token).ledger;
+  ledger = learning.transitionLearningProposal(ledger, proposal.proposal.id, 'implemented', { approvalFingerprint:token }).ledger;
+  ledger = learning.transitionLearningProposal(ledger, proposal.proposal.id, 'verified', { evidence:'Regression test passed.' }).ledger;
+  ledger = learning.recordLearningEvent(ledger, { id:'event-502', signal:'task_failure', category:'runtime', summary:'The same runtime failure returned.', severity:'high', source:'runtime', evidenceIds:[] }).ledger;
+  proposal = learning.proposeLearningImprovement(ledger, { id:'proposal-502', title:'Improve runtime recovery', hypothesis:'Add a regression test and bounded recovery path for this repeated runtime failure.', category:'runtime', evidenceIds:['event-502'], impact:.8, confidence:.9, risk:.2 });
+  assert.equal(proposal.accepted, true);
+  assert.equal(proposal.ledger.proposals.length, 2);
+  assert.equal(proposal.proposal.status, 'proposed');
+});
+
+test('learning review screen is reachable and exposes explicit human approval and evidence controls', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const main = fs.readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../src/learning.css', import.meta.url), 'utf8');
+  for (const id of ['learning-screen','learning-stats','learning-proposals','learning-events','learning-refresh','learning-back','drawer-learning']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(main, /approveLearningProposal\(learningLedger/);
+  assert.match(main, /Record external implementation/);
+  assert.match(main, /Verify with evidence/);
+  assert.match(main, /window\.prompt\("Enter concrete test or runtime evidence/);
+  assert.match(main, /window\.confirm\("Only continue if you have implemented this change outside ULTRON/);
+  assert.match(css, /learning-proposal/);
+  assert.match(css, /@media\(max-width:420px\)/);
+});

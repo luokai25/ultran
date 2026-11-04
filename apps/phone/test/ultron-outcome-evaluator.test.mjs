@@ -1,6 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateUltronOutcome } from '../src/ultron-outcome-evaluator.ts';
+const [{ readFile }, ts, vm] = await Promise.all([
+  import('node:fs/promises'),
+  import('typescript'),
+  import('node:vm'),
+]);
+const source = await readFile(new URL('../src/ultron-outcome-evaluator.ts', import.meta.url), 'utf8');
+const compiled = ts.transpile(source, {
+  module: ts.ModuleKind.CommonJS,
+  target: ts.ScriptTarget.ES2022,
+});
+const outcomeModule = { exports: {} };
+vm.runInNewContext(compiled, {
+  module: outcomeModule,
+  exports: outcomeModule.exports,
+});
+const { evaluateUltronOutcome } = outcomeModule.exports;
 
 const plan = [
   { id: 'step-understand', objective: 'Understand request', kind: 'understand', requiresTool: false, approval: false, completionSignal: 'scope known' },

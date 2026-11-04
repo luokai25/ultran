@@ -32,6 +32,19 @@ import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentit
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
 import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, selectIndependentLearningEvidence, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
 import { markDataUrl, markSvg } from "./mark";
+import {
+  cloudClient,
+  getCloudSession,
+  signInToCloud,
+  signOutOfCloud,
+  pullCloudWorkspace,
+  mergeCloudWorkspace,
+  syncCloudWorkspace,
+  scheduleCloudSync,
+  subscribeCloudWorkspace,
+  rememberCloudWorkspace,
+  deleteCloudConversation,
+} from "./cloud-sync";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
@@ -172,6 +185,13 @@ const proactiveUpdatesToggle = req<HTMLInputElement>("#proactive-updates-toggle"
 const voiceUpdatesToggle = req<HTMLInputElement>("#voice-updates-toggle");
 const presenceSettingsStatus = req<HTMLElement>("#presence-settings-status");
 const endpointEl = req<HTMLInputElement>("#endpoint");
+const cloudEmailEl = req<HTMLInputElement>("#cloud-email");
+const cloudPasswordEl = req<HTMLInputElement>("#cloud-password");
+const cloudConnectButton = req<HTMLButtonElement>("#cloud-connect");
+const cloudDisconnectButton = req<HTMLButtonElement>("#cloud-disconnect");
+const cloudSyncStatusEl = req<HTMLElement>("#cloud-sync-status");
+let cloudUnsubscribe: (() => void) | null = null;
+let cloudRefreshInFlight = false;
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeProjectorSelect = req<HTMLSelectElement>("#native-projector-select");
 const nativeProjectorButton = req<HTMLButtonElement>("#native-projector-import-btn");
@@ -567,7 +587,101 @@ const saveStore = (): void => {
     convo.knowledgeState = validateKnowledgeState(convo.knowledgeState ?? emptyKnowledgeState());
   }
   writeJson(STORE_KEY, store);
+  scheduleCloudSync(store.conversations);
 };
+
+
+async function applyInitialCloudSync(): Promise<void> {
+  const remote = await pullCloudWorkspace();
+  store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
+  if (!store.activeId && store.conversations.length) store.activeId = store.conversations[0]!.id;
+  saveStore();
+  await syncCloudWorkspace(store.conversations);
+  rememberCloudWorkspace(store.conversations);
+  renderHistory();
+  renderConversation();
+}
+
+async function refreshFromCloud(): Promise<void> {
+  if (cloudRefreshInFlight) return;
+  cloudRefreshInFlight = true;
+  try {
+    const remote = await pullCloudWorkspace();
+    store.conversations = mergeCloudWorkspace(store.conversations, remote) as Conversation[];
+    rememberCloudWorkspace(store.conversations);
+    saveStore();
+    renderHistory();
+    renderConversation();
+    cloudSyncStatusEl.textContent = `Connected · ${store.conversations.length} conversations synchronized.`;
+  } finally {
+    cloudRefreshInFlight = false;
+  }
+}
+
+function startCloudRealtime(): void {
+  cloudUnsubscribe?.();
+  cloudUnsubscribe = subscribeCloudWorkspace(() => {
+    void refreshFromCloud().catch((error) => {
+      cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Cloud refresh failed.";
+    });
+  });
+}
+
+async function connectCloudAccount(): Promise<void> {
+  cloudConnectButton.disabled = true;
+  cloudSyncStatusEl.textContent = "Signing in and verifying the ULTRON owner account…";
+  try {
+    const session = await signInToCloud(cloudEmailEl.value.trim(), cloudPasswordEl.value);
+    cloudPasswordEl.value = "";
+    cloudDisconnectButton.disabled = false;
+    await applyInitialCloudSync();
+    startCloudRealtime();
+    cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
+  } catch (error) {
+    cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not connect to ULTRON cloud.";
+  } finally {
+    cloudConnectButton.disabled = false;
+  }
+}
+
+async function restoreCloudAccount(): Promise<void> {
+  try {
+    const session = await getCloudSession();
+    if (!session) {
+      cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
+      return;
+    }
+    const { data: owner, error } = await cloudClient
+      .from("ultron_instance")
+      .select("display_name")
+      .eq("owner_id", session.user.id)
+      .maybeSingle();
+    if (error || !owner) {
+      await signOutOfCloud();
+      cloudSyncStatusEl.textContent = "Saved session was not authorized for this ULTRON instance. Sign in with the owner account.";
+      return;
+    }
+    cloudDisconnectButton.disabled = false;
+    await applyInitialCloudSync();
+    startCloudRealtime();
+    cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
+  } catch (error) {
+    cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not restore ULTRON cloud session.";
+  }
+}
+
+async function disconnectCloudAccount(): Promise<void> {
+  cloudDisconnectButton.disabled = true;
+  try {
+    cloudUnsubscribe?.();
+    cloudUnsubscribe = null;
+    await signOutOfCloud();
+    cloudSyncStatusEl.textContent = "Disconnected. Your local conversations and on-device model remain available.";
+  } catch (error) {
+    cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not disconnect cloud account.";
+    cloudDisconnectButton.disabled = false;
+  }
+}
 
 const uid = (): string => `c_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
@@ -1501,6 +1615,7 @@ function newConversation(): void {
 async function removeConversation(id: string): Promise<void> {
   const convo = store.conversations.find((c) => c.id === id);
   store.conversations = store.conversations.filter((c) => c.id !== id);
+  void deleteCloudConversation(id).catch((error) => console.warn("[ULTRON cloud delete]", error));
   if (store.activeId === id) store.activeId = null;
   saveStore();
   if (convo?.sessionId && store.agentId && settings.endpoint) {
@@ -3528,6 +3643,10 @@ voiceUpdatesToggle.addEventListener("change", () => {
   }
   voiceStatus(settings.voice ? "Spoken telemetry enabled. Only important proactive events will be spoken." : "Spoken telemetry paused.");
 });
+cloudConnectButton.addEventListener("click", () => void connectCloudAccount());
+cloudDisconnectButton.addEventListener("click", () => void disconnectCloudAccount());
+void restoreCloudAccount();
+
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
 req<HTMLButtonElement>("#vault-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#mindmap-refresh").addEventListener("click", rebuildMindMap);
@@ -3581,6 +3700,9 @@ nativeModelSelect.addEventListener("change", () => {
 
 req<HTMLButtonElement>("#clear-btn").addEventListener("click", () => {
   if (!window.confirm("Delete every conversation on this device?")) return;
+  for (const conversation of store.conversations) {
+    void deleteCloudConversation(conversation.id).catch((error) => console.warn("[ULTRON cloud delete]", error));
+  }
   store.conversations = [];
   store.activeId = null;
   saveStore();

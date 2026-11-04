@@ -24,6 +24,7 @@ import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, 
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile, calibrateReasoningDepth } from "./ultron-cognition";
 import { buildVectorMemoryContext, createVectorMemoryStore, retrieveVectorMemory, syncVectorMemory, validateVectorMemoryStore } from "./ultron-vector-memory";
+import { buildDistilledSkillContext, createSkillStore, distillVerifiedSkill, validateSkillStore } from "./ultron-skill-distillation";
 import { createUltronCheckpoint, validateUltronCheckpoint, buildUltronCheckpointPrompt, type Checkpoint } from "./ultron-state";
 import { emptyKnowledgeState, validateKnowledgeState, buildKnowledgePrompt, type KnowledgeState } from "./ultron-knowledge-state";
 import { captureExplicitKnowledge } from "./ultron-knowledge-capture";
@@ -213,6 +214,7 @@ const SETTINGS_KEY = "ultron.settings.v1";
 const PROJECTOR_KEY = "ultron.native-projector.v1";
 const LEARNING_KEY = "ultron.learning.v1";
 const VECTOR_MEMORY_KEY = "ultron.vector-memory.v1";
+const DISTILLED_SKILLS_KEY = "ultron.distilled-skills.v1";
 
 const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): string {
@@ -247,8 +249,9 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   ultronDecisionTrace.record({ phase: "plan", code: "cognitive-profile", detail: calibratedProfile.mode + "; passes=" + calibratedProfile.reasoningPasses + "; calibration=" + calibration.adjustment });
   const memoryContext = buildVectorMemoryContext(memoryMatches);
   const learningContext = buildLearningContext(learningLedger);
+  const distilledSkillsContext = buildDistilledSkillContext(task, skillStore);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, calibrationContext, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, calibrationContext, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext, distilledSkillsContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -269,6 +272,7 @@ function writeJson(key: string, value: unknown): void {
 }
 
 const learningLedger: LearningLedger = validateLearningLedger(readJson<unknown>(LEARNING_KEY, createLearningLedger()));
+const skillStore = validateSkillStore(readJson<unknown>(DISTILLED_SKILLS_KEY, createSkillStore()));
 const saveLearningLedger = (): void => writeJson(LEARNING_KEY, learningLedger);
 function recordLearningObservation(
   signal: "user_correction" | "task_failure" | "tool_failure" | "verification_failure" | "user_success" | "repeated_friction",
@@ -2576,6 +2580,26 @@ async function submit(raw: string): Promise<void> {
   ultronDecisionTrace.record({ phase: "validate", code: `outcome-${outcome.status}`, detail: `${outcome.cause}; confidence=${outcome.confidence.toFixed(2)}` });
   if (outcome.shouldRecord && outcome.cause === "positive_strategy") {
     recordLearningObservation("user_success", "outcome." + finalProfile.intent, "A runtime outcome was supported by successful execution evidence and passed validation.", "low", "runtime", false, "positive_strategy", convo.id);
+    const verifiedProcedure = executionLedger.steps
+      .filter((step) => step.status === "completed" && Boolean(step.evidence))
+      .map((step) => step.objective)
+      .filter((step) => typeof step === "string" && step.trim())
+      .slice(0, 8);
+    if (outcome.status === "verified_success" && outcome.evidenceIds.length && verifiedProcedure.length >= 2) {
+      const distilled = distillVerifiedSkill(skillStore, {
+        taskClass: finalProfile.intent,
+        actions: (result.tool_calls ?? []).filter((call) => call.ok).map((call) => call.connector + "." + call.action),
+        procedure: verifiedProcedure,
+        evidenceIds: outcome.evidenceIds,
+        correlationId: convo.id,
+        verified: true,
+        verifiedBugfix: finalProfile.intent === "implementation" && /\b(fix|debug|repair|bug)\b/i.test(executionLedger.task) && executionLedger.steps.some((step) => step.kind === "verify" && step.status === "completed" && Boolean(step.evidence)),
+      });
+      if (distilled.accepted) {
+        Object.assign(skillStore, distilled.store);
+        writeJson(DISTILLED_SKILLS_KEY, skillStore);
+      }
+    }
   } else if (outcome.shouldRecord && outcome.cause === "permission_boundary") {
     recordLearningObservation("verification_failure", "permission-boundary", "A requested operation was blocked by an explicit approval or permission boundary.", "medium", "runtime", false, "permission_boundary", convo.id);
   } else if (outcome.shouldRecord && ["reasoning_error", "tool_execution", "verification_gap", "incomplete_result"].includes(outcome.cause)) {

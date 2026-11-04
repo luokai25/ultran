@@ -192,3 +192,21 @@ test('ULTRON task ledgers preserve explicit continuation intent and inherited co
   assert.match(brain.buildUltronLedgerPrompt(ledger), /intent=continuation/);
   assert.match(brain.buildUltronLedgerPrompt(ledger), /unfinished verification step/);
 });
+
+
+test('continuation context carries bounded unfinished steps and ignores completed or malformed history', () => {
+  const previous = {
+    id:'prior-task', status:'blocked', constraints:['Keep the existing connector design.'],
+    steps:[
+      { id:'understand', status:'completed', objective:'Read the original request.' },
+      { id:'verify', status:'blocked', objective:'Run the final checks.' },
+      { id:'deliver', status:'pending', objective:'Report the verified result.' },
+    ],
+  };
+  const constraints = brain.buildUltronContinuationConstraints(previous);
+  assert.equal(constraints.length, 4);
+  assert.ok(constraints.some((item) => item.includes('verify [blocked]')));
+  assert.ok(!constraints.some((item) => item.includes('understand [completed]')));
+  assert.equal(brain.buildUltronContinuationConstraints({ ...previous, status:'completed' }).length, 0);
+  assert.equal(brain.buildUltronContinuationConstraints({ id:'broken', status:'active', steps:[] }).join(','), 'Continue prior task ledger broken (status: active).');
+});

@@ -6,7 +6,7 @@ This Supabase project is a private, single-owner backend for the ULTRON Android 
 
 - The phone remains local-first. Core inference, local files, and offline tools must continue working without Supabase.
 - Supabase stores encrypted/sensitive application state only behind authenticated access and database-enforced row policies: conversations, messages, long-term memory, memory relations, documents, task state, tool approvals/audit records, model profiles, settings, and device sync cursors.
-- Supabase Realtime is enabled for conversations, messages, tasks, tool runs, and memory items.
+- Supabase Realtime is enabled for conversations, messages, tasks, tool runs, memory items, and per-owner settings.
 - The `ultron-private` Storage bucket is private. Object paths must begin with the owner's Auth UUID.
 - pgvector is enabled. The initial embedding columns use 384 dimensions; the embedding model is recorded separately. Generation models remain model-agnostic and run locally or on a separately configured inference host.
 - Provider credentials must never be stored in plaintext in these tables or shipped in the APK. `credential_ref` is an opaque reference for a server-side secret store.

@@ -17,6 +17,8 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initConnectors } from "./connectors-ui";
 import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
+import { buildPresenceIdentityPrompt, selectCommunicationMode, evaluatePresenceEvent, shouldSpeakPresence, type PresenceEventKind } from "./ultron-presence";
+import { prepareTelemetrySpeech } from "./ultron-voice";
 import { AGENT_IDENTITIES, DEFAULT_IDENTITY_STATE, IDENTITY_STORAGE_KEY, resolveIdentityPrompt, type IdentityState } from "./agent-identities";
 import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, createUltronPlan, createUltronTaskLedger, buildUltronContinuationConstraints, nextUltronLedgerStep, transitionUltronLedger, rankUltronMemory, buildUltronMemoryContext, validateUltronDraft, UltronDecisionTrace, type UltronTaskLedger } from "./ultron-brain";
 import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
@@ -218,6 +220,8 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   const memoryMatches = rankUltronMemory(task, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(",") })), profile.depth === "instant" ? 2 : 6);
   if (memoryMatches.length) ultronDecisionTrace.record({ phase: "memory", code: "context-ranked", detail: `${memoryMatches.length} relevant entries` });
   const core = buildUltronSystemPrompt(buildBaseCapabilityPrompt(task, provider));
+  const expressiveMode = selectCommunicationMode({ task, settings: { highStressEngineering: profile.risk === "high" || profile.risk === "critical" } });
+  const expressiveIdentity = buildPresenceIdentityPrompt(expressiveMode);
   const selfModel = buildUltronSelfModelPrompt(provider);
   const brain = buildUltronBrainContract({ model: provider, task, memory: memoryMatches.map((match) => ({ id: match.item.id, text: match.item.text, kind: match.item.kind, confidence: match.item.confidence, source: match.item.source })) });
   const cognitiveProfile = analyzeCognitiveProfile(task, {
@@ -230,7 +234,7 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   const memoryContext = buildUltronMemoryContext(memoryMatches);
   const learningContext = buildLearningContext(learningLedger);
   const ledgerPrompt = ledger ? buildUltronLedgerPrompt(ledger) : "";
-  return [resolveIdentityPrompt(identityState), core, selfModel, brain, cognition, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
+  return [resolveIdentityPrompt(identityState), core, expressiveIdentity, selfModel, brain, cognition, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext].filter(Boolean).join("\n\n");
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -989,15 +993,18 @@ async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
     if (!finished && !failed && !active) continue;
     const title = finished ? "Task completed" : failed ? "Task needs attention" : task.status === "retrying" ? "Task retrying" : "Task started";
     const detail = task.message.slice(0, 110) + (finished ? " completed successfully." : failed ? " · " + task.status + (task.error ? ": " + task.error.slice(0, 160) : ".") : task.status === "retrying" ? " is being retried." : " has started.");
+    const eventKind: PresenceEventKind = finished ? "task_completed" : failed ? "task_failed" : "task_started";
+    const recommendation = evaluatePresenceEvent({ id: `${task.id}-${task.status}-${task.updated_at}`, kind: eventKind, title: task.message.slice(0, 100), detail: task.error?.slice(0, 220) || detail, occurredAt: Date.now(), severity: failed ? "warning" : "info" }, { proactiveUpdates: settings.proactiveUpdates === true, voiceEnabled: settings.voice, quietHours: false, quietMode: false });
+    if (!recommendation) continue;
     if (Capacitor.getPlatform() === "android") {
       try {
-        await NativeCompanion.notify({title, body: detail});
-        if (settings.voice && (finished || failed)) await NativeCompanion.speakInBackground({text: title + ". " + detail});
+        await NativeCompanion.notify({title: recommendation.title, body: recommendation.message});
+        if (shouldSpeakPresence(recommendation, { proactiveUpdates: settings.proactiveUpdates === true, voiceEnabled: settings.voice, quietHours: false, quietMode: false })) await NativeCompanion.speakInBackground({text: prepareTelemetrySpeech(recommendation.message, 420)});
       } catch (error) {
-        console.warn("Ultron proactive update could not be delivered", error);
+        console.warn("ULTRON proactive update could not be delivered", error);
       }
-    } else if (settings.voice && (finished || failed) && document.visibilityState === "visible") {
-      speak(title + ". " + detail);
+    } else if (shouldSpeakPresence(recommendation, { proactiveUpdates: settings.proactiveUpdates === true, voiceEnabled: settings.voice, quietHours: false, quietMode: false }) && document.visibilityState === "visible") {
+      speak(prepareTelemetrySpeech(recommendation.message, 420));
     }
   }
 }
@@ -2574,10 +2581,8 @@ async function submit(raw: string): Promise<void> {
     autosize();
     if (nearBottom()) scrollToEnd();
   });
-  if (settings.voice) {
-    if (Capacitor.getPlatform() === "android" && document.visibilityState !== "visible") void NativeCompanion.speakInBackground({text: plainSpeech(result.content).slice(0, 1800)}).catch(() => undefined);
-    else speak(result.content);
-  }
+  // ULTRON voice is an event/telemetry channel, not automatic narration of every answer.
+  // Manual playback remains available on an individual message when explicitly requested.
 }
 
 /* ------------------------------------------------------------------ *

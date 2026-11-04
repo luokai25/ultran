@@ -123,7 +123,19 @@
         <section class="learning-section"><div class="learning-section-head"><div><span class="section-eyebrow">OBSERVATION LOG</span><h2>Recent signals</h2></div><span id="learning-event-count" class="learning-count"></span></div><div id="learning-events" class="learning-events"></div></section>
         <p class="feature-disclaimer">A proposal is not a code change. “Record external implementation” only records that you changed something elsewhere. Verification requires test or runtime evidence that you provide.</p>
       </section>
-<nav class="bottom-nav" aria-label="Main navigation">
+
+      <section id="capabilities-screen" class="feature-screen capability-screen" aria-label="ULTRON capability control panel" hidden>
+        <header class="feature-head"><div><span class="feature-eyebrow">SELF-IMPROVEMENT · TOOL CONTROL PLANE</span><h1>Capabilities</h1><p>Tools ULTRON builds, changes he proposes, and the actual history of what ran.</p></div><button id="capabilities-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
+        <div class="capability-hero"><div class="capability-hero-mark">✳</div><div><strong>ULTRON capability engine</strong><p id="capability-connection">Checking owner session and Supabase connection…</p></div><button id="capability-refresh" class="ghost" type="button">Refresh</button></div>
+        <div id="capability-stats" class="capability-stats" aria-live="polite"><div class="capability-stat"><small>TOOLS</small><strong>—</strong></div><div class="capability-stat"><small>PROPOSALS</small><strong>—</strong></div><div class="capability-stat"><small>AGENT RUNS</small><strong>—</strong></div><div class="capability-stat"><small>EVENTS</small><strong>—</strong></div></div>
+        <div id="capability-feedback" class="capability-feedback" role="status" aria-live="polite">Connecting to the private ULTRON control plane…</div>
+        <section class="capability-section"><div class="capability-section-head"><div><span class="section-eyebrow">GENERATED TOOL REGISTRY</span><h2>Tools &amp; versions</h2></div><span id="capability-tool-count" class="capability-count">0</span></div><div id="capability-tools" class="capability-list"></div></section>
+        <section class="capability-section"><div class="capability-section-head"><div><span class="section-eyebrow">CHANGE CONTROL</span><h2>Proposals</h2></div><span id="capability-proposal-count" class="capability-count">0</span></div><div id="capability-proposals" class="capability-list"></div></section>
+        <section class="capability-section"><div class="capability-section-head"><div><span class="section-eyebrow">EXECUTION TELEMETRY</span><h2>Agent runs</h2></div><span id="capability-run-count" class="capability-count">0</span></div><div id="capability-runs" class="capability-list"></div></section>
+        <section class="capability-section"><div class="capability-section-head"><div><span class="section-eyebrow">APPEND-ONLY RECORD</span><h2>Event history</h2></div><span id="capability-event-count" class="capability-count">0</span></div><div id="capability-events" class="capability-list"></div></section>
+        <div class="capability-boundary"><strong>Execution status</strong><p>Generated tools are currently stored, reviewed and versioned, but the production worker is not connected yet. This panel will not pretend a draft has executed. Network-enabled tools will be a separate, explicitly granted capability; ordinary approved tools can remain offline.</p></div>
+      </section>
+\n<nav class="bottom-nav" aria-label="Main navigation">
         <button id="nav-chat" class="nav-item" type="button" aria-current="page">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chats</span>
         </button>
@@ -161,7 +173,7 @@
         <button id="workspace-btn" class="drawer-link" type="button"><span aria-hidden="true">▦</span>Agent Workspace</button>
         <button id="drawer-identities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>Agents &amp; Identities</button>
         <button id="drawer-mindmap" class="drawer-link" type="button"><span aria-hidden="true">◎</span>Mind Map</button>
-        <button id="drawer-learning" class="drawer-link" type="button"><span aria-hidden="true">⌁</span>Learning Review</button>
+        <button id="drawer-learning" class="drawer-link" type="button"><span aria-hidden="true">⌁</span>Learning Review</button>\n        <button id="drawer-capabilities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>ULTRON Capabilities</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
           Tools &amp; Connectors

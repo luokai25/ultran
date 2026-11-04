@@ -99,7 +99,7 @@ test("brain-independent capability policy is applied to native and connected bra
   assert.match(main, /shouldVerifyDraft\(text\)/);
   assert.match(main, /shouldVerifyDraft\(task\)/);
   assert.match(main, /reviewLocalDraft\(task, content\)/);
-  assert.match(main, /else if \(shouldVerifyDraft\(task\)\)/);
+  assert.match(main, /if \(shouldVerifyDraft\(task\)\)/);
   assert.match(main, /let finalFollowup = followup\.content/);
   assert.match(capabilityKernel, /export function profileTask/);
   assert.match(capabilityKernel, /export function buildCapabilityPrompt/);
@@ -214,7 +214,7 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(main, /handleNativeTool/);
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);
   assert.match(main, /runApprovedLocalTool/);
-  assert.match(main, /Only one local tool call may run per turn/);
+  assert.match(main, /up to eight sequential tool calls/);\n  assert.match(main, /Phone messaging and app-opening actions remain limited to one action per turn/);
   assert.doesNotMatch(html, /id="proactive-btn"|id="sms-btn"|id="voice-btn"|id="mic-btn"|id="background-btn/);
 });
 

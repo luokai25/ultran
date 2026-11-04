@@ -89,7 +89,7 @@ test("local file requests have a real PDF fallback and artifact card actions", a
   assert.match(main, /function artifactPreviewUrl\(/);
   assert.match(main, /baseUrl\(\)\}\$\{url/);
   assert.match(main, /attachRequestedArtifact\(text, finalContent, reply\.body\)/);
-  assert.match(main, /attachRequestedArtifact\(task, content, progressBody\)/);
+  assert.match(main, /attachRequestedArtifact\(task, finalContent, progressBody\)/);
   assert.match(kernel, /pdf\|docx\|pptx/);
   assert.match(kernel, /invisible internal quality-control pass/);
   assert.doesNotMatch(kernel, /You are Ultron.s independent quality reviewer/);

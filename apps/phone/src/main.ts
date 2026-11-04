@@ -51,6 +51,7 @@ import {
   pullCloudSetting,
   scheduleCloudSetting,
   saveCloudModelProfile,
+  registerCloudDevice,
 } from "./cloud-sync";
 
 /* ------------------------------------------------------------------ *
@@ -546,6 +547,7 @@ async function loadNativeModel(): Promise<void> {
   try {
     const result = await NativeLocalAI.loadModel({ name, projectorName: selectedNativeProjectorName || undefined });
     nativeModelLoaded = result.loaded;
+    void saveCloudModelProfile(result.name).catch((error) => console.warn("[ULTRON model profile sync]", error));
     nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · vision ready: " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
@@ -685,6 +687,7 @@ async function connectCloudAccount(): Promise<void> {
     const session = await signInToCloud(cloudEmailEl.value.trim(), cloudPasswordEl.value);
     cloudPasswordEl.value = "";
     cloudDisconnectButton.disabled = false;
+    await registerCloudDevice();
     await applyInitialCloudSync();
     startCloudRealtime();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
@@ -713,6 +716,7 @@ async function restoreCloudAccount(): Promise<void> {
       return;
     }
     cloudDisconnectButton.disabled = false;
+    await registerCloudDevice();
     await applyInitialCloudSync();
     startCloudRealtime();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;

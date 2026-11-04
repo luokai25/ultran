@@ -2105,7 +2105,7 @@ type LocalToolRequest =
   | { tool: "app.open"; app: "whatsapp" | "whatsapp-business" | "telegram" | "messages" | "gmail" | "phone" | "calendar" }
   | { tool: "capabilities.status" }
   | { tool: "capabilities.list" }
-  | { tool: "capabilities.save_tool_draft"; tool_key: string; version: string; description: string; input_schema: Record<string, unknown>; source_code: string; source_language: "python" | "typescript" | "javascript" }
+  | { tool: "capabilities.save_tool_draft"; tool_key: string; version: string; description: string; input_schema: Record<string, unknown>; source_code: string; source_language: "python" }
   | { tool: "capabilities.submit_tool"; id: string; source_sha256: string }
   | { tool: "capabilities.create_proposal"; proposal_kind: "tool_activation" | "edge_function" | "database_migration" | "connector" | "policy_change" | "runtime_upgrade"; title: string; description: string; artifact: Record<string, unknown>; risk_level: "low" | "medium" | "high" | "critical" }
   | { tool: "capabilities.checkpoint_run"; id?: string; goal: string; phase: string; iteration: number; iteration_limit: number; checkpoint: Record<string, unknown>; status?: "queued" | "running" | "waiting_approval" | "paused" | "completed" | "failed" | "cancelled"; tokens_used?: number; token_budget?: number; result?: Record<string, unknown>; error_message?: string };
@@ -2223,8 +2223,8 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
       const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
       const source_code = typeof parsed.source_code === "string" ? parsed.source_code : "";
       const source_language = parsed.source_language, input_schema = parsed.input_schema;
-      if (!/^[a-z][a-z0-9_]{1,47}$/.test(tool_key) || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version) || !description || description.length > 500 || !source_code.trim() || new TextEncoder().encode(source_code).byteLength > 32768 || !["python","typescript","javascript"].includes(String(source_language)) || !input_schema || typeof input_schema !== "object" || Array.isArray(input_schema) || (input_schema as Record<string, unknown>).type !== "object") return null;
-      return { tool: "capabilities.save_tool_draft", tool_key, version, description, input_schema: input_schema as Record<string, unknown>, source_code, source_language: source_language as "python" | "typescript" | "javascript" };
+      if (!/^[a-z][a-z0-9_]{1,47}$/.test(tool_key) || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version) || !description || description.length > 500 || !source_code.trim() || new TextEncoder().encode(source_code).byteLength > 32768 || source_language !== "python" || !input_schema || typeof input_schema !== "object" || Array.isArray(input_schema) || (input_schema as Record<string, unknown>).type !== "object") return null;
+      return { tool: "capabilities.save_tool_draft", tool_key, version, description, input_schema: input_schema as Record<string, unknown>, source_code, source_language: "python" };
     }
     if (parsed.tool === "capabilities.submit_tool" && typeof parsed.id === "string" && typeof parsed.source_sha256 === "string") {
       if (!/^[0-9a-f-]{36}$/i.test(parsed.id) || !/^[a-f0-9]{64}$/.test(parsed.source_sha256)) return null;

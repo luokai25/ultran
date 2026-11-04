@@ -21,6 +21,11 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function recordEvent(client: ReturnType<typeof createClient>, event: Record<string, unknown>): Promise<void> {
+  const { error } = await client.from("ultron_capability_events").insert(event);
+  if (error) throw error;
+}
+
 const SECRET_PATTERN = /(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|private[_-]?key)\s*[:=]\s*["'][^"']{8,}["']/i;
 
 Deno.serve(async (req: Request) => {
@@ -93,7 +98,7 @@ Deno.serve(async (req: Request) => {
       if (!/^\d+\.\d+\.\d+$/.test(version)) return response({ error: "invalid_semver" }, 400);
       if (!description.trim() || description.length > 500) return response({ error: "invalid_description" }, 400);
       if (!source_code.trim() || new TextEncoder().encode(source_code).byteLength > 32768) return response({ error: "invalid_source_size" }, 400);
-      if (!["python", "typescript", "javascript"].includes(source_language)) return response({ error: "invalid_source_language" }, 400);
+      if (source_language !== "python") return response({ error: "unsupported_source_language", supported: ["python"] }, 400);
       if (!object(input_schema) || input_schema.type !== "object") return response({ error: "input_schema_must_be_object" }, 400);
       if (SECRET_PATTERN.test(source_code)) return response({ error: "possible_secret_in_source" }, 400);
       const source_sha256 = await sha256(source_code);
@@ -105,7 +110,7 @@ Deno.serve(async (req: Request) => {
         review_report: object(body.review_report) ? body.review_report : {},
       }).select("id,tool_key,version,source_sha256,lifecycle_state,created_at").single();
       if (error) throw error;
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.draft_created",
         details: { tool_key, version, source_sha256 },
       });
@@ -121,7 +126,7 @@ Deno.serve(async (req: Request) => {
         .select("id,tool_key,version,source_sha256,lifecycle_state").maybeSingle();
       if (error) throw error;
       if (!data) return response({ error: "draft_not_found_or_hash_changed" }, 409);
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.submitted_for_approval",
         details: { source_sha256: data.source_sha256 },
       });
@@ -140,7 +145,7 @@ Deno.serve(async (req: Request) => {
         .select("id,tool_key,version,source_sha256,lifecycle_state,approved_at").maybeSingle();
       if (error) throw error;
       if (!data) return response({ error: "tool_not_pending_or_hash_changed" }, 409);
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.owner_approved",
         details: { source_sha256: data.source_sha256 },
       });
@@ -162,7 +167,7 @@ Deno.serve(async (req: Request) => {
         proposal_kind, title, description, artifact, artifact_sha256, risk_level, status: "pending",
       }).select("*").single();
       if (error) throw error;
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, agent_run_id: data.agent_run_id, proposal_id: data.id,
         event_type: "capability.proposed", details: { proposal_kind, risk_level, artifact_sha256 },
       });
@@ -182,7 +187,7 @@ Deno.serve(async (req: Request) => {
         .eq("status", "pending").select("*").maybeSingle();
       if (error) throw error;
       if (!data) return response({ error: "proposal_not_pending_or_artifact_changed" }, 409);
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, agent_run_id: data.agent_run_id, proposal_id: data.id,
         event_type: "capability.owner_" + decision, details: { artifact_sha256: data.artifact_sha256 },
       });
@@ -211,7 +216,7 @@ Deno.serve(async (req: Request) => {
         error_message: typeof body.error_message === "string" ? body.error_message.slice(0, 2000) : null,
       }, { onConflict: "id" }).select("*").single();
       if (error) throw error;
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, agent_run_id: data.id, event_type: "agent_run.checkpoint",
         details: { phase, iteration, status },
       });
@@ -226,7 +231,7 @@ Deno.serve(async (req: Request) => {
         .select("id,tool_key,version,lifecycle_state").maybeSingle();
       if (error) throw error;
       if (!data) return response({ error: "tool_not_disableable" }, 409);
-      await supabase.from("ultron_capability_events").insert({
+      await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.disabled", details: {},
       });
       return response({ ok: true, tool: data });

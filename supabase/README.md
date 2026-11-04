@@ -50,3 +50,8 @@ The capability tables persist agent-loop checkpoints, versioned generated tool s
 A saved draft is not an executable tool. The existing generated-tool policy and isolated-worker lifecycle must review and attest the exact source hash before activation. Database DDL, Edge Function deployment, permission changes and other infrastructure mutations remain proposals until the owner explicitly approves them. Never expose a service-role or secret key to Android, and never execute model-generated SQL directly against production.
 
 The phone's Realtime subscription includes agent runs, generated tool versions, capability proposals and capability events. The Edge Function also provides owner-facing approval and disable operations; approval actions are deliberately excluded from the model's tool catalogue.
+
+
+### Generated-tool language support
+
+Generated tool drafts currently accept **Python only**, matching the existing `review_generated_source` AST policy and the isolated-worker contract (`def run(payload)`). TypeScript and JavaScript are rejected until their own static policies and worker isolation adapters exist. Do not widen the database constraint merely to accept source that the runtime cannot safely review or execute. Capability events are required writes: a capability mutation is reported successful only after its audit event is stored.

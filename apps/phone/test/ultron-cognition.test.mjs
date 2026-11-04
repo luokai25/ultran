@@ -65,3 +65,12 @@ test('completion gate accepts only a present, fully verified deliverable', () =>
   assert.equal(done.complete, true);
   assert.equal(done.next, 'deliver');
 });
+
+
+test('continuations and corrections become explicit cognitive state signals', () => {
+  const continued = cognition.analyzeCognitiveProfile('Continue the implementation', { continuation: true });
+  const corrected = cognition.analyzeCognitiveProfile('Correction: I meant the local runtime', { priorCorrection: true });
+  assert.ok(continued.signals.includes('continuation'));
+  assert.ok(corrected.signals.includes('correction'));
+  assert.equal(continued.needsCompletionAudit, true);
+});

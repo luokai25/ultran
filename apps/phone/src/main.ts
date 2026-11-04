@@ -22,7 +22,7 @@ import { buildUltronBrainContract, buildUltronLedgerPrompt, classifyUltronTask, 
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
-import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, buildLearningContext, type LearningLedger } from "./ultron-learning";
+import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
 import { markDataUrl, markSvg } from "./mark";
 
 /* ------------------------------------------------------------------ *
@@ -3157,6 +3157,7 @@ req<HTMLButtonElement>("#drawer-new").addEventListener("click", newConversation)
 req<HTMLButtonElement>("#settings-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); openSheet(); });
 const identityScreenButton = req<HTMLButtonElement>("#drawer-identities");
 const mindMapDrawerButton = req<HTMLButtonElement>("#drawer-mindmap");
+const learningDrawerButton = req<HTMLButtonElement>("#drawer-learning");
 const identityDetails = req<HTMLTextAreaElement>("#identity-details");
 const identityEditorLabel = req<HTMLElement>("#identity-editor-label");
 function renderIdentitySettings(): void {
@@ -3176,6 +3177,94 @@ function renderIdentitySettings(): void {
   const brain = nativeLoadedModelName || settings.localModel || "No local model selected";
   req<HTMLElement>("#identity-brain-status").textContent = `Reasoning brain: ${brain}. ULTRON directs this model and validates its output.`;
 }
+function renderLearningReview(filter: "all" | "review" | "history" = "all"): void {
+  const stats = req<HTMLElement>("#learning-stats");
+  const proposalList = req<HTMLElement>("#learning-proposals");
+  const eventList = req<HTMLElement>("#learning-events");
+  const proposals = [...learningLedger.proposals].sort((a, b) => b.priority - a.priority || b.updatedAt - a.updatedAt);
+  const events = [...learningLedger.events].sort((a, b) => b.at - a.at);
+  const count = (status: string): number => proposals.filter((item) => item.status === status).length;
+  stats.replaceChildren();
+  for (const [label, value] of [["Observations", events.length], ["Pending review", count("proposed")], ["Approved", count("approved")], ["Verified", count("verified")]] as Array<[string, number]>) {
+    const card = document.createElement("article"); card.className = "learning-stat";
+    const number = document.createElement("strong"); number.textContent = String(value);
+    const caption = document.createElement("span"); caption.textContent = label;
+    card.append(number, caption); stats.append(card);
+  }
+  req<HTMLElement>("#learning-proposal-count").textContent = `${proposals.length} total`;
+  req<HTMLElement>("#learning-event-count").textContent = `${events.length} stored`;
+  document.querySelectorAll<HTMLButtonElement>("[data-learning-filter]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.learningFilter === filter)));
+  proposalList.replaceChildren();
+  const visibleProposals = proposals.filter((item) => filter === "all" || (filter === "review" ? item.status === "proposed" || item.status === "approved" || item.status === "implemented" : item.status === "verified" || item.status === "rejected"));
+  if (!visibleProposals.length) {
+    const empty = document.createElement("div"); empty.className = "learning-empty";
+    empty.textContent = filter === "review" ? "Nothing is waiting for your review. New evidence will appear here." : filter === "history" ? "No completed or rejected proposals yet." : "No improvement proposals yet. ULTRON will create one when it observes a meaningful, evidence-backed failure pattern.";
+    proposalList.append(empty);
+  }
+  const statusLabel: Record<string, string> = { observed: "Observed", proposed: "Needs review", approved: "Approved", implemented: "Implementation recorded", verified: "Verified", rejected: "Rejected" };
+  const button = (label: string, className: string, action: () => void): HTMLButtonElement => { const node = document.createElement("button"); node.type = "button"; node.className = className; node.textContent = label; node.addEventListener("click", action); return node; };
+  for (const proposal of visibleProposals) {
+    const card = document.createElement("article"); card.className = "learning-proposal"; card.dataset.status = proposal.status;
+    const head = document.createElement("div"); head.className = "learning-proposal-head";
+    const titleWrap = document.createElement("div");
+    const title = document.createElement("h3"); title.textContent = proposal.title;
+    const category = document.createElement("span"); category.className = "learning-category"; category.textContent = proposal.fingerprint.split("::", 1)[0] || "general";
+    titleWrap.append(category, title);
+    const status = document.createElement("span"); status.className = `learning-status status-${proposal.status}`; status.textContent = statusLabel[proposal.status] ?? proposal.status;
+    head.append(titleWrap, status);
+    const hypothesis = document.createElement("p"); hypothesis.className = "learning-hypothesis"; hypothesis.textContent = proposal.hypothesis;
+    const metrics = document.createElement("div"); metrics.className = "learning-metrics";
+    for (const [label, value] of [["Priority", proposal.priority], ["Impact", proposal.impact], ["Confidence", proposal.confidence], ["Risk", proposal.risk], ["Recurrence", proposal.recurrence]] as Array<[string, number]>) {
+      const metric = document.createElement("span"); metric.textContent = `${label} ${(value * 100).toFixed(0)}%`; metrics.append(metric);
+    }
+    const evidence = document.createElement("p"); evidence.className = "learning-evidence"; evidence.textContent = `${proposal.evidenceIds.length} linked observation(s) · Updated ${new Date(proposal.updatedAt).toLocaleString()}`;
+    const actions = document.createElement("div"); actions.className = "learning-actions";
+    const approval = `ultron-learning:${proposal.id}:${proposal.fingerprint}`;
+    if (proposal.status === "proposed") actions.append(button("Approve proposal", "solid", () => {
+      const result = approveLearningProposal(learningLedger, proposal.id, approval, approval);
+      if (result.accepted) { Object.assign(learningLedger, result.ledger); saveLearningLedger(); renderLearningReview(filter); }
+    }));
+    if (proposal.status === "approved") actions.append(button("Record external implementation", "solid", () => {
+      if (!window.confirm("Only continue if you have implemented this change outside ULTRON. This records your confirmation; it does not edit code.")) return;
+      const result = transitionLearningProposal(learningLedger, proposal.id, "implemented", { approvalFingerprint: proposal.approvalFingerprint });
+      if (result.accepted) { Object.assign(learningLedger, result.ledger); saveLearningLedger(); renderLearningReview(filter); }
+    }));
+    if (proposal.status === "implemented") actions.append(button("Verify with evidence", "solid", () => {
+      const evidenceText = window.prompt("Enter concrete test or runtime evidence. Example: ‘Phone tests passed: 110/110; TypeScript check passed.’");
+      if (!evidenceText?.trim()) return;
+      const result = transitionLearningProposal(learningLedger, proposal.id, "verified", { evidence: evidenceText });
+      if (result.accepted) { Object.assign(learningLedger, result.ledger); saveLearningLedger(); renderLearningReview(filter); }
+    }));
+    if (["proposed", "approved", "implemented"].includes(proposal.status)) actions.append(button("Reject", "ghost learning-reject", () => {
+      if (!window.confirm("Reject this improvement proposal? Its observation history will remain available.")) return;
+      const result = transitionLearningProposal(learningLedger, proposal.id, "rejected");
+      if (result.accepted) { Object.assign(learningLedger, result.ledger); saveLearningLedger(); renderLearningReview(filter); }
+    }));
+    card.append(head, hypothesis, metrics, evidence);
+    if (proposal.verificationEvidence) { const verified = document.createElement("p"); verified.className = "learning-verification"; verified.textContent = `Verification evidence: ${proposal.verificationEvidence}`; card.append(verified); }
+    if (actions.childElementCount) card.append(actions);
+    proposalList.append(card);
+  }
+  eventList.replaceChildren();
+  const visibleEvents = events.slice(0, 24);
+  if (!visibleEvents.length) { const empty = document.createElement("div"); empty.className = "learning-empty"; empty.textContent = "No observations recorded yet."; eventList.append(empty); }
+  for (const event of visibleEvents) {
+    const row = document.createElement("article"); row.className = "learning-event";
+    const marker = document.createElement("span"); marker.className = `learning-severity severity-${event.severity}`;
+    const detail = document.createElement("div"); detail.className = "learning-event-detail";
+    const heading = document.createElement("strong"); heading.textContent = event.category.replace(/[._-]+/g, " ");
+    const summary = document.createElement("p"); summary.textContent = event.summary;
+    const meta = document.createElement("small"); meta.textContent = `${event.signal.replace(/_/g, " ")} · ${event.source.replace(/_/g, " ")} · ${new Date(event.at).toLocaleString()}`;
+    detail.append(heading, summary, meta); row.append(marker, detail); eventList.append(row);
+  }
+}
+learningDrawerButton.addEventListener("click", () => { closeDrawer(); showFeatureScreen("learning-screen", navChatButton); renderLearningReview(); });
+req<HTMLButtonElement>("#learning-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
+req<HTMLButtonElement>("#learning-refresh").addEventListener("click", () => { Object.assign(learningLedger, validateLearningLedger(readJson<unknown>(LEARNING_KEY, learningLedger))); renderLearningReview(); });
+req<HTMLElement>("#learning-screen").addEventListener("click", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLButtonElement && target.dataset.learningFilter) renderLearningReview(target.dataset.learningFilter as "all" | "review" | "history");
+});
 identityScreenButton.addEventListener("click", () => { closeDrawer(); showFeatureScreen("agent-identities-screen", navChatButton); renderIdentitySettings(); });
 activeIdentityButton.addEventListener("click", () => { showFeatureScreen("agent-identities-screen", navChatButton); renderIdentitySettings(); });
 mindMapDrawerButton.addEventListener("click", () => { closeDrawer(); showFeatureScreen("vault-screen", navChatButton); rebuildMindMap(); });

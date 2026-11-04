@@ -3,6 +3,14 @@ export type GraphEdge = { id: string; from: string; to: string; relation: string
 export type SemanticGraph = { version: 1; updatedAt: number; nodes: GraphNode[]; edges: GraphEdge[] };
 export type GraphProposal = { nodes: Array<Omit<GraphNode, "updatedBy">>; edges: Array<Omit<GraphEdge, "updatedBy">> };
 export const EMPTY_GRAPH: SemanticGraph = { version: 1, updatedAt: 0, nodes: [], edges: [] };
+
+const SECRET_VALUE_PATTERN = /\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|private[_ -]?key|client[_ -]?secret)\s*[:=]\s*["']?[\w\-./+=]{8,}/i;
+const KNOWN_TOKEN_PATTERN = /\b(?:ghp_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}|sk-[a-z0-9]{20,}|xox[baprs]-[a-z0-9-]{15,}|AIza[0-9A-Za-z_-]{25,})\b/i;
+const PRIVATE_CONTACT_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\+?\d[\d ()-]{8,}\d/i;
+function containsSensitiveMemoryMaterial(value: string): boolean {
+  return SECRET_VALUE_PATTERN.test(value) || KNOWN_TOKEN_PATTERN.test(value) || PRIVATE_CONTACT_PATTERN.test(value);
+}
+
 export function graphPrompt(graph: SemanticGraph, model: string, conversationId: string): string {
   const compact = JSON.stringify({ nodes: graph.nodes.slice(-80), edges: graph.edges.slice(-120) }).slice(0, 9000);
   return `SHARED ULTRON SEMANTIC KNOWLEDGE GRAPH. Model: ${model}. Current source session: ${conversationId}.
@@ -23,9 +31,15 @@ export function mergeGraphProposal(current: SemanticGraph, raw: string, model: s
   const nodes = new Map(current.nodes.map(n => [n.id, n]));
   for (const item of proposal.nodes.slice(0, 40)) {
     if (!item || typeof item.id !== "string" || !/^[a-z0-9][a-z0-9_-]{1,79}$/i.test(item.id) || typeof item.label !== "string" || typeof item.summary !== "string" || !Array.isArray(item.sources)) continue;
+    const sourceIds = item.sources.filter(x=>typeof x==="string" && x.trim()).slice(0,20);
+    const confidence = Number(item.confidence);
+    const memoryText = `${item.label} ${item.summary}`;
+    // Only durable, sourced, high-confidence facts enter shared memory. Never
+    // turn credentials or private contact details into graph nodes.
+    if (!sourceIds.length || !Number.isFinite(confidence) || confidence < 0.72 || containsSensitiveMemoryMaterial(memoryText)) continue;
     const kind = ["concept","project","decision","person","preference","session"].includes(item.kind) ? item.kind : "concept";
     const old = nodes.get(item.id);
-    nodes.set(item.id, { id:item.id, label:item.label.slice(0,100), kind, summary:item.summary.slice(0,700), sources:[...new Set([...(old?.sources??[]),...item.sources.filter(x=>typeof x==="string").slice(0,20)])], updatedBy:model, confidence:Math.max(0,Math.min(1,Number(item.confidence)||0.5)) });
+    nodes.set(item.id, { id:item.id, label:item.label.slice(0,100), kind, summary:item.summary.slice(0,700), sources:[...new Set([...(old?.sources??[]),...sourceIds])], updatedBy:model, confidence:Math.max(0,Math.min(1,confidence)) });
   }
   const edges = new Map(current.edges.map(e => [e.id,e]));
   for (const item of proposal.edges.slice(0,80)) {

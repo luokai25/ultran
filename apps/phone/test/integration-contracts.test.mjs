@@ -512,3 +512,22 @@ test("connector refreshes run concurrently, discard stale panel responses and bo
   assert.match(connectors, /}, 20_000\)/);
   assert.match(connectors, /}, 15_000\)/);
 });
+
+
+test("semantic memory refuses unsourced, low-confidence, and credential-bearing graph proposals", async () => {
+  const ts = await import("typescript");
+  const vm = await import("node:vm");
+  const source = await read("src/semantic-graph.ts");
+  const compiled = ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 });
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, { module, exports: module.exports, Date, Map, Set, Math, JSON, RegExp, String, Number, Array });
+  const graph = module.exports.EMPTY_GRAPH;
+  const proposal = JSON.stringify({ nodes: [
+    { id:"good-fact", label:"Offline model plan", kind:"project", summary:"Use one local reasoning model with a deterministic identity layer.", sources:["conversation-1"], confidence:.91 },
+    { id:"weak-fact", label:"Maybe later", kind:"concept", summary:"An uncertain idea.", sources:["conversation-1"], confidence:.42 },
+    { id:"secret-fact", label:"Credential", kind:"concept", summary:"API key: ghp_abcdefghijklmnopqrstuvwxyz123456", sources:["conversation-1"], confidence:.99 },
+    { id:"unsourced-fact", label:"Unverified", kind:"concept", summary:"No traceable evidence.", sources:[], confidence:.99 }
+  ], edges:[] });
+  const merged = module.exports.mergeGraphProposal(graph, proposal, "test-model");
+  assert.deepEqual(Array.from(merged.nodes, node => node.id), ["good-fact"]);
+});

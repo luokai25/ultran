@@ -106,3 +106,63 @@ export async function registerDevice(deviceKey: string, deviceName: string, plat
 
   if (error) throw error;
 }
+
+export type UltronMessage = {
+  id: string;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  created_at: string;
+  sequence_no: number;
+  status: 'streaming' | 'complete' | 'failed' | 'cancelled';
+};
+
+export async function getConversation(conversationId: string) {
+  const { data, error } = await supabase
+    .from('ultron_conversations')
+    .select('id,title,status,last_message_at,updated_at')
+    .eq('id', conversationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('This conversation does not exist or is not accessible.');
+  return data as UltronConversation;
+}
+
+export async function listMessages(conversationId: string) {
+  const { data, error } = await supabase
+    .from('ultron_messages')
+    .select('id,role,content,created_at,sequence_no,status')
+    .eq('conversation_id', conversationId)
+    .order('sequence_no', { ascending: true })
+    .limit(500);
+
+  if (error) throw error;
+  return (data ?? []) as UltronMessage[];
+}
+
+export async function saveUserMessage(conversationId: string, content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message cannot be empty.');
+
+  const { data, error } = await supabase
+    .from('ultron_messages')
+    .insert({
+      conversation_id: conversationId,
+      role: 'user',
+      content: trimmed,
+      status: 'complete',
+    })
+    .select('id,role,content,created_at,sequence_no,status')
+    .single();
+
+  if (error) throw error;
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from('ultron_conversations')
+    .update({ last_message_at: now, updated_at: now })
+    .eq('id', conversationId);
+
+  if (updateError) throw updateError;
+  return data as UltronMessage;
+}

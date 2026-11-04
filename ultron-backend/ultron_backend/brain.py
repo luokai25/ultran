@@ -7,9 +7,6 @@ Two backends ship in the box:
     network, so the workspace is fully usable (and fully testable) on a machine
     that has never seen an API key. This is the default.
 
-``ollama``
-    Delegates to a local Ollama daemon over HTTP. Nothing leaves the host.
-
 ``openai``
     Any OpenAI-compatible chat endpoint you run yourself: llama.cpp's
     ``llama-server``, LM Studio, vLLM, LocalAI. Same local-first guarantee.
@@ -116,7 +113,7 @@ class EchoBackend:
         if not messages:
             raise ValidationFailed("messages must not be empty")
         if any(message.images for message in messages):
-            content = "The active Echo brain is text-only and cannot inspect image attachments. Connect a vision-capable Ollama or OpenAI-compatible model to analyze this image."
+            content = "The active Echo brain is text-only and cannot inspect image attachments. Connect a vision-capable OpenAI-compatible model to analyze this image."
             return BrainReply(
                 content=content,
                 tokens_in=sum(estimate_tokens(message.content) for message in messages),
@@ -167,109 +164,6 @@ class EchoBackend:
             tokens_out=estimate_tokens(body),
             model=model,
             backend=self.name,
-        )
-
-
-class OllamaBackend:
-    """Talks to a local Ollama daemon; never leaves the host."""
-
-    name = "ollama"
-
-    def __init__(self, endpoint: str, timeout_s: float = 30.0, client=None) -> None:
-        self.endpoint = endpoint.rstrip("/")
-        self.timeout_s = timeout_s
-        self._client = client
-
-    def _get_client(self):
-        if self._client is not None:
-            return self._client
-        import httpx
-
-        return httpx.Client(timeout=self.timeout_s)
-
-    def complete(
-        self, messages: list[BrainMessage], *, model: str, temperature: float
-    ) -> BrainReply:
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": m.role, "content": m.content, **({"images": [image.split(",", 1)[-1] for image in m.images]} if m.images else {})}
-                for m in messages
-            ],
-            "stream": False,
-            "options": {"temperature": temperature},
-        }
-        client = self._get_client()
-        try:
-            resp = client.post(f"{self.endpoint}/api/chat", json=payload)
-        except Exception as exc:  # noqa: BLE001 - normalised below
-            raise DependencyUnavailable(
-                "local model runtime is unreachable", details={"endpoint": self.endpoint}
-            ) from exc
-        if resp.status_code >= 400:
-            raise DependencyUnavailable(
-                "local model runtime returned an error",
-                details={"status": resp.status_code, "endpoint": self.endpoint},
-            )
-        data = resp.json()
-        content = (data.get("message") or {}).get("content", "")
-        return BrainReply(
-            content=content,
-            tokens_in=data.get("prompt_eval_count") or sum(estimate_tokens(m.content) for m in messages),
-            tokens_out=data.get("eval_count") or estimate_tokens(content),
-            model=model,
-            backend=self.name,
-            raw=data,
-        )
-
-
-    def complete_stream(
-        self, messages: list[BrainMessage], *, model: str, temperature: float,
-        on_token: Callable[[str], None],
-    ) -> BrainReply:
-        """Stream Ollama NDJSON tokens while retaining the normal reply contract."""
-        import json
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": m.role, "content": m.content, **({"images": [image.split(",", 1)[-1] for image in m.images]} if m.images else {})}
-                for m in messages
-            ],
-            "stream": True,
-            "options": {"temperature": temperature},
-        }
-        client = self._get_client()
-        chunks: list[str] = []
-        final: dict[str, Any] = {}
-        try:
-            with client.stream("POST", f"{self.endpoint}/api/chat", json=payload) as resp:
-                if resp.status_code >= 400:
-                    raise DependencyUnavailable(
-                        "local model runtime returned an error",
-                        details={"status": resp.status_code, "endpoint": self.endpoint},
-                    )
-                for line in resp.iter_lines():
-                    if not line:
-                        continue
-                    event = json.loads(line)
-                    token = ((event.get("message") or {}).get("content") or "")
-                    if token:
-                        chunks.append(token)
-                        on_token(token)
-                    if event.get("done"):
-                        final = event
-        except DependencyUnavailable:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            raise DependencyUnavailable(
-                "local model runtime is unreachable", details={"endpoint": self.endpoint}
-            ) from exc
-        content = "".join(chunks)
-        return BrainReply(
-            content=content,
-            tokens_in=final.get("prompt_eval_count") or sum(estimate_tokens(m.content) for m in messages),
-            tokens_out=final.get("eval_count") or estimate_tokens(content),
-            model=model, backend=self.name, raw=final,
         )
 
 
@@ -553,8 +447,6 @@ class BrainRuntime:
 
     @staticmethod
     def _make_backend(kind: str, settings) -> BrainBackend:
-        if kind == "ollama":
-            return OllamaBackend(settings.brain_endpoint, settings.brain_timeout_s)
         if kind == "openai":
             return OpenAICompatBackend(
                 settings.brain_openai_endpoint,

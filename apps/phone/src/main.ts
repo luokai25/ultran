@@ -2250,7 +2250,7 @@ function parseLocalToolRequest(content: string): LocalToolRequest | null {
 
 async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> {
   ultronDecisionTrace.record({ phase: "tool", code: "local-tool-approved", detail: request.tool });
-  if (request.tool === "capabilities.status" || request.tool === "capabilities.list" || request.tool === "capabilities.save_tool_draft" || request.tool === "capabilities.submit_tool" || request.tool === "capabilities.create_proposal") {
+  if (request.tool === "capabilities.status" || request.tool === "capabilities.list" || request.tool === "capabilities.save_tool_draft" || request.tool === "capabilities.submit_tool" || request.tool === "capabilities.create_proposal" || request.tool === "capabilities.checkpoint_run") {
     try {
       const action = request.tool.slice("capabilities.".length);
       const result = await invokeUltronCapabilities(action, request as unknown as Record<string, unknown>);

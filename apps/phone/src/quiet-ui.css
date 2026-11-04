@@ -106,3 +106,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+/* Remove the old red/amber accents from secondary local screens too. */
+.identity-card.is-active { border-color: #626973 !important; background: #1b1d21 !important; }
+.identity-symbol { background: #25282d !important; color: #d1d5db !important; }
+.identity-card i, .identity-program-grid article strong, .identity-brain-pulse { color: #c4c9d1 !important; }
+.identity-brain-pulse { background: #aeb4bd !important; box-shadow: none !important; }
+.identity-brain-link, .identity-visual-section { border-color: var(--line) !important; background: #141619 !important; }
+.workspace-status.status-running, .workspace-status.status-queued, .workspace-status.status-retrying,
+.workspace-status.status-succeeded, .workspace-status.status-failed, .workspace-status.status-interrupted {
+  color: #c4c9d1 !important; background: #25282d !important;
+}
+.workspace-actions button, .workspace-file button, .workspace-file-icon { border-color: #3a3e45 !important; background: #202329 !important; color: #d1d5db !important; }
+.learning-status, .learning-severity, .learning-category { filter: grayscale(1); }
+.conn-status, .capability-status, .status-badge { filter: grayscale(1); }

@@ -23,6 +23,7 @@ import { evaluateUltronOutcome } from "./ultron-outcome-evaluator";
 import { buildCognitiveInstructions, analyzeCognitiveProfile } from "./ultron-cognition";
 import { createUltronCheckpoint, validateUltronCheckpoint, buildUltronCheckpointPrompt, type Checkpoint } from "./ultron-state";
 import { emptyKnowledgeState, validateKnowledgeState, buildKnowledgePrompt, type KnowledgeState } from "./ultron-knowledge-state";
+import { captureExplicitKnowledge } from "./ultron-knowledge-capture";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
 import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, selectIndependentLearningEvidence, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
@@ -2261,6 +2262,8 @@ async function submit(raw: string): Promise<void> {
     if (started.ok) executionLedger = started.ledger;
   }
   convo.messages.push({ role: "user", content: text, ...(turnAttachments.length ? { attachments: turnAttachments } : {}) });
+  const knowledgeCapture = captureExplicitKnowledge(convo.knowledgeState ?? emptyKnowledgeState(), { id: `user-evidence-${convo.id}-${Date.now().toString(36)}`, text, source: "user_statement", observedAt: Date.now() });
+  convo.knowledgeState = knowledgeCapture.state;
   pendingAttachments = [];
   renderPendingAttachments();
   convo.updatedAt = Date.now();

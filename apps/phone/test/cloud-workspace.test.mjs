@@ -44,8 +44,8 @@ test('deduplicates by stable message ID and orders by cloud sequence number', ()
     ])],
   );
   assert.equal(result[0].messages.length, 3);
-  assert.deepEqual(result[0].messages.map((item) => item.id), ['m1', 'm2', 'm3']);
-  assert.deepEqual(result[0].messages.map((item) => item.sequenceNo), [1, 2, 3]);
+  assert.deepEqual([...result[0].messages].map((item) => item.id), ['m1', 'm2', 'm3']);
+  assert.deepEqual([...result[0].messages].map((item) => item.sequenceNo), [1, 2, 3]);
 });
 
 test('newer remote state updates matching message content and conversation title', () => {

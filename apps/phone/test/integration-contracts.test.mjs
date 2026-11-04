@@ -214,7 +214,8 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(main, /handleNativeTool/);
   assert.match(main, /ANDROID_PHONE_TOOL_RESULT/);
   assert.match(main, /runApprovedLocalTool/);
-  assert.match(main, /up to eight sequential tool calls/);\n  assert.match(main, /Phone messaging and app-opening actions remain limited to one action per turn/);
+  assert.match(main, /up to eight sequential tool calls/);
+  assert.match(main, /Phone messaging and app-opening actions remain limited to one action per turn/);
   assert.doesNotMatch(html, /id="proactive-btn"|id="sms-btn"|id="voice-btn"|id="mic-btn"|id="background-btn/);
 });
 

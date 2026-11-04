@@ -181,3 +181,14 @@ test('a replacement cannot suppress a fact from a different memory key', () => {
   const unrelated = { id:'theme-v2', key:'theme', value:'gold', confidence:.95, source:'user statement', observedAt:now, sensitivity:'ordinary', supersedes:'privacy-v1' };
   assert.deepEqual(brain.activeUltronMemoryFacts([important, unrelated], now).map(fact => fact.id), ['privacy-v1', 'theme-v2']);
 });
+
+
+test('ULTRON task ledgers preserve explicit continuation intent and inherited constraints', () => {
+  const profile = brain.classifyUltronTask('Continue', { continuation:true });
+  const ledger = brain.createUltronTaskLedger('task-resume', 'Continue', ['Prior task has an unfinished verification step.'], profile);
+  assert.equal(ledger.profile.intent, 'continuation');
+  assert.equal(ledger.profile.requiresVerification, true);
+  assert.ok(ledger.steps.some((step) => step.kind === 'verify'));
+  assert.match(brain.buildUltronLedgerPrompt(ledger), /intent=continuation/);
+  assert.match(brain.buildUltronLedgerPrompt(ledger), /unfinished verification step/);
+});

@@ -551,3 +551,28 @@ export async function saveCloudModelProfile(modelId: string, displayName = model
   }, { onConflict: 'owner_id,provider,model_id' });
   if (error) throw error;
 }
+
+const DEVICE_KEY = 'ultron.cloud.device-key.v1';
+
+export async function registerCloudDevice(): Promise<void> {
+  const session = await getCloudSession();
+  if (!session) return;
+  let deviceKey = '';
+  try {
+    deviceKey = window.localStorage.getItem(DEVICE_KEY) ?? '';
+    if (!deviceKey) {
+      deviceKey = uuid();
+      window.localStorage.setItem(DEVICE_KEY, deviceKey);
+    }
+  } catch {
+    deviceKey = uuid();
+  }
+  const { error } = await cloudClient.from('ultron_device_sync').upsert({
+    owner_id: session.user.id,
+    device_key: deviceKey,
+    device_name: (navigator.userAgent || 'ULTRON Android device').slice(0, 160),
+    platform: 'capacitor-android',
+    last_sync_at: new Date().toISOString(),
+  }, { onConflict: 'owner_id,device_key' });
+  if (error) throw error;
+}

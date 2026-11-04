@@ -1871,7 +1871,9 @@ async function remoteReply(
   const run = async (): Promise<ChatReply> => {
     const taskMessage = text;
     const agentId = await ensureAgent();
-    const cloudSession = await getCloudSession();
+    let cloudSession: Awaited<ReturnType<typeof getCloudSession>> = null;
+    try { cloudSession = await getCloudSession(); }
+    catch (error) { console.warn("[ULTRON Supabase session]", error); }
     const nativePhoneIntent = Capacitor.getPlatform() === "android"
       && /\b(whatsapp|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
     const body = JSON.stringify({

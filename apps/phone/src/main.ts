@@ -47,7 +47,8 @@ type NativeLocalAIPlugin = {
   getDeviceProfile(): Promise<{ deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
-  loadModel(options: { name: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
+  pickProjector(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
+  loadModel(options: { name: string; projectorName?: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
   generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
   cancelGeneration(): Promise<{ cancelled: boolean }>;
   runBenchmark(): Promise<{ model: string; output: string; contextTokens: number; largeModelMode: boolean; promptTokens: number; generatedTokens: number; promptMs: number; generationMs: number; tokensPerSecond: number; processPssKb: number; processPrivateDirtyKb: number }>;
@@ -153,6 +154,8 @@ const androidBatteryAccessButton = req<HTMLButtonElement>("#android-battery-acce
 const androidAppSettingsButton = req<HTMLButtonElement>("#android-app-settings");
 const endpointEl = req<HTMLInputElement>("#endpoint");
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
+const nativeProjectorButton = req<HTMLButtonElement>("#native-projector-import-btn");
+let selectedNativeProjectorName = "";
 const nativeModelStatus = req<HTMLElement>("#native-model-status");
 const deviceProfileEl = req<HTMLElement>("#device-profile");
 const nativeModelLoadButton = req<HTMLButtonElement>("#native-model-load-btn");
@@ -335,6 +338,21 @@ async function importNativeModel(): Promise<void> {
   }
 }
 
+async function importNativeProjector(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  nativeModelStatus.textContent = "Choose a compatible mmproj GGUF file. It will be copied into Ultran's private projector storage.";
+  try {
+    const imported = await NativeLocalAI.pickProjector();
+    if (imported.cancelled) return;
+    selectedNativeProjectorName = imported.name || "";
+    nativeModelStatus.textContent = "Imported projector " + selectedNativeProjectorName + " · " + formatBytes(imported.sizeBytes || 0) + ". Load a compatible vision model with this projector selected.";
+    nativeProjectorButton.textContent = selectedNativeProjectorName ? "Projector: " + selectedNativeProjectorName : "Import vision projector";
+  } catch (error) {
+    nativeModelStatus.dataset.tone = "bad";
+    nativeModelStatus.textContent = nativeFailureMessage("Projector import failed", error);
+  }
+}
+
 async function loadNativeModel(): Promise<void> {
   const name = nativeModelSelect.value;
   if (!name) return;
@@ -343,9 +361,9 @@ async function loadNativeModel(): Promise<void> {
   nativeModelUnloadButton.disabled = true;
   nativeModelStatus.textContent = "Opening model with memory-mapped weights. Large GGUF files may take time to map and can generate slowly…";
   try {
-    const result = await NativeLocalAI.loadModel({ name });
+    const result = await NativeLocalAI.loadModel({ name, projectorName: selectedNativeProjectorName || undefined });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · vision projector " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {
@@ -3066,6 +3084,7 @@ req<HTMLButtonElement>("#test-btn").addEventListener("click", () => void testLin
 req<HTMLButtonElement>("#native-model-pick-btn").addEventListener("click", () => void importNativeModel());
 renderCuratedModels();
 nativeModelLoadButton.addEventListener("click", () => void loadNativeModel());
+nativeProjectorButton.addEventListener("click", () => void importNativeProjector());
 nativeModelUnloadButton.addEventListener("click", () => void unloadNativeModel());
 nativeModelDeleteButton.addEventListener("click", () => void deleteNativeModel());
 nativeModelBenchmarkButton.addEventListener("click", () => void runNativeModelBenchmark());

@@ -59,3 +59,31 @@ test('an unrelated successful tool cannot validate a different claimed side effe
   const issues = selfModel.auditUltronIdentityOutput('Search the web', 'I successfully sent the email.', { successfulActions: ['web.search'] });
   assert.ok(issues.some(issue => issue.code === 'unsupported-action-claim'));
 });
+
+test('identity decision gate denies hard-constraint conflicts and unavailable capabilities', () => {
+  const conflict = selfModel.evaluateIdentityDecision({ action: 'export private data', explicitlyRequested: true, risk: 'critical', requiresExternalEffect: true, conflictsWithHardConstraint: true });
+  const unavailable = selfModel.evaluateIdentityDecision({ action: 'send SMS', explicitlyRequested: true, risk: 'low', requiresExternalEffect: true, capability: { id: 'sms', label: 'SMS', status: 'unavailable', evidence: 'No SMS adapter' } });
+  assert.equal(conflict.outcome, 'deny');
+  assert.equal(unavailable.outcome, 'deny');
+});
+
+test('identity decision gate requires exact approval for high-impact external effects', () => {
+  const pending = selfModel.evaluateIdentityDecision({ action: 'publish release', explicitlyRequested: true, risk: 'high', requiresExternalEffect: true, reversible: false });
+  const approved = selfModel.evaluateIdentityDecision({ action: 'publish release', explicitlyRequested: true, risk: 'high', requiresExternalEffect: true, reversible: false, approvalMatchesExactAction: true, capability: { id: 'publish', label: 'Publishing', status: 'verified_available', evidence: 'Connector ready' } });
+  assert.equal(pending.outcome, 'needs_approval');
+  assert.equal(approved.outcome, 'allow');
+});
+
+test('identity decision gate rejects inferred external actions but permits safe local reasoning', () => {
+  const inferred = selfModel.evaluateIdentityDecision({ action: 'send a message', explicitlyRequested: false, risk: 'low', requiresExternalEffect: true });
+  const local = selfModel.evaluateIdentityDecision({ action: 'summarize a local note', explicitlyRequested: false, risk: 'low', requiresExternalEffect: false });
+  assert.equal(inferred.outcome, 'deny');
+  assert.equal(local.outcome, 'allow');
+});
+
+test('self-model prompt defines a decision hierarchy where style cannot override safety', () => {
+  const prompt = selfModel.buildUltronSelfModelPrompt('local model');
+  assert.match(prompt, /DECISION ORDER/);
+  assert.match(prompt, /style never overrides higher levels/);
+  assert.match(prompt, /safest reversible option/);
+});

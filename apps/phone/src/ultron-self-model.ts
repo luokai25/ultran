@@ -59,6 +59,21 @@ export type IdentityAuditContext = {
   verifiedCapabilities?: readonly CapabilityEvidence[];
 };
 
+export type IdentityDecisionInput = { action: string; explicitlyRequested: boolean; risk: "low" | "moderate" | "high" | "critical"; requiresExternalEffect: boolean; approvalMatchesExactAction?: boolean; capability?: CapabilityEvidence; reversible?: boolean; conflictsWithHardConstraint?: boolean };
+export type IdentityDecision = { outcome: "allow" | "needs_approval" | "deny" | "not_applicable"; reasons: string[]; requiredNextStep?: string };
+
+/** Deterministic constitutional gate independent of model-generated prose. */
+export function evaluateIdentityDecision(input: IdentityDecisionInput): IdentityDecision {
+  if (!input.action.trim()) return { outcome: "not_applicable", reasons: ["No concrete action was supplied."] };
+  if (input.conflictsWithHardConstraint) return { outcome: "deny", reasons: ["The action conflicts with a non-negotiable safety, privacy, or platform constraint."] };
+  if (input.capability?.status === "unavailable") return { outcome: "deny", reasons: ["The required capability is unavailable: " + input.capability.evidence] };
+  if (input.capability && input.capability.status !== "verified_available") return { outcome: "needs_approval", reasons: ["Capability status is " + input.capability.status + "; availability is not verified."], requiredNextStep: "Verify capability and obtain required permission." };
+  if (!input.requiresExternalEffect) return { outcome: "allow", reasons: ["No external side effect; no hard constraint conflict."] };
+  if (!input.explicitlyRequested) return { outcome: "deny", reasons: ["External side effects require explicit user intent; inferred helpfulness is not consent."] };
+  if ((input.risk === "high" || input.risk === "critical" || input.reversible === false) && !input.approvalMatchesExactAction) return { outcome: "needs_approval", reasons: ["The action is high-impact, critical, or irreversible.", "Approval must match this exact action and scope."], requiredNextStep: "Present the exact action, target, and consequences for explicit approval." };
+  return { outcome: "allow", reasons: [input.approvalMatchesExactAction ? "Exact pending action has matching approval." : "Explicitly requested operation is within low-impact policy."] };
+}
+
 /** A capability can be claimed as available only when its evidence says so. */
 export function assessCapabilityClaim(capability: CapabilityEvidence): CapabilityClaimDecision {
   switch (capability.status) {
@@ -93,12 +108,20 @@ export function buildUltronSelfModelPrompt(model: string, capabilities: readonly
     `Purpose: ${ULTRON_IDENTITY_CONSTITUTION.purpose}`,
     ULTRON_IDENTITY_CONSTITUTION.ownership,
     `Selected reasoning engine: ${engine}. It is a replaceable component, not the identity owner. Adapt to its actual context, speed, modalities and tool support.`,
-    "CONSTITUTION:",
-    ...ULTRON_IDENTITY_CONSTITUTION.principles.map((item) => `- ${item}`),
+    "CONSTITUTION — DECISION ORDER:",
+    "1. System, platform, legal and safety boundaries are absolute.",
+    "2. The user's latest explicit instruction defines the task unless it conflicts with level 1.",
+    "3. Preserve hard project constraints, privacy, ownership and approved scope.",
+    "4. Consent and exact-action approval govern external or consequential effects.",
+    "5. Truth, evidence and verification govern factual and completion claims.",
+    "6. Optimize the requested outcome, reversibility, reliability and resource use.",
+    "7. Expressive personality governs presentation only; style never overrides higher levels.",
+    ...ULTRON_IDENTITY_CONSTITUTION.principles.map((item) => "- " + item),
     "NON-NEGOTIABLE INVARIANTS:",
     ...ULTRON_IDENTITY_CONSTITUTION.invariants.map((item) => `- ${item}`),
     "CURRENT CAPABILITY EVIDENCE:",
     ...(capabilityLines.length ? capabilityLines : ["- No additional runtime capability evidence was supplied. Do not infer availability from this prompt." ]),
+    "When principles conflict, apply the decision order. Prefer the safest reversible option; ask one targeted clarification when the conflict cannot be resolved without guessing.",
     "Do not describe private internal reasoning as a transcript. Present conclusions, concise rationale and verifiable outcomes.",
   ].join("\n");
 }

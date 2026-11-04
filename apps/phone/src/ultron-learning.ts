@@ -67,6 +67,33 @@ export function createLearningLedger(): LearningLedger {
   return { version: 1, events: [], proposals: [], updatedAt: Date.now() };
 }
 
+/**
+ * Selects recurrence evidence from independent task/conversation contexts.
+ * Multiple reports sharing one correlationId count as one occurrence; the
+ * newest report is retained so evidence stays bounded and representative.
+ */
+export function selectIndependentLearningEvidence(
+  events: readonly LearningEvent[],
+  options: { category: string; cause: LearningCause; now?: number; windowDays?: number; limit?: number },
+): LearningEvent[] {
+  const now = options.now ?? Date.now();
+  const windowDays = clamp(options.windowDays ?? 30, 1, 365);
+  const limit = Math.round(clamp(options.limit ?? 5, 1, 8));
+  if (!Number.isFinite(now) || now <= 0) return [];
+  const category = clean(options.category, 48).toLowerCase();
+  if (!category) return [];
+  const cutoff = now - windowDays * 86_400_000;
+  const independent = new Map<string, LearningEvent>();
+  for (const event of events) {
+    if (event.category !== category || event.cause !== options.cause || event.signal === "user_success") continue;
+    if (!Number.isFinite(event.at) || event.at < cutoff || event.at > now) continue;
+    const key = event.correlationId ?? event.id;
+    const previous = independent.get(key);
+    if (!previous || event.at > previous.at) independent.set(key, event);
+  }
+  return [...independent.values()].sort((a, b) => a.at - b.at).slice(-limit);
+}
+
 /** Validates imported local data before it is trusted by the learning engine. */
 export function validateLearningLedger(value: unknown): LearningLedger {
   const fallback = createLearningLedger();

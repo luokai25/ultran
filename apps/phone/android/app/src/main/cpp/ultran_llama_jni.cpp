@@ -7,11 +7,13 @@
 #include <sstream>
 #include <cstddef>
 #include <mutex>
+#include <memory>
 #include <string>
 #include <unistd.h>
 #include <vector>
 #include "llama.h"
 #include "mtmd.h"
+#include "mtmd-helper.h"
 
 namespace {
 std::mutex g_mutex;
@@ -224,7 +226,7 @@ Java_app_ultran_mobile_NativeLlama_nativeLoadModel(JNIEnv *env, jclass, jstring 
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_app_ultran_mobile_NativeLlama_nativeGenerate(
-    JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jint max_tokens, jobject callback) {
+    JNIEnv *env, jclass, jobjectArray jroles, jobjectArray jcontents, jobjectArray jimages, jint max_tokens, jobject callback) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_model || !g_context) return env->NewStringUTF("No native model is loaded.");
     using Clock = std::chrono::steady_clock;
@@ -252,28 +254,107 @@ Java_app_ultran_mobile_NativeLlama_nativeGenerate(
     }
 
     const std::string prompt = format_chat(roles, contents);
-    auto tokens = tokenize(prompt);
-    if (tokens.empty()) return env->NewStringUTF("The model could not tokenize this conversation.");
-    const int limit = std::max(16, std::min({512, static_cast<int>(max_tokens), static_cast<int>(g_context_tokens / 2)}));
+    std::vector<std::vector<unsigned char>> image_buffers;
+    const jsize image_count = jimages ? env->GetArrayLength(jimages) : 0;
+    if (image_count > 4) return env->NewStringUTF("On-device vision accepts up to four images in one prompt.");
+    const int limit = std::max(16, std::min({512, static_cast<int>(max_tokens), static_cast<int>(g_context_tokens / 2), image_count > 0 ? 128 : 512}));
     const size_t prompt_limit = static_cast<size_t>(g_context_tokens - static_cast<uint32_t>(limit) - 16);
-    if (tokens.size() > prompt_limit) {
-        // Preserve the opening system instructions and the newest conversation
-        // turns instead of chopping the system prompt off the front.
-        const size_t prefix_tokens = std::min<size_t>(256, prompt_limit / 4);
-        const size_t suffix_tokens = prompt_limit - prefix_tokens;
-        tokens.erase(tokens.begin() + static_cast<ptrdiff_t>(prefix_tokens),
-                     tokens.end() - static_cast<ptrdiff_t>(suffix_tokens));
+    image_buffers.reserve(static_cast<size_t>(image_count));
+    size_t total_image_bytes = 0;
+    for (jsize i = 0; i < image_count; ++i) {
+        auto image = static_cast<jbyteArray>(env->GetObjectArrayElement(jimages, i));
+        if (!image) return env->NewStringUTF("An attached image could not be read.");
+        const jsize length = env->GetArrayLength(image);
+        if (length <= 0 || length > 2 * 1024 * 1024) {
+            env->DeleteLocalRef(image);
+            return env->NewStringUTF("An attached image exceeds the 1 MB native vision limit.");
+        }
+        total_image_bytes += static_cast<size_t>(length);
+        if (total_image_bytes > 4 * 1024 * 1024) {
+            env->DeleteLocalRef(image);
+            return env->NewStringUTF("Attached images exceed the 4 MB combined native vision limit.");
+        }
+        std::vector<unsigned char> bytes(static_cast<size_t>(length));
+        env->GetByteArrayRegion(image, 0, length, reinterpret_cast<jbyte *>(bytes.data()));
+        env->DeleteLocalRef(image);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return env->NewStringUTF("An attached image could not be copied into native memory.");
+        }
+        image_buffers.push_back(std::move(bytes));
     }
 
-    g_last_prompt_tokens = tokens.size();
-    llama_memory_clear(llama_get_memory(g_context), true);
+    g_last_prompt_tokens = 0;
+    g_last_generated_tokens = 0;
+    g_last_prompt_ms = 0.0;
+    g_last_generation_ms = 0.0;
     const auto prompt_start = Clock::now();
-    for (size_t offset = 0; offset < tokens.size(); offset += 64) {
-        if (g_cancel_requested.load(std::memory_order_acquire)) return env->NewStringUTF("");
-        const size_t count = std::min<size_t>(64, tokens.size() - offset);
-        llama_batch prompt_batch = llama_batch_get_one(tokens.data() + offset, static_cast<int32_t>(count));
-        if (llama_decode(g_context, prompt_batch) != 0) {
-            return env->NewStringUTF("The model failed while processing the prompt. Try a shorter conversation.");
+    llama_memory_clear(llama_get_memory(g_context), true);
+
+    if (!image_buffers.empty()) {
+        if (!g_mtmd_context || !mtmd_support_vision(g_mtmd_context)) {
+            return env->NewStringUTF("Load a compatible vision projector before asking the on-device model to inspect images.");
+        }
+        std::vector<std::unique_ptr<mtmd_bitmap, decltype(&mtmd_bitmap_free)>> owned_bitmaps;
+        std::vector<const mtmd_bitmap *> bitmaps;
+        owned_bitmaps.reserve(image_buffers.size());
+        bitmaps.reserve(image_buffers.size());
+        const mtmd_helper_init_opt bitmap_options = mtmd_helper_init_opt_default();
+        for (const auto &bytes : image_buffers) {
+            const auto wrapper = mtmd_helper_bitmap_init_from_buf(
+                g_mtmd_context, bytes.data(), bytes.size(), false, bitmap_options);
+            if (!wrapper.bitmap) {
+                return env->NewStringUTF("The native vision engine could not decode an attached image. Use PNG, JPEG, or another supported image format.");
+            }
+            owned_bitmaps.emplace_back(wrapper.bitmap, mtmd_bitmap_free);
+        }
+        for (const auto &bitmap : owned_bitmaps) bitmaps.push_back(bitmap.get());
+
+        mtmd_input_text input_text{prompt.c_str(), prompt.size(), true, true};
+        std::unique_ptr<mtmd_input_chunks, decltype(&mtmd_input_chunks_free)> chunks(
+            mtmd_input_chunks_init(), mtmd_input_chunks_free);
+        if (!chunks) return env->NewStringUTF("Could not allocate the native multimodal prompt.");
+        const int32_t tokenize_result = mtmd_tokenize(
+            g_mtmd_context, chunks.get(), &input_text, bitmaps.data(), bitmaps.size());
+        if (tokenize_result != 0) {
+            return env->NewStringUTF(tokenize_result == 1
+                ? "The image markers did not match the attached images."
+                : "The native vision engine could not prepare the attached images.");
+        }
+        const size_t prompt_tokens = mtmd_helper_get_n_tokens(chunks.get());
+        const llama_pos prompt_positions = mtmd_helper_get_n_pos(chunks.get());
+        if (prompt_tokens == 0 || prompt_positions <= 0) {
+            return env->NewStringUTF("The native vision engine produced an empty prompt.");
+        }
+        if (static_cast<size_t>(prompt_positions) > prompt_limit) {
+            return env->NewStringUTF("The images and conversation exceed this model's available context. Shorten the conversation or attach fewer/smaller images.");
+        }
+        g_last_prompt_tokens = prompt_tokens;
+        llama_pos new_n_past = 0;
+        const int32_t eval_result = mtmd_helper_eval_chunks(
+            g_mtmd_context, g_context, chunks.get(), 0, 0, 64, true, &new_n_past);
+        if (eval_result != 0) {
+            return env->NewStringUTF("The on-device model failed while encoding or processing the attached image. Check that the projector matches this model and that enough memory is available.");
+        }
+    } else {
+        auto tokens = tokenize(prompt);
+        if (tokens.empty()) return env->NewStringUTF("The model could not tokenize this conversation.");
+        if (tokens.size() > prompt_limit) {
+            // Preserve the opening system instructions and the newest conversation
+            // turns instead of chopping the system prompt off the front.
+            const size_t prefix_tokens = std::min<size_t>(256, prompt_limit / 4);
+            const size_t suffix_tokens = prompt_limit - prefix_tokens;
+            tokens.erase(tokens.begin() + static_cast<ptrdiff_t>(prefix_tokens),
+                         tokens.end() - static_cast<ptrdiff_t>(suffix_tokens));
+        }
+        g_last_prompt_tokens = tokens.size();
+        for (size_t offset = 0; offset < tokens.size(); offset += 64) {
+            if (g_cancel_requested.load(std::memory_order_acquire)) return env->NewStringUTF("");
+            const size_t batch_count = std::min<size_t>(64, tokens.size() - offset);
+            llama_batch prompt_batch = llama_batch_get_one(tokens.data() + offset, static_cast<int32_t>(batch_count));
+            if (llama_decode(g_context, prompt_batch) != 0) {
+                return env->NewStringUTF("The model failed while processing the prompt. Try a shorter conversation.");
+            }
         }
     }
 

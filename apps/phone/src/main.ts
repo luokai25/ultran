@@ -49,7 +49,7 @@ type NativeLocalAIPlugin = {
   pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
   pickProjector(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
   loadModel(options: { name: string; projectorName?: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
-  generate(options: { messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
+  generate(options: { messages: Array<{ role: Role | "system"; content: string; images?: string[] }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
   cancelGeneration(): Promise<{ cancelled: boolean }>;
   runBenchmark(): Promise<{ model: string; output: string; contextTokens: number; largeModelMode: boolean; promptTokens: number; generatedTokens: number; promptMs: number; generationMs: number; tokensPerSecond: number; processPssKb: number; processPrivateDirtyKb: number }>;
   unloadModel(): Promise<{ loaded: boolean }>;
@@ -363,7 +363,7 @@ async function loadNativeModel(): Promise<void> {
   try {
     const result = await NativeLocalAI.loadModel({ name, projectorName: selectedNativeProjectorName || undefined });
     nativeModelLoaded = result.loaded;
-    nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · projector initialized (image inference integration pending): " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
+    nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · vision ready: " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
     setLink("online", "on-device AI");
     await refreshNativeModels();
   } catch (error) {
@@ -2010,7 +2010,7 @@ let activeTypewriterCancel: (() => void) | null = null;
 let activeReplyBody: HTMLElement | null = null;
 let activeAssistantMessage: Message | null = null;
 
-async function generateNativeStreaming(messages: Array<{ role: Role | "system"; content: string }>, maxTokens: number, onToken: (token: string) => void): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }> {
+async function generateNativeStreaming(messages: Array<{ role: Role | "system"; content: string; images?: string[] }>, maxTokens: number, onToken: (token: string) => void): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }> {
   const listener = await NativeLocalAI.addListener("generationToken", (event) => onToken(event.token));
   try {
     return await NativeLocalAI.generate({ messages, maxTokens });
@@ -2079,7 +2079,9 @@ async function submit(raw: string): Promise<void> {
     .map((item) => `\n\n[Attached file: ${item.name}]\n${item.text}`).join("");
   const requestText = text + attachmentContext;
   const nativeRequestText = requestText + turnAttachments.filter((item) => !item.text)
-    .map((item) => `\n\n[${item.type.startsWith("image/") ? "Image" : item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. This on-device GGUF model is text-only in this build, so the file bytes are not included in its inference context.]`).join("");
+    .map((item) => item.dataUrl
+      ? "\n\n[Image attached: " + item.name + (selectedNativeProjectorName ? ". The image is included for visual analysis." : ". Import a compatible mmproj projector to enable local image understanding.") + "]"
+      : "\n\n[" + (item.type === "application/pdf" ? "PDF" : "File") + " attached: " + item.name + ". This file type was not extracted for on-device inference.]").join("");
   const remoteRequestText = (requestText + turnAttachments.filter((item) => !item.text && !item.dataUrl)
     .map((item) => `\n\n[${item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. Its contents were not extracted.]`).join("")).slice(0, 16_000);
   const remoteBackgroundRequestText = (remoteRequestText + turnAttachments.filter((item) => item.dataUrl)
@@ -2123,7 +2125,12 @@ async function submit(raw: string): Promise<void> {
       const runtimeInventory = await localRuntimeInventoryPrompt();
       const messages = [
         { role: "system" as const, content: buildCapabilityPrompt(text, "on-device llama.cpp") + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT + sharedGraphPrompt(convo.id) + runtimeInventory },
-        ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200),
+        ...budgetConversation(convo.messages, profile.contextMessages, 2600, 1200).map((item, index, all) => ({
+          ...item,
+          ...(index === all.length - 1 && item.role === "user" && selectedNativeProjectorName && item.attachments?.some((attachment) => attachment.dataUrl)
+            ? { images: item.attachments.filter((attachment) => attachment.dataUrl).slice(0, 4).map((attachment) => attachment.dataUrl!.split(",", 2)[1] ?? "") }
+            : {}),
+        })),
       ];
       if (messages.length > 1 && messages[messages.length - 1]?.role === "user") messages[messages.length - 1]!.content = nativeRequestText;
       renderLiveEvent(reply.body, { type: "thinking", stage: "planning", label: "Planning your request" });

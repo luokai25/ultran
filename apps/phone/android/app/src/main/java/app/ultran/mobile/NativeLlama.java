@@ -10,7 +10,7 @@ final class NativeLlama {
     static native String nativeVersion();
     static native String nativeLoadModel(String path, String projectorPath, int contextTokens, boolean aggressiveLazyLoading);
     interface TokenCallback { void onToken(String token); }
-    static native String nativeGenerate(String[] roles, String[] contents, int maxTokens, TokenCallback callback);
+    static native String nativeGenerate(String[] roles, String[] contents, byte[][] images, int maxTokens, TokenCallback callback);
     static native void nativeCancelGeneration();
     static native void nativeResetGenerationCancellation();
     static native String nativeGetLastMetrics();

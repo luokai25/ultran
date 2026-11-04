@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.StatFs;
 import android.os.Build;
 import android.os.Debug;
+import android.util.Base64;
 import android.provider.OpenableColumns;
 
 import com.getcapacitor.annotation.ActivityCallback;
@@ -732,6 +733,7 @@ public class UltranLocalAiPlugin extends Plugin {
                 String output = NativeLlama.nativeGenerate(
                         new String[]{"user"},
                         new String[]{"Reply with one short word: READY."},
+                        new byte[0][],
                         48,
                         null
                 );
@@ -762,17 +764,38 @@ public class UltranLocalAiPlugin extends Plugin {
 
         List<String> roles = new ArrayList<>();
         List<String> contents = new ArrayList<>();
+        List<byte[]> imagePayloads = new ArrayList<>();
+        long totalImageBytes = 0;
         try {
             for (int i = 0; i < messages.length(); i++) {
                 JSONObject message = messages.getJSONObject(i);
                 String role = message.optString("role", "");
                 String content = message.optString("content", "");
                 if (!(role.equals("system") || role.equals("user") || role.equals("assistant"))) continue;
+                org.json.JSONArray images = message.optJSONArray("images");
+                if (images != null && images.length() > 0) {
+                    if (loadedProjectorPath == null) throw new IllegalArgumentException("Import and load a compatible mmproj projector before attaching images to the on-device model.");
+                    if (imagePayloads.size() + images.length() > 4) throw new IllegalArgumentException("On-device vision accepts up to four images in one prompt.");
+                    StringBuilder markers = new StringBuilder();
+                    for (int imageIndex = 0; imageIndex < images.length(); imageIndex++) {
+                        String encoded = images.optString(imageIndex, "");
+                        int comma = encoded.indexOf(',');
+                        if (comma >= 0) encoded = encoded.substring(comma + 1);
+                        if (encoded.isEmpty() || encoded.length() > 2_800_000) throw new IllegalArgumentException("An attached image is empty or exceeds the native vision size limit.");
+                        byte[] decoded = Base64.decode(encoded, Base64.DEFAULT);
+                        if (decoded.length == 0 || decoded.length > 2 * 1024 * 1024) throw new IllegalArgumentException("An attached image exceeds the 2 MB native vision limit.");
+                        totalImageBytes += decoded.length;
+                        if (totalImageBytes > 4L * 1024L * 1024L) throw new IllegalArgumentException("Attached images exceed the 4 MB combined native vision limit.");
+                        imagePayloads.add(decoded);
+                        markers.append("\n\n<__media__>");
+                    }
+                    content += markers.toString();
+                }
                 roles.add(role);
                 contents.add(content);
             }
-        } catch (JSONException error) {
-            call.reject("Conversation messages are invalid.");
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Conversation messages are invalid." : error.getMessage());
             return;
         }
         if (roles.isEmpty()) {
@@ -782,6 +805,7 @@ public class UltranLocalAiPlugin extends Plugin {
 
         final String[] roleArray = roles.toArray(new String[0]);
         final String[] contentArray = contents.toArray(new String[0]);
+        final byte[][] imageArray = imagePayloads.toArray(new byte[0][]);
         final int maxTokens = Math.max(32, Math.min(512, call.getInt("maxTokens", 256)));
         NativeLlama.nativeResetGenerationCancellation();
         inferenceExecutor.execute(() -> {
@@ -790,7 +814,7 @@ public class UltranLocalAiPlugin extends Plugin {
                     call.reject("The local model was unloaded before inference started.");
                     return;
                 }
-                String text = NativeLlama.nativeGenerate(roleArray, contentArray, maxTokens, token -> {
+                String text = NativeLlama.nativeGenerate(roleArray, contentArray, imageArray, maxTokens, token -> {
                     android.app.Activity activity = getActivity();
                     if (activity == null) return;
                     activity.runOnUiThread(() -> {

@@ -326,7 +326,8 @@ test("curated phone models declare the input modes supported by the native runti
   assert.match(modelLibrary, /nativeInput: "text"/);
   assert.equal((modelLibrary.match(/nativeInput: "text"/g) ?? []).length, 6);
   assert.match(main, /Native input: \$\{model\.nativeInput\} only/);
-  assert.match(main, /on-device GGUF model is text-only in this build/);
+  assert.match(main, /images: item\.attachments\.filter/);
+  assert.match(main, /The image is included for visual analysis/);
 });
 
 test("skills engine exposes bounded read-only search and resource reads for references", () => {
@@ -449,7 +450,7 @@ test("Android native vision projector import is private, optional, compatibility
   assert.ok(html.includes('id="native-projector-import-btn"'));
   assert.match(main, /NativeLocalAI\.pickProjector\(\)/);
   assert.match(main, /projectorName: selectedNativeProjectorName/);
-  assert.match(main, /image inference integration pending/);
+  assert.match(main, /vision ready:/);
   assert.match(nativePluginJava, /public void pickProjector\(PluginCall call\)/);
   assert.match(nativePluginJava, /new File\(getContext\(\)\.getFilesDir\(\), "projectors"\)/);
   assert.match(nativePluginJava, /mmproj GGUF projector/);
@@ -458,6 +459,15 @@ test("Android native vision projector import is private, optional, compatibility
   assert.match(nativeJni, /#include "mtmd\.h"/);
   assert.match(nativeJni, /mtmd_init_from_file\(projector_path\.c_str\(\), g_model, mtmd_params\)/);
   assert.match(nativeJni, /mtmd_support_vision\(g_mtmd_context\)/);
+  assert.ok(nativeJni.includes('#include "mtmd-helper.h"'));
+  assert.ok(nativeJni.includes("mtmd_helper_bitmap_init_from_buf"));
+  assert.ok(nativeJni.includes("mtmd_tokenize("));
+  assert.ok(nativeJni.includes("mtmd_helper_eval_chunks("));
+  assert.ok(nativeJni.includes("jobjectArray jimages"));
+  assert.ok(nativePluginJava.includes('optJSONArray("images")'));
+  assert.ok(nativePluginJava.includes("Base64.decode"));
+  assert.ok(nativePluginJava.includes("imageArray"));
+  assert.ok(nativeLlamaJava.includes("byte[][] images"));
   assert.match(nativeJni, /mtmd_free\(g_mtmd_context\)/);
   assert.match(nativeBuild, /tools\/mtmd/);
 });

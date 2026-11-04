@@ -554,6 +554,11 @@ test("Supabase is the default shared runtime for ULTRON-authored tools and skill
   assert.match(main, /runtime\.tool\.create/);
   assert.match(main, /runtime\.tool\.run/);
   assert.match(main, /skills\.cloud\.save/);
+  assert.match(main, /database\.ddl/);
+  assert.match(main, /database\.rpc/);
+  assert.match(main, /allowAnotherTool/);
+  assert.match(main, /cloudToolDepth \\+ 1/);
+  assert.match(main, /Maximum eight tool calls total/);
   assert.match(main, /invokeUltronRuntime/);
   assert.match(runtimeCloud, /functions\.invoke\("ultron-runtime"/);
   assert.match(capabilityPanel, /runtimeInvoke\("list_tools"/);

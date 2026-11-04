@@ -7,33 +7,35 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-test("Ultron v3 finishing stylesheet is loaded after all existing theme layers", async () => {
+test("Ultron quiet UI stylesheet is loaded after all existing theme layers", async () => {
   const html = await read("index.html");
   const paths = [
     "./src/styles.css",
     "./src/workspace.css",
     "./src/experience.css",
     "./src/finish.css",
+    "./src/quiet-ui.css",
   ];
   const positions = paths.map((path) => html.indexOf(path));
   assert.ok(positions.every((position) => position >= 0), "every required stylesheet must be loaded");
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b),
-    "finishing layer must load after base, workspace, and experience styles");
+    "quiet layer must load after base, workspace, experience and finishing styles");
 });
 
-test("finishing layer maintains one accent and supports narrow devices and accessibility", async () => {
-  const css = await read("src/finish.css");
-  assert.match(css, /--gold:\s*#e52d41/i);
-  assert.match(css, /--gold-bright:\s*#ff7180/i);
-  assert.match(css, /max-width:\s*360px/);
+test("quiet layer maintains a monochrome palette and supports narrow devices and accessibility", async () => {
+  const css = await read("src/quiet-ui.css");
+  assert.match(css, /--void:\s*#090a0b/i);
+  assert.match(css, /--accent:\s*#aeb4bd/i);
+  assert.doesNotMatch(css, /#e52d41|#ff7180|#8d071d/i);
+  assert.match(css, /max-width:\s*390px/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
-  assert.match(css, /overscroll-behavior-x:\s*none/);
+  assert.match(css, /overscroll-behavior/);
 });
 
 
 test("phone experience visuals do not reintroduce the retired gold palette", async () => {
-  const css = await read("src/experience.css");
+  const css = await read("src/quiet-ui.css");
   for (const legacyColor of [
     "#fff5d8", "#f2ead8", "#f1d58e", "#a58f5b", "#e6cb83",
     "#e6c77a", "#e6c878", "#8e7140", "#6d532c", "#f0d99a", "#c49b4d",
@@ -50,17 +52,18 @@ test("phone experience visuals do not reintroduce the retired gold palette", asy
 });
 
 
-test("local model import is directly discoverable on the home screen and wired to native import", async () => {
+test("local model import is available from the model picker without a duplicate home action", async () => {
   const html = await read("index.html");
   const app = await read("src/main.ts");
-  assert.match(html, /id="hero-import-model"[^>]*>Import a local model/);
-  assert.match(app, /#hero-import-model[\s\S]{0,120}importNativeModel\(\)/);
+  assert.doesNotMatch(html, /id="hero-import-model"/);
+  assert.match(html, /id="chat-model-import"/);
+  assert.match(app, /#chat-model-import[\s\S]*?importNativeModel\(\)/);
 });
 
 
-test("knowledge map uses the unified Ultron plasma accent instead of legacy gold", async () => {
+test("knowledge map uses the neutral monochrome Ultron palette", async () => {
   const map = await read("src/mind-map.ts");
-  assert.match(map, /root:\s*"#ff7180"/);
-  assert.match(map, /project:\s*"#e52d41"/);
+  assert.match(map, /root:\s*"#e5e7eb"/);
+  assert.match(map, /project:\s*"#c4c9d1"/);
   assert.doesNotMatch(map, /#e5c36b|#c99b52/i);
 });

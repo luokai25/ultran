@@ -42,7 +42,7 @@ test("fixed navigation cannot sit above the drawer, connector panel, or settings
   assert.match(workspace, /\.workspace-panel\{position:fixed;z-index:60;/);
 });
 
-test("plasma orb identity stays aligned across web, Android generator, and adaptive icon", async () => {
+test("monochrome orb identity stays aligned across web, Android generator, and adaptive icon", async () => {
   const [mark, generator, vector, background] = await Promise.all([
     read("src/mark.ts"),
     read("android/tools/generate_assets.py"),
@@ -54,8 +54,8 @@ test("plasma orb identity stays aligned across web, Android generator, and adapt
   assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
   assert.ok(generator.includes("Two orbital ellipses and a three-layer plasma nucleus"));
   assert.doesNotMatch(generator, /U_START|U_CURVE|U_STROKE|CREST/);
-  assert.match(vector, /android:strokeColor="#E52D41" android:strokeWidth="2.5"/);
-  assert.match(vector, /android:strokeColor="#FF7180" android:strokeWidth="2.4"/);
+  assert.match(vector, /android:strokeColor="#AEB4BD" android:strokeWidth="2.5"/);
+  assert.match(vector, /android:strokeColor="#E2E5E9" android:strokeWidth="2.4"/);
   assert.doesNotMatch(mark, /M34 34v21/);
   assert.match(background, /#080609/);
   assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
@@ -136,7 +136,7 @@ test("model import is directly reachable from the model picker", async () => {
   assert.match(main, /#chat-model-import[\s\S]*?importNativeModel\(\)/);
 });
 
-test("the plasma-red identity is unified and mobile content stays within the viewport", async () => {
+test("the neutral identity is unified and mobile content stays within the viewport", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const experience = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
   assert.doesNotMatch(html, /redline\.css/);
@@ -145,13 +145,13 @@ test("the plasma-red identity is unified and mobile content stays within the vie
 });
 
 
-test("version 3 keeps one red theme and retains native capability entry points", async () => {
+test("version 3 uses a neutral ULTRON identity and retains native capability entry points", async () => {
   const [pkg, main, html, mark] = await Promise.all([
     read("package.json"), read("src/main.ts"), read("index.html"), read("src/mark.ts"),
   ]);
   assert.ok(pkg.includes('"version": "3.0.0"'));
   assert.ok(main.includes('type ThemeId = "ultron"'));
-  assert.ok(main.includes("accent: 0xe52d41"));
+  assert.ok(main.includes("accent: 0x9ca3af"));
   assert.ok(main.includes("importNativeModel()"));
   assert.ok(main.includes("initConnectors("));
   assert.ok(main.includes("NativeRuntime"));
@@ -159,7 +159,7 @@ test("version 3 keeps one red theme and retains native capability entry points",
   assert.ok(html.includes('id="chat-model-import"'));
   assert.ok(html.includes('id="ultron-runtime-download"'));
   assert.ok(mark.includes("ultron-core"));
-  assert.ok(mark.includes("#ff304b"));
+  assert.ok(mark.includes("#9ca3af"));
 });
 
 test("chat is the only primary surface and retired Worlds, Luonix, Agents, and More screens are removed", async () => {

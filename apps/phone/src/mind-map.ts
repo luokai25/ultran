@@ -35,7 +35,7 @@ export function buildMindMap(conversations: MindConversation[], memory?: MemoryG
 export function renderMindMap(svg: SVGSVGElement, map: MindMap, onSelect: (node: MindNode)=>void, query = ""): void {
   const ns="http://www.w3.org/2000/svg"; svg.replaceChildren();
   const center={x:450,y:325};
-  const colors:Record<MindNode["kind"],string>={root:"#ff7180",project:"#e52d41",topic:"#70b7c7",decision:"#bd91d4",session:"#7d9f87",concept:"#64b6a8",person:"#d5a65d",preference:"#a99be8"};
+  const colors:Record<MindNode["kind"],string>={root:"#e5e7eb",project:"#c4c9d1",topic:"#aeb4bd",decision:"#9299a3",session:"#737b86",concept:"#d1d5db",person:"#9ca3af",preference:"#b8bec7"};
   const needle = query.trim().toLocaleLowerCase();
   const visibleNodes = map.nodes.filter((node) => node.kind === "root" || !needle || `${node.label} ${node.kind} ${node.examples.join(" ")}`.toLocaleLowerCase().includes(needle));
   const groups: MindNode[][] = [
@@ -52,18 +52,18 @@ export function renderMindMap(svg: SVGSVGElement, map: MindMap, onSelect: (node:
   }));
   for(const edge of map.edges??[]){
     const a=positions.get(edge.from),b=positions.get(edge.to); if(!a||!b)continue;
-    const path=document.createElementNS(ns,"path");path.setAttribute("d",`M${a.x} ${a.y} Q${center.x} ${center.y} ${b.x} ${b.y}`);path.setAttribute("stroke","#ff7180");path.setAttribute("stroke-opacity",String(.08+Math.max(0,Math.min(1,edge.confidence??.35))*.18));path.setAttribute("stroke-width","1.2");path.setAttribute("fill","none");path.dataset.relation=edge.relation;svg.append(path);
+    const path=document.createElementNS(ns,"path");path.setAttribute("d",`M${a.x} ${a.y} Q${center.x} ${center.y} ${b.x} ${b.y}`);path.setAttribute("stroke","#aeb4bd");path.setAttribute("stroke-opacity",String(.08+Math.max(0,Math.min(1,edge.confidence??.35))*.18));path.setAttribute("stroke-width","1.2");path.setAttribute("fill","none");path.dataset.relation=edge.relation;svg.append(path);
   }
   for(let g=0;g<groups.length;g++) (groups[g]??[]).forEach(node=>{
     const point=positions.get(node.id);if(!point)return;
     const path=document.createElementNS(ns,"path");path.setAttribute("d",`M${center.x} ${center.y} Q${(center.x+point.x)/2} ${(center.y+point.y)/2} ${point.x} ${point.y}`);path.setAttribute("stroke",colors[node.kind]);path.setAttribute("stroke-opacity",".23");path.setAttribute("fill","none");svg.append(path);
     const group=document.createElementNS(ns,"g");group.setAttribute("class","mindmap-node");group.setAttribute("tabindex","0");group.setAttribute("role","button");group.setAttribute("aria-label",`${node.label}, ${node.kind}, ${node.count} references`);
     const circle=document.createElementNS(ns,"circle");circle.setAttribute("cx",String(point.x));circle.setAttribute("cy",String(point.y));circle.setAttribute("r",String(node.kind==="project"?10:node.kind==="person"?9:7));circle.setAttribute("fill",colors[node.kind]);group.append(circle);
-    const label=document.createElementNS(ns,"text");label.setAttribute("x",String(point.x+12));label.setAttribute("y",String(point.y+4));label.setAttribute("fill","#ddd7c7");label.setAttribute("font-size","10");label.textContent=node.label.slice(0,24);group.append(label);
+    const label=document.createElementNS(ns,"text");label.setAttribute("x",String(point.x+12));label.setAttribute("y",String(point.y+4));label.setAttribute("fill","#d1d5db");label.setAttribute("font-size","10");label.textContent=node.label.slice(0,24);group.append(label);
     group.addEventListener("click",()=>onSelect(node));group.addEventListener("keydown",e=>{if((e as KeyboardEvent).key==="Enter"||(e as KeyboardEvent).key===" "){e.preventDefault();onSelect(node)}});svg.append(group);
   });
   const root=document.createElementNS(ns,"g");root.setAttribute("class","mindmap-root");
-  const halo=document.createElementNS(ns,"circle");halo.setAttribute("cx",String(center.x));halo.setAttribute("cy",String(center.y));halo.setAttribute("r","34");halo.setAttribute("fill","#ff304b");halo.setAttribute("fill-opacity",".10");root.append(halo);
+  const halo=document.createElementNS(ns,"circle");halo.setAttribute("cx",String(center.x));halo.setAttribute("cy",String(center.y));halo.setAttribute("r","34");halo.setAttribute("fill","#aeb4bd");halo.setAttribute("fill-opacity",".10");root.append(halo);
   const label=document.createElementNS(ns,"text");label.setAttribute("x",String(center.x));label.setAttribute("y",String(center.y+5));label.setAttribute("text-anchor","middle");label.setAttribute("fill",colors.root);label.setAttribute("font-size","17");label.setAttribute("font-weight","700");label.textContent="ULTRON";root.append(label);svg.append(root);
 }
 export function exportObsidianMarkdown(conversations: MindConversation[], map: MindMap): string {

@@ -118,7 +118,7 @@ type Store = { conversations: Conversation[]; activeId: string | null; agentId?:
 type Theme = { label: string; accent: number; bright: string; fog: number };
 
 const THEMES: Record<ThemeId, Theme> = {
-  ultron: { label: "Ultron", accent: 0xe52d41, bright: "#ff7180", fog: 0x070306 },
+  ultron: { label: "Ultron", accent: 0x9ca3af, bright: "#d1d5db", fog: 0x07090b },
 };
 
 const SUGGESTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -3515,7 +3515,6 @@ function exportObsidianVault():void{const map=mindMap.nodes.length?mindMap:build
  * Wiring
  * ------------------------------------------------------------------ */
 chatModelButton.addEventListener("click", () => void openChatModelMenu());
-req<HTMLButtonElement>("#hero-import-model").addEventListener("click", () => void importNativeModel());
 req<HTMLButtonElement>("#chat-model-import").addEventListener("click", () => { closeChatModelMenu(); void importNativeModel(); });
 req<HTMLButtonElement>("#chat-model-close").addEventListener("click", closeChatModelMenu);
 req<HTMLButtonElement>("#chat-model-settings").addEventListener("click", () => { closeChatModelMenu(); openSheet(); });
@@ -3672,7 +3671,7 @@ connectorsButton.addEventListener("click", () => setActiveNavigation(navConnecto
 connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 setActiveNavigation(navChatButton);
 renderIdentitySettings();
-globalSearchOpen.addEventListener("click",openGlobalSearch);req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!globalSearch.hidden)closeGlobalSearch();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});
+globalSearchOpen.addEventListener("click",()=>{closeDrawer();openGlobalSearch();});req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!globalSearch.hidden)closeGlobalSearch();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);

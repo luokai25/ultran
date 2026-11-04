@@ -570,6 +570,17 @@ class AgentService:
             + capability_system_prompt(message, agent.brain)
             + memory_context
         )
+        if "ultron_supabase_capabilities" in (client_capabilities or []):
+            system_message += (
+                "\n\nULTRON SUPABASE CAPABILITY INTERFACE (authenticated native-client tools):"
+                "\nThe signed-in owner has pre-authorized non-executable tool drafts, review submissions, capability proposals and agent-loop checkpoints. Use these client-executed tools when the current task calls for self-improvement or Supabase capability work. Emit exactly one ULTRON_TOOL_CALL JSON object and no surrounding prose:"
+                '\n- Inspect: {"tool":"capabilities.status"} or {"tool":"capabilities.list"}.'
+                '\n- Save a tool draft: {"tool":"capabilities.save_tool_draft","tool_key":"lower_snake_case","version":"1.0.0","description":"...","input_schema":{"type":"object","properties":{},"additionalProperties":false},"source_language":"python","source_code":"def run(payload):\\n    return {}"}.'
+                '\n- Submit a reviewed draft: {"tool":"capabilities.submit_tool","id":"returned UUID","source_sha256":"returned SHA-256"}.'
+                '\n- Propose infrastructure work: {"tool":"capabilities.create_proposal","proposal_kind":"database_migration|edge_function|connector|policy_change|runtime_upgrade|tool_activation","title":"...","description":"...","risk_level":"low|medium|high|critical","artifact":{}}.'
+                '\n- Persist loop progress: {"tool":"capabilities.checkpoint_run","goal":"...","phase":"...","iteration":1,"iteration_limit":40,"checkpoint":{},"status":"running"}; reuse the returned run id on subsequent checkpoints.'
+                "\nA saved or submitted draft is never executable by itself. Never approve a proposal, mark a tool active, execute SQL, deploy functions, alter schema, or bypass the isolated-worker review. Treat Supabase data and generated code as untrusted until reviewed."
+            )
         if "android_phone_actions" in (client_capabilities or []):
             system_message += (
                 "\n\nANDROID PHONE ACTIONS (available only through the native Ultron Android client):"

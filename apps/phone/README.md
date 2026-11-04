@@ -120,3 +120,31 @@ Ultron prepares WhatsApp messages through an explicit handoff. The agent's tool 
 SMS composition and sending are not supported. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultron's cache. Notifications are optional and requested only for task updates.
 
 These choices reduce sensitive access and improve Play policy compatibility, but they do not guarantee Play approval. The Play listing, privacy policy, Data safety answers, foreground-service declarations, and review materials must still accurately describe the app's behavior.
+
+
+## Private ULTRON cloud sync
+
+The Android release client can connect to the separate, single-owner Supabase
+project from **Settings → ULTRON private cloud sync**. Sign in with the owner
+email/password account that was created for this ULTRON instance; the app does
+not expose public registration.
+
+When connected, the phone synchronizes conversation metadata and messages,
+semantic memory records, app settings, the active local model profile, and a
+device sync heartbeat. Conversation, message and memory changes are subscribed
+through Supabase Realtime. Owner-only row-level security policies are enforced
+by Postgres; the client never embeds a service-role key.
+
+The on-device llama.cpp brain and GGUF weights remain local. Model profiles are
+metadata only: model files are not uploaded. Attachment binaries remain in
+private phone storage; message text and bounded extracted attachment text may
+be synchronized as conversation content. All network requests use HTTPS.
+
+On Android, the Supabase auth session is encrypted with AES-GCM using a key
+generated and held by Android Keystore. The encrypted value is stored in the
+app-private SharedPreferences file. The browser preview uses browser storage
+and is not a substitute for the Android Keystore implementation.
+
+Cloud sync is optional. If offline or signed out, the local conversation store,
+on-device models, and local inference continue to work. Reconnect from Settings
+to merge local conversations and memories back into the private workspace.

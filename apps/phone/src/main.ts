@@ -203,7 +203,7 @@ const LEARNING_KEY = "ultron.learning.v1";
 
 const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string, executionLedger?: UltronTaskLedger): string {
-  const profile = classifyUltronTask(task);
+  const profile = executionLedger?.profile ?? classifyUltronTask(task);
   const plan = createUltronPlan(task, profile);
   const goalGraph = createUltronGoalGraph(`goal-${Date.now().toString(36)}`, task, plan);
   const goalPrompt = profile.depth === "instant" ? "" : buildUltronGoalPrompt(goalGraph);
@@ -2227,7 +2227,18 @@ async function submit(raw: string): Promise<void> {
     .map((item) => `\n\n[${item.type === "application/pdf" ? "PDF" : "File"} attached: ${item.name}. Its contents were not extracted.]`).join("")).slice(0, 16_000);
   const remoteBackgroundRequestText = (remoteRequestText + turnAttachments.filter((item) => item.dataUrl)
     .map((item) => `\n\n[Image attached: ${item.name}. Background task submissions currently accept text only, so the image bytes are not sent in background mode.]`).join("")).slice(0, 16_000);
-  let executionLedger = createUltronTaskLedger(`task-${convo.id}-${Date.now().toString(36)}`, text.slice(0, 4000));
+  const continuation = /\b(continue|carry on|resume|pick up where|keep going|go on)\b|(?:استمر|كمل|تابع)/i.test(text);
+  const taskProfile = classifyUltronTask(text, { continuation });
+  const previousLedger = convo.executionLedger;
+  const inheritedConstraints = continuation && previousLedger && Array.isArray(previousLedger.steps) && previousLedger.status !== "completed"
+    ? [
+        `Continue prior task ledger ${previousLedger.id} (status: ${previousLedger.status}).`,
+        ...previousLedger.steps.filter((step) => step.status !== "completed" && step.status !== "skipped").slice(0, 8)
+          .map((step) => `Carry forward unfinished step ${step.id} [${step.status}]: ${step.objective}`),
+        ...previousLedger.constraints.slice(0, 20),
+      ].slice(0, 40)
+    : [];
+  let executionLedger = createUltronTaskLedger(`task-${convo.id}-${Date.now().toString(36)}`, text.slice(0, 4000), inheritedConstraints, taskProfile);
   const understandStart = transitionUltronLedger(executionLedger, "understand", "running");
   if (understandStart.ok) {
     const understandDone = transitionUltronLedger(understandStart.ledger, "understand", "completed", { summary: "Captured the current request and attachment context.", evidence: `User request received in conversation ${convo.id}; ${turnAttachments.length} attachment(s) were included in the turn context.` });
@@ -2409,7 +2420,7 @@ async function submit(raw: string): Promise<void> {
   if (turnController.signal.aborted) result = { content: "Stopped.", session_id: "" };
   setThinking(false);
 
-  const finalProfile = classifyUltronTask(text);
+  const finalProfile = taskProfile;
   const validation = validateUltronDraft(text, result.content, finalProfile);
   for (const issue of validation.issues) {
     ultronDecisionTrace.record({ phase: "validate", code: issue.code, detail: issue.message });

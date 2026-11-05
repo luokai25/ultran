@@ -21,6 +21,13 @@ function embedMemoryText(text: string): number[] {
   const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
   return norm ? vector.map((value) => value / norm) : vector;
 }
+function redactMemorySecrets(value: string): string {
+  return value
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/gi, "[REDACTED]")
+    .replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, "[REDACTED]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{16,}/gi, "Bearer [REDACTED]")
+    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
+}
 async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const apiKey = Deno.env.get("ULTRON_MODEL_API_KEY");
   if (!apiKey) throw new Error("model_not_configured: set ULTRON_MODEL_API_KEY to enable cloud memory consolidation");
@@ -39,8 +46,8 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   if (duplicate) return { deduplicated: true, source_ref: sourceRef, memories_created: 0 };
   const { data: existing, error: existingError } = await db.from("ultron_memory_items").select("id,memory_type,content,summary,importance,confidence").eq("owner_id", ownerId).is("archived_at", null).order("updated_at", { ascending: false }).limit(60);
   if (existingError) throw existingError;
-  const transcript = messages.map((row) => String(row.role).toUpperCase() + ": " + String(row.content ?? "").slice(0, 5000)).join("\n").slice(-42000);
-  const memoryContext = (existing ?? []).map((row) => ({ id: row.id, type: row.memory_type, summary: row.summary, content: String(row.content).slice(0, 500) }));
+  const transcript = messages.map((row) => String(row.role).toUpperCase() + ": " + redactMemorySecrets(String(row.content ?? "")).slice(0, 5000)).join("\n").slice(-42000);
+  const memoryContext = (existing ?? []).map((row) => ({ id: row.id, type: row.memory_type, summary: typeof row.summary === "string" ? redactMemorySecrets(row.summary) : row.summary, content: redactMemorySecrets(String(row.content)).slice(0, 500) }));
   const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/$/, "");
   const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
   const model = Deno.env.get("ULTRON_MODEL_ID") ?? "llama-3.3-70b-versatile";
@@ -71,7 +78,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   let created = 0, relationCount = 0;
   for (const rawMemory of rows) {
     if (!isObject(rawMemory)) continue;
-    const text = typeof rawMemory.content === "string" ? rawMemory.content.trim().slice(0, 12000) : "";
+    const text = typeof rawMemory.content === "string" ? redactMemorySecrets(rawMemory.content).trim().slice(0, 12000) : "";
     if (text.length < 12) continue;
     const type = typeof rawMemory.memory_type === "string" && allowed.has(rawMemory.memory_type) ? rawMemory.memory_type : "semantic";
     const { data: inserted, error: insertError } = await db.from("ultron_memory_items").insert({
@@ -96,7 +103,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
       relationCount++;
     }
   }
-  const summary = typeof proposal.summary === "string" ? proposal.summary.trim().slice(0, 3000) : "";
+  const summary = typeof proposal.summary === "string" ? redactMemorySecrets(proposal.summary).trim().slice(0, 3000) : "";
   if (summary) { const { error } = await db.from("ultron_conversations").update({ summary }).eq("owner_id", ownerId).eq("id", conversationId); if (error) throw error; }
   return { conversation_id: conversationId, source_ref: sourceRef, memories_created: created, relations_created: relationCount, model, sequence_watermark: watermark };
 }

@@ -530,13 +530,13 @@ async function downloadCuratedModel(model:typeof CURATED_MODELS[number]):Promise
 
 async function importNativeModel(): Promise<void> {
   if (Capacitor.getPlatform() !== "android") return;
-  nativeModelStatus.textContent = "Choose one GGUF file or select every numbered shard of a split model. Ultron verifies the set before importing it.";
+  nativeModelStatus.textContent = "Choose one GGUF file, a .tgz/.tar.gz archive containing GGUF weights, or every numbered shard of a split model. Ultron verifies the files before importing them.";
   try {
     const imported = await NativeLocalAI.pickModel();
     if (imported.cancelled) return;
     await refreshNativeModels();
     if (imported.name) nativeModelSelect.value = imported.name;
-    nativeModelStatus.textContent = "Imported " + (imported.name || "model") + (imported.shards ? " · " + imported.shards + " verified shards" : "") + " · " + formatBytes(imported.sizeBytes || 0) + ". Load it when ready.";
+    nativeModelStatus.textContent = "Imported " + (imported.name || "model") + (imported.shards ? " · " + imported.shards + " verified shards" : "") + (imported.extractedModels ? " · " + imported.extractedModels + " archive entries extracted" : "") + " · " + formatBytes(imported.sizeBytes || 0) + ". Load it when ready.";
     nativeModelLoadButton.disabled = !nativeModelSelect.value;
     nativeModelDeleteButton.disabled = !nativeModelSelect.value || nativeModelSelect.value === nativeLoadedModelName;
   } catch (error) {

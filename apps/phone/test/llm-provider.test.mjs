@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel } from "../src/llm-provider.ts";
+import ts from "typescript";
+import fs from "node:fs";
+import vm from "node:vm";
+
+const source = fs.readFileSync(new URL("../src/llm-provider.ts", import.meta.url), "utf8");
+const js = ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 });
+const module = { exports: {} };
+vm.runInNewContext(js, { module, exports: module.exports, Set, RegExp, String, Array, Object });
+const { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel } = module.exports;
 
 test("detects supported OpenAI-compatible key formats without a provider selector", () => {
   assert.equal(detectProvider("sk-proj-12345678901234567890").id, "openai");

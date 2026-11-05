@@ -77,7 +77,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
     const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
     const message = choices[0]?.message as Record<string, unknown> | undefined;
     let content = typeof message?.content === "string" ? message.content : "";
-    content = content.replace(/^\\s*\`\`\`(?:json)?/i, "").replace(/\`\`\`\\s*$/, "").trim();
+    content = content.replace(new RegExp("^\\s*```(?:json)?", "i"), "").replace(new RegExp("```\\s*$"), "").trim();
     proposal = JSON.parse(content) as Record<string, unknown>;
   }
   const rows = Array.isArray(proposal.memories) ? proposal.memories.slice(0, 8) : [];

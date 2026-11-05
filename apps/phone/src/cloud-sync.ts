@@ -78,6 +78,8 @@ function readIdMap(): IdMap {
   }
 }
 
+export function getCloudConversationId(localConversationId: string): string | null { return readIdMap().conversations[localConversationId] ?? null; }
+
 function writeIdMap(value: IdMap): void {
   try {
     window.localStorage.setItem(ID_MAP_KEY, JSON.stringify(value));

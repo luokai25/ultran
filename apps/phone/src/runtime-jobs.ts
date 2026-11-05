@@ -65,7 +65,7 @@ export async function enqueueUltronMemoryConsolidation(conversationId: string, s
     title: "Consolidate conversation memory",
     payload: { conversation_id: conversationId, sequence_watermark: sequenceWatermark },
     priority: 2,
-    max_attempts: 3,
+    max_attempts: 20,
     idempotency_key: key,
   });
   void processUltronJobs().catch((error) => console.warn("[ULTRON cloud worker]", error));

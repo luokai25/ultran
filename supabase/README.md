@@ -8,7 +8,7 @@ This Supabase project is a private, single-owner backend for the ULTRON Android 
 - Supabase stores encrypted/sensitive application state only behind authenticated access and database-enforced row policies: conversations, messages, long-term memory, memory relations, documents, task state, tool approvals/audit records, model profiles, settings, and device sync cursors.
 - Supabase Realtime is enabled for conversations, messages, tasks, tool runs, memory items, and per-owner settings.
 - The `ultron-private` Storage bucket is private. Object paths must begin with the owner's Auth UUID.
-- pgvector is enabled. The initial embedding columns use 384 dimensions; the embedding model is recorded separately. Generation models remain model-agnostic and run locally or on a separately configured inference host.
+- pgvector is enabled. The initial local_embedding column uses 96-dimensional deterministic feature-hash vectors; this is lightweight retrieval, not a neural embedding model. The embedding model is recorded separately for a future upgrade. Generation models remain model-agnostic and run locally or on a separately configured inference host.
 - Provider credentials must never be stored in plaintext in these tables or shipped in the APK. `credential_ref` is an opaque reference for a server-side secret store.
 - ULTRON may create, version and run owner-scoped cloud workflow tools and skills autonomously. Android device actions, external communications, payments and destructive operations retain their explicit action policies.
 
@@ -93,3 +93,23 @@ ULTRON's deterministic 96-dimensional feature-hash vectors are now mirrored to `
 ### Autonomous Supabase code authoring
 
 ULTRON can create and alter its own Supabase public-schema objects through the `database.ddl` workflow operation, backed by `ultron_apply_schema_change`. It can create tables, views, indexes and invoker SQL functions, then call its own `ultron_*` Postgres functions with `database.rpc`. The schema authoring function checks the authenticated ULTRON owner, records the applied statement hash and preview in capability events, and keeps destructive DROP/TRUNCATE operations outside the autonomous path. New public functions created by the postgres owner do not receive PUBLIC or anon execution by default; ULTRON can explicitly grant execution to authenticated. This lets ULTRON write real database-side code without putting service credentials in the Android app.
+
+
+## Durable background jobs (2026-11-05)
+
+The ultron_jobs table is the durable job ledger and queue. It stores owner-scoped jobs with priority, scheduled availability, idempotency keys, retry limits, attempt counts, worker leases, heartbeats, results and failure details. It is included in Supabase Realtime so the phone can observe job state changes without polling.
+
+The ultron-jobs Edge Function (JWT verification enabled) exposes:
+- enqueue: create a job, optionally deduplicated by an owner-scoped idempotency key
+- list: inspect recent jobs or filter by status
+- claim: atomically claim up to five due jobs with FOR UPDATE SKIP LOCKED and a time-limited lease
+- heartbeat: extend a worker lease
+- complete: persist a structured result and finish a job
+- fail: record an error and schedule bounded exponential retry, or mark the job failed after its retry budget is exhausted
+- cancel: cancel queued, retrying or running work
+
+The queue is durable Postgres storage, not an Edge Function kept alive in the background. The Android app or another authorized worker claims jobs and heartbeats while executing. If a worker disappears, its lease expires and another claim can recover the job. Keep Edge Function requests short: Free-plan workers have a 150-second wall-clock limit, 256 MB memory and 2 seconds of CPU time per request. Long work must be split into checkpointed jobs, with actual device-only actions remaining on Android.
+
+### Job placement
+
+Use the cloud queue for resumable research, multi-step plans, document indexing, connector synchronization, memory consolidation, scheduled maintenance and other work that benefits from durable state. Keep local inference, native filesystem operations, app launches, notifications, voice and approved device actions on Android. A job payload should contain references and small structured inputs, not large files; place file bytes in the private Storage bucket and keep only the object path in the job.

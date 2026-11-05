@@ -357,6 +357,7 @@ export function subscribeCloudWorkspace(onChange: () => void): () => void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_generated_tools', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_capability_proposals', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_capability_events', filter: `owner_id=eq.${ownerId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_jobs', filter: `owner_id=eq.${ownerId}` }, onChange)
       .subscribe();
     unsubscribeChannel = () => { void cloudClient.removeChannel(channel); };
   }).catch((error) => console.warn('[ULTRON realtime]', error));

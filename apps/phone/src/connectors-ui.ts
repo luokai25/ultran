@@ -11,6 +11,7 @@
  */
 
 import catalogJson from "./connectors.catalog.json";
+import { listUltronConnectors, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector } from "./connectors-cloud";
 
 export type CatalogEntry = {
   id: string;
@@ -24,7 +25,8 @@ export type CatalogEntry = {
 
 type Deps = {
   /** True when a brain endpoint is linked. */
-  linked: () => boolean;
+  linked: () => Promise<boolean>;
+  backendLinked: () => boolean;
   api: (path: string, init?: RequestInit, timeoutMs?: number) => Promise<Response>;
   closeDrawer: () => void;
   openExternal: (url: string) => Promise<void>;
@@ -86,6 +88,7 @@ export function initConnectors(deps: Deps): void {
   const approvalPanel = need<HTMLElement>("#composio-approvals");
   const approvalList = need<HTMLElement>("#composio-approval-list");
 
+  let cloudLinked = false;
   let category = "all";
   let tier: "all" | "free" | "paid" = "all";
   let shown = PAGE;
@@ -199,7 +202,8 @@ export function initConnectors(deps: Deps): void {
 
   async function refreshEnabled(): Promise<void> {
     const generation = refreshGeneration;
-    if (!deps.linked()) {
+    cloudLinked = await deps.linked();
+    if (!cloudLinked && !deps.backendLinked()) {
       setPermissionOverview("empty", 0, "No permissions are granted. Ultron can browse the local connector catalogue, and asks only when you enable a capability.");
       remoteKnown = false;
       enabled = new Set();
@@ -210,25 +214,21 @@ export function initConnectors(deps: Deps): void {
     }
     setPermissionOverview("loading", null, "Checking granted capabilities. Nothing is assumed while the backend is being checked.");
     try {
-      const res = await deps.api("/v1/connectors/enabled/list", {}, 8_000);
-      if (!res.ok) throw new Error(String(res.status));
-      const body: unknown = await res.json();
+      const connected = cloudLinked ? await listUltronConnectors() : { configured: false, connections: [] };
       if (!panelOpen || generation !== refreshGeneration) return;
-      if (
-        typeof body !== "object" ||
-        body === null ||
-        !("enabled" in body) ||
-        !Array.isArray(body.enabled) ||
-        !body.enabled.every((id): id is string => typeof id === "string")
-      ) {
-        throw new Error("Invalid enabled-connectors response");
+      enabled = new Set(connected.connections.filter((item) => item.status === "connected").map((item) => item.provider_key));
+      if (deps.backendLinked()) {
+        const legacy = await deps.api("/v1/connectors/enabled/list", {}, 8_000);
+        if (legacy.ok) {
+          const body = await legacy.json() as { enabled?: unknown };
+          if (Array.isArray(body.enabled)) for (const id of body.enabled) if (typeof id === "string") enabled.add(id);
+        }
       }
-      enabled = new Set(body.enabled);
       remoteKnown = true;
-      statusEl.textContent = `${enabled.size} enabled on your backend.`;
+      statusEl.textContent = `${enabled.size} connected or enabled across your ULTRON gateway.`;
       statusEl.dataset.tone = "ok";
       const capabilityCount = CATALOG.filter((entry) => enabled.has(entry.id)).reduce((sum, entry) => sum + entry.actions.length, 0);
-      setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} actions are available across ${enabled.size} enabled connectors. Write-capable actions still require your approval.` : "No permissions are granted. Your catalogue is ready; enable only the services and actions you need.");
+      setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} catalog actions are available across ${enabled.size} connectors. Write-capable actions still require approval.` : "No connector permissions are active. Connect only the services you need.");
     } catch {
       if (!panelOpen || generation !== refreshGeneration) return;
       // Never present a stale "On" badge as current backend state after a failed
@@ -245,52 +245,40 @@ export function initConnectors(deps: Deps): void {
   async function refreshOAuthConnections(): Promise<void> {
     const generation = refreshGeneration;
     oauthConnected = new Set();
-    if (!deps.linked()) {
+    cloudLinked = await deps.linked();
+    if (!cloudLinked) {
       composioHealth.dataset.state = "disconnected";
-      composioHealthLabel.textContent = "Backend not linked";
-      composioHealthDetail.textContent = "Connect a private Ultron backend in Settings to check Composio.";
+      composioHealthLabel.textContent = "Cloud account not connected";
+      composioHealthDetail.textContent = "Sign in to the ULTRON owner account to manage provider connections.";
       return;
     }
     composioHealth.dataset.state = "loading";
     composioHealthLabel.textContent = "Checking connection";
-    composioHealthDetail.textContent = "Verifying backend configuration and active OAuth accounts.";
+    composioHealthDetail.textContent = "Checking connected provider accounts through the Supabase gateway.";
     try {
-      const status = await deps.api("/v1/connectors/composio/status", {}, 8_000);
-      if (!status.ok) throw new Error("Composio status endpoint returned " + status.status);
-      const configured = (await status.json()) as { configured?: boolean };
+      const result = await listUltronConnectors();
       if (!panelOpen || generation !== refreshGeneration) return;
-      if (configured.configured !== true) {
-        composioHealth.dataset.state = "disconnected";
-        composioHealthLabel.textContent = "GitHub authorization unavailable";
-        composioHealthDetail.textContent = "The secure authorization service is not configured on this backend. GitHub cannot be connected until the server-side integration is configured.";
-        statusEl.textContent = "GitHub authorization is not configured on the backend. No credentials were stored on this device.";
-        statusEl.dataset.tone = "warn";
-        return;
+      for (const connection of result.connections) {
+        if (connection.toolkit_slug && connection.status === "connected") oauthConnected.add(connection.toolkit_slug);
       }
-      const response = await deps.api("/v1/connectors/composio/connections", {}, 12_000);
-      if (!response.ok) throw new Error("Composio connections endpoint returned " + response.status);
-      const body = (await response.json()) as { connections?: Array<{ toolkit?: string; status?: string }> };
-      if (!panelOpen || generation !== refreshGeneration) return;
-      for (const account of body.connections ?? []) {
-        if (account.toolkit && account.status === "ACTIVE") oauthConnected.add(account.toolkit);
-      }
-      composioHealth.dataset.state = oauthConnected.size ? "ready" : "disconnected";
-      composioHealthLabel.textContent = oauthConnected.size ? "GitHub connected" : "Awaiting GitHub sign-in";
-      composioHealthDetail.textContent = oauthConnected.size ? "GitHub account authorized. Repository reads are available; writes remain approval-gated." : "The authorization service is reachable, but no active GitHub account was found. Connect your account to continue.";
-    } catch {
+      composioHealth.dataset.state = result.configured ? (oauthConnected.size ? "ready" : "disconnected") : "error";
+      composioHealthLabel.textContent = result.configured ? (oauthConnected.size ? "Connected accounts ready" : "No connected accounts") : "Connector gateway not configured";
+      composioHealthDetail.textContent = result.configured
+        ? (oauthConnected.size ? `${oauthConnected.size} provider accounts are available through the central gateway.` : "The gateway is reachable. Connect a provider to make its tools available.")
+        : "The Supabase gateway is reachable, but its Composio server credential is not configured.";
+    } catch (error) {
       if (!panelOpen || generation !== refreshGeneration) return;
       composioHealth.dataset.state = "error";
-      composioHealthLabel.textContent = "GitHub not connected";
-      composioHealthDetail.textContent = "Composio could not be reached. Existing connections are not shown as active until the service responds.";
+      composioHealthLabel.textContent = "Connector gateway unavailable";
+      composioHealthDetail.textContent = error instanceof Error ? error.message : "Could not load connected accounts.";
     }
   }
-
 
   async function refreshApprovals(): Promise<void> {
     const generation = refreshGeneration;
     approvalList.replaceChildren();
     approvalPanel.hidden = true;
-    if (!deps.linked()) return;
+    if (!deps.backendLinked()) return;
     try {
       const response = await deps.api("/v1/connectors/composio/approvals", {}, 10_000);
       if (!response.ok) return;
@@ -418,7 +406,7 @@ export function initConnectors(deps: Deps): void {
       detailEl.append(field);
     }
 
-    const canAct = deps.linked();
+    const canAct = entry.auth === "oauth2" ? cloudLinked : deps.backendLinked();
     if (!canAct) {
       note.textContent = "Link your Ultron backend in Settings to enable this connector.";
     }
@@ -432,12 +420,9 @@ export function initConnectors(deps: Deps): void {
       note.textContent = "Working…";
       try {
         if (entry.auth === "oauth2") {
-          const res = await deps.api(`/v1/connectors/composio/authorize/${encodeURIComponent(toolkit)}`, { method: "POST" }, 15_000);
-          if (!res.ok) throw new Error(`${res.status}`);
-          const body = (await res.json()) as { redirect_url?: string };
-          if (!body.redirect_url || !body.redirect_url.startsWith("https://")) throw new Error("Invalid authorization link");
-          await deps.openExternal(body.redirect_url);
-          note.textContent = "Complete sign-in in your browser, return to Ultron, then refresh the connection status.";
+          const result = await startUltronConnectorConnection({ providerKey: entry.id.replace(/-/g, "_"), toolkitSlug: toolkit });
+          await deps.openExternal(result.redirectUrl);
+          note.textContent = "Complete provider authorization in your browser, then return here to refresh the connection.";
           act.disabled = false;
           return;
         } else if (entry.auth === "none") {
@@ -461,6 +446,7 @@ export function initConnectors(deps: Deps): void {
           if (!res.ok) throw new Error(`${res.status}`);
         }
         await refreshEnabled();
+        await refreshOAuthConnections();
         closeDetail();
       } catch (error) {
         note.dataset.tone = "bad";
@@ -475,6 +461,9 @@ export function initConnectors(deps: Deps): void {
       refresh.type = "button";
       refresh.addEventListener("click", async () => {
         refresh.disabled = true;
+        const rows = await listUltronConnectors();
+        const matching = rows.connections.filter((item) => item.toolkit_slug === toolkit && item.status !== "revoked");
+        for (const item of matching) await refreshUltronConnectorStatus(item.id);
         await refreshOAuthConnections();
         const nowConnected = oauthConnected.has(toolkit);
         note.dataset.tone = nowConnected ? "ok" : "";
@@ -482,6 +471,26 @@ export function initConnectors(deps: Deps): void {
         refresh.disabled = false;
       });
       buttons.append(refresh);
+    }
+    if (oauthOn) {
+      const off = el("button", "ghost danger", "Disconnect account");
+      off.type = "button";
+      off.addEventListener("click", async () => {
+        off.disabled = true;
+        try {
+          const rows = await listUltronConnectors();
+          const matches = rows.connections.filter((item) => item.toolkit_slug === toolkit && item.status !== "revoked");
+          for (const item of matches) await disconnectUltronConnector(item.id);
+          await refreshOAuthConnections();
+          await refreshEnabled();
+          closeDetail();
+        } catch (error) {
+          note.dataset.tone = "bad";
+          note.textContent = error instanceof Error ? error.message : "Could not disconnect account.";
+          off.disabled = false;
+        }
+      });
+      buttons.append(off);
     }
     if (on && entry.auth !== "none" && entry.auth !== "oauth2") {
       const off = el("button", "ghost danger", "Disable");

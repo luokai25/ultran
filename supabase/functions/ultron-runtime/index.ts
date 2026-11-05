@@ -7,6 +7,13 @@ const headers = {
   "Content-Type": "application/json",
 };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
+async function kickDurableWorker(url:string,authorization:string,publishableKey:string):Promise<Record<string,unknown>>{
+  try{
+    const response=await fetch(url+"/functions/v1/ultron-jobs",{method:"POST",headers:{"Authorization":authorization,"apikey":publishableKey,"Content-Type":"application/json"},body:JSON.stringify({action:"process",limit:1}),signal:AbortSignal.timeout(25000)});
+    const raw=await response.text();let data:unknown={};try{data=raw?JSON.parse(raw):{};}catch{data={};}
+    return {triggered:response.ok,response_status:response.status,...(isObject(data)?data:{})};
+  }catch(error){return {triggered:false,deferred:true,reason:error instanceof Error?error.message:"worker_kick_failed"};}
+}
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), b => b.toString(16).padStart(2,"0")).join("");
 const slug = /^[a-z][a-z0-9_]{1,63}$/;
@@ -259,9 +266,13 @@ Deno.serve(async (req: Request) => {
       const {data:job,error:jobError}=await db.from("ultron_jobs").insert({owner_id,job_type:"agent.workflow.execute",title:"Run ULTRON tool: "+tool_key,payload:{tool_key,input},priority:Math.max(-10,Math.min(10,Number(body.priority)||0)),idempotency_key}).select("id,job_type,title,status,created_at").single();
       if(jobError?.code==="23505"&&idempotency_key){
         const existing=await db.from("ultron_jobs").select("id,job_type,title,status,created_at").eq("owner_id",owner_id).eq("idempotency_key",idempotency_key).maybeSingle();
-        if(existing.error)throw existing.error;return reply({ok:true,queued:true,deduplicated:true,job:existing.data});
+        if(existing.error)throw existing.error;
+        const worker=existing.data&&["queued","retry_wait"].includes(String(existing.data.status))?await kickDurableWorker(url,auth,key):{triggered:false,already_claimed:true};
+        return reply({ok:true,queued:true,deduplicated:true,job:existing.data,worker});
       }
-      if(jobError)throw jobError;return reply({ok:true,queued:true,deduplicated:false,job},201);
+      if(jobError)throw jobError;
+      const worker=await kickDurableWorker(url,auth,key);
+      return reply({ok:true,queued:true,deduplicated:false,job,worker},201);
     }
     if(action==="run_tool"){
       const tool_key=String(body.tool_key??"");if(!slug.test(tool_key))return reply({error:"invalid_tool_key"},400);

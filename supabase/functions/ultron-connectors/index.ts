@@ -1,0 +1,59 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+const headers={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
+const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
+const obj=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const str=(v:unknown,n=160)=>typeof v==="string"?v.trim().slice(0,n):"";
+async function composio(path:string,key:string,method="GET",body?:unknown){
+ const r=await fetch("https://backend.composio.dev/api/v3.1"+path,{method,headers:{"x-api-key":key,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+ const raw=await r.text();let data:unknown={};try{data=raw?JSON.parse(raw):{};}catch{data={};}
+ if(!r.ok){const msg=obj(data)&&obj(data.error)&&typeof data.error.message==="string"?data.error.message:"Composio request failed ("+r.status+")";throw new Error(msg.slice(0,300));}
+ return data;
+}
+Deno.serve(async(req:Request)=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers});
+ if(req.method!=="POST")return reply({error:"method_not_allowed"},405);
+ const auth=req.headers.get("Authorization")??"",token=auth.match(/^Bearer\\s+(.+)$/i)?.[1];
+ if(!token)return reply({error:"unauthorized"},401);
+ const url=Deno.env.get("SUPABASE_URL"),anon=Deno.env.get("SUPABASE_PUBLISHABLE_KEY")??Deno.env.get("SUPABASE_ANON_KEY");
+ if(!url||!anon)return reply({error:"server_configuration_missing"},500);
+ const db=createClient(url,anon,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+ try{
+  const {data:a,error:ae}=await db.auth.getUser(token),user=a?.user;
+  if(ae||!user)return reply({error:"unauthorized"},401);
+  const {data:instance,error:ie}=await db.from("ultron_instance").select("owner_id").eq("owner_id",user.id).maybeSingle();
+  if(ie||!instance)return reply({error:"owner_instance_required"},403);
+  const raw=await req.text();if(new TextEncoder().encode(raw).byteLength>24000)return reply({error:"payload_too_large"},413);
+  const body:unknown=JSON.parse(raw);if(!obj(body)||typeof body.action!=="string")return reply({error:"invalid_request"},400);
+  const key=Deno.env.get("COMPOSIO_API_KEY");
+  if(body.action==="list"){
+   const {data,error}=await db.from("ultron_connector_connections").select("id,provider_key,toolkit_slug,auth_config_id,connection_key,display_name,status,scopes,external_account_id,external_account_label,last_verified_at,last_error,metadata,created_at,updated_at").eq("owner_id",user.id).order("provider_key");
+   if(error)throw error;return reply({ok:true,configured:Boolean(key),connections:data??[]});
+  }
+  if(body.action==="connect"){
+   const provider=str(body.provider_key,64).toLowerCase(),toolkit=str(body.toolkit_slug,80).toLowerCase(),authConfig=str(body.auth_config_id,120),alias=str(body.alias||body.display_name||provider,120),display=str(body.display_name||alias,160);
+   if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!authConfig||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
+   if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
+   const linked=await composio("/connected_accounts/link",key,"POST",{auth_config_id:authConfig,user_id:user.id,alias});
+   if(!obj(linked)||typeof linked.connected_account_id!=="string"||typeof linked.redirect_url!=="string")throw new Error("Composio returned an incomplete connection link");
+   const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:user.id,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();
+   if(error)throw error;return reply({ok:true,connection:data,redirect_url:linked.redirect_url,expires_at:linked.expires_at??null},201);
+  }
+  if(body.action==="status"||body.action==="disconnect"){
+   const id=str(body.id,80);if(!id)return reply({error:"connection_id_required"},400);
+   const {data:c,error:ce}=await db.from("ultron_connector_connections").select("id,external_account_id").eq("owner_id",user.id).eq("id",id).maybeSingle();
+   if(ce)throw ce;if(!c)return reply({error:"connection_not_found"},404);if(!c.external_account_id)return reply({error:"external_connection_not_created"},409);
+   if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
+   if(body.action==="disconnect"){
+    await composio("/connected_accounts/"+encodeURIComponent(c.external_account_id)+"/revoke",key,"POST",{});
+    const {data,error}=await db.from("ultron_connector_connections").update({status:"revoked",last_verified_at:new Date().toISOString(),last_error:null}).eq("owner_id",user.id).eq("id",id).select("id,status").single();
+    if(error)throw error;return reply({ok:true,connection:data});
+   }
+   const remote=await composio("/connected_accounts/"+encodeURIComponent(c.external_account_id),key);
+   const state=obj(remote)&&typeof remote.status==="string"?remote.status.toUpperCase():"UNKNOWN";
+   const status=state==="ACTIVE"?"connected":state==="EXPIRED"||state==="INACTIVE"?"refresh_required":state==="FAILED"||state==="ERROR"?"error":"pending";
+   const {data,error}=await db.from("ultron_connector_connections").update({status,last_verified_at:new Date().toISOString(),last_error:status==="error"?"Provider connection failed":null,metadata:{composio_status:state}}).eq("owner_id",user.id).eq("id",id).select("id,provider_key,toolkit_slug,display_name,status,external_account_id,last_verified_at,last_error,metadata").single();
+   if(error)throw error;return reply({ok:true,connection:data});
+  }
+  return reply({error:"unknown_action"},400);
+ }catch(e){return reply({error:"connector_request_failed",message:(e instanceof Error?e.message:"request_failed").slice(0,400)},400);}
+});

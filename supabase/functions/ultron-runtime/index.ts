@@ -248,6 +248,21 @@ Deno.serve(async (req: Request) => {
       await db.from("ultron_capability_events").insert({owner_id,event_type:"tool_spec.archived",details:{tool_key:data.tool_key,version:data.version}});
       return reply({ok:true,tool:data});
     }
+    if(action==="queue_tool"){
+      const tool_key=String(body.tool_key??"");if(!slug.test(tool_key))return reply({error:"invalid_tool_key"},400);
+      const {data:tool,error:toolError}=await db.from("ultron_tool_specs").select("id,tool_key,version,workflow,workflow_sha256,input_schema,lifecycle_state").eq("owner_id",owner_id).eq("tool_key",tool_key).eq("lifecycle_state","active").order("created_at",{ascending:false}).limit(1).maybeSingle();
+      if(toolError)throw toolError;if(!tool)return reply({error:"active_tool_not_found"},404);
+      if(await sha256(JSON.stringify(tool.workflow))!==tool.workflow_sha256)return reply({error:"workflow_integrity_mismatch"},409);
+      const input=isObject(body.input)?body.input:{};
+      const inputError=validateInput(isObject(tool.input_schema)?tool.input_schema:{},input);if(inputError)return reply({error:"invalid_tool_input",message:inputError},400);
+      const idempotency_key=typeof body.idempotency_key==="string"?body.idempotency_key.slice(0,160):null;
+      const {data:job,error:jobError}=await db.from("ultron_jobs").insert({owner_id,job_type:"agent.workflow.execute",title:"Run ULTRON tool: "+tool_key,payload:{tool_key,input},priority:Math.max(-10,Math.min(10,Number(body.priority)||0)),idempotency_key}).select("id,job_type,title,status,created_at").single();
+      if(jobError?.code==="23505"&&idempotency_key){
+        const existing=await db.from("ultron_jobs").select("id,job_type,title,status,created_at").eq("owner_id",owner_id).eq("idempotency_key",idempotency_key).maybeSingle();
+        if(existing.error)throw existing.error;return reply({ok:true,queued:true,deduplicated:true,job:existing.data});
+      }
+      if(jobError)throw jobError;return reply({ok:true,queued:true,deduplicated:false,job},201);
+    }
     if(action==="run_tool"){
       const tool_key=String(body.tool_key??"");if(!slug.test(tool_key))return reply({error:"invalid_tool_key"},400);
       const {data:tool,error:toolError}=await db.from("ultron_tool_specs").select("*").eq("owner_id",owner_id).eq("tool_key",tool_key).eq("lifecycle_state","active").order("created_at",{ascending:false}).limit(1).maybeSingle();

@@ -12,7 +12,7 @@ async function composio(path:string,key:string,method="GET",body?:unknown){
 Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers});
  if(req.method!=="POST")return reply({error:"method_not_allowed"},405);
- const auth=req.headers.get("Authorization")??"",token=auth.match(/^Bearer\\s+(.+)$/i)?.[1];
+ const auth=req.headers.get("Authorization")??"",token=auth.match(/^Bearer\s+(.+)$/i)?.[1];
  if(!token)return reply({error:"unauthorized"},401);
  const url=Deno.env.get("SUPABASE_URL"),anon=Deno.env.get("SUPABASE_PUBLISHABLE_KEY")??Deno.env.get("SUPABASE_ANON_KEY");
  if(!url||!anon)return reply({error:"server_configuration_missing"},500);
@@ -33,10 +33,29 @@ Deno.serve(async(req:Request)=>{
    const provider=str(body.provider_key,64).toLowerCase(),toolkit=str(body.toolkit_slug,80).toLowerCase(),authConfig=str(body.auth_config_id,120)||Deno.env.get("COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase())||"",alias=str(body.alias||body.display_name||provider,120),display=str(body.display_name||alias,160);
    if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!authConfig||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
+   if(!authConfig)return reply({error:"composio_auth_config_not_configured",required_secret:"COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase()},503);
    const linked=await composio("/connected_accounts/link",key,"POST",{auth_config_id:authConfig,user_id:user.id,alias});
    if(!obj(linked)||typeof linked.connected_account_id!=="string"||typeof linked.redirect_url!=="string")throw new Error("Composio returned an incomplete connection link");
    const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:user.id,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();
    if(error)throw error;return reply({ok:true,connection:data,redirect_url:linked.redirect_url,expires_at:linked.expires_at??null},201);
+  }
+  if(body.action==="tools"){
+   if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
+   let query=db.from("ultron_connector_connections").select("id,provider_key,toolkit_slug,display_name,external_account_id").eq("owner_id",user.id).eq("status","connected");
+   const filter=str(body.toolkit_slug,80).toLowerCase();if(filter)query=query.eq("toolkit_slug",filter);
+   const {data:connections,error}=await query.order("provider_key");if(error)throw error;
+   const available:Record<string,unknown>[]=[];
+   for(const connection of connections??[]){
+    if(!connection.toolkit_slug||!connection.external_account_id)continue;
+    const remote=await composio("/tools?toolkit_slug="+encodeURIComponent(connection.toolkit_slug)+"&toolkit_versions=latest&limit=100",key);
+    const candidates=obj(remote)&&Array.isArray(remote.items)?remote.items:obj(remote)&&Array.isArray(remote.tools)?remote.tools:obj(remote)&&Array.isArray(remote.data)?remote.data:[];
+    for(const item of candidates){
+     if(!obj(item))continue;
+     const slug=str(item.slug||item.name||item.tool_slug,120).toUpperCase();if(!/^[A-Z][A-Z0-9_]{2,119}$/.test(slug))continue;
+     available.push({connection_id:connection.id,provider_key:connection.provider_key,toolkit_slug:connection.toolkit_slug,display_name:connection.display_name,tool_slug:slug,description:str(item.description,1000),input_parameters:item.input_parameters??item.parameters??item.input_schema??{}});
+    }
+   }
+   return reply({ok:true,tools:available});
   }
   if(body.action==="enqueue_tool"){
    const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase(),args=obj(body.arguments)?body.arguments:{};

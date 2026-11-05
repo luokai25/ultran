@@ -34,6 +34,17 @@ for (const [id, handler] of Object.entries(navigation)) {
   assert.ok(main.includes(handler), `missing click handler for #${id}`);
 }
 
+// The unified API-key surface must be present, reachable from the drawer and backed by real handlers.
+for (const id of ["llm-api-keys-screen", "drawer-llm-api-keys", "llm-api-key", "llm-api-key-provider", "llm-api-key-status", "llm-api-key-save", "llm-api-key-remove", "llm-api-key-models"]) {
+  element(id);
+}
+assert.match(element("llm-api-keys-screen"), /\shidden(?:\s|>)/, "API key screen must start hidden");
+assert.ok(main.includes('req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener'), "missing API key drawer navigation handler");
+assert.ok(main.includes('apiKeySaveButton.addEventListener'), "missing API key save/test handler");
+assert.ok(main.includes('apiKeyRemoveButton.addEventListener'), "missing API key removal handler");
+assert.ok(main.includes('NativeSecureStorage.set'), "API keys must use Android encrypted storage");
+assert.ok(main.includes('providerGenerationToken'), "API provider streaming must render token events");
+
 // A missing required node aborts module evaluation before any interaction works.
 // Keep the required DOM references aligned with the shipped HTML shell.
 const requiredIds = [...main.matchAll(/req<[^>]+>\("#([^"]+)"\)/g)].map((match) => match[1]);

@@ -30,10 +30,21 @@ Deno.serve(async(req:Request)=>{
    if(error)throw error;return reply({ok:true,configured:Boolean(key),connections:data??[]});
   }
   if(body.action==="connect"){
-   const provider=str(body.provider_key,64).toLowerCase(),toolkit=str(body.toolkit_slug,80).toLowerCase(),authConfig=str(body.auth_config_id,120)||Deno.env.get("COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase())||"",alias=str(body.alias||body.display_name||provider,120),display=str(body.display_name||alias,160);
+   const provider=str(body.provider_key,64).toLowerCase(),toolkit=str(body.toolkit_slug,80).toLowerCase();let authConfig=str(body.auth_config_id,120)||Deno.env.get("COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase())||"";const alias=str(body.alias||body.display_name||provider,120),display=str(body.display_name||alias,160);
    if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!authConfig||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
-   if(!authConfig)return reply({error:"composio_auth_config_not_configured",required_secret:"COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase()},503);
+   if(!authConfig){
+    const configs=await composio("/auth_configs?toolkit_slug="+encodeURIComponent(toolkit)+"&limit=100",key);
+    const items=obj(configs)&&Array.isArray(configs.items)?configs.items:[];
+    const enabled=items.filter((item)=>obj(item)&&item.status==="ENABLED"&&obj(item.toolkit)&&item.toolkit.slug===toolkit&&item.auth_scheme==="OAUTH2");
+    const preferred=enabled.find((item)=>obj(item)&&item.is_composio_managed===true)??enabled[0];
+    if(obj(preferred))authConfig=str(preferred.id,120);
+    if(!authConfig){
+     const created=await composio("/auth_configs",key,"POST",{toolkit,options:{type:"use_composio_managed_auth",name:"ULTRON "+display}});
+     if(obj(created))authConfig=str(created.id??(obj(created.auth_config)?created.auth_config.id:""),120);
+    }
+   }
+   if(!authConfig)return reply({error:"composio_auth_config_unavailable",message:"Composio did not return an enabled OAuth configuration for "+toolkit},503);
    const linked=await composio("/connected_accounts/link",key,"POST",{auth_config_id:authConfig,user_id:user.id,alias});
    if(!obj(linked)||typeof linked.connected_account_id!=="string"||typeof linked.redirect_url!=="string")throw new Error("Composio returned an incomplete connection link");
    const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:user.id,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();

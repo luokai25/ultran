@@ -92,7 +92,7 @@ type NativeLocalAIPlugin = {
   getStatus(): Promise<{ supported: boolean; loaded: boolean; loadedModel: string; runtimeVersion: string }>;
   getDeviceProfile(): Promise<{ deviceModel: string; totalRamBytes: number; availableRamBytes: number; availableStorageBytes: number; cpuCores: number; abi: string }>;
   listModels(): Promise<{ models: NativeModel[] }>;
-  pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number }>;
+  pickModel(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number; shards?: number; extractedModels?: number }>;
   pickProjector(): Promise<{ cancelled?: boolean; name?: string; sizeBytes?: number }>;
   listProjectors(): Promise<{ projectors: Array<{ name: string; sizeBytes: number; loaded?: boolean }> }>;
   loadModel(options: { name: string; projectorName?: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;

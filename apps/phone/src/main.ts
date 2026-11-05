@@ -3992,7 +3992,8 @@ if (synth) {
  * ------------------------------------------------------------------ */
 
 initConnectors({
-  linked: () => baseUrl() !== "",
+  linked: async () => Boolean(await getCloudSession()),
+  backendLinked: () => baseUrl() !== "",
   api,
   closeDrawer,
   openExternal: async (url) => {

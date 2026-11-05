@@ -139,3 +139,31 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .composer { border-radius:24px; }
   .composer-row #send-btn { flex-basis:48px; width:48px; min-width:48px; height:48px; }
 }
+
+/* LLM key page and compact chat model selector final overrides. */
+.chat-model-menu{max-height:min(390px,52dvh);padding:13px}
+.chat-model-options{max-height:198px;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 3px 0;scrollbar-width:thin}
+.chat-model-option{min-height:58px;padding:10px 36px 10px 12px}
+.llm-api-keys-screen{padding-bottom:calc(28px + var(--safe-bottom))}
+.llm-key-card{display:grid;gap:14px;padding:17px;border:1px solid rgba(229,45,65,.18);border-radius:18px;background:linear-gradient(155deg,#171b1d,#0c0f10 72%);box-shadow:0 12px 35px rgba(0,0,0,.2)}
+.llm-key-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.llm-key-heading strong{font-size:14px}
+.llm-key-heading span{max-width:55%;overflow:hidden;text-overflow:ellipsis;color:#a9a8a0;font-size:10px;text-align:right}
+.llm-key-field{display:grid;gap:8px}
+.llm-key-field>span{color:#c9c0c4;font-size:11px}
+.llm-key-field input{width:100%;min-height:48px;padding:0 13px;border:1px solid rgba(255,255,255,.1);border-radius:12px;outline:none;background:#090c0d;color:#f5f0f1;font:12px var(--font-mono)}
+.llm-key-field input:focus{border-color:rgba(229,45,65,.55);box-shadow:0 0 0 3px rgba(229,45,65,.08)}
+.llm-key-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.llm-key-actions .gold-button{min-height:42px;padding-inline:16px}
+.llm-key-actions .text-action{min-height:38px;margin:0;padding:0 12px}
+.llm-api-key-status{margin:0;padding:9px 11px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);color:#a7a49a;font-size:10px;line-height:1.5}
+.llm-api-key-status[data-state="connected"]{border-color:rgba(61,214,140,.25);background:rgba(61,214,140,.06);color:#65dda0}
+.llm-api-key-status[data-state="expired"]{border-color:rgba(245,174,73,.28);background:rgba(245,174,73,.06);color:#f5b85d}
+.llm-api-key-status[data-state="invalid"]{border-color:rgba(229,72,77,.3);background:rgba(229,72,77,.06);color:#ff777d}
+.llm-api-key-status[data-state="incompatible"]{border-color:rgba(175,130,255,.28);background:rgba(175,130,255,.06);color:#c3a4ff}
+.llm-api-key-status[data-state="unreachable"]{border-color:rgba(244,143,85,.28);background:rgba(244,143,85,.06);color:#f2a06f}
+.llm-api-key-status[data-state="missing"]{color:#92938b}
+.llm-api-models{min-height:0;color:#8f9793;font-size:10px}
+.llm-api-model-summary{display:block;line-height:1.5;overflow-wrap:anywhere}
+.llm-key-note{color:#858d89;font-size:10px;line-height:1.65}
+@media(max-width:380px){.llm-key-card{padding:13px}.llm-key-heading{align-items:flex-start;flex-direction:column}.llm-key-heading span{max-width:100%;text-align:left}.chat-model-menu{max-height:48dvh}}

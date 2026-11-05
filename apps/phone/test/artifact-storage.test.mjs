@@ -13,7 +13,7 @@ test("cloud artifact client supports signed upload, listing, download and deleti
 });
 
 test("artifact gateway keeps uploads owner-prefixed and uses expiring private download links", async () => {
-  const fn = await readFile(new URL("../../supabase/functions/ultron-artifacts/index.ts", import.meta.url), "utf8");
+  const fn = await readFile(new URL("../../../supabase/functions/ultron-artifacts/index.ts", import.meta.url), "utf8");
   assert.match(fn, /user\.id\s*\+\s*"\/"\s*\+\s*id/);
   assert.match(fn, /createSignedUrl\([^,]+,\s*300/);
   assert.match(fn, /ultron-private/);

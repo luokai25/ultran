@@ -20,6 +20,12 @@ Automatic chat routing is free-tier constrained: OpenRouter IDs must end in `:fr
 
 The public directory at https://github.com/raullenchai/free-llm-api-resources is refreshed daily and stored in `ultron_settings.free_provider_registry`. It discovers provider resources; it does not contain reusable API credentials. ULTRON cannot create provider accounts, complete identity checks, accept provider terms, or mint keys on the owner's behalf. When all supplied quotas are exhausted, the cloud brain remains available for maintenance but generation waits for a quota reset or another valid key.
 
+## Prometheus goal loop
+
+The shared phone/cloud agent prompt uses a resumable goal loop: define success criteria, split substantial work into verifiable milestones, inspect available models/keys/tools/skills/connectors and phone-vs-cloud capabilities, execute, verify, and checkpoint progress. Capability gaps trigger catalog discovery first, then versioned ULTRON-owned tool/skill creation and bounded evaluation. Failed steps are diagnosed and retried through alternate providers, keys, tools or smaller sub-tasks; the loop stops only on verified completion or a concrete blocker.
+
+The cloud brain estimates task complexity from recent user turns and ranks eligible free models by approximate parameter scale and task-fit signals (reasoning, coding and vision). It then ranks provider-key candidates by model score, key priority and least-recent use, with fallback across up to eight candidates. This is a routing heuristic, not a benchmark or a guarantee of unlimited compute: model availability, provider quotas, hardware, permissions and external services remain real constraints. Durable run checkpoints and the job queue let work resume after an app restart.
+
 ## Scheduled cloud worker
 
 Supabase Edge Functions are serverless, not a permanently running VM. `pg_cron` invokes `ultron-brain` every minute using a random internal secret stored in Vault and delivered only as a server-to-server header. The supervisor checks key health, refreshes the provider directory, and invokes `ultron-jobs` to claim durable work. The system job claimer uses `FOR UPDATE SKIP LOCKED` and an owner-scoped lease.

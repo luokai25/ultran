@@ -38,6 +38,27 @@ Deno.serve(async(req:Request)=>{
    const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:user.id,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();
    if(error)throw error;return reply({ok:true,connection:data,redirect_url:linked.redirect_url,expires_at:linked.expires_at??null},201);
   }
+  if(body.action==="execute"){
+   const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase();
+   const args=obj(body.arguments)?body.arguments:{};
+   if(!id||! /^[A-Z][A-Z0-9_]{2,119}$/.test(toolSlug))return reply({error:"invalid_tool_execution"},400);
+   const {data:connection,error:connectionError}=await db.from("ultron_connector_connections").select("provider_key,toolkit_slug,external_account_id,status").eq("owner_id",user.id).eq("id",id).maybeSingle();
+   if(connectionError)throw connectionError;
+   if(!connection||connection.status!=="connected"||!connection.external_account_id)return reply({error:"connector_not_connected"},409);
+   const toolkit=String(connection.toolkit_slug??"").toUpperCase().replace(/-/g,"_");
+   if(!toolkit||!toolSlug.startsWith(toolkit+"_"))return reply({error:"toolkit_connection_mismatch"},403);
+   if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
+   const readOnly=/(^|_)(GET|LIST|SEARCH|FETCH|READ|FIND|QUERY|ENUM|DOWNLOAD|PROFILE|STATUS)(_|$)/.test(toolSlug);
+   if(!readOnly){
+    const permissionKey="composio."+toolSlug.toLowerCase();
+    const {data:permission,error:permissionError}=await db.from("ultron_tool_permissions").select("access_mode,require_confirmation").eq("owner_id",user.id).eq("tool_key",permissionKey).maybeSingle();
+    if(permissionError)throw permissionError;
+    if(!permission||permission.access_mode!=="allow"||permission.require_confirmation!==false)
+      return reply({error:"approval_required",tool_slug:toolSlug,permission_key:permissionKey,message:"This connector action changes data. It requires an explicit owner grant before execution."},403);
+   }
+   const result=await composio("/tools/execute/"+encodeURIComponent(toolSlug),key,"POST",{connected_account_id:connection.external_account_id,user_id:user.id,version:"latest",arguments:args});
+   return reply({ok:true,tool_slug:toolSlug,provider_key:connection.provider_key,result});
+  }
   if(body.action==="status"||body.action==="disconnect"){
    const id=str(body.id,80);if(!id)return reply({error:"connection_id_required"},400);
    const {data:c,error:ce}=await db.from("ultron_connector_connections").select("id,external_account_id").eq("owner_id",user.id).eq("id",id).maybeSingle();

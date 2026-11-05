@@ -575,11 +575,16 @@ public class UltronLocalAiPlugin extends Plugin {
             remaining -= read;
         }
         long padding = (512 - (size % 512)) % 512;
-        skipTarEntry(input, padding);
+        skipExact(input, padding);
     }
 
     private static void skipTarEntry(InputStream input, long size) throws Exception {
         long remaining = size + ((512 - (size % 512)) % 512);
+        skipExact(input, remaining);
+    }
+
+    private static void skipExact(InputStream input, long amount) throws Exception {
+        long remaining = amount;
         while (remaining > 0) {
             long skipped = input.skip(remaining);
             if (skipped <= 0) {

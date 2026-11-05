@@ -16,3 +16,5 @@ export async function refreshUltronConnectorStatus(id:string):Promise<UltronConn
 export async function disconnectUltronConnector(id:string):Promise<void>{await invoke("disconnect",{id});}
 
 export async function executeUltronConnectorTool(input:{connectionId:string;toolSlug:string;arguments?:Record<string,unknown>}):Promise<Record<string,unknown>>{const r=await invoke("execute",{connection_id:input.connectionId,tool_slug:input.toolSlug,arguments:input.arguments??{}});return r.result&&typeof r.result==="object"?r.result as Record<string,unknown>:r;}
+
+export async function queueUltronConnectorTool(input:{connectionId:string;toolSlug:string;arguments?:Record<string,unknown>;idempotencyKey?:string}):Promise<Record<string,unknown>>{return invoke("enqueue_tool",{connection_id:input.connectionId,tool_slug:input.toolSlug,arguments:input.arguments??{},idempotency_key:input.idempotencyKey});}

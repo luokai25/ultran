@@ -105,6 +105,26 @@
         <p class="feature-disclaimer">ULTRON runs a programmed orchestration layer around the selected reasoning model. Custom preferences cannot override its core policies, permissions, or approval gates.</p>
         <button id="identity-save" class="gold-button" type="button">Save identity details</button>
       </section>
+      <section id="llm-api-keys-screen" class="feature-screen llm-api-keys-screen" aria-label="LLM API keys" hidden>
+        <header class="feature-head">
+          <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>One secure place for compatible model-provider keys.</p></div>
+          <button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button>
+        </header>
+        <section class="llm-key-card">
+          <div class="llm-key-heading"><strong>Provider API key</strong><span id="llm-api-key-provider">No provider detected</span></div>
+          <label class="llm-key-field">
+            <span>Paste your API key</span>
+            <input id="llm-api-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste API key…" />
+          </label>
+          <div class="llm-key-actions">
+            <button id="llm-api-key-save" class="gold-button" type="button">Save &amp; test</button>
+            <button id="llm-api-key-remove" class="text-action" type="button" disabled>Remove key</button>
+          </div>
+          <p id="llm-api-key-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">No API key saved</p>
+          <div id="llm-api-key-models" class="llm-api-models"></div>
+          <small class="llm-key-note">ULTRON detects supported key formats automatically. Android stores the key encrypted with the device Keystore. Only compatible chat-completion APIs are enabled; unsupported key types are identified instead of being silently accepted.</small>
+        </section>
+      </section>
       <section id="vault-screen" class="feature-screen mindmap-screen" aria-label="Combined knowledge mind map" hidden>
         <header class="feature-head"><div><span class="feature-eyebrow">YOUR SECOND BRAIN · LOCAL</span><h1>Mind Map</h1><p>One connected knowledge graph from every conversation.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
         <div class="mindmap-toolbar"><span id="mindmap-stats">Combining all sessions…</span><input id="mindmap-search" type="search" inputmode="search" placeholder="Find a person, project or idea…" aria-label="Search mind map" /><button id="mindmap-refresh" class="ghost" type="button">Rebuild map</button></div>
@@ -178,6 +198,7 @@
         <button id="drawer-mindmap" class="drawer-link" type="button"><span aria-hidden="true">◎</span>Mind Map</button>
         <button id="drawer-learning" class="drawer-link" type="button"><span aria-hidden="true">⌁</span>Learning Review</button>
         <button id="drawer-capabilities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>ULTRON Capabilities</button>
+        <button id="drawer-llm-api-keys" class="drawer-link" type="button"><span aria-hidden="true">⌘</span>LLM API KEYS</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
           Tools &amp; Connectors

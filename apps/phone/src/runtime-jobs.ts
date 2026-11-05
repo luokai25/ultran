@@ -58,12 +58,12 @@ export async function processUltronJobs(limit = 3): Promise<number> {
   return Number(result.processed) || 0;
 }
 
-export async function enqueueUltronMemoryConsolidation(conversationId: string, sequenceWatermark: number): Promise<UltronJob> {
+export async function enqueueUltronMemoryConsolidation(conversationId: string, sequenceWatermark: number, proposal?: Record<string, unknown>, modelId?: string): Promise<UltronJob> {
   const key = `memory:${conversationId}:${Math.max(0, Math.floor(sequenceWatermark))}`;
   const job = await enqueueUltronJob({
     job_type: "memory.consolidate",
     title: "Consolidate conversation memory",
-    payload: { conversation_id: conversationId, sequence_watermark: sequenceWatermark },
+    payload: { conversation_id: conversationId, sequence_watermark: sequenceWatermark, ...(proposal ? { proposal, model_id: modelId ?? "on_device" } : {}) },
     priority: 2,
     max_attempts: 20,
     idempotency_key: key,

@@ -1,6 +1,6 @@
 {
   "name": "@ultron/phone",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "private": true,
   "description": "Ultron phone client - the Capacitor shell that ships the signed Android APK.",
   "license": "Apache-2.0",

@@ -92,6 +92,15 @@ Deno.serve(async (req: Request) => {
       changeStarted = false;
     };
 
+    if (body.action === "get_run") {
+      if (typeof body.id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.id)) return response({ error: "run_id_required" }, 400);
+      const { data, error } = await supabase.from("ultron_agent_runs").select("*")
+        .eq("id", body.id).eq("owner_id", owner_id).maybeSingle();
+      if (error) throw error;
+      if (!data) return response({ error: "agent_run_not_found" }, 404);
+      return response({ ok: true, run: data });
+    }
+
     if (body.action === "status") {
       const [runs, tools, proposals] = await Promise.all([
         supabase.from("ultron_agent_runs").select("id", { count: "exact", head: true }),

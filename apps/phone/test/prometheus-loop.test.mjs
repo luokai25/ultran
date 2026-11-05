@@ -3,32 +3,25 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
+const capabilities = await readFile(new URL('../../../supabase/functions/ultron-capabilities/index.ts', import.meta.url), 'utf8');
+const brain = await readFile(new URL('../../../supabase/functions/ultron-brain/index.ts', import.meta.url), 'utf8');
 
-test('Prometheus goal loop audits capability, adapts compute, verifies milestones and resumes checkpoints', () => {
-  const start = source.indexOf('PROMETHEUS GOAL LOOP:');
-  const end = source.indexOf('ULTRON SELF-EXTENSION AND CLOUD RUNTIME:', start);
-  assert.ok(start >= 0 && end > start, 'Prometheus protocol must be part of the shared agent system prompt');
-  const prompt = source.slice(start, end);
-  assert.match(source, /return \[resolveIdentityPrompt\(identityState\), core, PROMETHEUS_GOAL_LOOP_PROMPT/);
-  assert.match(source, /const PROMETHEUS_GOAL_LOOP_PROMPT =/);
-  for (const phrase of [
-    'concrete success condition',
-    'connected provider keys',
-    'fall back across eligible keys and providers',
-    'checkpoint durable progress',
-    'create a versioned ULTRON-owned tool or skill',
-    'without repeating an unchanged failure',
-    'genuine blocker',
-    'capabilities.checkpoint_run',
-    'Never claim a goal is guaranteed or completed without evidence',
-  ]) assert.ok(prompt.includes(phrase), `missing Prometheus behavior: ${phrase}`);
+test('Prometheus Supabase provider runs a bounded tool loop with durable checkpoints', () => {
+  assert.match(source, /PROMETHEUS GOAL LOOP:/);
+  assert.match(source, /if \(cloudBrainActive\)[\s\S]*?for \(let modelTurn = 0; modelTurn <= iterationLimit; modelTurn\+\+\)/);
+  assert.match(source, /await runApprovedLocalTool\(request\)/);
+  assert.match(source, /savePrometheusCheckpoint\("tool_completed", "running"\)/);
+  assert.match(source, /send “continue” to resume from the last checkpoint/i);
+  assert.match(source, /invokeUltronCapabilities\("get_run"/);
+  assert.match(capabilities, /body\.action === "get_run"/);
+  assert.match(capabilities, /\.eq\("id", body\.id\)\.eq\("owner_id", owner_id\)/);
 });
 
-test('Supabase cloud brain ranks model capacity by task complexity and keeps provider-key fallback', async () => {
-  const backend = await readFile(new URL('../../../supabase/functions/ultron-brain/index.ts', import.meta.url), 'utf8');
-  assert.match(backend, /function taskComplexity\(messages: Json\[\]\)/);
-  assert.match(backend, /function modelCapabilityScore\(model: string, complexity: number\)/);
-  assert.match(backend, /bestFreeModel\(provider, key\.models \?\? \[\], complexity\)/);
-  assert.match(backend, /b\.modelScore - a\.modelScore \|\| b\.key\.priority - a\.key\.priority/);
-  assert.match(backend, /for \(const candidate of candidates\.slice\(0, 8\)\)/);
+test('Supabase cloud brain ranks eligible free models by task complexity and falls back across keys', () => {
+  assert.match(brain, /function taskComplexity\(messages: Json\[\]\)/);
+  assert.match(brain, /messages\.filter\(\(message\) => message\.role === "user"\)/);
+  assert.match(brain, /function modelCapabilityScore\(model: string, complexity: number\)/);
+  assert.match(brain, /bestFreeModel\(provider, key\.models \?\? \[\], complexity\)/);
+  assert.match(brain, /b\.modelScore - a\.modelScore \|\| b\.key\.priority - a\.key\.priority/);
+  assert.match(brain, /for \(const candidate of candidates\.slice\(0, 8\)\)/);
 });

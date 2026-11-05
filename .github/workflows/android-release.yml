@@ -24,9 +24,10 @@ on:
         type: string
 
 concurrency:
-  # Only the newest main build should publish; stale emulator smoke tests must not block fixes.
+  # Serialize main releases instead of cancelling a build during Android 12
+  # install/smoke testing when CI also commits a generated lockfile.
   group: android-release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write

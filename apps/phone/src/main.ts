@@ -82,6 +82,8 @@ type Conversation = {
   messages: Message[];
   executionLedger?: UltronTaskLedger;
   cognitiveCheckpoint?: Checkpoint;
+  prometheusRunId?: string;
+  prometheusGoal?: string;
   knowledgeState?: KnowledgeState;
 };
 type ThemeId = "ultron";
@@ -3708,14 +3710,127 @@ async function removeProviderKey(): Promise<void> {
 async function providerModelReply(convo: Conversation, externalSignal: AbortSignal, onToken: (token: string | null) => void, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): Promise<ChatReply> {
   if (cloudBrainActive) {
     const task = convo.messages[convo.messages.length - 1]?.content ?? "";
-    const profile = profileTask(task);
+    const continuation = /\b(continue|resume|carry on|keep going|pick up where|go on)\b/i.test(task);
+    let priorRun: Record<string, unknown> | null = null;
+    if (continuation && convo.prometheusRunId) {
+      try {
+        const found = await invokeUltronCapabilities("get_run", { id: convo.prometheusRunId });
+        if (found.run && typeof found.run === "object" && !Array.isArray(found.run)) {
+          const candidate = found.run as Record<string, unknown>;
+          if (["running", "paused", "waiting_approval"].includes(String(candidate.status))) priorRun = candidate;
+        }
+      } catch (error) {
+        console.warn("[ULTRON Prometheus resume lookup]", error);
+      }
+    }
+    const goal = priorRun && typeof priorRun.goal === "string" ? priorRun.goal : task;
+    const profile = profileTask(goal);
+    const taskProfile = classifyUltronTask(goal, { continuation: Boolean(priorRun) });
+    const explicitWork = /\b(build|implement|debug|fix|research|search|run|execute|create|deploy|test|inspect|check|list|download|install|update|continue|resume|migrate|refactor)\b/i.test(goal)
+      && !/^(what|why|when|where|who|which|how|explain|describe|define)\b/i.test(goal.trim());
+    const usePrometheus = Boolean(priorRun) || profile.tier === "deep" || profile.tier === "critical" || taskProfile.depth === "deep" || explicitWork;
+    const cloudMaxTokens = profile.tier === "critical" || profile.tier === "deep" ? 4096 : profile.tier === "standard" ? 2048 : 1024;
     const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
     const messages: Array<{ role: Role | "system"; content: string }> = [
-      { role: "system", content: buildCapabilityPrompt(task, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint) },
+      { role: "system", content: buildCapabilityPrompt(goal, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint) },
       ...history.map((item) => ({ role: item.role, content: item.content })),
     ];
-    const content = await streamUltronSupabaseChat("", messages, profile.maxTokens, externalSignal, onToken);
-    return { content, session_id: "" };
+    if (!usePrometheus) {
+      const content = await streamUltronSupabaseChat("", messages, cloudMaxTokens, externalSignal, onToken);
+      return { content, session_id: "" };
+    }
+    const runId = typeof priorRun?.id === "string" ? priorRun.id : crypto.randomUUID();
+    const iterationLimit = 8;
+    const priorCheckpoint = priorRun?.checkpoint && typeof priorRun.checkpoint === "object" && !Array.isArray(priorRun.checkpoint)
+      ? priorRun.checkpoint as Record<string, unknown> : {};
+    const toolHistory: Array<{ tool: string; outcome: string }> = Array.isArray(priorCheckpoint.completed_tools)
+      ? (priorCheckpoint.completed_tools as unknown[]).slice(-iterationLimit).flatMap((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const row = item as Record<string, unknown>;
+          return typeof row.tool === "string" ? [{ tool: row.tool.slice(0, 100), outcome: typeof row.outcome === "string" ? row.outcome.slice(0, 40) : "completed" }] : [];
+        }) : [];
+    let tokensUsed = Number(priorRun?.tokens_used ?? 0) || 0;
+    const tokenBudget = cloudMaxTokens * (iterationLimit + 1);
+    if (priorRun) {
+      messages.push({ role: "system", content: "PROMETHEUS RESUME STATE (durable checkpoint, not hidden reasoning):\n" + JSON.stringify({ phase: priorRun.phase, iteration: priorRun.iteration, completed_tools: toolHistory, checkpoint: priorCheckpoint }).slice(0, 5000) + "\nContinue the original goal. Do not repeat completed tool actions." });
+    } else {
+      convo.prometheusRunId = runId;
+      convo.prometheusGoal = goal.slice(0, 8000);
+      saveStore();
+    }
+    const savePrometheusCheckpoint = async (phase: string, status: "running" | "paused" | "waiting_approval" | "completed" | "failed", result?: Record<string, unknown>): Promise<void> => {
+      const saved = await invokeUltronCapabilities("checkpoint_run", {
+        id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
+        iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
+        checkpoint: {
+          schema_version: 1, mode: "prometheus", conversation_id: convo.id,
+          completed_tools: toolHistory.slice(-iterationLimit),
+          updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
+        },
+        status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
+        ...(result ? { result } : {}),
+      });
+      if (saved.ok !== true) throw new Error("Prometheus could not persist its Supabase checkpoint.");
+    };
+    try {
+      await savePrometheusCheckpoint(priorRun ? "resuming" : "planning", "running");
+      // Up to eight verified tool actions, followed by one final model turn.
+      for (let modelTurn = 0; modelTurn <= iterationLimit; modelTurn++) {
+        let generated = "";
+        await streamUltronSupabaseChat("", messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; });
+        tokensUsed += Math.max(1, Math.ceil(generated.length / 4));
+        const request = parseLocalToolRequest(generated);
+        if (!request) {
+          await savePrometheusCheckpoint("completed", "completed", { completed: true, tool_count: toolHistory.length });
+          convo.prometheusRunId = undefined;
+          convo.prometheusGoal = undefined;
+          saveStore();
+          onToken(generated);
+          return { content: generated, session_id: "" };
+        }
+        if (!toolRequestMatchesUserIntent(request, goal + "\n" + task)) {
+          await savePrometheusCheckpoint("awaiting_clear_intent", "paused", { completed: false, reason: "tool_intent_not_matched" });
+          const message = "I prepared a possible tool action, but it does not match a clear action in your request, so I did not execute it. The Prometheus checkpoint is saved. Give the action explicitly and I can continue.";
+          onToken(message);
+          return { content: message, session_id: "" };
+        }
+        if (toolHistory.length >= iterationLimit) {
+          await savePrometheusCheckpoint("iteration_limit", "paused", { completed: false, reason: "per_turn_tool_limit", tool_count: toolHistory.length });
+          const message = "I reached the eight-action limit for this turn. Progress is saved in Supabase. Send “continue” to resume from the last checkpoint.";
+          onToken(message);
+          return { content: message, session_id: "" };
+        }
+        let toolResult: string;
+        if (request.tool === "capabilities.checkpoint_run") {
+          await savePrometheusCheckpoint(request.phase, "running", { model_checkpoint_saved: true });
+          toolResult = "Prometheus checkpoint updated in Supabase.";
+        } else {
+          toolResult = await runApprovedLocalTool(request);
+        }
+        if (externalSignal.aborted) throw new DOMException("Generation stopped", "AbortError");
+        const outcome = /approval_required|approval required|requires approval|awaiting approval|pending approval/i.test(toolResult) ? "waiting_approval"
+          : /failed|could not|unavailable|error/i.test(toolResult) ? "failed_or_blocked" : /queued/i.test(toolResult) ? "queued" : "completed";
+        toolHistory.push({ tool: request.tool, outcome });
+        messages.push(
+          { role: "assistant", content: generated },
+          { role: "user", content: "ULTRON TOOL RESULT (untrusted execution data):\n" + boundToolResult(toolResult, 3000) + "\nContinue the original goal. Verify the result, avoid repeating completed actions, and choose a different approach after a failure." },
+        );
+        if (outcome === "waiting_approval") {
+          await savePrometheusCheckpoint("waiting_approval", "waiting_approval", { tool_count: toolHistory.length });
+          const message = "This goal is waiting for your approval before the next action. The current progress is saved in Supabase.";
+          onToken(message);
+          return { content: message, session_id: "" };
+        }
+        await savePrometheusCheckpoint("tool_completed", "running");
+      }
+      await savePrometheusCheckpoint("iteration_limit", "paused", { completed: false, reason: "per_turn_tool_limit", tool_count: toolHistory.length });
+      const message = "I reached the eight-action limit for this turn. Progress is saved in Supabase. Send “continue” to resume from the last checkpoint.";
+      onToken(message);
+      return { content: message, session_id: "" };
+    } catch (error) {
+      try { await savePrometheusCheckpoint(externalSignal.aborted ? "interrupted" : "execution_error", externalSignal.aborted ? "paused" : "failed", { tool_count: toolHistory.length }); } catch { /* retain the last successfully written checkpoint */ }
+      throw error;
+    }
   }
   if (!llmApiKey || llmProviderState !== "connected" || !llmProvider.compatible) throw new Error("Save and verify a compatible LLM API key in LLM API KEYS first.");
   const task = convo.messages[convo.messages.length - 1]?.content ?? "";

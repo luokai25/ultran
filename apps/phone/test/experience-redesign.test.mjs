@@ -170,7 +170,7 @@ test("version 3 uses a neutral ULTRON identity and retains native capability ent
   const [pkg, main, html, mark] = await Promise.all([
     read("package.json"), read("src/main.ts"), read("index.html"), read("src/mark.ts"),
   ]);
-  assert.ok(pkg.includes('"version": "3.0.0"'));
+  assert.match(pkg, /"version"\s*:\s*"3\.\d+\.\d+"/);
   assert.ok(main.includes('type ThemeId = "ultron"'));
   assert.ok(main.includes("accent: 0x9ca3af"));
   assert.ok(main.includes("importNativeModel()"));

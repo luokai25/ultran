@@ -750,6 +750,7 @@ async function connectCloudAccount(): Promise<void> {
     await registerCloudDevice();
     await applyInitialCloudSync();
     startCloudRealtime();
+    startUltronJobWorker();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not connect to ULTRON cloud.";
@@ -779,6 +780,7 @@ async function restoreCloudAccount(): Promise<void> {
     await registerCloudDevice();
     await applyInitialCloudSync();
     startCloudRealtime();
+    startUltronJobWorker();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not restore ULTRON cloud session.";
@@ -790,6 +792,7 @@ async function disconnectCloudAccount(): Promise<void> {
   try {
     cloudUnsubscribe?.();
     cloudUnsubscribe = null;
+    stopUltronJobWorker();
     await signOutOfCloud();
     cloudSyncStatusEl.textContent = "Disconnected. Your local conversations and on-device model remain available.";
   } catch (error) {

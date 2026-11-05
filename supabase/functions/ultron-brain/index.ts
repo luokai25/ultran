@@ -64,7 +64,10 @@ function modelCapabilityScore(model: string, complexity: number): number {
   const id = model.toLowerCase();
   const params = Number(id.match(/(?:^|[-_.])(\d+(?:\.\d+)?)b(?:[-_.]|$)/)?.[1] ?? 0);
   let score = 100 + Math.min(160, params) * 5;
-  if (/gpt-oss-120b|llama-4-maverick|command-a-/.test(id)) score += 260;
+  if (/gpt-oss-120b/.test(id)) score += 1200;
+  if (/llama-4-maverick/.test(id)) score += 1600;
+  if (/command-a-/.test(id)) score += 1000;
+  if (/llama-4-scout/.test(id)) score += 450;
   if (/llama-3\.3-70b|llama-3\.1-70b|qwen3-32b|command-r-plus/.test(id)) score += 180;
   if (/reason|r1|qwq|deepseek/.test(id) && complexity >= 3) score += 150;
   if (/coder|codestral|qwen.*coder|deepseek-coder/.test(id) && complexity >= 2) score += 180;

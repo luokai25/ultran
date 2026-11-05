@@ -50,6 +50,33 @@ function parseModels(_provider: Provider, payload: unknown): string[] {
   const ids = rows.map((row) => isObject(row) ? clean(row.id ?? row.name ?? row.model, 180) : "").filter(Boolean);
   return chatModelFilter(ids);
 }
+function taskComplexity(messages: Json[]): number {
+  const task = messages.map((message) => clean(message.content, 24000)).join("\n").toLowerCase();
+  let score = 0;
+  if (/\b(build|implement|debug|refactor|architecture|research|compare|analy[sz]e|design|migrate|deploy|multi.step|step.by.step|investigate|prove|optimi[sz]e)\b/.test(task)) score += 2;
+  if (/\b(code|typescript|javascript|python|sql|android|supabase|github|compiler|stack trace|test suite)\b/.test(task)) score += 2;
+  if (/\b(reasoning|mathematical proof|derive|formal|algorithm|security review|large codebase)\b/.test(task)) score += 2;
+  if (task.length > 5000) score += 1;
+  if (messages.length > 5) score += 1;
+  return Math.min(7, score);
+}
+function modelCapabilityScore(model: string, complexity: number): number {
+  const id = model.toLowerCase();
+  const params = Number(id.match(/(?:^|[-_.])(\d+(?:\.\d+)?)b(?:[-_.]|$)/)?.[1] ?? 0);
+  let score = 100 + Math.min(160, params) * 5;
+  if (/gpt-oss-120b|llama-4-maverick|command-a-/.test(id)) score += 260;
+  if (/llama-3\.3-70b|llama-3\.1-70b|qwen3-32b|command-r-plus/.test(id)) score += 180;
+  if (/reason|r1|qwq|deepseek/.test(id) && complexity >= 3) score += 150;
+  if (/coder|codestral|qwen.*coder|deepseek-coder/.test(id) && complexity >= 2) score += 180;
+  if (/vision|vl|llava/.test(id) && complexity >= 2) score += 80;
+  if (complexity <= 1) score -= params * 7;
+  else score += params * Math.min(5, complexity) * 2;
+  return score;
+}
+function bestFreeModel(provider: Provider, models: string[], complexity: number): string {
+  return models.filter((model) => isFreeModel(provider, model))
+    .sort((a, b) => modelCapabilityScore(b, complexity) - modelCapabilityScore(a, complexity))[0] ?? "";
+}
 function isFreeModel(provider: Provider, model: string): boolean {
   const id = model.toLowerCase();
   if (provider === "openrouter") return id.endsWith(":free");
@@ -324,21 +351,23 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   }
   const allRows = await keyRows(db, ownerId);
   const now = Date.now();
-  const candidates = allRows.filter(({ provider, key }) =>
-    key.enabled && key.status === "connected" && (!requestedProvider || provider === requestedProvider) &&
-    (!key.cooldown_until || Date.parse(key.cooldown_until) <= now) &&
-    (requestedModel ? (key.models ?? []).includes(requestedModel) && isFreeModel(provider, requestedModel) : (key.models ?? []).some((model) => isFreeModel(provider, model)))
-  ).sort((a, b) => b.key.priority - a.key.priority || Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01"));
+  const complexity = taskComplexity(messages);
+  const candidates = allRows.flatMap(({ provider, key }) => {
+    if (!key.enabled || key.status !== "connected" || (requestedProvider && provider !== requestedProvider) || (key.cooldown_until && Date.parse(key.cooldown_until) > now)) return [];
+    const chosenModel = requestedModel
+      ? ((key.models ?? []).includes(requestedModel) && isFreeModel(provider, requestedModel) ? requestedModel : "")
+      : bestFreeModel(provider, key.models ?? [], complexity);
+    if (!chosenModel) return [];
+    return [{ provider, key, chosenModel, modelScore: modelCapabilityScore(chosenModel, complexity) }];
+  }).sort((a, b) => b.modelScore - a.modelScore || b.key.priority - a.key.priority || Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01"));
   if (!candidates.length) return json({ error: "no_available_model_key", message: requestedModel ? "No connected key currently supports this free-tier model." : "No connected key currently has an available free-tier chat model. Add another key or wait for a provider quota to reset." }, 503);
   let lastError = "No provider key could complete the request.";
   for (const candidate of candidates.slice(0, 8)) {
-    const { provider, key } = candidate;
+    const { provider, key, chosenModel } = candidate;
     let secret: string;
     try { secret = await getKeySecret(db, key.vault_secret_id); }
     catch { await updateKey(db, ownerId, provider, key.id, { status: "unreachable", last_error: "Vault credential could not be read." }); continue; }
     const config = PROVIDERS[provider];
-    const chosenModel = requestedModel || (key.models ?? []).find((model) => isFreeModel(provider, model)) || "";
-    if (!chosenModel) continue;
     const endpoint = config.protocol === "cohere" ? `${config.base}/chat` : `${config.base}/chat/completions`;
     const requestMessages = messages.map((message) => ({ role: message.role, content: message.content }));
     const payload: Json = config.protocol === "cohere"

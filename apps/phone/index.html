@@ -313,14 +313,14 @@
         <section class="field native-model-manager" aria-labelledby="native-model-heading">
           <span id="native-model-heading">On-device AI model</span>
           <small>Runs llama.cpp inside the Android app. GGUF weights stay in private app storage and use file-backed memory mapping. This can reduce anonymous RAM use, but it does not guarantee every model will fit. llama.cpp's row-lazy path applies only to tensors marked by a supported architecture, not every transformer layer. Split GGUF models can be imported by selecting every numbered shard together. The context cache still needs RAM, and very large models can be extremely slow on phone storage and CPU. Start with a 1B–3B Q4 model, then test larger ones.</small>
-          <select id="native-model-select" aria-label="Installed GGUF models"></select>
+          <select id="native-model-select" aria-label="Installed local models"></select>
           <select id="native-projector-select" aria-label="Vision projector">
             <option value="">Text-only model (no projector)</option>
           </select>
           <p id="native-model-status" class="native-model-status" role="status">Checking native model runtime…</p>
           <p id="device-profile" class="device-profile" role="status">Checking device memory and storage…</p>
           <div class="sheet-actions native-model-actions">
-            <button id="native-model-pick-btn" class="ghost" type="button">Import GGUF</button>
+            <button id="native-model-pick-btn" class="ghost" type="button">Import GGUF / .tgz</button>
             <button id="native-projector-import-btn" class="ghost" type="button">Import mmproj</button>
             <button id="native-model-load-btn" class="ghost" type="button" disabled>Load model</button>
             <button id="native-model-unload-btn" class="ghost" type="button" disabled>Unload</button>
@@ -338,7 +338,7 @@
             <p id="model-library-status" class="native-model-status" role="status" aria-live="polite">Search the Hugging Face catalog. Downloaded weights stay in Ultron's private app storage.</p>
             <progress id="model-download-progress" class="model-download-progress" max="100" value="0" aria-label="Model download progress" hidden></progress>
             <div id="model-library-results" class="model-library-results"></div>
-            <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. Only GGUF files are supported by the current on-device text inference engine. Image, video and audio generation require additional native engines and decoders.</small>
+            <small class="model-library-note">Models are community-published. Review each model's license and source before use. Downloads can be several gigabytes and require Wi-Fi and free storage. On-device llama.cpp runs GGUF weights. Import a .tgz or .tar.gz archive containing GGUF files to extract them automatically. Safetensors and PyTorch checkpoints need a separate runtime and are not executable in this build.</small>
           </section>
         </section>
 

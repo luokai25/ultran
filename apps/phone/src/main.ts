@@ -1,5 +1,6 @@
 import { normalizeToolCall } from "@ultron/connectors/tool-contract";
 import { CURATED_MODELS } from "./model-library";
+import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel, type ProviderProfile, type ProviderState } from "./llm-provider";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
 import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
@@ -102,9 +103,10 @@ type NativeLocalAIPlugin = {
   deleteModel(options: { name: string }): Promise<{ deleted: boolean }>;
   downloadModel(options: { name: string; url: string; sha256?: string; expectedBytes?: number }): Promise<{ downloaded: boolean; name: string; sizeBytes: number }>;
   addListener(eventName: "modelImportProgress", listener: (event: { name: string; copiedBytes: number; totalBytes: number }) => void): Promise<{ remove(): Promise<void> }>;
-  addListener(eventName: "generationToken", listener: (event: { token: string }) => void): Promise<{ remove(): Promise<void> }>;
+  addListener(eventName: "generationToken" | "providerGenerationToken", listener: (event: { token: string }) => void): Promise<{ remove(): Promise<void> }>;
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltronLocalAI");
+const NativeSecureStorage = registerPlugin<{ get(options: { key: string }): Promise<{ value: string | null }>; set(options: { key: string; value: string }): Promise<{ stored: boolean }>; remove(options: { key: string }): Promise<{ removed: boolean }> }>("UltronSecureStorage");
 const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>;  openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;approved?:boolean;sent?:boolean;requiresUserSend?:boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; composeTelegram(options:{body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}>; openAppBatterySettings():Promise<{opened:boolean}>; getBackgroundAccessStatus():Promise<{notifications:boolean;manufacturer:string;model:string;sdk:number}> }>("UltronCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prootAvailable?: boolean; wgetAvailable?: boolean; sshAvailable?: boolean; aptAvailable?: boolean; packageManagerEnabled?: boolean; packageManagerNote?: string; availableCommands?: string[]; availableCommandCount?: number; commandInventoryTruncated?: boolean; prefix: string; architecture: string }>;
@@ -229,6 +231,12 @@ let hubSearchSequence = 0;
 const localModelEndpointEl = document.createElement("input");
 const localModelEl = document.createElement("input");
 const endpointNote = req<HTMLElement>("#endpoint-note");
+const apiKeyInput = req<HTMLInputElement>("#llm-api-key");
+const apiKeyStatus = req<HTMLElement>("#llm-api-key-status");
+const apiKeyProvider = req<HTMLElement>("#llm-api-key-provider");
+const apiKeySaveButton = req<HTMLButtonElement>("#llm-api-key-save");
+const apiKeyRemoveButton = req<HTMLButtonElement>("#llm-api-key-remove");
+const apiKeyModels = req<HTMLElement>("#llm-api-key-models");
 const themesEl = req<HTMLElement>("#themes");
 
 req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
@@ -245,6 +253,8 @@ document.head.append(favicon);
 
 const STORE_KEY = "ultron.chat.v1";
 const SETTINGS_KEY = "ultron.settings.v1";
+const LLM_PROVIDER_META_KEY = "ultron.llm-provider.v1";
+const LLM_PROVIDER_SECRET_KEY = "llm-provider-api-key";
 const PROJECTOR_KEY = "ultron.native-projector.v1";
 const LEARNING_KEY = "ultron.learning.v1";
 const VECTOR_MEMORY_KEY = "ultron.vector-memory.v1";
@@ -359,6 +369,12 @@ const identityState: IdentityState = { ...DEFAULT_IDENTITY_STATE, ...storedIdent
 const saveIdentityState = (): void => writeJson(IDENTITY_STORAGE_KEY, identityState);
 
 const settings: Settings = { endpoint: "", localModelEndpoint: "", localModel: "llama3.2:3b", voice: false, theme: "ultron", ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) };
+type ProviderMetadata = { id: ProviderProfile["id"]; label: string; baseUrl: string; compatible: boolean; models: string[]; selectedModel: string; state: ProviderState };
+let llmApiKey = "";
+let llmProvider: ProviderProfile = detectProvider("");
+let llmProviderState: ProviderState = "missing";
+let llmProviderModels: string[] = [];
+let selectedLlmModel = "";
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;
@@ -2906,6 +2922,18 @@ async function submit(raw: string): Promise<void> {
         ? { content: "Stopped.", session_id: "" }
         : { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
     }
+  } else if (llmProviderState === "connected" && llmApiKey && selectedLlmModel) {
+    try {
+      result = await providerModelReply(convo, turnController.signal, (token) => {
+        streamedText += token; renderStreamedReply(reply.body, streamedText);
+        if (nearBottom()) scrollToEnd(false);
+      }, executionLedger, priorCheckpoint ?? undefined);
+      setLink("online", llmProvider.label + " API");
+    } catch (error) {
+      setLink("error", "API model unavailable");
+      const why = error instanceof Error ? error.message : "unknown error";
+      result = turnController.signal.aborted ? { content: "Stopped.", session_id: "" } : { content: "I could not reach " + llmProvider.label + " (" + why + "). Your conversation remains saved on this device.", session_id: "" };
+    }
   } else if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
       const nativePhoneIntent = Capacitor.getPlatform() === "android"
@@ -3457,8 +3485,120 @@ async function testLink(): Promise<void> {
 }
 
 
+async function persistProviderMetadata(): Promise<void> {
+  const metadata: ProviderMetadata = { id: llmProvider.id, label: llmProvider.label, baseUrl: llmProvider.baseUrl, compatible: llmProvider.compatible, models: llmProviderModels.slice(0, 200), selectedModel: selectedLlmModel, state: llmProviderState };
+  writeJson(LLM_PROVIDER_META_KEY, metadata);
+}
+function renderProviderKeyState(message?: string): void {
+  apiKeyProvider.textContent = llmProvider.id === "unknown" ? "Provider not recognised" : llmProvider.label;
+  apiKeyStatus.dataset.state = llmProviderState;
+  apiKeyStatus.textContent = message ?? providerStatusLabel(llmProviderState);
+  apiKeyRemoveButton.disabled = !llmApiKey;
+  apiKeyModels.replaceChildren();
+  if (llmProviderModels.length) {
+    const summary = document.createElement("small");
+    summary.className = "llm-api-model-summary";
+    summary.textContent = llmProviderModels.length + " chat model(s) available · active: " + (selectedLlmModel || llmProviderModels[0]);
+    apiKeyModels.append(summary);
+  }
+}
+async function loadSavedProviderKey(): Promise<void> {
+  const metadata = readJson<Partial<ProviderMetadata>>(LLM_PROVIDER_META_KEY, {});
+  try {
+    if (Capacitor.getPlatform() === "android") {
+      const stored = await NativeSecureStorage.get({ key: LLM_PROVIDER_SECRET_KEY });
+      llmApiKey = stored.value ?? "";
+    }
+  } catch (error) { console.warn("[ULTRON secure API key storage]", error); llmApiKey = ""; }
+  if (!llmApiKey) { llmProviderState = "missing"; renderProviderKeyState(); return; }
+  llmProvider = detectProvider(llmApiKey);
+  if (llmProvider.id === "unknown" || !llmProvider.compatible) { llmProviderState = "incompatible"; renderProviderKeyState(); return; }
+  llmProviderModels = Array.isArray(metadata.models) ? selectChatModels(metadata.models) : [];
+  selectedLlmModel = metadata.selectedModel && llmProviderModels.includes(metadata.selectedModel) ? metadata.selectedModel : llmProviderModels[0] ?? "";
+  apiKeyInput.value = "";
+  renderProviderKeyState("Saved securely. Recheck the key to confirm it is still valid.");
+  await verifyProviderKey(false);
+}
+async function verifyProviderKey(saveSecret: boolean): Promise<void> {
+  const key = apiKeyInput.value.trim() || llmApiKey;
+  if (!key) { llmProviderState = "missing"; renderProviderKeyState(); return; }
+  const detected = detectProvider(key);
+  llmProvider = detected; llmProviderModels = []; selectedLlmModel = "";
+  if (detected.id === "unknown" || !detected.compatible) {
+    llmProviderState = "incompatible";
+    renderProviderKeyState(detected.id === "unknown" ? "Ultron cannot identify this key format. It has not been stored." : detected.label + " keys are recognised, but this API protocol is not supported by the current chat runtime.");
+    return;
+  }
+  apiKeySaveButton.disabled = true;
+  llmProviderState = "unreachable"; renderProviderKeyState("Checking provider and available models…");
+  const controller = new AbortController(); const timeout = window.setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(detected.baseUrl + "/models", { method: "GET", headers: { Authorization: "Bearer " + key, Accept: "application/json" }, signal: controller.signal });
+    llmProviderState = classifyProviderResponse(response.status);
+    if (!response.ok) { renderProviderKeyState(providerStatusLabel(llmProviderState) + " · HTTP " + response.status); return; }
+    const payload = await response.json() as { data?: Array<{ id?: string }> };
+    llmProviderModels = selectChatModels((payload.data ?? []).map((item) => item.id ?? ""));
+    if (!llmProviderModels.length) { llmProviderState = "incompatible"; renderProviderKeyState("The key is accepted, but this provider returned no chat models Ultron can select."); return; }
+    selectedLlmModel = llmProviderModels[0] ?? ""; llmApiKey = key;
+    if (saveSecret && Capacitor.getPlatform() === "android") await NativeSecureStorage.set({ key: LLM_PROVIDER_SECRET_KEY, value: key });
+    await persistProviderMetadata();
+    apiKeyInput.value = ""; llmProviderState = "connected";
+    renderProviderKeyState("Connected · " + llmProviderModels.length + " chat models found"); syncChatModelLabel();
+  } catch (error) {
+    llmProviderState = "unreachable";
+    renderProviderKeyState(error instanceof Error && error.name === "AbortError" ? "Provider check timed out. Check the network and try again." : "Could not reach this provider from the app. The key was not marked as connected.");
+  } finally { window.clearTimeout(timeout); apiKeySaveButton.disabled = false; }
+}
+async function removeProviderKey(): Promise<void> {
+  try { if (Capacitor.getPlatform() === "android") await NativeSecureStorage.remove({ key: LLM_PROVIDER_SECRET_KEY }); }
+  catch (error) { apiKeyStatus.textContent = "Could not remove the encrypted key: " + (error instanceof Error ? error.message : "unknown error"); apiKeyStatus.dataset.state = "expired"; return; }
+  llmApiKey = ""; llmProvider = detectProvider(""); llmProviderState = "missing"; llmProviderModels = []; selectedLlmModel = ""; apiKeyInput.value = "";
+  writeJson(LLM_PROVIDER_META_KEY, {}); renderProviderKeyState(); syncChatModelLabel();
+}
+async function providerModelReply(convo: Conversation, externalSignal: AbortSignal, onToken: (token: string | null) => void, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): Promise<ChatReply> {
+  if (!llmApiKey || llmProviderState !== "connected" || !llmProvider.compatible) throw new Error("Save and verify a compatible LLM API key in LLM API KEYS first.");
+  const task = convo.messages[convo.messages.length - 1]?.content ?? "";
+  const profile = profileTask(task);
+  const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
+  const messages = [{ role: "system", content: buildCapabilityPrompt(task, llmProvider.label, executionLedger, checkpoint ?? convo.cognitiveCheckpoint) }, ...history.map((item) => ({ role: item.role, content: item.content }))];
+  const response = await fetch(llmProvider.baseUrl + "/chat/completions", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + llmApiKey, Accept: "text/event-stream" },
+    signal: externalSignal, body: JSON.stringify({ model: selectedLlmModel || llmProviderModels[0], messages, stream: true, max_tokens: profile.maxTokens, temperature: profile.temperature }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    const state = classifyProviderResponse(response.status);
+    if (state !== "connected") { llmProviderState = state; renderProviderKeyState(providerStatusLabel(state) + " · HTTP " + response.status); void persistProviderMetadata(); }
+    throw new Error("Provider returned HTTP " + response.status + (detail ? ": " + detail.slice(0, 240) : ""));
+  }
+  if (!response.body) throw new Error("Provider did not return a readable streaming response.");
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let content = "";
+  const consume = (block: string): void => {
+    for (const line of block.split(/\r?\n/)) {
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim(); if (!data || data === "[DONE]") continue;
+      const event = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }>; error?: { message?: string } };
+      if (event.error) throw new Error(event.error.message ?? "Provider generation failed.");
+      const delta = event.choices?.[0]?.delta?.content;
+      const text = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
+      if (text) { content += text; onToken(text); }
+    }
+  };
+  while (true) {
+    if (externalSignal.aborted) throw new DOMException("Generation stopped", "AbortError");
+    const chunk = await reader.read(); buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    let boundary = buffer.search(/\r?\n\r?\n/);
+    while (boundary >= 0) { const match = buffer.slice(boundary).match(/^\r?\n\r?\n/); consume(buffer.slice(0, boundary)); buffer = buffer.slice(boundary + (match?.[0].length ?? 2)); boundary = buffer.search(/\r?\n\r?\n/); }
+    if (chunk.done) break;
+  }
+  if (buffer.trim()) consume(buffer);
+  if (!content.trim()) throw new Error("The provider completed without returning any text.");
+  return { content: content.trim(), session_id: "" };
+}
+
 function activeModelLabel(): string {
   if (nativeModelLoaded && nativeLoadedModelName) return nativeLoadedModelName.replace(/\.gguf$/i, "");
+  if (llmProviderState === "connected" && selectedLlmModel) return selectedLlmModel;
   if (settings.localModelEndpoint.trim() && settings.localModel.trim()) return settings.localModel.trim();
   if (settings.endpoint.trim()) return "Ultron connected brain";
   return "Choose model";
@@ -3527,6 +3667,16 @@ async function openChatModelMenu(): Promise<void> {
         }, model.loaded);
       }
     }
+    if (llmProviderState === "connected" && llmApiKey && llmProviderModels.length) {
+      for (const modelName of llmProviderModels) {
+        addModelChoice(modelName, llmProvider.label + " · API key connected", async () => {
+          if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
+          nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = modelName;
+          await persistProviderMetadata(); await refreshNativeModels(); syncChatModelLabel();
+          chatModelStatus.textContent = modelName + " is now locked as the active " + llmProvider.label + " model.";
+        }, !nativeModelLoaded && selectedLlmModel === modelName);
+      }
+    }
     if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
       addModelChoice(settings.localModel.trim(), "OpenAI-compatible endpoint · configured", async () => {
         try {
@@ -3545,7 +3695,7 @@ async function openChatModelMenu(): Promise<void> {
     if (!chatModelOptions.childElementCount) {
       const empty = document.createElement("p");
       empty.className = "chat-model-empty";
-      empty.textContent = Capacitor.getPlatform() === "android" ? "No GGUF models installed yet. Download a small model or import one in Model settings." : "Install the Android app for on-device GGUF models, or configure an OpenAI-compatible endpoint in Model settings.";
+      empty.textContent = Capacitor.getPlatform() === "android" ? "No local model or verified API provider yet. Import a model or add one key in LLM API KEYS." : "Configure an OpenAI-compatible endpoint or add a key in LLM API KEYS.";
       chatModelOptions.appendChild(empty);
     }
     chatModelStatus.textContent = "Switch models without leaving your conversation. Model weights stay in Ultron's private storage.";
@@ -3960,6 +4110,9 @@ cloudDisconnectButton.addEventListener("click", () => void disconnectCloudAccoun
 void restoreCloudAccount();
 
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
+apiKeySaveButton.addEventListener("click", () => void verifyProviderKey(true));
+apiKeyRemoveButton.addEventListener("click", () => void removeProviderKey());
+void loadSavedProviderKey();
 req<HTMLButtonElement>("#vault-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#mindmap-refresh").addEventListener("click", rebuildMindMap);
 req<HTMLInputElement>("#mindmap-search").addEventListener("input", () => renderMindMap(req<SVGSVGElement>("#mindmap-canvas"), mindMap, showMindNode, req<HTMLInputElement>("#mindmap-search").value));
@@ -3981,6 +4134,11 @@ androidAppSettingsButton.addEventListener("click", () => {
     .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open app settings."; });
 });
 
+req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener("click", () => {
+  showFeatureScreen("llm-api-keys-screen", navChatButton);
+  renderProviderKeyState();
+});
+req<HTMLButtonElement>("#llm-api-keys-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); openWorkspace(); });
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => { closeWorkspace(); hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));

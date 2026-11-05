@@ -3526,6 +3526,8 @@ async function loadSavedProviderKey(): Promise<void> {
 async function verifyProviderKey(saveSecret: boolean): Promise<void> {
   const key = apiKeyInput.value.trim() || llmApiKey;
   if (!key) { llmProviderState = "missing"; renderProviderKeyState(); return; }
+  const previousProviderId = llmProvider.id;
+  const previousModel = selectedLlmModel;
   const detected = detectProvider(key);
   llmProvider = detected; llmProviderModels = []; selectedLlmModel = "";
   if (detected.id === "unknown" || !detected.compatible) {
@@ -3560,7 +3562,9 @@ async function verifyProviderKey(saveSecret: boolean): Promise<void> {
     }
     llmProviderModels = selectChatModels(modelIds);
     if (!llmProviderModels.length) { llmProviderState = "incompatible"; renderProviderKeyState("The key is accepted, but this provider returned no chat models Ultron can select."); return; }
-    selectedLlmModel = llmProviderModels[0] ?? ""; llmApiKey = key;
+    selectedLlmModel = previousProviderId === detected.id && llmProviderModels.includes(previousModel)
+      ? previousModel : llmProviderModels[0] ?? "";
+    llmApiKey = key;
     if (saveSecret && Capacitor.getPlatform() === "android") await NativeSecureStorage.set({ key: LLM_PROVIDER_SECRET_KEY, value: key });
     await persistProviderMetadata();
     apiKeyInput.value = ""; llmProviderState = "connected";

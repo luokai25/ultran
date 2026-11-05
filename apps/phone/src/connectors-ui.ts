@@ -11,7 +11,7 @@
  */
 
 import catalogJson from "./connectors.catalog.json";
-import { listUltronConnectors, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector } from "./connectors-cloud";
+import { listUltronConnectors, listUltronConnectorTools, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector } from "./connectors-cloud";
 
 export type CatalogEntry = {
   id: string;
@@ -386,6 +386,39 @@ export function initConnectors(deps: Deps): void {
 
     const note = el("small", "conn-note");
     const buttons = el("div", "sheet-actions");
+    let toolsStatus: HTMLElement | null = null;
+    let toolsList: HTMLElement | null = null;
+    const refreshAvailableTools = async (): Promise<void> => {
+      if (!toolsStatus || !toolsList) return;
+      toolsStatus.textContent = "Loading tools from the ULTRON gateway…";
+      toolsList.replaceChildren();
+      try {
+        const available = await listUltronConnectorTools(toolkit);
+        const matching = available.filter((tool) => tool.toolkit_slug.replace(/-/g, "_") === toolkit);
+        if (matching.length === 0) {
+          toolsStatus.textContent = "No executable tools were returned for this connected provider.";
+          return;
+        }
+        toolsStatus.textContent = `${matching.length} cloud tools available to ULTRON's agent runtime.`;
+        for (const tool of matching) {
+          const row = el("article", "github-capability-row");
+          const details = el("div", "conn-tool-details");
+          details.append(el("strong", "conn-tool-name", tool.tool_slug));
+          details.append(el("p", "conn-tool-description", tool.description || "No description supplied by provider."));
+          row.append(details);
+          toolsList.append(row);
+        }
+      } catch (error) {
+        toolsStatus.textContent = error instanceof Error ? error.message : "Could not load tools from the ULTRON gateway.";
+      }
+    };
+    if (entry.auth === "oauth2") {
+      detailEl.append(el("div", "drawer-label", "CLOUD TOOLS"));
+      toolsStatus = el("small", "conn-note", oauthOn ? "Checking available tools…" : "Connect this provider to load its cloud tools.");
+      toolsList = el("div", "github-capability-list");
+      detailEl.append(toolsStatus, toolsList);
+      if (oauthOn) void refreshAvailableTools();
+    }
 
     const close = el("button", "ghost", "Close");
     close.type = "button";
@@ -466,6 +499,7 @@ export function initConnectors(deps: Deps): void {
         for (const item of matching) await refreshUltronConnectorStatus(item.id);
         await refreshOAuthConnections();
         const nowConnected = oauthConnected.has(toolkit);
+        if (nowConnected) await refreshAvailableTools();
         note.dataset.tone = nowConnected ? "ok" : "";
         note.textContent = nowConnected ? "Account connected and ready." : "No active connection found yet. Finish authorization in the browser first.";
         refresh.disabled = false;

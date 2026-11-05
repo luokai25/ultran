@@ -47,3 +47,51 @@ export async function failUltronJob(job: UltronJob, error: unknown): Promise<Ult
 export async function cancelUltronJob(id: string): Promise<UltronJob> {
   return (await invokeUltronJobs("cancel", { id })).job as UltronJob;
 }
+
+let workerTimer: ReturnType<typeof setInterval> | null = null;
+let workerBusy = false;
+let workerVisibilityHandler: (() => void) | null = null;
+
+export async function processUltronJobs(limit = 3): Promise<number> {
+  const result = await invokeUltronJobs("process", { limit });
+  return Number(result.processed) || 0;
+}
+
+export async function enqueueUltronMemoryConsolidation(conversationId: string, sequenceWatermark: number): Promise<UltronJob> {
+  const key = `memory:${conversationId}:${Math.max(0, Math.floor(sequenceWatermark))}`;
+  const job = await enqueueUltronJob({
+    job_type: "memory.consolidate",
+    title: "Consolidate conversation memory",
+    payload: { conversation_id: conversationId, sequence_watermark: sequenceWatermark },
+    priority: 2,
+    max_attempts: 3,
+    idempotency_key: key,
+  });
+  void processUltronJobs().catch((error) => console.warn("[ULTRON cloud worker]", error));
+  return job;
+}
+
+/** Quiet foreground pump. Work remains durable in Supabase when the app is backgrounded or closed. */
+export function startUltronJobWorker(): void {
+  if (workerTimer) return;
+  const tick = async (): Promise<void> => {
+    if (workerBusy || (typeof document !== "undefined" && document.visibilityState === "hidden")) return;
+    workerBusy = true;
+    try { await processUltronJobs(3); }
+    catch (error) { console.warn("[ULTRON cloud worker]", error); }
+    finally { workerBusy = false; }
+  };
+  void tick();
+  workerTimer = setInterval(() => { void tick(); }, 15_000);
+  workerVisibilityHandler = () => { if (document.visibilityState === "visible") void tick(); };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", workerVisibilityHandler);
+  if (typeof window !== "undefined") window.addEventListener("online", tick);
+}
+
+export function stopUltronJobWorker(): void {
+  if (workerTimer) clearInterval(workerTimer);
+  workerTimer = null;
+  if (workerVisibilityHandler && typeof document !== "undefined") document.removeEventListener("visibilitychange", workerVisibilityHandler);
+  if (typeof window !== "undefined") window.removeEventListener("online", () => undefined);
+  workerVisibilityHandler = null;
+}

@@ -12,7 +12,7 @@ ULTRON uses five provider-specific key pools. The raw API keys are stored in Sup
 | Groq | `ultron_groq_keys` | https://console.groq.com/keys |
 | Cohere | `ultron_cohere_keys` | https://dashboard.cohere.com/api-keys |
 
-Add keys from the phone app's **LLM API KEYS → Ultron Supabase** panel. Select a provider, paste a key, and save. The gateway verifies the credential against the provider's model-list endpoint before storing it. Multiple keys per provider are supported. Do not paste plaintext keys into the Supabase Table Editor; the tables intentionally have no client-side write grant and do not contain the secret value.
+Add keys from the phone app's **LLM API KEYS → Ultron Supabase** panel, or insert a row directly in the provider table. For direct Table Editor entry, paste the raw key only into the `api_key_input` column and optionally set `label`; leave `owner_id`, `vault_secret_id` and `key_fingerprint` blank. A BEFORE trigger moves the key into Vault in the same transaction, clears `api_key_input`, fills the owner and fingerprint, and sets the row to `pending`. The minute supervisor verifies pending keys against the provider model-list endpoint and updates their status/models. Multiple keys per provider are supported. Never paste the raw key into any other column.
 
 `ultron-brain` provides key management, model catalog, streaming chat, status and provider-directory actions. It rotates between enabled keys, prefers higher-priority/less-recently-used keys, marks 401/403 credentials invalid/expired, cools down 429 keys, and falls back to another key. Usage counters are updated from provider usage metadata when returned. Providers do not expose a uniform remaining-token API, so exact remaining quota cannot be promised; rate limits and exhausted quotas are detected from provider responses.
 
@@ -48,4 +48,4 @@ This rollback covers ULTRON-authored database-backed tools, skills, specs and pr
 - SQL Editor: https://supabase.com/dashboard/project/vshoxrtrfleptqxkrmtc/sql/new
 - Vault: https://supabase.com/dashboard/project/vshoxrtrfleptqxkrmtc/integrations/vault/secrets
 
-Use the app key form to add credentials. Table Editor is for inspecting metadata; it is deliberately not a raw-key entry point.
+The provider table links above open each key pool. Use `api_key_input` for direct entry; the trigger transfers it into Vault and clears the field. The phone app form remains the easiest path because it verifies the provider immediately.

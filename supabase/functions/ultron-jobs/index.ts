@@ -91,36 +91,60 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   const allowed = new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);
   const existingIds = new Set((existing ?? []).map((row) => String(row.id)));
   let created = 0, relationCount = 0;
+  let merged = 0;
   for (const rawMemory of rows) {
     if (!isObject(rawMemory)) continue;
     const text = typeof rawMemory.content === "string" ? redactMemorySecrets(rawMemory.content).trim().slice(0, 12000) : "";
     if (text.length < 12) continue;
     const type = typeof rawMemory.memory_type === "string" && allowed.has(rawMemory.memory_type) ? rawMemory.memory_type : "semantic";
-    const { data: inserted, error: insertError } = await db.from("ultron_memory_items").insert({
-      owner_id: ownerId, memory_type: type, content: text,
-      summary: String(rawMemory.summary ?? text.slice(0, 300)).slice(0, 500),
-      importance: Math.max(1, Math.min(5, Math.round(Number(rawMemory.importance) || 3))),
-      confidence: Math.max(0, Math.min(1, Number(rawMemory.confidence) || 0.8)),
-      source: "model_consolidation", source_ref: sourceRef, local_embedding: embedMemoryText(text),
-      metadata: { model, conversation_id: conversationId, sequence_watermark: watermark, consolidation_version: 1 },
-    }).select("id").single();
-    if (insertError) throw insertError;
-    created++;
+    const embedding = embedMemoryText(text);
+    const { data: matches, error: matchError } = await db.rpc("ultron_match_local_memories", { query_embedding: embedding, match_count: 5, min_similarity: 0.9 });
+    if (matchError) throw matchError;
+    const duplicate = (matches ?? []).find((row: Record<string, unknown>) => Number(row.similarity) >= 0.94 && typeof row.id === "string");
+    let memoryId: string;
+    if (duplicate) {
+      memoryId = String(duplicate.id);
+      existingIds.add(memoryId);
+      const oldMetadata = isObject(duplicate.metadata) ? duplicate.metadata : {};
+      const oldSources = Array.isArray(oldMetadata.consolidated_sources) ? oldMetadata.consolidated_sources.filter((value): value is string => typeof value === "string") : [];
+      const nextSources = [...new Set([...oldSources, sourceRef])].slice(-24);
+      const { error: updateError } = await db.from("ultron_memory_items").update({
+        memory_type: type,
+        summary: String(rawMemory.summary ?? text.slice(0, 300)).slice(0, 500),
+        importance: Math.max(Number(duplicate.importance) || 1, Math.min(5, Math.round(Number(rawMemory.importance) || 3))),
+        confidence: Math.max(Number(duplicate.confidence) || 0, Math.min(1, Number(rawMemory.confidence) || 0.8)),
+        metadata: { ...oldMetadata, consolidated_sources: nextSources, last_consolidated_at: new Date().toISOString(), model },
+      }).eq("owner_id", ownerId).eq("id", memoryId);
+      if (updateError) throw updateError;
+      merged++;
+    } else {
+      const { data: inserted, error: insertError } = await db.from("ultron_memory_items").insert({
+        owner_id: ownerId, memory_type: type, content: text,
+        summary: String(rawMemory.summary ?? text.slice(0, 300)).slice(0, 500),
+        importance: Math.max(1, Math.min(5, Math.round(Number(rawMemory.importance) || 3))),
+        confidence: Math.max(0, Math.min(1, Number(rawMemory.confidence) || 0.8)),
+        source: "model_consolidation", source_ref: sourceRef, local_embedding: embedding,
+        metadata: { model, conversation_id: conversationId, sequence_watermark: watermark, consolidation_version: 1 },
+      }).select("id").single();
+      if (insertError) throw insertError;
+      memoryId = inserted.id;
+      created++;
+    }
     const relations = Array.isArray(rawMemory.relations) ? rawMemory.relations.slice(0, 6) : [];
     for (const rel of relations) {
-      if (!isObject(rel) || typeof rel.target_id !== "string" || !existingIds.has(rel.target_id)) continue;
-      const { error: relationError } = await db.from("ultron_memory_relations").insert({
-        owner_id: ownerId, source_memory_id: inserted.id, target_memory_id: rel.target_id,
+      if (!isObject(rel) || typeof rel.target_id !== "string" || !existingIds.has(rel.target_id) || rel.target_id === memoryId) continue;
+      const { error: relationError } = await db.from("ultron_memory_relations").upsert({
+        owner_id: ownerId, source_memory_id: memoryId, target_memory_id: rel.target_id,
         relation_type: String(rel.relation_type ?? "related_to").slice(0, 60),
         weight: Math.max(0, Math.min(1, Number(rel.weight) || 0.7)),
-      });
+      }, { onConflict: "owner_id,source_memory_id,target_memory_id,relation_type" });
       if (relationError) throw relationError;
       relationCount++;
     }
   }
   const summary = typeof proposal.summary === "string" ? redactMemorySecrets(proposal.summary).trim().slice(0, 3000) : "";
   if (summary) { const { error } = await db.from("ultron_conversations").update({ summary }).eq("owner_id", ownerId).eq("id", conversationId); if (error) throw error; }
-  return { conversation_id: conversationId, source_ref: sourceRef, memories_created: created, relations_created: relationCount, model, sequence_watermark: watermark };
+  return { conversation_id: conversationId, source_ref: sourceRef, memories_created: created, memories_merged: merged, relations_created: relationCount, model, sequence_watermark: watermark };
 }
 
 Deno.serve(async (req: Request) => {

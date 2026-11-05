@@ -3,6 +3,13 @@ const headers={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
 const obj=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==="object"&&!Array.isArray(v);
 const str=(v:unknown,n=160)=>typeof v==="string"?v.trim().slice(0,n):"";
+async function kickDurableWorker(url:string,authorization:string,publishableKey:string):Promise<Record<string,unknown>>{
+ try{
+  const response=await fetch(url+"/functions/v1/ultron-jobs",{method:"POST",headers:{"Authorization":authorization,"apikey":publishableKey,"Content-Type":"application/json"},body:JSON.stringify({action:"process",limit:1}),signal:AbortSignal.timeout(25000)});
+  const raw=await response.text();let data:unknown={};try{data=raw?JSON.parse(raw):{};}catch{data={};}
+  return {triggered:response.ok,response_status:response.status,...(obj(data)?data:{})};
+ }catch(error){return {triggered:false,deferred:true,reason:error instanceof Error?error.message:"worker_kick_failed"};}
+}
 async function composio(path:string,key:string,method="GET",body?:unknown){
  const r=await fetch("https://backend.composio.dev/api/v3.1"+path,{method,headers:{"x-api-key":key,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
  const raw=await r.text();let data:unknown={};try{data=raw?JSON.parse(raw):{};}catch{data={};}
@@ -83,9 +90,13 @@ Deno.serve(async(req:Request)=>{
    }).select("id,job_type,title,status,created_at").single();
    if(jobError?.code==="23505"&&idempotencyKey){
     const existing=await db.from("ultron_jobs").select("id,job_type,title,status,created_at").eq("owner_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
-    if(existing.error)throw existing.error;return reply({ok:true,deduplicated:true,job:existing.data});
+    if(existing.error)throw existing.error;
+    const worker=existing.data&&["queued","retry_wait"].includes(String(existing.data.status))?await kickDurableWorker(url,auth,anon):{triggered:false,already_claimed:true};
+    return reply({ok:true,deduplicated:true,job:existing.data,worker});
    }
-   if(jobError)throw jobError;return reply({ok:true,deduplicated:false,job},201);
+   if(jobError)throw jobError;
+   const worker=await kickDurableWorker(url,auth,anon);
+   return reply({ok:true,deduplicated:false,job,worker},201);
   }
   if(body.action==="execute"){
    const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase();

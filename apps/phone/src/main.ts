@@ -3731,8 +3731,9 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     const usePrometheus = Boolean(priorRun) || profile.tier === "deep" || profile.tier === "critical" || taskProfile.depth === "deep" || explicitWork;
     const cloudMaxTokens = profile.tier === "critical" || profile.tier === "deep" ? 4096 : profile.tier === "standard" ? 2048 : 1024;
     const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
+    const basePrompt = buildCapabilityPrompt(goal, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint);
     const messages: Array<{ role: Role | "system"; content: string }> = [
-      { role: "system", content: buildCapabilityPrompt(goal, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint) },
+      { role: "system", content: usePrometheus ? basePrompt + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT : basePrompt },
       ...history.map((item) => ({ role: item.role, content: item.content })),
     ];
     if (!usePrometheus) {

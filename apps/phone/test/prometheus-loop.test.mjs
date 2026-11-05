@@ -8,6 +8,7 @@ const brain = await readFile(new URL('../../../supabase/functions/ultron-brain/i
 
 test('Prometheus Supabase provider runs a bounded tool loop with durable checkpoints', () => {
   assert.match(source, /PROMETHEUS GOAL LOOP:/);
+  assert.match(source, /usePrometheus \? basePrompt \+ "\\n\\n" \+ LOCAL_AGENT_SYSTEM_PROMPT/);
   assert.match(source, /if \(cloudBrainActive\)[\s\S]*?for \(let modelTurn = 0; modelTurn <= iterationLimit; modelTurn\+\+\)/);
   assert.match(source, /await runApprovedLocalTool\(request\)/);
   assert.match(source, /savePrometheusCheckpoint\("tool_completed", "running"\)/);

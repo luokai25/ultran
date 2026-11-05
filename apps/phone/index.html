@@ -110,8 +110,30 @@
           <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>One secure place for compatible model-provider keys.</p></div>
           <button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button>
         </header>
+        <section class="llm-key-card llm-cloud-card">
+          <div class="llm-key-heading"><strong>Ultron Supabase · Cloud brain</strong><span id="cloud-brain-state">Checking cloud…</span></div>
+          <p id="cloud-brain-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">Sign in to connect provider keys to the private ULTRON cloud runtime.</p>
+          <label class="llm-key-field"><span>Provider</span>
+            <select id="cloud-llm-provider">
+              <option value="openrouter">OpenRouter</option>
+              <option value="mistral">Mistral</option>
+              <option value="cerebras">Cerebras</option>
+              <option value="groq">Groq</option>
+              <option value="cohere">Cohere</option>
+            </select>
+          </label>
+          <small id="cloud-llm-provider-note" class="llm-key-note">Automatic routing uses only free-tier model IDs where the provider publishes them.</small>
+          <a id="cloud-llm-provider-console" class="model-source-link" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">Open OpenRouter API keys ↗</a>
+          <label class="llm-key-field"><span>Key label <small>(optional)</small></span><input id="cloud-llm-label" type="text" maxlength="100" placeholder="e.g. OpenRouter key 2" autocomplete="off" /></label>
+          <label class="llm-key-field"><span>Paste API key</span><input id="cloud-llm-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="API key is encrypted in Supabase Vault…" /></label>
+          <button id="cloud-llm-add" class="gold-button" type="button">Save to Supabase &amp; test</button>
+          <div id="cloud-llm-keys" class="cloud-llm-keys" aria-live="polite"><small>Loading saved provider keys…</small></div>
+          <div class="cloud-provider-directory"><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>
+          <a class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>
+          <small class="llm-key-note">Keys are encrypted in Supabase Vault. ULTRON stores only secret references in its five provider tables, rotates between your valid keys, tracks usage and cools down rate-limited keys. It cannot create provider accounts or mint API keys on your behalf.</small>
+        </section>
         <section class="llm-key-card">
-          <div class="llm-key-heading"><strong>Provider API key</strong><span id="llm-api-key-provider">No provider detected</span></div>
+          <div class="llm-key-heading"><strong>Device-only provider key</strong><span id="llm-api-key-provider">No provider detected</span></div>
           <label class="llm-key-field">
             <span>Paste your API key</span>
             <input id="llm-api-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste API key…" />

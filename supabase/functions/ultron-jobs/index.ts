@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-ultron-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -28,19 +28,93 @@ function redactMemorySecrets(value: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{16,}/gi, "Bearer [REDACTED]")
     .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
 }
-async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const apiKey = Deno.env.get("ULTRON_MODEL_API_KEY");
+
+type CloudProvider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere";
+const CLOUD_PROVIDERS: Array<{ id: CloudProvider; base: string; protocol: "openai" | "cohere" }> = [
+  { id: "groq", base: "https://api.groq.com/openai/v1", protocol: "openai" },
+  { id: "cerebras", base: "https://api.cerebras.ai/v1", protocol: "openai" },
+  { id: "openrouter", base: "https://openrouter.ai/api/v1", protocol: "openai" },
+  { id: "cohere", base: "https://api.cohere.com/v2", protocol: "cohere" },
+  { id: "mistral", base: "https://api.mistral.ai/v1", protocol: "openai" },
+];
+function isFreeModel(provider: CloudProvider, model: string): boolean {
+  const id = model.toLowerCase();
+  if (provider === "openrouter") return id.endsWith(":free");
+  if (provider === "cerebras") return /gpt-oss-120b|llama.?3.?1.?8b/.test(id);
+  if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
+  if (provider === "cohere") return /c4ai-aya-expanse-32b|command-a-03-2025|command-a-reasoning-08-2025|command-r-08-2024|command-r-plus-08-2024|command-r7b-12-2024|command-r7b-arabic-02-2025/.test(id);
+  return /^(mistral|codestral)[-_]/.test(id);
+}
+async function hasAvailableCloudModel(secretDb: ReturnType<typeof createClient>, ownerId: string): Promise<boolean> {
+  for (const provider of CLOUD_PROVIDERS) {
+    const { data, error } = await secretDb.from(`ultron_${provider.id}_keys`).select("models").eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected").limit(20);
+    if (error) throw error;
+    if ((data ?? []).some((row) => Array.isArray(row.models) && row.models.some((model) => typeof model === "string" && isFreeModel(provider.id, model)))) return true;
+  }
+  return false;
+}
+async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>, ownerId: string, messages: Array<{ role: string; content: string }>): Promise<{ proposal: Record<string, unknown>; model: string }> {
+  for (const provider of CLOUD_PROVIDERS) {
+    const { data: keys, error } = await secretDb.from(`ultron_${provider.id}_keys`).select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at").eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected").order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(20);
+    if (error) throw error;
+    for (const key of keys ?? []) {
+      const model = Array.isArray(key.models) ? key.models.find((value): value is string => typeof value === "string" && isFreeModel(provider.id, value)) : undefined;
+      if (!model) continue;
+      const { data: secret, error: secretError } = await secretDb.rpc("ultron_read_llm_secret", { p_secret_id: key.vault_secret_id });
+      if (secretError || typeof secret !== "string" || !secret) continue;
+      const endpoint = provider.protocol === "cohere" ? `${provider.base}/chat` : `${provider.base}/chat/completions`;
+      const payload = provider.protocol === "cohere"
+        ? { model, messages, temperature: 0.1, max_tokens: 1800 }
+        : { model, messages, temperature: 0.1, max_tokens: 1800, response_format: { type: "json_object" } };
+      try {
+        const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(45000) });
+        const raw = await response.text();
+        if (!response.ok) {
+          const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";
+          await secretDb.from(`ultron_${provider.id}_keys`).update({ status: state, last_error: `HTTP ${response.status}: ${raw.slice(0, 300)}`, last_checked_at: new Date().toISOString(), cooldown_until: response.status === 429 ? new Date(Date.now() + 60000).toISOString() : null }).eq("id", key.id).eq("owner_id", ownerId);
+          continue;
+        }
+        const envelope = JSON.parse(raw) as Record<string, unknown>;
+        let content = "";
+        let usage = 0;
+        if (provider.protocol === "cohere") {
+          const message = isObject(envelope.message) ? envelope.message : {};
+          const parts = Array.isArray(message.content) ? message.content : [];
+          content = parts.map((part) => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
+          const meta = isObject(envelope.usage) ? envelope.usage : {};
+          const billed = isObject(meta.billed_units) ? meta.billed_units : {};
+          usage = Number(billed.input_tokens ?? 0) + Number(billed.output_tokens ?? 0);
+        } else {
+          const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
+          const message = isObject(choices[0]?.message) ? choices[0].message : {};
+          content = typeof message.content === "string" ? message.content : "";
+          const meta = isObject(envelope.usage) ? envelope.usage : {};
+          usage = Number(meta.total_tokens ?? (Number(meta.prompt_tokens ?? 0) + Number(meta.completion_tokens ?? 0)));
+        }
+        content = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+        const proposal = JSON.parse(content) as Record<string, unknown>;
+        await secretDb.from(`ultron_${provider.id}_keys`).update({ status: "connected", request_count: Number(key.request_count ?? 0) + 1, tokens_used: Number(key.tokens_used ?? 0) + Math.max(0, usage), last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(), last_error: null, cooldown_until: null }).eq("id", key.id).eq("owner_id", ownerId);
+        return { proposal, model: `${provider.id}:${model}` };
+      } catch (error) {
+        console.warn(`[ULTRON memory model ${provider.id}]`, error instanceof Error ? error.message : "provider_call_failed");
+      }
+    }
+  }
+  throw new Error("model_not_configured_or_free_quota_exhausted");
+}
+async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>, secretDb: ReturnType<typeof createClient>): Promise<Record<string, unknown>> {
   const localProposal = isObject(payload.proposal) && Array.isArray(payload.proposal.memories) ? payload.proposal : null;
+  const modelAvailable = localProposal ? true : await hasAvailableCloudModel(secretDb, ownerId);
   const conversationId = typeof payload.conversation_id === "string" ? payload.conversation_id : "";
   if (!conversationId) {
-    if (!apiKey) return { skipped: true, reason: "model_not_configured", memories_created: 0 };
+    if (!modelAvailable) return { skipped: true, reason: "model_not_configured_or_free_quota_exhausted", memories_created: 0 };
     const { data: recent, error: recentError } = await db.from("ultron_conversations").select("id").eq("owner_id", ownerId).order("updated_at", { ascending: false }).limit(5);
     if (recentError) throw recentError;
     const results: Record<string, unknown>[] = [];
-    for (const row of recent ?? []) results.push(await consolidateConversationMemory(db, ownerId, { conversation_id: row.id }));
+    for (const row of recent ?? []) results.push(await consolidateConversationMemory(db, ownerId, { conversation_id: row.id }, secretDb));
     return { conversations_processed: results.length, memories_created: results.reduce((sum, row) => sum + (Number(row.memories_created) || 0), 0), maintenance: true };
   }
-  if (!localProposal && !apiKey) return { skipped: true, reason: "model_not_configured", conversation_id: conversationId, memories_created: 0 };
+  if (!localProposal && !modelAvailable) return { skipped: true, reason: "model_not_configured_or_free_quota_exhausted", conversation_id: conversationId, memories_created: 0 };
   const { data: conversation, error: conversationError } = await db.from("ultron_conversations").select("id,title,summary").eq("owner_id", ownerId).eq("id", conversationId).maybeSingle();
   if (conversationError) throw conversationError;
   if (!conversation) throw new Error("conversation_not_found");
@@ -62,30 +136,12 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
     proposal = localProposal;
     model = typeof payload.model_id === "string" ? payload.model_id.slice(0, 120) : "on_device";
   } else {
-    const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/$/, "");
-    const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
-    model = Deno.env.get("ULTRON_MODEL_ID") ?? "llama-3.3-70b-versatile";
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model, temperature: 0.1, max_tokens: 1800,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
-          { role: "user", content: JSON.stringify({ conversation: { title: conversation.title, existing_memories: memoryContext }, transcript }) },
-        ],
-      }),
-      signal: AbortSignal.timeout(45000),
-    });
-    const raw = await response.text();
-    if (!response.ok) throw new Error("memory_model_http_" + response.status + ":" + raw.slice(0, 500));
-    const envelope = JSON.parse(raw) as Record<string, unknown>;
-    const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
-    const message = choices[0]?.message as Record<string, unknown> | undefined;
-    let content = typeof message?.content === "string" ? message.content : "";
-    content = content.replace(new RegExp("^\\s*```(?:json)?", "i"), "").replace(new RegExp("```\\s*$"), "").trim();
-    proposal = JSON.parse(content) as Record<string, unknown>;
+    const generated = await generateMemoryProposal(secretDb, ownerId, [
+      { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
+      { role: "user", content: JSON.stringify({ conversation: { title: conversation.title, existing_memories: memoryContext }, transcript }) },
+    ]);
+    model = generated.model;
+    proposal = generated.proposal;
   }
   const rows = Array.isArray(proposal.memories) ? proposal.memories.slice(0, 8) : [];
   const allowed = new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);
@@ -98,7 +154,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
     if (text.length < 12) continue;
     const type = typeof rawMemory.memory_type === "string" && allowed.has(rawMemory.memory_type) ? rawMemory.memory_type : "semantic";
     const embedding = embedMemoryText(text);
-    const { data: matches, error: matchError } = await db.rpc("ultron_match_local_memories", { query_embedding: embedding, match_count: 5, min_similarity: 0.9 });
+    const { data: matches, error: matchError } = await secretDb.rpc("ultron_match_local_memories_system", { p_owner_id: ownerId, query_embedding: embedding, match_count: 5, min_similarity: 0.9 });
     if (matchError) throw matchError;
     const duplicate = (matches ?? []).find((row: Record<string, unknown>) => Number(row.similarity) >= 0.94 && typeof row.id === "string");
     let memoryId: string;
@@ -153,32 +209,44 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return respond({ error: "method_not_allowed" }, 405);
 
-  const authorization = req.headers.get("Authorization") ?? "";
-  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!token) return respond({ error: "unauthorized" }, 401);
-
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
-  if (!url || !key) return respond({ error: "server_configuration_missing" }, 500);
-
-  const db = createClient(url, key, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  const publishable = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
+  if (!url || !publishable || !serviceKey) return respond({ error: "server_configuration_missing" }, 500);
+  const serviceDb = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const key = publishable;
+  const authorization = req.headers.get("Authorization") ?? "";
+  const cronSecret = req.headers.get("x-ultron-cron-secret") ?? "";
+  let db: ReturnType<typeof createClient>;
+  let owner_id = "";
+  let internalWorker = false;
 
   try {
-    const { data: authData, error: authError } = await db.auth.getUser(token);
-    const user = authData?.user;
-    if (authError || !user) return respond({ error: "unauthorized" }, 401);
-    const { data: owner, error: ownerError } = await db.from("ultron_instance")
-      .select("owner_id").eq("owner_id", user.id).maybeSingle();
-    if (ownerError || !owner) return respond({ error: "owner_instance_required" }, 403);
-
+    if (cronSecret) {
+      const { data: expected, error: secretError } = await serviceDb.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+      if (secretError || typeof expected !== "string" || expected !== cronSecret) return respond({ error: "unauthorized_worker" }, 401);
+      const { data: instance, error: ownerError } = await serviceDb.from("ultron_instance").select("owner_id").eq("id", true).maybeSingle();
+      if (ownerError || !instance?.owner_id) return respond({ error: "owner_instance_required" }, 403);
+      db = serviceDb; owner_id = instance.owner_id; internalWorker = true;
+    } else {
+      const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+      if (!token) return respond({ error: "unauthorized" }, 401);
+      const userDb = createClient(url, publishable, {
+        global: { headers: { Authorization: authorization } },
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const { data: authData, error: authError } = await userDb.auth.getUser(token);
+      const user = authData?.user;
+      if (authError || !user) return respond({ error: "unauthorized" }, 401);
+      const { data: owner, error: ownerError } = await userDb.from("ultron_instance").select("owner_id").eq("owner_id", user.id).maybeSingle();
+      if (ownerError || !owner) return respond({ error: "owner_instance_required" }, 403);
+      db = userDb; owner_id = user.id;
+    }
     const raw = await req.text();
     if (new TextEncoder().encode(raw).byteLength > 100_000) return respond({ error: "payload_too_large" }, 413);
     const body: unknown = JSON.parse(raw);
     if (!isObject(body) || typeof body.action !== "string") return respond({ error: "invalid_request" }, 400);
-    const owner_id = user.id;
+    if (internalWorker && body.action !== "process") return respond({ error: "worker_action_not_allowed" }, 403);
 
     if (body.action === "enqueue") {
       const job_type = String(body.job_type ?? "");
@@ -267,7 +335,9 @@ Deno.serve(async (req: Request) => {
 
     if (body.action === "process") {
       const limit = Math.max(1, Math.min(5, Math.trunc(Number(body.limit) || 3)));
-      const { data: claimed, error: claimError } = await db.rpc("ultron_claim_jobs", { p_limit: limit, p_lease_seconds: 120 });
+      const { data: claimed, error: claimError } = internalWorker
+        ? await db.rpc("ultron_claim_jobs_system", { p_owner_id: owner_id, p_limit: limit, p_lease_seconds: 120 })
+        : await db.rpc("ultron_claim_jobs", { p_limit: limit, p_lease_seconds: 120 });
       if (claimError) throw claimError;
       const outcomes: Array<Record<string, unknown>> = [];
       for (const job of claimed ?? []) {
@@ -277,7 +347,9 @@ Deno.serve(async (req: Request) => {
           if (job.job_type === "connector.tool.execute") {
             const response = await fetch(url + "/functions/v1/ultron-connectors", {
               method: "POST",
-              headers: { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
+              headers: internalWorker
+                ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
+                : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
               body: JSON.stringify({ action: "execute", ...(isObject(job.payload) ? job.payload : {}) }),
             });
             const data = await response.json() as Record<string, unknown>;
@@ -286,7 +358,9 @@ Deno.serve(async (req: Request) => {
           } else if (job.job_type === "agent.workflow.execute") {
             const response = await fetch(url + "/functions/v1/ultron-runtime", {
               method: "POST",
-              headers: { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
+              headers: internalWorker
+                ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
+                : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
               body: JSON.stringify({ action: "run_tool", ...(isObject(job.payload) ? job.payload : {}) }),
             });
             const data = await response.json() as Record<string, unknown>;
@@ -303,7 +377,7 @@ Deno.serve(async (req: Request) => {
             if (failed.error) throw failed.error;
             result = { healthy: true, queue: { queued: queued.count ?? 0, running: running.count ?? 0, failed: failed.count ?? 0 }, checked_at: new Date().toISOString() };
           } else if (job.job_type === "memory.consolidate") {
-            result = await consolidateConversationMemory(db, owner_id, isObject(job.payload) ? job.payload : {});
+            result = await consolidateConversationMemory(db, owner_id, isObject(job.payload) ? job.payload : {}, serviceDb);
           } else {
             throw new Error("unsupported_job_type:" + String(job.job_type));
           }

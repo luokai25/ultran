@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-ultron-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -117,7 +117,18 @@ function validatePublicUrl(raw: string): URL {
   }
   return url;
 }
-async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string): Promise<unknown> {
+async function requireOperationPermission(db: ReturnType<typeof createClient>, ownerId: string, step: Record<string, unknown>): Promise<void> {
+  const op = String(step.op ?? "");
+  const params = isObject(step.params) ? step.params : {};
+  const method = String(params.method ?? "GET").toUpperCase();
+  const needsPermission = ["database.insert", "database.update", "database.ddl", "database.rpc"].includes(op) || (op === "http.request" && !["GET", "HEAD"].includes(method));
+  if (!needsPermission) return;
+  const { data, error } = await db.from("ultron_tool_permissions").select("access_mode,require_confirmation").eq("owner_id", ownerId).eq("tool_key", op).maybeSingle();
+  if (error) throw error;
+  if (!data || data.access_mode !== "allow" || data.require_confirmation !== false) throw new Error(`approval_required:${op}`);
+}
+
+async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string, internalWorker = false): Promise<unknown> {
   const op = String(step.op);
   const params = resolveValue(isObject(step.params) ? step.params : {}, input, results) as Record<string, unknown>;
   if (op === "text.template") {
@@ -163,7 +174,9 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
   if (op === "memory.search") {
     const query = String(params.query ?? "").trim();
     if (!query) throw new Error("memory.search requires a query.");
-    const {data,error}=await db.rpc("ultron_match_local_memories",{query_embedding:embedMemoryText(query),match_count:Math.min(20,Math.max(1,Number(params.limit)||8)),min_similarity:0.08});
+    const {data,error}=internalWorker
+      ? await db.rpc("ultron_match_local_memories_system",{p_owner_id:ownerId,query_embedding:embedMemoryText(query),match_count:Math.min(20,Math.max(1,Number(params.limit)||8)),min_similarity:0.08})
+      : await db.rpc("ultron_match_local_memories",{query_embedding:embedMemoryText(query),match_count:Math.min(20,Math.max(1,Number(params.limit)||8)),min_similarity:0.08});
     if(error)throw error;return data;
   }
   if (op === "memory.save") {
@@ -175,7 +188,9 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
   if(op==="database.ddl"){
     const statement=String(params.statement??"").trim();
     if(!statement||statement.length>50000)throw new Error("database.ddl requires a schema statement up to 50 KB.");
-    const {data,error}=await db.rpc("ultron_apply_schema_change",{statement});
+    const {data,error}=internalWorker
+      ? await db.rpc("ultron_apply_schema_change_system",{p_owner_id:ownerId,statement})
+      : await db.rpc("ultron_apply_schema_change",{statement});
     if(error)throw error;return data;
   }
   if(op==="database.rpc"){
@@ -192,6 +207,7 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
     if(op==="database.select"){
       const columns=String(params.columns??"*");if(!/^(\*|[a-zA-Z0-9_, ]{1,500})$/.test(columns))throw new Error("Invalid select columns.");
       let query=db.from(table).select(columns);
+      if(internalWorker)query=query.eq("owner_id",ownerId);
       if(isObject(params.filters))for(const [key,value]of Object.entries(params.filters)){if(!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)||!(["string","number","boolean"].includes(typeof value)))throw new Error("Invalid database filter.");query=query.eq(key,value);}
       const {data,error}=await query.limit(Math.min(50,Math.max(1,Number(params.limit)||20)));if(error)throw error;return data;
     }
@@ -212,22 +228,41 @@ Deno.serve(async (req: Request) => {
   if(req.method==="OPTIONS")return new Response("ok",{headers});
   if(req.method!=="POST")return reply({error:"method_not_allowed"},405);
   const auth=req.headers.get("Authorization")??"";
-  const token=auth.match(/^Bearer\s+(.+)$/i)?.[1];if(!token)return reply({error:"unauthorized"},401);
+  const token=auth.match(/^Bearer\s+(.+)$/i)?.[1];
   const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_PUBLISHABLE_KEY")??Deno.env.get("SUPABASE_ANON_KEY");
-  if(!url||!key)return reply({error:"server_configuration_missing"},500);
-  const db=createClient(url,key,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??Deno.env.get("SUPABASE_SECRET_KEY");
+  if(!url||!key||!serviceKey)return reply({error:"server_configuration_missing"},500);
+  const serviceDb=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  let db:ReturnType<typeof createClient>;
+  let owner_id="";
+  let internalWorker=false;
   try{
-    const {data:authData,error:authError}=await db.auth.getUser(token);const user=authData?.user;
-    if(authError||!user)return reply({error:"unauthorized"},401);
-    const {data:owner,error:ownerError}=await db.from("ultron_instance").select("owner_id").eq("owner_id",user.id).maybeSingle();
-    if(ownerError||!owner)return reply({error:"owner_instance_required"},403);
+    const cronSecret=req.headers.get("x-ultron-cron-secret")??"";
+    if(cronSecret){
+      const {data:expected,error:secretError}=await serviceDb.rpc("ultron_get_system_secret",{p_name:"ultron_brain_cron_secret"});
+      if(secretError||typeof expected!=="string"||expected!==cronSecret)return reply({error:"unauthorized_worker"},401);
+      const {data:instance,error:ownerError}=await serviceDb.from("ultron_instance").select("owner_id").eq("id",true).maybeSingle();
+      if(ownerError||!instance?.owner_id)return reply({error:"owner_instance_required"},403);
+      db=serviceDb;owner_id=instance.owner_id;internalWorker=true;
+    }else{
+      if(!token)return reply({error:"unauthorized"},401);
+      const userDb=createClient(url,key,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+      const {data:authData,error:authError}=await userDb.auth.getUser(token);const user=authData?.user;
+      if(authError||!user)return reply({error:"unauthorized"},401);
+      const {data:owner,error:ownerError}=await userDb.from("ultron_instance").select("owner_id").eq("owner_id",user.id).maybeSingle();
+      if(ownerError||!owner)return reply({error:"owner_instance_required"},403);
+      db=userDb;owner_id=user.id;
+    }
     const raw=await req.text();if(new TextEncoder().encode(raw).byteLength>100000)return reply({error:"payload_too_large"},413);
     const body:unknown=JSON.parse(raw);if(!isObject(body)||typeof body.action!=="string")return reply({error:"invalid_request"},400);
-    const owner_id=user.id, action=body.action;
+    const action=body.action;
+    if(internalWorker&&action!=="run_tool")return reply({error:"worker_action_not_allowed"},403);
     if(action==="search_memory"){
       const vector=Array.isArray(body.query_embedding)?body.query_embedding.map(Number):embedMemoryText(String(body.query??""));
       if(vector.length!==96||vector.some(value=>!Number.isFinite(value)))return reply({error:"query_embedding_must_have_96_finite_values"},400);
-      const {data,error}=await db.rpc("ultron_match_local_memories",{query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))});
+      const {data,error}=internalWorker
+        ? await db.rpc("ultron_match_local_memories_system",{p_owner_id:owner_id,query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))})
+        : await db.rpc("ultron_match_local_memories",{query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))});
       if(error)throw error;return reply({ok:true,matches:data});
     }
     if(action==="catalog")return reply({ok:true,tools:CATALOG,workflow_operations:CATALOG.filter(x=>OPS.has(x.id))});
@@ -285,18 +320,18 @@ Deno.serve(async (req: Request) => {
       if(runError)throw runError;
       const started=Date.now(),results:Record<string,unknown>={};
       try{
-        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");results[String(step.id)]=await runStep(step,input,results,db,owner_id);}
+        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");await requireOperationPermission(db,owner_id,step);results[String(step.id)]=await runStep(step,input,results,db,owner_id,internalWorker);}
         const output={tool_key,version:tool.version,steps:results};
         await db.from("ultron_tool_runs").update({status:"succeeded",output,finished_at:new Date().toISOString(),metadata:{tool_spec_id:tool.id,version:tool.version,workflow_sha256:tool.workflow_sha256,latency_ms:Date.now()-started}}).eq("id",run.id).eq("owner_id",owner_id);
         await db.from("ultron_tool_specs").update({run_count:Number(tool.run_count??0)+1,last_run_at:new Date().toISOString(),last_run_status:"succeeded"}).eq("id",tool.id).eq("owner_id",owner_id);
-        await db.from("ultron_capability_events").insert({owner_id,event_type:"tool_spec.run_succeeded",details:{tool_key,version,run_id:run.id,latency_ms:Date.now()-started}});
-        return reply({ok:true,run_id:run.id,tool_key,version,output});
+        await db.from("ultron_capability_events").insert({owner_id,event_type:"tool_spec.run_succeeded",details:{tool_key,version:tool.version,run_id:run.id,latency_ms:Date.now()-started}});
+        return reply({ok:true,run_id:run.id,tool_key,version:tool.version,output});
       }catch(error){
         const message=error instanceof Error?error.message:"tool_execution_failed";
         await db.from("ultron_tool_runs").update({status:"failed",error_message:message.slice(0,2000),finished_at:new Date().toISOString(),metadata:{tool_spec_id:tool.id,version:tool.version,latency_ms:Date.now()-started}}).eq("id",run.id).eq("owner_id",owner_id);
         await db.from("ultron_tool_specs").update({run_count:Number(tool.run_count??0)+1,last_run_at:new Date().toISOString(),last_run_status:"failed"}).eq("id",tool.id).eq("owner_id",owner_id);
-        await db.from("ultron_capability_events").insert({owner_id,event_type:"tool_spec.run_failed",details:{tool_key,version,run_id:run.id,error:message.slice(0,500)}});
-        return reply({ok:false,run_id:run.id,tool_key,version,error:message},422);
+        await db.from("ultron_capability_events").insert({owner_id,event_type:"tool_spec.run_failed",details:{tool_key,version:tool.version,run_id:run.id,error:message.slice(0,500)}});
+        return reply({ok:false,run_id:run.id,tool_key,version:tool.version,error:message},422);
       }
     }
     if(action==="list_tool_runs"){

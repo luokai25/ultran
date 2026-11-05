@@ -26,6 +26,17 @@ async function recordEvent(client: ReturnType<typeof createClient>, event: Recor
   if (error) throw error;
 }
 
+async function callBrainCheckpoint(url: string, key: string, authorization: string, action: string, payload: Record<string, unknown> = {}): Promise<void> {
+  const result = await fetch(`${url}/functions/v1/ultron-brain`, {
+    method: "POST",
+    headers: { Authorization: authorization, apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, action }),
+    signal: AbortSignal.timeout(12000),
+  });
+  const body = await result.json().catch(() => ({})) as Record<string, unknown>;
+  if (!result.ok || body.ok !== true) throw new Error(String(body.message ?? body.error ?? `brain_checkpoint_${action}_http_${result.status}`));
+}
+
 const SECRET_PATTERN = /(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|private[_-]?key)\s*[:=]\s*["'][^"']{8,}["']/i;
 
 Deno.serve(async (req: Request) => {
@@ -45,6 +56,8 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 
+  let changeStarted = false;
+  let changeName = "capability_change";
   try {
     const { data: authData, error: authError } = await supabase.auth.getUser(match[1]);
     const user = authData?.user;
@@ -62,6 +75,22 @@ Deno.serve(async (req: Request) => {
     const body: unknown = JSON.parse(raw);
     if (!object(body) || typeof body.action !== "string") return response({ error: "invalid_request" }, 400);
     const owner_id = user.id;
+    const beginChange = async (name: string, sourceFingerprint = "") => {
+      changeName = name;
+      const fingerprint = sourceFingerprint ? await sha256(`${name}:${sourceFingerprint}`) : "";
+      await callBrainCheckpoint(url, key, authorization, "checkpoint_before_change", { change: name, fingerprint });
+      changeStarted = true;
+    };
+    const finishChange = async () => {
+      if (!changeStarted) return;
+      await callBrainCheckpoint(url, key, authorization, "commit_change");
+      changeStarted = false;
+    };
+    const abortChange = async () => {
+      if (!changeStarted) return;
+      await callBrainCheckpoint(url, key, authorization, "abort_change");
+      changeStarted = false;
+    };
 
     if (body.action === "status") {
       const [runs, tools, proposals] = await Promise.all([
@@ -104,6 +133,7 @@ Deno.serve(async (req: Request) => {
       const source_sha256 = await sha256(source_code);
       if (typeof body.source_sha256 === "string" && body.source_sha256 !== source_sha256) return response({ error: "source_hash_mismatch" }, 409);
 
+      await beginChange("save_tool_draft", source_sha256);
       const { data, error } = await supabase.from("ultron_generated_tools").insert({
         owner_id, tool_key, version, description, input_schema, source_language,
         source_code, source_sha256, lifecycle_state: "draft",
@@ -114,22 +144,25 @@ Deno.serve(async (req: Request) => {
         owner_id, tool_id: data.id, event_type: "tool.draft_created",
         details: { tool_key, version, source_sha256 },
       });
+      await finishChange();
       return response({ ok: true, tool: data }, 201);
     }
 
     if (body.action === "submit_tool") {
       if (typeof body.id !== "string" || typeof body.source_sha256 !== "string") return response({ error: "tool_id_and_hash_required" }, 400);
+      await beginChange("submit_tool", String(body.source_sha256));
       const { data, error } = await supabase.from("ultron_generated_tools")
         .update({ lifecycle_state: "pending_approval" })
         .eq("id", body.id).eq("owner_id", owner_id).eq("source_sha256", body.source_sha256)
         .eq("lifecycle_state", "draft")
         .select("id,tool_key,version,source_sha256,lifecycle_state").maybeSingle();
       if (error) throw error;
-      if (!data) return response({ error: "draft_not_found_or_hash_changed" }, 409);
+      if (!data) { await abortChange(); return response({ error: "draft_not_found_or_hash_changed" }, 409); }
       await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.submitted_for_approval",
         details: { source_sha256: data.source_sha256 },
       });
+      await finishChange();
       return response({ ok: true, tool: data });
     }
 
@@ -138,17 +171,19 @@ Deno.serve(async (req: Request) => {
         return response({ error: "explicit_owner_confirmation_required" }, 403);
       }
       if (typeof body.id !== "string" || typeof body.source_sha256 !== "string") return response({ error: "tool_id_and_hash_required" }, 400);
+      await beginChange("approve_tool", String(body.source_sha256));
       const { data, error } = await supabase.from("ultron_generated_tools")
         .update({ lifecycle_state: "approved", approved_by: owner_id, approved_at: new Date().toISOString() })
         .eq("id", body.id).eq("owner_id", owner_id).eq("source_sha256", body.source_sha256)
         .eq("lifecycle_state", "pending_approval")
         .select("id,tool_key,version,source_sha256,lifecycle_state,approved_at").maybeSingle();
       if (error) throw error;
-      if (!data) return response({ error: "tool_not_pending_or_hash_changed" }, 409);
+      if (!data) { await abortChange(); return response({ error: "tool_not_pending_or_hash_changed" }, 409); }
       await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.owner_approved",
         details: { source_sha256: data.source_sha256 },
       });
+      await finishChange();
       return response({ ok: true, tool: data, activation: "requires_verified_isolated_worker" });
     }
 
@@ -162,6 +197,7 @@ Deno.serve(async (req: Request) => {
       const artifact = object(body.artifact) ? body.artifact : {};
       const artifact_sha256 = await sha256(JSON.stringify(artifact));
       const risk_level = ["low", "medium", "high", "critical"].includes(String(body.risk_level)) ? String(body.risk_level) : "medium";
+      await beginChange("create_proposal", artifact_sha256);
       const { data, error } = await supabase.from("ultron_capability_proposals").insert({
         owner_id, agent_run_id: typeof body.agent_run_id === "string" ? body.agent_run_id : null,
         proposal_kind, title, description, artifact, artifact_sha256, risk_level, status: "pending",
@@ -171,6 +207,7 @@ Deno.serve(async (req: Request) => {
         owner_id, agent_run_id: data.agent_run_id, proposal_id: data.id,
         event_type: "capability.proposed", details: { proposal_kind, risk_level, artifact_sha256 },
       });
+      await finishChange();
       return response({ ok: true, proposal: data }, 201);
     }
 
@@ -181,16 +218,18 @@ Deno.serve(async (req: Request) => {
       const decision = body.decision;
       if (!["approved", "rejected"].includes(String(decision))) return response({ error: "invalid_decision" }, 400);
       if (typeof body.id !== "string" || typeof body.artifact_sha256 !== "string") return response({ error: "proposal_id_and_hash_required" }, 400);
+      await beginChange("resolve_proposal", String(body.artifact_sha256));
       const { data, error } = await supabase.from("ultron_capability_proposals")
         .update({ status: decision, approved_by: owner_id, approved_at: new Date().toISOString() })
         .eq("id", body.id).eq("owner_id", owner_id).eq("artifact_sha256", body.artifact_sha256)
         .eq("status", "pending").select("*").maybeSingle();
       if (error) throw error;
-      if (!data) return response({ error: "proposal_not_pending_or_artifact_changed" }, 409);
+      if (!data) { await abortChange(); return response({ error: "proposal_not_pending_or_artifact_changed" }, 409); }
       await recordEvent(supabase, {
         owner_id, agent_run_id: data.agent_run_id, proposal_id: data.id,
         event_type: "capability.owner_" + decision, details: { artifact_sha256: data.artifact_sha256 },
       });
+      await finishChange();
       return response({ ok: true, proposal: data, applied: false });
     }
 
@@ -225,21 +264,27 @@ Deno.serve(async (req: Request) => {
 
     if (body.action === "disable_tool") {
       if (typeof body.id !== "string") return response({ error: "tool_id_required" }, 400);
+      await beginChange("disable_tool", String(body.id));
       const { data, error } = await supabase.from("ultron_generated_tools")
         .update({ lifecycle_state: "disabled" }).eq("id", body.id).eq("owner_id", owner_id)
         .in("lifecycle_state", ["approved", "active"])
         .select("id,tool_key,version,lifecycle_state").maybeSingle();
       if (error) throw error;
-      if (!data) return response({ error: "tool_not_disableable" }, 409);
+      if (!data) { await abortChange(); return response({ error: "tool_not_disableable" }, 409); }
       await recordEvent(supabase, {
         owner_id, tool_id: data.id, event_type: "tool.disabled", details: {},
       });
+      await finishChange();
       return response({ ok: true, tool: data });
     }
 
     return response({ error: "unknown_action" }, 400);
   } catch (error) {
     const message = error instanceof Error ? error.message : "request_failed";
+    if (changeStarted) {
+      try { await callBrainCheckpoint(url, key, authorization, "mark_change_crashed", { change: changeName, error: message.slice(0, 500) }); }
+      catch (checkpointError) { console.error("[ULTRON crash checkpoint]", checkpointError); }
+    }
     return response({ error: "request_failed", message: message.slice(0, 500) }, 400);
   }
 });

@@ -1,6 +1,7 @@
 import { normalizeToolCall } from "@ultron/connectors/tool-contract";
 import { CURATED_MODELS } from "./model-library";
 import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel, type ProviderProfile, type ProviderState } from "./llm-provider";
+import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, removeUltronCloudKey, setUltronCloudKey, streamUltronSupabaseChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
 import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
@@ -239,6 +240,17 @@ const apiKeyProvider = req<HTMLElement>("#llm-api-key-provider");
 const apiKeySaveButton = req<HTMLButtonElement>("#llm-api-key-save");
 const apiKeyRemoveButton = req<HTMLButtonElement>("#llm-api-key-remove");
 const apiKeyModels = req<HTMLElement>("#llm-api-key-models");
+const cloudLlmProvider = req<HTMLSelectElement>("#cloud-llm-provider");
+const cloudLlmProviderNote = req<HTMLElement>("#cloud-llm-provider-note");
+const cloudLlmProviderConsoleLink = req<HTMLAnchorElement>("#cloud-llm-provider-console");
+const cloudLlmKeyInput = req<HTMLInputElement>("#cloud-llm-key");
+const cloudLlmLabelInput = req<HTMLInputElement>("#cloud-llm-label");
+const cloudLlmAddButton = req<HTMLButtonElement>("#cloud-llm-add");
+const cloudLlmKeysEl = req<HTMLElement>("#cloud-llm-keys");
+const cloudBrainStateEl = req<HTMLElement>("#cloud-brain-state");
+const cloudBrainStatusEl = req<HTMLElement>("#cloud-brain-status");
+const cloudFreeProviderCountEl = req<HTMLElement>("#cloud-free-provider-count");
+const cloudFreeProvidersRefreshButton = req<HTMLButtonElement>("#cloud-free-providers-refresh");
 const themesEl = req<HTMLElement>("#themes");
 
 req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
@@ -377,6 +389,7 @@ let llmProvider: ProviderProfile = detectProvider("");
 let llmProviderState: ProviderState = "missing";
 let llmProviderModels: string[] = [];
 let selectedLlmModel = "";
+let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", false);
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;
@@ -2926,17 +2939,18 @@ async function submit(raw: string): Promise<void> {
         ? { content: "Stopped.", session_id: "" }
         : { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
     }
-  } else if (llmProviderState === "connected" && llmApiKey && selectedLlmModel) {
+  } else if (cloudBrainActive || (llmProviderState === "connected" && llmApiKey && selectedLlmModel)) {
     try {
       result = await providerModelReply(convo, turnController.signal, (token) => {
         streamedText += token; renderStreamedReply(reply.body, streamedText);
         if (nearBottom()) scrollToEnd(false);
       }, executionLedger, priorCheckpoint ?? undefined);
-      setLink("online", llmProvider.label + " API");
+      setLink("online", cloudBrainActive ? "Ultron Supabase" : llmProvider.label + " API");
     } catch (error) {
-      setLink("error", "API model unavailable");
+      setLink("error", cloudBrainActive ? "Supabase brain unavailable" : "API model unavailable");
       const why = error instanceof Error ? error.message : "unknown error";
-      result = turnController.signal.aborted ? { content: "Stopped.", session_id: "" } : { content: "I could not reach " + llmProvider.label + " (" + why + "). Your conversation remains saved on this device.", session_id: "" };
+      const providerLabel = cloudBrainActive ? "Ultron Supabase" : llmProvider.label;
+      result = turnController.signal.aborted ? { content: "Stopped.", session_id: "" } : { content: "I could not reach " + providerLabel + " (" + why + "). Your conversation remains saved on this device.", session_id: "" };
     }
   } else if (!settings.localModelEndpoint.trim() && baseUrl()) {
     try {
@@ -3506,6 +3520,116 @@ function renderProviderKeyState(message?: string): void {
     apiKeyModels.append(summary);
   }
 }
+
+function cloudKeyStateLabel(state: string): string {
+  return ({ connected: "Connected", pending: "Checking", invalid: "Invalid", expired: "Expired", rate_limited: "Rate limited", unreachable: "Offline", disabled: "Disabled" } as Record<string, string>)[state] ?? state;
+}
+
+function renderCloudKeyGroups(groups: CloudProviderGroup[]): void {
+  cloudLlmKeysEl.replaceChildren();
+  if (!groups.some((group) => group.keys.length)) {
+    const empty = document.createElement("small");
+    empty.textContent = "No cloud API keys saved yet. Add one above; you can add multiple keys for every provider.";
+    cloudLlmKeysEl.append(empty);
+    return;
+  }
+  for (const group of groups) {
+    const section = document.createElement("section");
+    section.className = "cloud-provider-group";
+    const heading = document.createElement("div");
+    heading.className = "cloud-provider-head";
+    const title = document.createElement("span"); title.textContent = group.label;
+    const count = document.createElement("small"); count.textContent = `${group.connected_count}/${group.key_count} connected`;
+    heading.append(title, count); section.append(heading);
+    for (const key of group.keys) {
+      const line = document.createElement("div");
+      line.className = "cloud-key-line"; line.dataset.state = key.enabled ? key.status : "disabled";
+      const dot = document.createElement("i"); dot.className = "cloud-key-dot"; dot.setAttribute("aria-hidden", "true");
+      const name = document.createElement("span"); name.className = "cloud-key-name";
+      name.textContent = `${key.label} · ${key.free_model_count} free models · ${key.request_count} calls · ${key.tokens_used.toLocaleString()} tokens`;
+      name.title = key.last_error ?? name.textContent;
+      const state = document.createElement("span"); state.className = "cloud-key-state"; state.textContent = cloudKeyStateLabel(key.enabled ? key.status : "disabled");
+      const toggle = document.createElement("button"); toggle.className = "cloud-key-action"; toggle.type = "button"; toggle.textContent = key.enabled ? "Pause" : "Enable";
+      toggle.addEventListener("click", () => {
+        toggle.disabled = true;
+        void setUltronCloudKey(group.id, key.id, { enabled: !key.enabled }).then(() => refreshCloudLlmScreen()).catch((error) => {
+          cloudBrainStatusEl.textContent = "Could not update key: " + (error instanceof Error ? error.message : "unknown error");
+        }).finally(() => { toggle.disabled = false; });
+      });
+      const remove = document.createElement("button"); remove.className = "cloud-key-action"; remove.type = "button"; remove.textContent = "Remove";
+      remove.addEventListener("click", () => {
+        remove.disabled = true;
+        void removeUltronCloudKey(group.id, key.id).then(() => refreshCloudLlmScreen()).catch((error) => {
+          cloudBrainStatusEl.textContent = "Could not remove key: " + (error instanceof Error ? error.message : "unknown error");
+        }).finally(() => { remove.disabled = false; });
+      });
+      line.append(dot, name, state, toggle, remove); section.append(line);
+    }
+    cloudLlmKeysEl.append(section);
+  }
+}
+
+async function refreshFreeProviderDirectory(refresh = false): Promise<void> {
+  cloudFreeProvidersRefreshButton.disabled = true;
+  cloudFreeProviderCountEl.textContent = "Reading public provider directory…";
+  try {
+    const registry = await getUltronFreeProviders(refresh);
+    cloudFreeProviderCountEl.textContent = registry ? `${registry.providers.length} free providers listed · synced ${new Date(registry.synced_at).toLocaleString()}` : "Provider directory is unavailable.";
+  } catch (error) {
+    cloudFreeProviderCountEl.textContent = "Could not refresh provider directory: " + (error instanceof Error ? error.message : "unknown error");
+  } finally { cloudFreeProvidersRefreshButton.disabled = false; }
+}
+
+async function refreshCloudLlmScreen(): Promise<void> {
+  try {
+    const session = await getCloudSession();
+    if (!session) {
+      cloudBrainStateEl.textContent = "Not signed in";
+      cloudBrainStatusEl.dataset.state = "missing";
+      cloudBrainStatusEl.textContent = "Connect the ULTRON owner account in Cloud Sync before saving provider keys.";
+      cloudLlmKeysEl.replaceChildren();
+      return;
+    }
+    const [keys, status] = await Promise.all([listUltronCloudKeys(), getUltronCloudStatus()]);
+    renderCloudKeyGroups(keys.providers);
+    const state = status.status?.state ?? "unknown";
+    cloudBrainStateEl.textContent = state === "active" ? "Cloud brain active" : state === "waiting_for_keys" ? "Waiting for keys" : state;
+    cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : state === "degraded" ? "expired" : "missing";
+    cloudBrainStatusEl.textContent = keys.connected_keys > 0
+      ? `Connected · ${keys.connected_keys} valid key(s) across five providers. Supabase checks the pool every minute and automatically avoids invalid or rate-limited keys.`
+      : "No usable free-tier models yet. Add another provider key or check whether the provider account has free-tier model access. The cloud worker will keep checking the pool.";
+    void refreshFreeProviderDirectory(false);
+  } catch (error) {
+    cloudBrainStateEl.textContent = "Cloud unavailable";
+    cloudBrainStatusEl.dataset.state = "unreachable";
+    cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not load ULTRON cloud provider status.";
+  }
+}
+
+async function addCloudLlmKeyFromScreen(): Promise<void> {
+  const provider = cloudLlmProvider.value as CloudProviderId;
+  const key = cloudLlmKeyInput.value.trim();
+  const label = cloudLlmLabelInput.value.trim();
+  if (!key) {
+    cloudBrainStatusEl.dataset.state = "invalid";
+    cloudBrainStatusEl.textContent = "Paste an API key first.";
+    cloudLlmKeyInput.focus();
+    return;
+  }
+  cloudLlmAddButton.disabled = true;
+  cloudBrainStatusEl.dataset.state = "unreachable";
+  cloudBrainStatusEl.textContent = `Verifying ${provider} key and discovering chat models…`;
+  try {
+    const result = await addUltronCloudKey(provider, key, label);
+    cloudLlmKeyInput.value = ""; cloudLlmLabelInput.value = "";
+    cloudBrainStatusEl.dataset.state = "connected";
+    cloudBrainStatusEl.textContent = `Saved and verified. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
+    await refreshCloudLlmScreen();
+  } catch (error) {
+    cloudBrainStatusEl.dataset.state = "invalid";
+    cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not verify and save this provider key.";
+  } finally { cloudLlmAddButton.disabled = false; }
+}
 async function loadSavedProviderKey(): Promise<void> {
   const metadata = readJson<Partial<ProviderMetadata>>(LLM_PROVIDER_META_KEY, {});
   try {
@@ -3581,6 +3705,17 @@ async function removeProviderKey(): Promise<void> {
   writeJson(LLM_PROVIDER_META_KEY, {}); renderProviderKeyState(); syncChatModelLabel();
 }
 async function providerModelReply(convo: Conversation, externalSignal: AbortSignal, onToken: (token: string | null) => void, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): Promise<ChatReply> {
+  if (cloudBrainActive) {
+    const task = convo.messages[convo.messages.length - 1]?.content ?? "";
+    const profile = profileTask(task);
+    const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
+    const messages: Array<{ role: Role | "system"; content: string }> = [
+      { role: "system", content: buildCapabilityPrompt(task, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint) },
+      ...history.map((item) => ({ role: item.role, content: item.content })),
+    ];
+    const content = await streamUltronSupabaseChat("", messages, profile.maxTokens, externalSignal, onToken);
+    return { content, session_id: "" };
+  }
   if (!llmApiKey || llmProviderState !== "connected" || !llmProvider.compatible) throw new Error("Save and verify a compatible LLM API key in LLM API KEYS first.");
   const task = convo.messages[convo.messages.length - 1]?.content ?? "";
   const profile = profileTask(task);
@@ -3640,6 +3775,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
 }
 
 function activeModelLabel(): string {
+  if (cloudBrainActive) return "Ultron Supabase";
   if (nativeModelLoaded && nativeLoadedModelName) return nativeLoadedModelName.replace(/\.gguf$/i, "");
   if (llmProviderState === "connected" && selectedLlmModel) return selectedLlmModel;
   if (settings.localModelEndpoint.trim() && settings.localModel.trim()) return settings.localModel.trim();
@@ -3693,7 +3829,7 @@ async function openChatModelMenu(): Promise<void> {
       for (const model of listed.models) {
         addModelChoice(model.name.replace(/\.gguf$/i, ""), `${formatBytes(model.sizeBytes)} · on this device${model.loaded ? " · loaded" : ""}`, async () => {
           if (model.loaded) return;
-          selectedLlmModel = "";
+          selectedLlmModel = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false);
           void persistProviderMetadata();
           nativeModelStatus.textContent = `Loading ${model.name}…`;
           chatModelStatus.textContent = `Loading ${model.name} into memory…`;
@@ -3712,11 +3848,31 @@ async function openChatModelMenu(): Promise<void> {
         }, model.loaded);
       }
     }
+    const cloudStatus = await getUltronCloudStatus().catch(() => null);
+    const cloudConnectedKeys = Number(cloudStatus?.connected_keys ?? 0);
+    {
+      addModelChoice("Ultron Supabase", cloudConnectedKeys > 0
+        ? `${cloudConnectedKeys} connected key(s) · five-provider automatic routing and failover`
+        : "No connected cloud keys · open LLM API KEYS to add or repair credentials",
+      async () => {
+        if (cloudConnectedKeys < 1) {
+          showFeatureScreen("llm-api-keys-screen", navChatButton);
+          void refreshCloudLlmScreen();
+          return;
+        }
+        if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
+        nativeModelLoaded = false; nativeLoadedModelName = "";
+        cloudBrainActive = true; writeJson("ultron.cloud-brain.active.v1", true);
+        selectedLlmModel = "";
+        await refreshNativeModels(); syncChatModelLabel();
+        chatModelStatus.textContent = "Ultron Supabase is active. It selects from your valid cloud API keys and fails over when a provider is rate-limited.";
+      }, cloudBrainActive);
+    }
     if (llmProviderState === "connected" && llmApiKey && llmProviderModels.length) {
       for (const modelName of llmProviderModels) {
         addModelChoice(modelName, llmProvider.label + " · API key connected", async () => {
           if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
-          nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = modelName;
+          nativeModelLoaded = false; nativeLoadedModelName = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false); selectedLlmModel = modelName;
           await persistProviderMetadata(); await refreshNativeModels(); syncChatModelLabel();
           chatModelStatus.textContent = modelName + " is now locked as the active " + llmProvider.label + " model.";
         }, !nativeModelLoaded && selectedLlmModel === modelName);
@@ -3728,7 +3884,7 @@ async function openChatModelMenu(): Promise<void> {
           if (nativeModelLoaded) await NativeLocalAI.unloadModel();
           nativeModelLoaded = false;
           nativeLoadedModelName = "";
-          selectedLlmModel = "";
+          selectedLlmModel = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false);
           void persistProviderMetadata();
           saveSettings();
           await refreshNativeModels();
@@ -4159,6 +4315,23 @@ void restoreCloudAccount();
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
 apiKeySaveButton.addEventListener("click", () => void verifyProviderKey(true));
 apiKeyRemoveButton.addEventListener("click", () => void removeProviderKey());
+cloudLlmAddButton.addEventListener("click", () => void addCloudLlmKeyFromScreen());
+cloudLlmProvider.addEventListener("change", () => {
+  const links: Record<string, { url: string; label: string }> = {
+    openrouter: { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" },
+    mistral: { url: "https://console.mistral.ai/api-keys/", label: "Open Mistral API keys ↗" },
+    cerebras: { url: "https://cloud.cerebras.ai", label: "Open Cerebras Cloud ↗" },
+    groq: { url: "https://console.groq.com/keys", label: "Open Groq API keys ↗" },
+    cohere: { url: "https://dashboard.cohere.com/api-keys", label: "Open Cohere API keys ↗" },
+  };
+  const selected = links[cloudLlmProvider.value] ?? { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" };
+  cloudLlmProviderConsoleLink.href = selected.url;
+  cloudLlmProviderConsoleLink.textContent = selected.label;
+  cloudLlmProviderNote.textContent = cloudLlmProvider.value === "mistral"
+    ? "Mistral free Experiment mode may require accepting provider data-use conditions. Only add this key if you accept them; avoid sensitive conversations on this route."
+    : "Automatic routing uses the free-tier model list for this provider where the provider publishes one. Rate limits trigger key rotation and cooldown.";
+});
+cloudFreeProvidersRefreshButton.addEventListener("click", () => void refreshFreeProviderDirectory(true));
 void loadSavedProviderKey();
 req<HTMLButtonElement>("#vault-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#mindmap-refresh").addEventListener("click", rebuildMindMap);
@@ -4184,6 +4357,7 @@ androidAppSettingsButton.addEventListener("click", () => {
 req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener("click", () => {
   showFeatureScreen("llm-api-keys-screen", navChatButton);
   renderProviderKeyState();
+  void refreshCloudLlmScreen();
 });
 req<HTMLButtonElement>("#llm-api-keys-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); openWorkspace(); });

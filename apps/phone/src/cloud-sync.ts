@@ -5,9 +5,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { fetchAllPages } from './cloud-pagination';
 
 
-const SUPABASE_URL =
+export const ULTRON_SUPABASE_URL =
   import.meta.env.VITE_ULTRON_SUPABASE_URL ?? 'https://vshoxrtrfleptqxkrmtc.supabase.co';
-const SUPABASE_KEY =
+export const ULTRON_SUPABASE_PUBLISHABLE_KEY =
   import.meta.env.VITE_ULTRON_SUPABASE_PUBLISHABLE_KEY ??
   'sb_publishable_OuRYpP7YP76xv4mfUgd_ng_NF4nWVoV';
 
@@ -43,7 +43,7 @@ const secureSessionStorage = {
   },
 };
 
-export const cloudClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+export const cloudClient = createClient(ULTRON_SUPABASE_URL, ULTRON_SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: secureSessionStorage,
     persistSession: true,

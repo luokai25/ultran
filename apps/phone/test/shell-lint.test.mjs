@@ -35,13 +35,15 @@ for (const [id, handler] of Object.entries(navigation)) {
 }
 
 // The unified API-key surface must be present, reachable from the drawer and backed by real handlers.
-for (const id of ["llm-api-keys-screen", "drawer-llm-api-keys", "llm-api-key", "llm-api-key-provider", "llm-api-key-status", "llm-api-key-save", "llm-api-key-remove", "llm-api-key-models"]) {
+for (const id of ["llm-api-keys-screen", "drawer-llm-api-keys", "llm-api-key", "llm-api-key-provider", "llm-api-key-status", "llm-api-key-save", "llm-api-key-remove", "llm-api-key-models", "cloud-brain-state", "cloud-brain-status", "cloud-llm-provider", "cloud-llm-provider-note", "cloud-llm-provider-console", "cloud-llm-label", "cloud-llm-key", "cloud-llm-add", "cloud-llm-keys", "cloud-free-provider-count", "cloud-free-providers-refresh"]) {
   element(id);
 }
 assert.match(element("llm-api-keys-screen"), /\shidden(?:\s|>)/, "API key screen must start hidden");
 assert.ok(main.includes('req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener'), "missing API key drawer navigation handler");
 assert.ok(main.includes('apiKeySaveButton.addEventListener'), "missing API key save/test handler");
 assert.ok(main.includes('apiKeyRemoveButton.addEventListener'), "missing API key removal handler");
+assert.ok(main.includes('cloudLlmAddButton.addEventListener'), "missing Supabase API key save handler");
+assert.ok(main.includes('refreshCloudLlmScreen'), "missing Supabase cloud key/status refresh");
 assert.ok(main.includes('NativeSecureStorage.set'), "API keys must use Android encrypted storage");
 assert.ok(main.includes('providerGenerationToken'), "API provider streaming must render token events");
 

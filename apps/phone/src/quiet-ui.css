@@ -167,3 +167,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .llm-api-model-summary{display:block;line-height:1.5;overflow-wrap:anywhere}
 .llm-key-note{color:#858d89;font-size:10px;line-height:1.65}
 @media(max-width:380px){.llm-key-card{padding:13px}.llm-key-heading{align-items:flex-start;flex-direction:column}.llm-key-heading span{max-width:100%;text-align:left}.chat-model-menu{max-height:48dvh}}
+
+/* Multi-key cloud LLM gateway */
+.llm-cloud-card{border-color:rgba(229,45,65,.28);background:linear-gradient(155deg,#1b1d20,#0d1012 76%)}
+.llm-key-field select{width:100%;min-height:44px;padding:0 12px;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:#14171a;color:#eee;font:inherit;font-size:12px}
+.cloud-llm-keys{display:grid;gap:12px;min-width:0}
+.cloud-provider-group{display:grid;gap:6px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)}
+.cloud-provider-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#e9e6dd;font-size:11px;font-weight:650}
+.cloud-provider-head small{color:#92958f;font-size:9px;font-weight:500}
+.cloud-key-line{display:flex;align-items:center;gap:7px;min-width:0;padding:6px 8px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.025)}
+.cloud-key-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:#888}
+.cloud-key-line[data-state="connected"] .cloud-key-dot{background:#4dd69a;box-shadow:0 0 8px rgba(77,214,154,.35)}
+.cloud-key-line[data-state="rate_limited"] .cloud-key-dot,.cloud-key-line[data-state="expired"] .cloud-key-dot{background:#e6ad55}
+.cloud-key-line[data-state="invalid"] .cloud-key-dot{background:#ef6670}
+.cloud-key-name{flex:1;min-width:0;overflow:hidden;color:#c9c8c0;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.cloud-key-state{color:#8f958f;font-size:8px;white-space:nowrap}
+.cloud-key-action{padding:4px 6px;border:0;background:transparent;color:#a8aaa3;font-size:9px}
+.cloud-provider-directory{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+.cloud-provider-directory>div{display:grid;gap:3px}.cloud-provider-directory strong{font-size:10px}.cloud-provider-directory small{color:#8e938e;font-size:9px}
+.cloud-provider-directory button{white-space:nowrap}

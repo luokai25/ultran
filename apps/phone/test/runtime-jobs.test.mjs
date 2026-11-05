@@ -16,3 +16,11 @@ test("cloud workspace subscribes to durable job updates", async () => {
   const sync = await readFile(new URL("../src/cloud-sync.ts", import.meta.url), "utf8");
   assert.match(sync, /table: 'ultron_jobs'/);
 });
+
+test("agent can retrieve durable Supabase job results after queueing tools", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  assert.match(main, /runtime\.cloud\.jobs/);
+  assert.match(main, /runtime\.cloud\.status/);
+  assert.match(main, /listUltronJobs/);
+  assert.match(main, /never report success while its status is queued or running/);
+});

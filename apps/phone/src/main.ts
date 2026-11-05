@@ -3581,7 +3581,10 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
   const task = convo.messages[convo.messages.length - 1]?.content ?? "";
   const profile = profileTask(task);
   const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
-  const messages = [{ role: "system", content: buildCapabilityPrompt(task, llmProvider.label, executionLedger, checkpoint ?? convo.cognitiveCheckpoint) }, ...history.map((item) => ({ role: item.role, content: item.content }))];
+  const messages: Array<{ role: Role | "system"; content: string }> = [
+    { role: "system", content: buildCapabilityPrompt(task, llmProvider.label, executionLedger, checkpoint ?? convo.cognitiveCheckpoint) },
+    ...history.map((item) => ({ role: item.role, content: item.content })),
+  ];
   if (Capacitor.getPlatform() === "android") {
     const listener = await NativeLocalAI.addListener("providerGenerationToken", (event) => onToken(event.token));
     const abort = (): void => { void NativeLocalAI.cancelGeneration().catch(() => undefined); };

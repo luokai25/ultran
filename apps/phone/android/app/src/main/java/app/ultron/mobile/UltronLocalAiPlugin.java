@@ -1144,6 +1144,9 @@ public class UltronLocalAiPlugin extends Plugin {
 
     @PluginMethod
     public void cancelGeneration(PluginCall call) {
+        // Provider requests run independently from JNI inference and can be disconnected directly.
+        HttpURLConnection providerConnection = activeProviderConnection;
+        if (providerConnection != null) providerConnection.disconnect();
         // Never enqueue this on inferenceExecutor: the active JNI call owns that queue.
         NativeLlama.nativeCancelGeneration();
         call.resolve(new JSObject().put("cancelled", true));

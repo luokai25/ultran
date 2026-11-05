@@ -2343,7 +2343,7 @@ async function runApprovedLocalTool(request: LocalToolRequest): Promise<string> 
   ultronDecisionTrace.record({ phase: "tool", code: "local-tool-approved", detail: request.tool });
   if (request.tool === "runtime.catalog" || request.tool === "runtime.tools.list" || request.tool === "runtime.tool.create" || request.tool === "runtime.tool.run" || request.tool === "runtime.tool.archive" || request.tool === "skills.cloud.list" || request.tool === "skills.cloud.save" || request.tool === "skills.cloud.archive") {
     try {
-      const actionMap: Record<string,string> = {"runtime.catalog":"catalog","runtime.tools.list":"list_tools","runtime.tool.create":"create_tool","runtime.tool.run":"run_tool","runtime.tool.archive":"archive_tool","skills.cloud.list":"list_skills","skills.cloud.save":"save_skill","skills.cloud.archive":"archive_skill"};
+      const actionMap: Record<string,string> = {"runtime.catalog":"catalog","runtime.tools.list":"list_tools","runtime.tool.create":"create_tool","runtime.tool.run":"queue_tool","runtime.tool.archive":"archive_tool","skills.cloud.list":"list_skills","skills.cloud.save":"save_skill","skills.cloud.archive":"archive_skill"};
       const payload={...request} as Record<string,unknown>; delete payload.tool;
       const action=actionMap[request.tool]; if(!action) throw new Error("Unknown ULTRON runtime action.");
       const result=await invokeUltronRuntime(action,payload);

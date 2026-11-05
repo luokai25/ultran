@@ -6,6 +6,7 @@ import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
 import { invokeUltronCapabilities } from "./capability-cloud";
 import { initCapabilityPanel } from "./capability-panel";
 import { invokeUltronRuntime } from "./runtime-cloud";
+import { enqueueUltronMemoryConsolidation, startUltronJobWorker, stopUltronJobWorker } from "./runtime-jobs";
 /**
  * Ultron phone client - a conversation console.
  *
@@ -56,6 +57,7 @@ import {
   rememberCloudSetting,
   saveCloudModelProfile,
   registerCloudDevice,
+  getCloudConversationId,
 } from "./cloud-sync";
 
 /* ------------------------------------------------------------------ *

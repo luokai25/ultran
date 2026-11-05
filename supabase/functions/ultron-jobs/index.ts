@@ -111,6 +111,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
       const { error: updateError } = await db.from("ultron_memory_items").update({
         memory_type: type,
         content: text,
+        local_embedding: embedding,
         summary: String(rawMemory.summary ?? text.slice(0, 300)).slice(0, 500),
         importance: Math.max(Number(duplicate.importance) || 1, Math.min(5, Math.round(Number(rawMemory.importance) || 3))),
         confidence: Math.max(Number(duplicate.confidence) || 0, Math.min(1, Number(rawMemory.confidence) || 0.8)),

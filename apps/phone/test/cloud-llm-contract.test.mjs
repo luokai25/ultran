@@ -54,4 +54,8 @@ assert.match(main, /addModelChoice\("Ultron Supabase"/);
 assert.match(main, /cloudBrainActive/);
 assert.match(main, /cloudConnectedKeys < 1/);
 
+assert.ok(brain.includes('provider === "cerebras") return false'));
+assert.ok(jobs.includes('provider === "cerebras") return false'));
+assert.ok(main.includes("one-time $5 trial"));
+
 console.log("ULTRON cloud LLM, Vault, worker, permission and crash-recovery contracts passed.");

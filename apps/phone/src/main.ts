@@ -4328,8 +4328,12 @@ cloudLlmProvider.addEventListener("change", () => {
   cloudLlmProviderConsoleLink.href = selected.url;
   cloudLlmProviderConsoleLink.textContent = selected.label;
   cloudLlmProviderNote.textContent = cloudLlmProvider.value === "mistral"
-    ? "Mistral free Experiment mode may require accepting provider data-use conditions. Only add this key if you accept them; avoid sensitive conversations on this route."
-    : "Automatic routing uses the free-tier model list for this provider where the provider publishes one. Rate limits trigger key rotation and cooldown.";
+    ? "Mistral Free mode has limited evaluation quotas and may have data-use conditions. Check your workspace limits and data settings before using it."
+    : cloudLlmProvider.value === "cerebras"
+      ? "Cerebras currently offers a one-time $5 trial after adding a verified payment method. It expires after 30 days, so ULTRON will verify and store this key but will not use it for automatic zero-cost routing."
+      : cloudLlmProvider.value === "cohere"
+        ? "Cohere trial keys are free but limited to 1,000 calls per month and 20 chat requests per minute."
+        : "Automatic routing uses the provider's eligible free-tier models where available. Rate limits trigger key rotation and cooldown.";
 });
 cloudFreeProvidersRefreshButton.addEventListener("click", () => void refreshFreeProviderDirectory(true));
 void loadSavedProviderKey();

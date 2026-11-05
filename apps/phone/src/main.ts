@@ -3906,7 +3906,7 @@ req<HTMLElement>("#learning-screen").addEventListener("click", (event) => {
   if (target instanceof HTMLButtonElement && target.dataset.learningFilter) renderLearningReview(target.dataset.learningFilter as "all" | "review" | "history");
 });
 identityScreenButton.addEventListener("click", () => { closeDrawer(); showFeatureScreen("agent-identities-screen", navChatButton); renderIdentitySettings(); });
-activeIdentityButton.addEventListener("click", () => { showFeatureScreen("agent-identities-screen", navChatButton); renderIdentitySettings(); });
+activeIdentityButton.addEventListener("click", () => { if (app.dataset.page === "agent-identities") { leaveIdentityScreen(); return; } showFeatureScreen("agent-identities-screen", navChatButton); renderIdentitySettings(); });
 mindMapDrawerButton.addEventListener("click", () => { closeDrawer(); showFeatureScreen("vault-screen", navChatButton); rebuildMindMap(); });
 const identityBackButton = req<HTMLButtonElement>("#identity-back");
 function leaveIdentityScreen(): void {

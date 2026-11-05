@@ -2691,7 +2691,7 @@ async function loadOptionalCloudTurnContext(text: string, turnController: AbortC
   try {
     await Promise.race([
       Promise.allSettled([memoryTask, skillsTask]),
-      new Promise<void>((resolve) => { timeout = window.setTimeout(resolve, 700); }),
+      new Promise<void>((resolve) => { timeout = window.setTimeout(resolve, 500); }),
     ]);
   } finally {
     if (timeout) window.clearTimeout(timeout);
@@ -2959,6 +2959,7 @@ async function submit(raw: string): Promise<void> {
     result = localReply(requestText);
   }
   if (turnController.signal.aborted) result = { content: "Stopped.", session_id: "" };
+  else if (!result.content || !result.content.trim()) result = { ...result, content: "The selected model returned an empty response. Check that the model is loaded and its endpoint is reachable, then try again." };
   setThinking(false);
 
   const finalProfile = taskProfile;

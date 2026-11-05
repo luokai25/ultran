@@ -3567,6 +3567,7 @@ async function organiseSemanticMemory(convo:Conversation):Promise<void>{
   const session=await getCloudSession();
   if(session){
    await syncCloudWorkspace(store.conversations);
+   await syncCloudMemories(vectorMemory.records);
    const cloudConversationId=getCloudConversationId(convo.id);
    if(cloudConversationId)await enqueueUltronMemoryConsolidation(cloudConversationId,convo.messages.length,memoryProposal,nativeLoadedModelName||"on_device");
   }

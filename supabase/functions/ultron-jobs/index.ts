@@ -30,7 +30,8 @@ function redactMemorySecrets(value: string): string {
 }
 async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const apiKey = Deno.env.get("ULTRON_MODEL_API_KEY");
-  if (!apiKey) throw new Error("model_not_configured: set ULTRON_MODEL_API_KEY to enable cloud memory consolidation");
+  const localProposal = isObject(payload.proposal) && Array.isArray(payload.proposal.memories) ? payload.proposal : null;
+  if (!localProposal && !apiKey) throw new Error("model_not_configured: set ULTRON_MODEL_API_KEY or enable an on-device model");
   const conversationId = typeof payload.conversation_id === "string" ? payload.conversation_id : "";
   if (!conversationId) throw new Error("conversation_id_required");
   const { data: conversation, error: conversationError } = await db.from("ultron_conversations").select("id,title,summary").eq("owner_id", ownerId).eq("id", conversationId).maybeSingle();
@@ -48,30 +49,37 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   if (existingError) throw existingError;
   const transcript = messages.map((row) => String(row.role).toUpperCase() + ": " + redactMemorySecrets(String(row.content ?? "")).slice(0, 5000)).join("\n").slice(-42000);
   const memoryContext = (existing ?? []).map((row) => ({ id: row.id, type: row.memory_type, summary: typeof row.summary === "string" ? redactMemorySecrets(row.summary) : row.summary, content: redactMemorySecrets(String(row.content)).slice(0, 500) }));
-  const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/$/, "");
-  const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
-  const model = Deno.env.get("ULTRON_MODEL_ID") ?? "llama-3.3-70b-versatile";
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model, temperature: 0.1, max_tokens: 1800,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
-        { role: "user", content: JSON.stringify({ conversation: { title: conversation.title, existing_memories: memoryContext }, transcript }) },
-      ],
-    }),
-    signal: AbortSignal.timeout(45000),
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error("memory_model_http_" + response.status + ":" + raw.slice(0, 500));
-  const envelope = JSON.parse(raw) as Record<string, unknown>;
-  const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
-  const message = choices[0]?.message as Record<string, unknown> | undefined;
-  let content = typeof message?.content === "string" ? message.content : "";
-  content = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
-  const proposal = JSON.parse(content) as Record<string, unknown>;
+  let proposal: Record<string, unknown>;
+  let model: string;
+  if (localProposal) {
+    proposal = localProposal;
+    model = typeof payload.model_id === "string" ? payload.model_id.slice(0, 120) : "on_device";
+  } else {
+    const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/$/, "");
+    const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
+    model = Deno.env.get("ULTRON_MODEL_ID") ?? "llama-3.3-70b-versatile";
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, temperature: 0.1, max_tokens: 1800,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
+          { role: "user", content: JSON.stringify({ conversation: { title: conversation.title, existing_memories: memoryContext }, transcript }) },
+        ],
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    const raw = await response.text();
+    if (!response.ok) throw new Error("memory_model_http_" + response.status + ":" + raw.slice(0, 500));
+    const envelope = JSON.parse(raw) as Record<string, unknown>;
+    const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
+    const message = choices[0]?.message as Record<string, unknown> | undefined;
+    let content = typeof message?.content === "string" ? message.content : "";
+    content = content.replace(/^\\s*\`\`\`(?:json)?/i, "").replace(/\`\`\`\\s*$/, "").trim();
+    proposal = JSON.parse(content) as Record<string, unknown>;
+  }
   const rows = Array.isArray(proposal.memories) ? proposal.memories.slice(0, 8) : [];
   const allowed = new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);
   const existingIds = new Set((existing ?? []).map((row) => String(row.id)));

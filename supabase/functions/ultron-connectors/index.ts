@@ -38,6 +38,25 @@ Deno.serve(async(req:Request)=>{
    const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:user.id,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();
    if(error)throw error;return reply({ok:true,connection:data,redirect_url:linked.redirect_url,expires_at:linked.expires_at??null},201);
   }
+  if(body.action==="enqueue_tool"){
+   const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase(),args=obj(body.arguments)?body.arguments:{};
+   if(!id||! /^[A-Z][A-Z0-9_]{2,119}$/.test(toolSlug))return reply({error:"invalid_tool_execution"},400);
+   const {data:connection,error:connectionError}=await db.from("ultron_connector_connections").select("provider_key,toolkit_slug,status").eq("owner_id",user.id).eq("id",id).maybeSingle();
+   if(connectionError)throw connectionError;if(!connection||connection.status!=="connected")return reply({error:"connector_not_connected"},409);
+   const toolkit=String(connection.toolkit_slug??"").toUpperCase().replace(/-/g,"_");
+   if(!toolkit||!toolSlug.startsWith(toolkit+"_"))return reply({error:"toolkit_connection_mismatch"},403);
+   const idempotencyKey=str(body.idempotency_key,160)||null;
+   const {data:job,error:jobError}=await db.from("ultron_jobs").insert({
+    owner_id:user.id,job_type:"connector.tool.execute",title:"Run "+toolSlug,
+    payload:{connection_id:id,tool_slug:toolSlug,arguments:args},priority:Math.max(-10,Math.min(10,Number(body.priority)||0)),
+    idempotency_key:idempotencyKey
+   }).select("id,job_type,title,status,created_at").single();
+   if(jobError?.code==="23505"&&idempotencyKey){
+    const existing=await db.from("ultron_jobs").select("id,job_type,title,status,created_at").eq("owner_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
+    if(existing.error)throw existing.error;return reply({ok:true,deduplicated:true,job:existing.data});
+   }
+   if(jobError)throw jobError;return reply({ok:true,deduplicated:false,job},201);
+  }
   if(body.action==="execute"){
    const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase();
    const args=obj(body.arguments)?body.arguments:{};

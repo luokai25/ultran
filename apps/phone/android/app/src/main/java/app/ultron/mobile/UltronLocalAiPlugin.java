@@ -999,6 +999,59 @@ public class UltronLocalAiPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void listProviderModels(PluginCall call) {
+        final String baseUrl = call.getString("baseUrl", "").trim();
+        final String apiKey = call.getString("apiKey", "").trim();
+        try {
+            URL parsed = new URL(baseUrl);
+            String host = parsed.getHost().toLowerCase(Locale.ROOT);
+            boolean allowed = "https".equalsIgnoreCase(parsed.getProtocol()) &&
+                (host.equals("api.openai.com") || host.equals("api.groq.com") ||
+                 host.equals("openrouter.ai") || host.equals("api.cerebras.ai") ||
+                 host.equals("api.fireworks.ai"));
+            if (!allowed || !baseUrl.matches("https://[^\\\\s]+/v1/?")) throw new IllegalArgumentException("This provider endpoint is not supported by ULTRON.");
+            if (apiKey.isEmpty() || apiKey.length() > 4096) throw new IllegalArgumentException("API key is missing or too long.");
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Invalid provider request." : error.getMessage(), error);
+            return;
+        }
+        providerExecutor.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(baseUrl.replaceAll("/+$", "") + "/models").openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(20000);
+                connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+                connection.setRequestProperty("Accept", "application/json");
+                int status = connection.getResponseCode();
+                JSObject result = new JSObject();
+                result.put("status", status);
+                InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+                StringBuilder payload = new StringBuilder();
+                if (stream != null) try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line; while ((line = reader.readLine()) != null && payload.length() < 2_000_000) payload.append(line);
+                }
+                if (status >= 200 && status < 300) {
+                    JSONObject parsed = new JSONObject(payload.toString());
+                    org.json.JSONArray data = parsed.optJSONArray("data");
+                    JSArray models = new JSArray();
+                    if (data != null) for (int i = 0; i < data.length(); i++) {
+                        JSONObject item = data.optJSONObject(i);
+                        if (item != null) models.put(new JSObject().put("id", item.optString("id", "")));
+                    }
+                    result.put("models", models);
+                } else {
+                    result.put("detail", payload.toString().substring(0, Math.min(600, payload.length())));
+                }
+                call.resolve(result);
+            } catch (Exception error) {
+                call.reject(error.getMessage() == null ? "Could not verify provider API key." : error.getMessage(), error);
+            } finally { if (connection != null) connection.disconnect(); }
+        });
+    }
+
+    @PluginMethod
     public void generateProvider(PluginCall call) {
         final String baseUrl = call.getString("baseUrl", "").trim();
         final String apiKey = call.getString("apiKey", "").trim();

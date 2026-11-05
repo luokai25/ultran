@@ -13,7 +13,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const MEMORY_STOP = new Set("the a an and or but if then than this that these those with from into about for to of in on at by as is are was were be been it its i me my we our you your what why how when where which can could should would do does did have has had please help want need make build create use using now next continue more same all every also just very really".split(" "));
 function embedMemoryText(text: string): number[] {
-  const tokens = (text.toLocaleLowerCase().match(/[\\p{L}\\p{N}_-]{2,}/gu) ?? []).filter((term) => !MEMORY_STOP.has(term)).slice(0, 240);
+  const tokens = (text.toLocaleLowerCase().match(/[\p{L}\p{N}_-]{2,}/gu) ?? []).filter((term) => !MEMORY_STOP.has(term)).slice(0, 240);
   const vector = Array.from({ length: 96 }, () => 0);
   const hash = (value: string) => { let h = 2166136261; for (let i = 0; i < value.length; i++) h = Math.imul(h ^ value.charCodeAt(i), 16777619); return h >>> 0; };
   const features = [...tokens, ...tokens.slice(0, -1).map((token, index) => token + "_" + tokens[index + 1])];
@@ -39,9 +39,9 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   if (duplicate) return { deduplicated: true, source_ref: sourceRef, memories_created: 0 };
   const { data: existing, error: existingError } = await db.from("ultron_memory_items").select("id,memory_type,content,summary,importance,confidence").eq("owner_id", ownerId).is("archived_at", null).order("updated_at", { ascending: false }).limit(60);
   if (existingError) throw existingError;
-  const transcript = messages.map((row) => String(row.role).toUpperCase() + ": " + String(row.content ?? "").slice(0, 5000)).join("\\n").slice(-42000);
+  const transcript = messages.map((row) => String(row.role).toUpperCase() + ": " + String(row.content ?? "").slice(0, 5000)).join("\n").slice(-42000);
   const memoryContext = (existing ?? []).map((row) => ({ id: row.id, type: row.memory_type, summary: row.summary, content: String(row.content).slice(0, 500) }));
-  const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\\/$/, "");
+  const baseUrl = (Deno.env.get("ULTRON_MODEL_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/$/, "");
   const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
   const model = Deno.env.get("ULTRON_MODEL_ID") ?? "llama-3.3-70b-versatile";
   const response = await fetch(endpoint, {
@@ -63,7 +63,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
   const message = choices[0]?.message as Record<string, unknown> | undefined;
   let content = typeof message?.content === "string" ? message.content : "";
-  content = content.replace(/^\\s*```(?:json)?/i, "").replace(/```\\s*$/, "").trim();
+  content = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
   const proposal = JSON.parse(content) as Record<string, unknown>;
   const rows = Array.isArray(proposal.memories) ? proposal.memories.slice(0, 8) : [];
   const allowed = new Set(["identity","preference","fact","episodic","semantic","goal","decision","procedure","relationship"]);

@@ -51,6 +51,7 @@ export async function cancelUltronJob(id: string): Promise<UltronJob> {
 let workerTimer: ReturnType<typeof setInterval> | null = null;
 let workerBusy = false;
 let workerVisibilityHandler: (() => void) | null = null;
+let workerOnlineHandler: (() => void) | null = null;
 
 export async function processUltronJobs(limit = 3): Promise<number> {
   const result = await invokeUltronJobs("process", { limit });
@@ -85,13 +86,15 @@ export function startUltronJobWorker(): void {
   workerTimer = setInterval(() => { void tick(); }, 15_000);
   workerVisibilityHandler = () => { if (document.visibilityState === "visible") void tick(); };
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", workerVisibilityHandler);
-  if (typeof window !== "undefined") window.addEventListener("online", tick);
+  workerOnlineHandler = () => { void tick(); };
+  if (typeof window !== "undefined") window.addEventListener("online", workerOnlineHandler);
 }
 
 export function stopUltronJobWorker(): void {
   if (workerTimer) clearInterval(workerTimer);
   workerTimer = null;
   if (workerVisibilityHandler && typeof document !== "undefined") document.removeEventListener("visibilitychange", workerVisibilityHandler);
-  if (typeof window !== "undefined") window.removeEventListener("online", () => undefined);
+  if (workerOnlineHandler && typeof window !== "undefined") window.removeEventListener("online", workerOnlineHandler);
+  workerOnlineHandler = null;
   workerVisibilityHandler = null;
 }

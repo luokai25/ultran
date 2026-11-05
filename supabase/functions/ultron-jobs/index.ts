@@ -257,10 +257,10 @@ Deno.serve(async (req: Request) => {
           outcomes.push({ id: job.id, job_type: job.job_type, status: "completed", duration_ms: Date.now() - started });
         } catch (error) {
           const message = error instanceof Error ? error.message : "job_execution_failed";
-          const terminal = /approval_required|unsupported_job_type|model_not_configured|conversation_not_found|no_complete_messages/i.test(message);
+          const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages/i.test(message);
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
-          const delay = Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          const delay = message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
           const { error: failError } = await db.from("ultron_jobs").update({
             status: exhausted ? "failed" : "retry_wait",
             run_after: new Date(Date.now() + delay * 1000).toISOString(),

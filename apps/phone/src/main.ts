@@ -3546,24 +3546,31 @@ vectorMemory = syncVectorMemory(vectorMemory, semanticGraph.nodes.map((node) => 
 function sharedGraphPrompt(conversationId:string):string{return "\\n\\n"+graphPrompt(semanticGraph,nativeLoadedModelName||"active brain",conversationId);}
 async function organiseSemanticMemory(convo:Conversation):Promise<void>{
  if(!convo.messages.length)return;
+ let memoryProposal:Record<string,unknown>|undefined;
+ if(nativeModelLoaded&&Capacitor.getPlatform()==="android"){
+  try{
+   const evidence=convo.messages.slice(-8).map(m=>({role:m.role,content:m.content.slice(0,1400)}));
+   const response=await NativeLocalAI.generate({messages:[
+    {role:"system",content:"You curate ULTRON's private semantic memory. Extract durable project facts, decisions, preferences, goals, procedures and useful relationship context. Return strict JSON only with keys nodes, edges, summary, memories. Never store passwords, tokens, credentials, API keys, or highly sensitive personal data. Ignore transient chatter and unsupported inferences. Merge or refine existing concepts instead of repeating them. Each memory has memory_type (identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship), content, summary, importance (1-5), confidence (0-1), and optional relations. Return at most 8 memories. If nothing durable exists return empty nodes, edges and memories."},
+    {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph and memory proposal."}
+   ],maxTokens:1100});
+   const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
+   if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);scheduleCloudSetting("semantic_graph",semanticGraph);scheduleCloudMemorySync(vectorMemory.records);}
+   try{
+    const raw=response.content.trim().replace(/^\`\`\`(?:json)?/i,"").replace(/\`\`\`$/,"").trim();
+    const parsed=JSON.parse(raw) as Record<string,unknown>;
+    if(Array.isArray(parsed.memories))memoryProposal={summary:typeof parsed.summary==="string"?parsed.summary:"",memories:parsed.memories.slice(0,8)};
+   }catch{/* a graph-only response can still be consolidated by the cloud model */}
+  }catch(error){console.warn("[ULTRON local memory model]",error);}
+ }
  try{
   const session=await getCloudSession();
   if(session){
    await syncCloudWorkspace(store.conversations);
    const cloudConversationId=getCloudConversationId(convo.id);
-   if(cloudConversationId) await enqueueUltronMemoryConsolidation(cloudConversationId,convo.messages.length);
+   if(cloudConversationId)await enqueueUltronMemoryConsolidation(cloudConversationId,convo.messages.length,memoryProposal,nativeLoadedModelName||"on_device");
   }
  }catch(error){console.warn("[ULTRON memory queue]",error);}
- if(!nativeModelLoaded||Capacitor.getPlatform()!=="android")return;
- try{
-  const evidence=convo.messages.slice(-8).map(m=>({role:m.role,content:m.content.slice(0,1400)}));
-  const response=await NativeLocalAI.generate({messages:[
-   {role:"system",content:"You curate Ultron's private semantic memory. Extract durable project facts, decisions, preferences and useful concepts. Return strict JSON only. Never store passwords, tokens, credentials or highly sensitive personal data. If nothing durable exists return {\"nodes\":[],\"edges\":[]}."},
-   {role:"user",content:sharedGraphPrompt(convo.id)+"\\nEvidence from this conversation:\\n"+JSON.stringify(evidence)+"\\nReturn a JSON graph proposal."}
-  ],maxTokens:420});
-  const next=mergeGraphProposal(semanticGraph,response.content,nativeLoadedModelName||"active brain");
-  if(next!==semanticGraph){semanticGraph=next;writeJson(SEMANTIC_GRAPH_KEY,semanticGraph);vectorMemory=syncVectorMemory(vectorMemory,semanticGraph.nodes.map((node)=>({id:node.id,text:`${node.label} ${node.summary}`,kind:node.kind,confidence:node.confidence,source:node.sources?.join(","),updatedAt:semanticGraph.updatedAt})));writeJson(VECTOR_MEMORY_KEY,vectorMemory);scheduleCloudSetting("semantic_graph",semanticGraph,error=>{cloudSyncStatusEl.textContent="Knowledge graph saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});scheduleCloudMemorySync(vectorMemory.records,error=>{cloudSyncStatusEl.textContent="Memory saved locally; cloud sync failed: "+(error instanceof Error?error.message:"unknown error");});}
- }catch{/* memory enrichment never blocks chat */}
 }
 function rebuildMindMap():void{mindMap=buildMindMap(store.conversations,semanticGraph);writeJson(MINDMAP_KEY,mindMap);renderMindMap(req<SVGSVGElement>("#mindmap-canvas"),mindMap,showMindNode,req<HTMLInputElement>("#mindmap-search").value);req<HTMLElement>("#mindmap-empty").hidden=store.conversations.length>0;req<HTMLElement>("#mindmap-stats").textContent=`${store.conversations.length} sessions · ${store.conversations.reduce((n,c)=>n+c.messages.length,0)} messages · ${mindMap.nodes.length-1} knowledge nodes · ${mindMap.edges?.length??0} relationships`;req<HTMLElement>("#mindmap-organizer").textContent=`Local index · ${nativeLoadedModelName||"automatic organiser"} · ${new Date(mindMap.updatedAt).toLocaleTimeString()}`;}
 function showMindNode(node:MindNode):void{const detail=req<HTMLElement>("#mindmap-detail");detail.replaceChildren();const title=document.createElement("strong");title.textContent=node.label;const meta=document.createElement("small");meta.textContent=`${node.kind} · ${node.conversationIds.length} linked sessions · ${node.count} references`;const body=document.createElement("p");body.textContent=node.examples.slice(0,3).join(" · ");const open=document.createElement("button");open.className="ghost";open.type="button";open.textContent="Open linked conversation";open.disabled=!node.conversationIds.length;open.addEventListener("click",()=>{const c=store.conversations.find(x=>x.id===node.conversationIds[0]);if(c){store.activeId=c.id;saveStore();renderConversation();showFeatureScreen("chat-screen",navChatButton);}});detail.append(title,meta,body,open);}

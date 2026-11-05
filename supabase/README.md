@@ -108,7 +108,7 @@ The ultron-jobs Edge Function (JWT verification enabled) exposes:
 - fail: record an error and schedule bounded exponential retry, or mark the job failed after its retry budget is exhausted
 - cancel: cancel queued, retrying or running work
 
-The queue is durable Postgres storage, not an Edge Function kept alive in the background. The Android app or another authorized worker claims jobs and heartbeats while executing. If a worker disappears, its lease expires and another claim can recover the job. Keep Edge Function requests short: Free-plan workers have a 150-second wall-clock limit, 256 MB memory and 2 seconds of CPU time per request. Long work must be split into checkpointed jobs, with actual device-only actions remaining on Android.
+The queue is durable Postgres storage, not an Edge Function kept alive in the background. The Android app or another authorized worker claims jobs and heartbeats while executing. If a worker disappears, its lease expires and another claim can recover the job. If the final permitted attempt also loses its worker lease, the next claim marks it failed rather than leaving it stuck forever. Keep Edge Function requests short: Free-plan workers have a 150-second wall-clock limit, 256 MB memory and 2 seconds of CPU time per request. Long work must be split into checkpointed jobs, with actual device-only actions remaining on Android.
 
 ### Job placement
 

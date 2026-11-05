@@ -372,6 +372,11 @@ public class UltronLocalAiPlugin extends Plugin {
     }
 
     private void importSelectedModel(PluginCall call, Uri uri, String displayName) {
+        String lowerName = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
+        if (lowerName.endsWith(".tgz") || lowerName.endsWith(".tar.gz")) {
+            importModelArchive(call, uri);
+            return;
+        }
         File partial = null;
         try {
             String name = safeModelName(displayName);
@@ -445,6 +450,141 @@ public class UltronLocalAiPlugin extends Plugin {
         } catch (Exception error) {
             if (partial != null && partial.exists()) partial.delete();
             call.reject(error.getMessage() == null ? "Model import failed." : error.getMessage(), error);
+        }
+    }
+
+    /**
+     * .tgz is a transport archive, not a model format. Extract only regular
+     * GGUF files into private storage and reject unsafe or incomplete entries.
+     */
+    private void importModelArchive(PluginCall call, Uri uri) {
+        ArrayList<File> partials = new ArrayList<>();
+        ArrayList<File> finalized = new ArrayList<>();
+        try {
+            File directory = modelDirectory();
+            StatFs storage = new StatFs(directory.getAbsolutePath());
+            final long availableAtStart = storage.getAvailableBytes();
+            long totalExtracted = 0;
+            try (InputStream raw = getContext().getContentResolver().openInputStream(uri)) {
+                if (raw == null) throw new IllegalStateException("Could not open the selected model archive.");
+                java.util.zip.GZIPInputStream gzip = new java.util.zip.GZIPInputStream(raw, 256 * 1024);
+                byte[] header = new byte[512];
+                Set<String> names = new HashSet<>();
+                while (readTarBlock(gzip, header)) {
+                    boolean zero = true;
+                    for (byte value : header) if (value != 0) { zero = false; break; }
+                    if (zero) break;
+                    String name = tarString(header, 0, 100);
+                    String prefix = tarString(header, 345, 155);
+                    if (!prefix.isEmpty()) name = prefix + "/" + name;
+                    long size = tarOctal(header, 124, 12);
+                    int type = header[156] & 0xff;
+                    boolean regular = type == 0 || type == '0';
+                    int slash = name.lastIndexOf('/');
+                    String baseName = slash >= 0 ? name.substring(slash + 1) : name;
+                    boolean gguf = regular && baseName.toLowerCase(Locale.ROOT).endsWith(".gguf");
+                    if (gguf) {
+                        String safeName = safeModelName(baseName);
+                        if (!names.add(safeName.toLowerCase(Locale.ROOT))) throw new IllegalStateException("The archive contains duplicate model filenames.");
+                        if (size < 1024L * 1024L || size > MAX_MODEL_BYTES || totalExtracted + size > MAX_MODEL_BYTES || totalExtracted + size > availableAtStart) {
+                            throw new IllegalStateException("The archive's GGUF files exceed the size limit or available device storage.");
+                        }
+                        File destination = new File(directory, safeName);
+                        if (destination.exists()) throw new IllegalStateException("A model named " + safeName + " is already installed.");
+                        if (destination.getAbsolutePath().equals(loadedModelPath)) throw new IllegalStateException("Unload the active model before replacing it.");
+                        File partial = new File(directory, safeName + ".partial");
+                        partials.add(partial);
+                        try (FileOutputStream output = new FileOutputStream(partial)) {
+                            copyTarEntry(gzip, output, size);
+                            output.getFD().sync();
+                        }
+                        try (RandomAccessFile check = new RandomAccessFile(partial, "r")) {
+                            byte[] magic = new byte[4]; check.readFully(magic);
+                            if (magic[0] != 'G' || magic[1] != 'G' || magic[2] != 'U' || magic[3] != 'F') {
+                                throw new IllegalStateException("Archive entry " + safeName + " is not a valid GGUF model.");
+                            }
+                        }
+                        totalExtracted += size;
+                        JSObject progress = new JSObject();
+                        progress.put("name", safeName);
+                        progress.put("copiedBytes", totalExtracted);
+                        progress.put("totalBytes", -1);
+                        notifyListeners("modelImportProgress", progress);
+                    } else {
+                        skipTarEntry(gzip, size);
+                    }
+                }
+            }
+            if (partials.isEmpty()) throw new IllegalStateException("This .tgz archive contains no GGUF weights. llama.cpp cannot load Safetensors or PyTorch checkpoints directly.");
+            for (File partial : partials) {
+                String finalName = partial.getName().substring(0, partial.getName().length() - ".partial".length());
+                File destination = new File(directory, finalName);
+                if (!partial.renameTo(destination)) throw new IllegalStateException("Could not finalize extracted model " + finalName + ".");
+                finalized.add(destination);
+            }
+            call.resolve(new JSObject().put("cancelled", false).put("name", finalized.get(0).getName())
+                    .put("sizeBytes", totalExtracted).put("extractedModels", finalized.size()));
+        } catch (Exception error) {
+            for (File file : partials) if (file.exists()) file.delete();
+            for (File file : finalized) if (file.exists()) file.delete();
+            call.reject(error.getMessage() == null ? "Model archive import failed." : error.getMessage(), error);
+        }
+    }
+
+    private static boolean readTarBlock(InputStream input, byte[] block) throws Exception {
+        int offset = 0;
+        while (offset < block.length) {
+            int read = input.read(block, offset, block.length - offset);
+            if (read < 0) {
+                if (offset == 0) return false;
+                throw new IllegalStateException("The .tgz archive ended inside a tar header.");
+            }
+            offset += read;
+        }
+        return true;
+    }
+
+    private static String tarString(byte[] bytes, int offset, int length) {
+        int end = offset;
+        while (end < offset + length && bytes[end] != 0) end++;
+        return new String(bytes, offset, end - offset, java.nio.charset.StandardCharsets.UTF_8).trim();
+    }
+
+    private static long tarOctal(byte[] bytes, int offset, int length) {
+        String value = tarString(bytes, offset, length).trim();
+        long result = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char digit = value.charAt(i);
+            if (digit == ' ' || digit == 0) continue;
+            if (digit < '0' || digit > '7') throw new IllegalStateException("The .tgz archive contains an invalid file size.");
+            result = result * 8 + (digit - '0');
+            if (result > MAX_MODEL_BYTES) throw new IllegalStateException("An archive entry exceeds the model size limit.");
+        }
+        return result;
+    }
+
+    private static void copyTarEntry(InputStream input, FileOutputStream output, long size) throws Exception {
+        byte[] buffer = new byte[256 * 1024];
+        long remaining = size;
+        while (remaining > 0) {
+            int read = input.read(buffer, 0, (int) Math.min(buffer.length, remaining));
+            if (read < 0) throw new IllegalStateException("The .tgz archive contains a truncated model file.");
+            output.write(buffer, 0, read);
+            remaining -= read;
+        }
+        long padding = (512 - (size % 512)) % 512;
+        skipTarEntry(input, padding);
+    }
+
+    private static void skipTarEntry(InputStream input, long size) throws Exception {
+        long remaining = size + ((512 - (size % 512)) % 512);
+        while (remaining > 0) {
+            long skipped = input.skip(remaining);
+            if (skipped <= 0) {
+                if (input.read() < 0) throw new IllegalStateException("The .tgz archive contains a truncated entry.");
+                skipped = 1;
+            }
+            remaining -= skipped;
         }
     }
 

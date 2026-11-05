@@ -3508,7 +3508,16 @@ let vectorMemory = validateVectorMemoryStore(readJson(VECTOR_MEMORY_KEY, createV
 vectorMemory = syncVectorMemory(vectorMemory, semanticGraph.nodes.map((node) => ({ id: node.id, text: `${node.label} ${node.summary}`, kind: node.kind, confidence: node.confidence, source: node.sources?.join(","), updatedAt: semanticGraph.updatedAt })));
 function sharedGraphPrompt(conversationId:string):string{return "\\n\\n"+graphPrompt(semanticGraph,nativeLoadedModelName||"active brain",conversationId);}
 async function organiseSemanticMemory(convo:Conversation):Promise<void>{
- if(!nativeModelLoaded||Capacitor.getPlatform()!=="android"||!convo.messages.length)return;
+ if(!convo.messages.length)return;
+ try{
+  const session=await getCloudSession();
+  if(session){
+   await syncCloudWorkspace(store.conversations);
+   const cloudConversationId=getCloudConversationId(convo.id);
+   if(cloudConversationId) await enqueueUltronMemoryConsolidation(cloudConversationId,convo.messages.length);
+  }
+ }catch(error){console.warn("[ULTRON memory queue]",error);}
+ if(!nativeModelLoaded||Capacitor.getPlatform()!=="android")return;
  try{
   const evidence=convo.messages.slice(-8).map(m=>({role:m.role,content:m.content.slice(0,1400)}));
   const response=await NativeLocalAI.generate({messages:[

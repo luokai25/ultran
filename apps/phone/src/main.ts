@@ -97,6 +97,8 @@ type NativeLocalAIPlugin = {
   listProjectors(): Promise<{ projectors: Array<{ name: string; sizeBytes: number; loaded?: boolean }> }>;
   loadModel(options: { name: string; projectorName?: string }): Promise<{ loaded: boolean; name: string; contextTokens: number; device: string; memoryMapped?: boolean; largeModelMode?: boolean }>;
   generate(options: { messages: Array<{ role: Role | "system"; content: string; images?: string[] }>; maxTokens: number }): Promise<{ content: string; model: string; promptTokens?: number; generatedTokens?: number; promptMs?: number; generationMs?: number; tokensPerSecond?: number; processPssKb?: number }>;
+  listProviderModels(options: { baseUrl: string; apiKey: string }): Promise<{ status: number; models?: Array<{ id: string }>; detail?: string }>;
+  generateProvider(options: { baseUrl: string; apiKey: string; model: string; messages: Array<{ role: Role | "system"; content: string }>; maxTokens: number; temperature: number }): Promise<{ content: string; model: string }>;
   cancelGeneration(): Promise<{ cancelled: boolean }>;
   runBenchmark(): Promise<{ model: string; output: string; contextTokens: number; largeModelMode: boolean; promptTokens: number; generatedTokens: number; promptMs: number; generationMs: number; tokensPerSecond: number; processPssKb: number; processPrivateDirtyKb: number }>;
   unloadModel(): Promise<{ loaded: boolean }>;
@@ -570,6 +572,8 @@ async function loadNativeModel(): Promise<void> {
   nativeModelStatus.textContent = "Opening model with memory-mapped weights. Large GGUF files may take time to map and can generate slowly…";
   try {
     const result = await NativeLocalAI.loadModel({ name, projectorName: selectedNativeProjectorName || undefined });
+    selectedLlmModel = "";
+    void persistProviderMetadata();
     nativeModelLoaded = result.loaded;
     void saveCloudModelProfile(result.name).catch((error) => console.warn("[ULTRON model profile sync]", error));
     nativeModelStatus.textContent = "Ready: " + result.name + (selectedNativeProjectorName ? " · vision ready: " + selectedNativeProjectorName : " · text-only") + " · " + result.contextTokens + " context tokens · " + (result.largeModelMode ? "large-model memory policy" : "automatic memory policy") + " · CPU inference";
@@ -3533,11 +3537,28 @@ async function verifyProviderKey(saveSecret: boolean): Promise<void> {
   llmProviderState = "unreachable"; renderProviderKeyState("Checking provider and available models…");
   const controller = new AbortController(); const timeout = window.setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(detected.baseUrl + "/models", { method: "GET", headers: { Authorization: "Bearer " + key, Accept: "application/json" }, signal: controller.signal });
-    llmProviderState = classifyProviderResponse(response.status);
-    if (!response.ok) { renderProviderKeyState(providerStatusLabel(llmProviderState) + " · HTTP " + response.status); return; }
-    const payload = await response.json() as { data?: Array<{ id?: string }> };
-    llmProviderModels = selectChatModels((payload.data ?? []).map((item) => item.id ?? ""));
+    let responseStatus = 0;
+    let modelIds: string[] = [];
+    let errorDetail = "";
+    if (Capacitor.getPlatform() === "android") {
+      const checked = await NativeLocalAI.listProviderModels({ baseUrl: detected.baseUrl, apiKey: key });
+      responseStatus = checked.status;
+      modelIds = (checked.models ?? []).map((item) => item.id);
+      errorDetail = checked.detail ?? "";
+    } else {
+      const response = await fetch(detected.baseUrl + "/models", { method: "GET", headers: { Authorization: "Bearer " + key, Accept: "application/json" }, signal: controller.signal });
+      responseStatus = response.status;
+      if (response.ok) {
+        const payload = await response.json() as { data?: Array<{ id?: string }> };
+        modelIds = (payload.data ?? []).map((item) => item.id ?? "");
+      } else errorDetail = await response.text().catch(() => "");
+    }
+    llmProviderState = classifyProviderResponse(responseStatus);
+    if (responseStatus < 200 || responseStatus >= 300) {
+      renderProviderKeyState(providerStatusLabel(llmProviderState) + " · HTTP " + responseStatus + (errorDetail ? " · " + errorDetail.slice(0, 180) : ""));
+      return;
+    }
+    llmProviderModels = selectChatModels(modelIds);
     if (!llmProviderModels.length) { llmProviderState = "incompatible"; renderProviderKeyState("The key is accepted, but this provider returned no chat models Ultron can select."); return; }
     selectedLlmModel = llmProviderModels[0] ?? ""; llmApiKey = key;
     if (saveSecret && Capacitor.getPlatform() === "android") await NativeSecureStorage.set({ key: LLM_PROVIDER_SECRET_KEY, value: key });
@@ -3561,6 +3582,21 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
   const profile = profileTask(task);
   const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
   const messages = [{ role: "system", content: buildCapabilityPrompt(task, llmProvider.label, executionLedger, checkpoint ?? convo.cognitiveCheckpoint) }, ...history.map((item) => ({ role: item.role, content: item.content }))];
+  if (Capacitor.getPlatform() === "android") {
+    const listener = await NativeLocalAI.addListener("providerGenerationToken", (event) => onToken(event.token));
+    const abort = (): void => { void NativeLocalAI.cancelGeneration().catch(() => undefined); };
+    externalSignal.addEventListener("abort", abort, { once: true });
+    try {
+      const nativeResult = await NativeLocalAI.generateProvider({
+        baseUrl: llmProvider.baseUrl, apiKey: llmApiKey, model: selectedLlmModel || llmProviderModels[0] || "",
+        messages, maxTokens: profile.maxTokens, temperature: profile.temperature,
+      });
+      return { content: nativeResult.content, session_id: "" };
+    } finally {
+      externalSignal.removeEventListener("abort", abort);
+      await listener.remove();
+    }
+  }
   const response = await fetch(llmProvider.baseUrl + "/chat/completions", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + llmApiKey, Accept: "text/event-stream" },
     signal: externalSignal, body: JSON.stringify({ model: selectedLlmModel || llmProviderModels[0], messages, stream: true, max_tokens: profile.maxTokens, temperature: profile.temperature }),
@@ -3650,6 +3686,8 @@ async function openChatModelMenu(): Promise<void> {
       for (const model of listed.models) {
         addModelChoice(model.name.replace(/\.gguf$/i, ""), `${formatBytes(model.sizeBytes)} · on this device${model.loaded ? " · loaded" : ""}`, async () => {
           if (model.loaded) return;
+          selectedLlmModel = "";
+          void persistProviderMetadata();
           nativeModelStatus.textContent = `Loading ${model.name}…`;
           chatModelStatus.textContent = `Loading ${model.name} into memory…`;
           try {
@@ -3683,6 +3721,8 @@ async function openChatModelMenu(): Promise<void> {
           if (nativeModelLoaded) await NativeLocalAI.unloadModel();
           nativeModelLoaded = false;
           nativeLoadedModelName = "";
+          selectedLlmModel = "";
+          void persistProviderMetadata();
           saveSettings();
           await refreshNativeModels();
           syncChatModelLabel();

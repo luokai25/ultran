@@ -291,6 +291,16 @@ Deno.serve(async (req: Request) => {
             const data = await response.json() as Record<string, unknown>;
             if (!response.ok || data.ok !== true) throw new Error(String(data.message ?? data.error ?? "workflow_execution_failed"));
             result = data;
+          } else if (job.job_type === "maintenance.health_check") {
+            const [queued, running, failed] = await Promise.all([
+              db.from("ultron_jobs").select("id", { count: "exact", head: true }).eq("owner_id", owner_id).in("status", ["queued", "retry_wait"]),
+              db.from("ultron_jobs").select("id", { count: "exact", head: true }).eq("owner_id", owner_id).eq("status", "running"),
+              db.from("ultron_jobs").select("id", { count: "exact", head: true }).eq("owner_id", owner_id).eq("status", "failed"),
+            ]);
+            if (queued.error) throw queued.error;
+            if (running.error) throw running.error;
+            if (failed.error) throw failed.error;
+            result = { healthy: true, queue: { queued: queued.count ?? 0, running: running.count ?? 0, failed: failed.count ?? 0 }, checked_at: new Date().toISOString() };
           } else if (job.job_type === "memory.consolidate") {
             result = await consolidateConversationMemory(db, owner_id, isObject(job.payload) ? job.payload : {});
           } else {

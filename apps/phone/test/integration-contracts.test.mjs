@@ -75,7 +75,8 @@ test("device capability profile is shown in the model settings UI", () => {
 });
 
 test("Termux runtime download verifies the published checksum before installation", () => {
-  assert.ok(html.includes('id="ultron-runtime-download"'));
+  assert.ok(!html.includes('id="ultron-runtime-download"'), "runtime installer is intentionally hidden from Settings");
+  assert.ok(!html.includes('id="ultron-runtime-install"'), "runtime ZIP picker is intentionally hidden from Settings");
   assert.match(main, /NativeRuntime\.downloadBootstrap\(\)/);
   assert.match(runtime, /public void downloadBootstrap\(/);
   assert.match(runtime, /SHA256SUMS/);
@@ -257,7 +258,8 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));
-  assert.equal((composerMarkup.match(/<button\b/g) ?? []).length, 1, "text-only composer exposes only the adaptive Send/Stop action");
+  assert.equal((composerMarkup.match(/<button\b/g) ?? []).length, 2, "composer exposes the model selector and adaptive Send/Stop action");
+  assert.equal((composerMarkup.match(/type="submit"/g) ?? []).length, 1, "composer has exactly one send action");
   assert.ok(composerMarkup.indexOf('id="send-btn"') > composerMarkup.indexOf('id="link-pill"'));
   assert.doesNotMatch(composerMarkup, /sms-btn|voice-btn|mic-btn|proactive-btn|background-btn|tool-strip/);
   assert.match(main, /const taskMessage = text;/, "remote model receives the user's request before any skill is loaded");

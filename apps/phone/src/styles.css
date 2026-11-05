@@ -1607,6 +1607,9 @@ button {
 .github-detail-mark { width:44px; height:44px; }
 .github-capability-list { display:grid; gap:8px; margin:10px 0 16px; }
 .github-capability-row { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font-size:13px; }
+.conn-tool-details { min-width:0; display:grid; gap:4px; }
+.conn-tool-name { overflow-wrap:anywhere; font-size:12px; letter-spacing:.02em; }
+.conn-tool-description { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
 .github-capability-check { display:grid; place-items:center; width:22px; height:22px; border-radius:50%; color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent); font-weight:900; }
 .github-approval-note { padding:12px; border-left:2px solid var(--accent); border-radius:0 10px 10px 0; background:color-mix(in srgb,var(--accent) 6%,transparent); color:var(--muted); font-size:12px; line-height:1.55; }
 

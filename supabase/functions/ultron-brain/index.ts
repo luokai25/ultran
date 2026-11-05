@@ -51,7 +51,7 @@ function parseModels(_provider: Provider, payload: unknown): string[] {
   return chatModelFilter(ids);
 }
 function taskComplexity(messages: Json[]): number {
-  const task = messages.map((message) => clean(message.content, 24000)).join("\n").toLowerCase();
+  const task = messages.filter((message) => message.role === "user").slice(-6).map((message) => clean(message.content, 24000)).join("\n").toLowerCase();
   let score = 0;
   if (/\b(build|implement|debug|refactor|architecture|research|compare|analy[sz]e|design|migrate|deploy|multi.step|step.by.step|investigate|prove|optimi[sz]e)\b/.test(task)) score += 2;
   if (/\b(code|typescript|javascript|python|sql|android|supabase|github|compiler|stack trace|test suite)\b/.test(task)) score += 2;

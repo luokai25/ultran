@@ -46,6 +46,8 @@ public class UltronLocalAiPlugin extends Plugin {
     // One queue serializes model imports, load/unload, inference and deletion so
     // a file can never be replaced or removed while native code is reading it.
     private final ExecutorService inferenceExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService providerExecutor = Executors.newSingleThreadExecutor();
+    private volatile HttpURLConnection activeProviderConnection;
     private volatile String loadedModelPath;
     private volatile String loadedProjectorPath;
     private volatile int loadedContextTokens;
@@ -992,6 +994,92 @@ public class UltronLocalAiPlugin extends Plugin {
                 call.resolve(response);
             } catch (Throwable error) {
                 call.reject(error.getMessage() == null ? "Native inference failed." : error.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void generateProvider(PluginCall call) {
+        final String baseUrl = call.getString("baseUrl", "").trim();
+        final String apiKey = call.getString("apiKey", "").trim();
+        final String model = call.getString("model", "").trim();
+        final JSArray messages = call.getArray("messages");
+        final int maxTokens = Math.max(32, Math.min(8192, call.getInt("maxTokens", 1024)));
+        final double temperature = Math.max(0.0, Math.min(2.0, call.getDouble("temperature", 0.7)));
+        try {
+            URL parsed = new URL(baseUrl);
+            String host = parsed.getHost().toLowerCase(Locale.ROOT);
+            boolean allowed = "https".equalsIgnoreCase(parsed.getProtocol()) &&
+                (host.equals("api.openai.com") || host.equals("api.groq.com") ||
+                 host.equals("openrouter.ai") || host.equals("api.cerebras.ai") ||
+                 host.equals("api.fireworks.ai"));
+            if (!allowed || !baseUrl.matches("https://[^\\\\s]+/v1/?")) throw new IllegalArgumentException("This provider endpoint is not supported by ULTRON.");
+            if (apiKey.isEmpty() || apiKey.length() > 4096 || model.isEmpty() || model.length() > 180 || messages == null || messages.length() == 0) {
+                throw new IllegalArgumentException("The provider request is missing its API key, model or messages.");
+            }
+        } catch (Exception error) {
+            call.reject(error.getMessage() == null ? "Invalid provider request." : error.getMessage(), error);
+            return;
+        }
+        providerExecutor.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(baseUrl.replaceAll("/+$", "") + "/chat/completions");
+                connection = (HttpURLConnection) url.openConnection();
+                activeProviderConnection = connection;
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(20000);
+                connection.setReadTimeout(120000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Accept", "text/event-stream");
+                JSONObject body = new JSONObject();
+                body.put("model", model);
+                body.put("messages", messages);
+                body.put("stream", true);
+                body.put("max_tokens", maxTokens);
+                body.put("temperature", temperature);
+                byte[] bytes = body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(bytes.length);
+                try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); output.flush(); }
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) {
+                    InputStream errorStream = connection.getErrorStream();
+                    StringBuilder detail = new StringBuilder();
+                    if (errorStream != null) try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(errorStream, java.nio.charset.StandardCharsets.UTF_8))) {
+                        String line; while ((line = reader.readLine()) != null && detail.length() < 1200) detail.append(line);
+                    }
+                    throw new IllegalStateException("Provider returned HTTP " + status + (detail.length() > 0 ? ": " + detail : ""));
+                }
+                StringBuilder content = new StringBuilder();
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (!line.startsWith("data:")) continue;
+                        String data = line.substring(5).trim();
+                        if (data.isEmpty() || "[DONE]".equals(data)) continue;
+                        JSONObject event = new JSONObject(data);
+                        JSONObject error = event.optJSONObject("error");
+                        if (error != null) throw new IllegalStateException(error.optString("message", "Provider generation failed."));
+                        org.json.JSONArray choices = event.optJSONArray("choices");
+                        if (choices == null || choices.length() == 0) continue;
+                        JSONObject delta = choices.optJSONObject(0) == null ? null : choices.optJSONObject(0).optJSONObject("delta");
+                        if (delta == null) continue;
+                        String token = delta.optString("content", "");
+                        if (!token.isEmpty()) {
+                            content.append(token);
+                            notifyListeners("providerGenerationToken", new JSObject().put("token", token));
+                        }
+                    }
+                }
+                if (content.toString().trim().isEmpty()) throw new IllegalStateException("The provider completed without returning any text.");
+                call.resolve(new JSObject().put("content", content.toString().trim()).put("model", model));
+            } catch (Exception error) {
+                call.reject(error.getMessage() == null ? "Provider generation failed." : error.getMessage(), error);
+            } finally {
+                activeProviderConnection = null;
+                if (connection != null) connection.disconnect();
             }
         });
     }

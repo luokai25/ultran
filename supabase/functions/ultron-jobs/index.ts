@@ -31,9 +31,16 @@ function redactMemorySecrets(value: string): string {
 async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const apiKey = Deno.env.get("ULTRON_MODEL_API_KEY");
   const localProposal = isObject(payload.proposal) && Array.isArray(payload.proposal.memories) ? payload.proposal : null;
-  if (!localProposal && !apiKey) throw new Error("model_not_configured: set ULTRON_MODEL_API_KEY or enable an on-device model");
   const conversationId = typeof payload.conversation_id === "string" ? payload.conversation_id : "";
-  if (!conversationId) throw new Error("conversation_id_required");
+  if (!conversationId) {
+    if (!apiKey) return { skipped: true, reason: "model_not_configured", memories_created: 0 };
+    const { data: recent, error: recentError } = await db.from("ultron_conversations").select("id").eq("owner_id", ownerId).order("updated_at", { ascending: false }).limit(5);
+    if (recentError) throw recentError;
+    const results: Record<string, unknown>[] = [];
+    for (const row of recent ?? []) results.push(await consolidateConversationMemory(db, ownerId, { conversation_id: row.id }));
+    return { conversations_processed: results.length, memories_created: results.reduce((sum, row) => sum + (Number(row.memories_created) || 0), 0), maintenance: true };
+  }
+  if (!localProposal && !apiKey) return { skipped: true, reason: "model_not_configured", conversation_id: conversationId, memories_created: 0 };
   const { data: conversation, error: conversationError } = await db.from("ultron_conversations").select("id,title,summary").eq("owner_id", ownerId).eq("id", conversationId).maybeSingle();
   if (conversationError) throw conversationError;
   if (!conversation) throw new Error("conversation_not_found");

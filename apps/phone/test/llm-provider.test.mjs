@@ -35,5 +35,5 @@ test("maps provider responses to distinct status states", () => {
 });
 
 test("filters non-chat model IDs and removes duplicates", () => {
-  assert.deepEqual(selectChatModels(["gpt-4o", "text-embedding-3-small", "gpt-4o", "whisper-1", "claude-sonnet"]), ["claude-sonnet", "gpt-4o"]);
+  assert.equal(JSON.stringify(selectChatModels(["gpt-4o", "text-embedding-3-small", "gpt-4o", "whisper-1", "claude-sonnet"])), JSON.stringify(["claude-sonnet", "gpt-4o"]));
 });

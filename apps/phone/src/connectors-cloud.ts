@@ -18,3 +18,6 @@ export async function disconnectUltronConnector(id:string):Promise<void>{await i
 export async function executeUltronConnectorTool(input:{connectionId:string;toolSlug:string;arguments?:Record<string,unknown>}):Promise<Record<string,unknown>>{const r=await invoke("execute",{connection_id:input.connectionId,tool_slug:input.toolSlug,arguments:input.arguments??{}});return r.result&&typeof r.result==="object"?r.result as Record<string,unknown>:r;}
 
 export async function queueUltronConnectorTool(input:{connectionId:string;toolSlug:string;arguments?:Record<string,unknown>;idempotencyKey?:string}):Promise<Record<string,unknown>>{return invoke("enqueue_tool",{connection_id:input.connectionId,tool_slug:input.toolSlug,arguments:input.arguments??{},idempotency_key:input.idempotencyKey});}
+
+export type UltronConnectorTool={connection_id:string;provider_key:string;toolkit_slug:string;display_name:string;tool_slug:string;description:string;input_parameters:unknown};
+export async function listUltronConnectorTools(toolkitSlug?:string):Promise<UltronConnectorTool[]>{const r=await invoke("tools",toolkitSlug?{toolkit_slug:toolkitSlug}:{});return Array.isArray(r.tools)?r.tools as UltronConnectorTool[]:[];}

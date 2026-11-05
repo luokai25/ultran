@@ -110,6 +110,14 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
   assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
 });
 
+test("chat shell has no stray literal newline and composer is anchored to the viewport bottom", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /\\\\n<nav/);
+  assert.match(quiet, /#app\s*\{\s*padding-bottom:\s*0\s*!important;/);
+  assert.match(quiet, /\.dock\s*\{\s*flex:\s*0\s+0\s+auto;/);
+});
+
 test("model picker lives above the composer and request progress survives streamed tokens", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");

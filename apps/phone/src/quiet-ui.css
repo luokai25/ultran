@@ -31,7 +31,7 @@ html, body { overscroll-behavior: none; background: var(--void) !important; colo
 body { background-image: none !important; }
 button, a, input, textarea, select, label[role="button"] { touch-action: manipulation; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [role="button"]:focus-visible { outline: 2px solid #b9bec6; outline-offset: 2px; }
-#app { padding-bottom: calc(76px + var(--safe-bottom)); }
+#app { padding-bottom: 0 !important; }
 .topbar { min-height: 58px; flex-basis: 58px; gap: 8px; padding: 6px 12px; background: #0d0e10; border-bottom: 1px solid var(--line); backdrop-filter: none; }
 .topbar > .menu-trigger, .topbar-actions .icon-btn { width: 44px; height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: 12px; background: #141518; }
 .brand { gap: 8px; }
@@ -122,7 +122,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 
 /* Composer refinements: compact model switcher above the input, aligned actions. */
-.dock { padding-bottom: calc(var(--safe-bottom) + 2px); }
+.dock { flex: 0 0 auto; padding-bottom: calc(var(--safe-bottom) + 2px); }
 .composer { border-radius: 22px; padding: 10px 12px 12px; }
 .composer-model-row { display:flex; align-items:center; min-height:34px; margin:0 0 4px; }
 .composer-model-row .chat-model-button {

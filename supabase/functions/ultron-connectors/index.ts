@@ -31,7 +31,7 @@ Deno.serve(async(req:Request)=>{
   }
   if(body.action==="connect"){
    const provider=str(body.provider_key,64).toLowerCase(),toolkit=str(body.toolkit_slug,80).toLowerCase();let authConfig=str(body.auth_config_id,120)||Deno.env.get("COMPOSIO_AUTH_CONFIG_"+toolkit.toUpperCase())||"";const alias=str(body.alias||body.display_name||provider,120),display=str(body.display_name||alias,160);
-   if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!authConfig||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
+   if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
    if(!authConfig){
     const configs=await composio("/auth_configs?toolkit_slug="+encodeURIComponent(toolkit)+"&limit=100",key);

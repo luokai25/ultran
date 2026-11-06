@@ -19,6 +19,7 @@ const jobsSource = jobs;
 const phone = read("apps/phone/src/cloud-llm.ts");
 const cloudSync = read("apps/phone/src/cloud-sync.ts");
 const main = read("apps/phone/src/main.ts");
+const html = read("apps/phone/index.html");
 
 for (const provider of ["openrouter", "mistral", "cerebras", "groq", "cohere"]) {
   assert.ok(keysMigration.includes(`'${provider}'`), `missing ${provider} key pool table`);
@@ -84,6 +85,11 @@ assert.match(phone, /functions\.invoke\("ultron-brain"/);
 assert.match(main, /getUltronCloudModels/);
 assert.match(main, /providerDirectory/);
 assert.match(main, /renderCloudProviderModels/);
+assert.match(main, /cloudLlmProviderFallback/);
+assert.match(main, /This key format is ambiguous/);
+assert.match(main, /selectedProvider/);
+assert.match(html, /Paste any supported API key/);
+
 assert.match(main, /selectedCloudProvider/);
 assert.match(phone, /provider\?: CloudProviderId/);
 assert.match(main, /cloudBrainActive/);

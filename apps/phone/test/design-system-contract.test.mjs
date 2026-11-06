@@ -20,8 +20,8 @@ test("ULTRON gstack workflow, design skill and screen ledger are installed", asy
   assert.match(design, /360×800/);
   assert.match(skill, /ULTRON Design Studio/);
   assert.match(skill, /Verify every screen/);
-  for (const phase of ["THINK", "PLAN", "DESIGN", "BUILD", "REVIEW", "TEST", "SHIP", "REFLECT"]) {
-    assert.ok(gstack.includes(`### ${phase}`), `gstack workflow is missing ${phase}`);
+  for (const [index, phase] of ["THINK", "PLAN", "DESIGN", "BUILD", "REVIEW", "TEST", "SHIP", "REFLECT"].entries()) {
+    assert.ok(gstack.includes(`### ${index + 1}. ${phase}`), `gstack workflow is missing ${phase}`);
   }
   for (const area of ["Main conversation experience", "Models and provider credentials", "Memory and learning", "Agent configuration and capabilities", "Connectors and workspace", "Settings and transient surfaces", "Secondary web surface"]) {
     assert.ok(ledger.includes(area), `screen ledger is missing ${area}`);

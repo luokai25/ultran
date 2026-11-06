@@ -124,8 +124,8 @@
           <div class="llm-key-heading"><strong>Ultron Supabase · Cloud brain</strong><span id="cloud-brain-state">Checking cloud…</span></div>
           <p id="cloud-brain-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">Sign in to connect provider keys to the private ULTRON cloud runtime.</p>
           <div class="ultron-universal-key-entry">
-            <label class="llm-key-field"><span>Paste API key</span><input id="cloud-llm-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste an OpenRouter, Groq or Google AI Studio key…" /></label>
-            <p id="cloud-llm-detected" class="ultron-key-detected" aria-live="polite">Provider is detected automatically. Paste a key to connect it.</p>
+            <label class="llm-key-field"><span>Paste API key</span><input id="cloud-llm-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste any supported API key…" /></label>
+            <p id="cloud-llm-detected" class="ultron-key-detected" aria-live="polite">Provider is detected automatically. If the key format is ambiguous, choose its provider below.</p>
             <button id="cloud-llm-add" class="gold-button" type="button" hidden>Save and verify key</button>
           </div>
           <div class="ultron-key-file-import">
@@ -138,12 +138,17 @@
             <button id="cloud-llm-import" class="ghost" type="button">Import and verify keys</button>
             <p id="cloud-llm-import-status" class="ultron-key-import-status" role="status" aria-live="polite">No files selected. Key values are never displayed in this screen.</p>
           </div>
-          <div hidden>
-            <select id="cloud-llm-provider">
-              <option value="openrouter">OpenRouter</option><option value="mistral">Mistral</option><option value="cerebras">Cerebras</option><option value="groq">Groq</option><option value="cohere">Cohere</option><option value="google_ai_studio">Google AI Studio</option>
-            </select>
-            <small id="cloud-llm-provider-note"></small><a id="cloud-llm-provider-console"></a>
-            <input id="cloud-llm-label" type="text" />
+          <div id="cloud-llm-provider-fallback" hidden>
+            <label class="llm-key-field" for="cloud-llm-provider">
+              <span>Choose provider for this key</span>
+              <select id="cloud-llm-provider">
+                <option value="" selected disabled>Select provider…</option>
+                <option value="openrouter">OpenRouter</option><option value="mistral">Mistral</option><option value="cerebras">Cerebras</option><option value="groq">Groq</option><option value="cohere">Cohere</option><option value="google_ai_studio">Google AI Studio</option>
+              </select>
+            </label>
+            <small id="cloud-llm-provider-note">Only needed when a provider uses an ambiguous key format.</small>
+            <a id="cloud-llm-provider-console"></a>
+            <input id="cloud-llm-label" type="text" hidden />
           </div>
           <div id="cloud-llm-keys" class="cloud-llm-keys" aria-live="polite"><small>Loading saved provider keys…</small></div>
           <div class="cloud-provider-directory" hidden><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>

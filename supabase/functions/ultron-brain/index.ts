@@ -161,7 +161,7 @@ async function handleAddKey(db: ReturnType<typeof service>, ownerId: string, bod
   const detectedProvider: Provider | undefined = isProvider(body.provider) ? body.provider : (
     /^sk-or-v1-/i.test(secret) ? "openrouter" :
     /^gsk_/i.test(secret) ? "groq" :
-    /^(AQ\\.|AIza)/i.test(secret) ? "google_ai_studio" :
+    /^(AQ\.|AIza)/i.test(secret) ? "google_ai_studio" :
     /^csk-/i.test(secret) ? "cerebras" : undefined
   );
   const provider = detectedProvider;

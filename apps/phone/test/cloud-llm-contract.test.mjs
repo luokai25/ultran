@@ -119,7 +119,7 @@ assert.match(connectorsCloud, /saveUltronComposioApiKey/);
 assert.match(connectorsUi, /composio-api-key-save/);
 assert.match(connectorsUi, /stored in Supabase Vault/);
 assert.match(html, /id="composio-api-key"/);
-assert.match(main, /function mergeCloudMemoryGraph/);
+assert.match(main, /mergeCloudMemoryGraph\(remoteMemories, remoteMemoryRelations\)/);
 assert.match(main, /cloud-memory-sync/);
 assert.match(main, /cloud-memory-edge-/);
 assert.match(main, /pullCloudMemoryRelations/);

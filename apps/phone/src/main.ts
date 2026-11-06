@@ -3741,7 +3741,7 @@ async function importCloudLlmKeyFiles(): Promise<void> {
   }
   cloudLlmImportStatus.dataset.state = failed ? "unreachable" : attempted ? "connected" : "invalid";
   const failureDetail = failureReasons.size ? ` First error: ${[...failureReasons][0]}` : "";
-  cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped.${failureDetail} The source file stays on this device.`;
+  cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped.${failureDetail} Source files stay on this device.`;
   try { await refreshCloudLlmScreen(); } catch { /* Preserve the import result if the status refresh fails. */ }
 }
 

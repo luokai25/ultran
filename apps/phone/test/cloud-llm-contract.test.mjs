@@ -17,6 +17,7 @@ const restrictedDdlMigration = read("supabase/migrations/20261106145244_ultron_r
 const googleProviderMigration = read("supabase/migrations/20261106171000_ultron_google_ai_studio_provider.sql");
 const jobsSource = jobs;
 const phone = read("apps/phone/src/cloud-llm.ts");
+const cloudSync = read("apps/phone/src/cloud-sync.ts");
 const main = read("apps/phone/src/main.ts");
 
 for (const provider of ["openrouter", "mistral", "cerebras", "groq", "cohere"]) {
@@ -61,6 +62,14 @@ assert.match(capabilities, /mark_change_crashed/);
 assert.match(recoveryMigration, /ultron_restore_generated_tool_lifecycle/);
 assert.match(recoveryMigration, /ultron\.recovery_mode/);
 assert.match(phone, /streamUltronSupabaseChat/);
+assert.match(cloudSync, /sessionRefreshInFlight/);
+assert.match(cloudSync, /expires_at/);
+assert.match(phone, /refreshSession\(\)/);
+assert.match(phone, /Supabase function HTTP/);
+assert.match(phone, /response\.status === 401/);
+assert.match(main, /Promise\.allSettled\(\[listUltronCloudKeys\(\), getUltronCloudStatus\(\)\]\)/);
+assert.match(main, /TOKEN_REFRESHED/);
+assert.match(main, /SIGNED_OUT/);
 assert.match(phone, /functions\.invoke\("ultron-brain"/);
 assert.match(main, /getUltronCloudModels/);
 assert.match(main, /providerDirectory/);

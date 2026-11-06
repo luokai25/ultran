@@ -283,3 +283,22 @@ test("Learning Review filter controls meet the minimum touch target", async () =
   const css = await read("src/quiet-ui.css");
   assert.match(css, /\.learning-filters button \{[\s\S]*?min-width: 48px;[\s\S]*?min-height: 48px;/);
 });
+
+test("cinematic motion layer gives ULTRON an atmospheric responsive shell", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("src/motion-experience.css")]);
+  assert.ok(html.indexOf("./src/motion-experience.css") > html.indexOf("./src/quiet-ui.css"));
+  for (const token of ["ultron-grid-drift", "ultron-nebula-turn", "ultron-core-float", "ultron-page-arrive", "ultron-surface-enter"]) assert.ok(css.includes(token));
+  assert.match(css, /@media \(min-width: 900px\)/);
+  assert.match(css, /flex-direction: column/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /backdrop-filter: blur/);
+});
+
+
+test("LLM API Keys exposes an explicit owner-session and provider-pool reconnect action", async () => {
+  const [html, main, css] = await Promise.all([read("index.html"), read("src/main.ts"), read("src/motion-experience.css")]);
+  assert.match(html, /id="cloud-llm-refresh"/);
+  assert.match(main, /#cloud-llm-refresh/);
+  assert.match(main, /Reconnecting…/);
+  assert.match(css, /\.llm-key-header-actions/);
+});

@@ -12,22 +12,42 @@ export type CloudModel = { id: string; model_id: string; provider: CloudProvider
 export type CloudBrainStatus = { state: string; connected_keys?: number; enabled_keys?: number; last_worker_at?: string; registry_providers?: number; registry_synced_at?: string };
 export type CloudProviderRegistry = { source: string; synced_at: string; providers: Array<{ name: string; url: string }> };
 
+function cloudFunctionError(error: unknown): { status: number; message: string } {
+  const candidate = error as { message?: string; context?: unknown };
+  if (candidate.context instanceof Response) {
+    const response = candidate.context;
+    return { status: response.status, message: `Supabase function HTTP ${response.status}` };
+  }
+  return { status: 0, message: candidate.message ?? "Supabase function request failed." };
+}
+
 export async function invokeUltronBrain(action: string, payload: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const session = await getCloudSession();
+  let session = await getCloudSession();
   if (!session) throw new Error("Sign in with the ULTRON owner account before using the cloud brain.");
-  const { data, error } = await cloudClient.functions.invoke("ultron-brain", { body: { ...payload, action } });
-  if (error) {
+  let attempt = 0;
+  while (true) {
+    const { data, error } = await cloudClient.functions.invoke("ultron-brain", { body: { ...payload, action } });
+    if (!error) {
+      if (!data || typeof data !== "object") throw new Error("ULTRON cloud brain returned an invalid response.");
+      const result = data as Record<string, unknown>;
+      if (result.error) throw new Error(String(result.message ?? result.error));
+      return result;
+    }
+    const detail = cloudFunctionError(error);
+    if (attempt === 0 && detail.status === 401) {
+      const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
+      if (refreshError || !refreshed.session) throw new Error("Your ULTRON cloud session expired. Reconnect the owner account in Settings.");
+      session = refreshed.session;
+      attempt += 1;
+      continue;
+    }
     const context = (error as { context?: unknown }).context;
     if (context instanceof Response) {
-      const detail = await context.clone().json().catch(() => ({})) as Record<string, unknown>;
-      throw new Error(String(detail.message ?? detail.error ?? error.message));
+      const body = await context.clone().json().catch(() => ({})) as Record<string, unknown>;
+      throw new Error(String(body.message ?? body.error ?? error.message));
     }
     throw error;
   }
-  if (!data || typeof data !== "object") throw new Error("ULTRON cloud brain returned an invalid response.");
-  const result = data as Record<string, unknown>;
-  if (result.error) throw new Error(String(result.message ?? result.error));
-  return result;
 }
 
 export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderGroup[]; total_keys: number; connected_keys: number }> {
@@ -68,19 +88,28 @@ export async function streamUltronSupabaseChat(
   onToken: (token: string | null) => void,
   provider?: CloudProviderId,
 ): Promise<string> {
-  const session = await getCloudSession();
+  let session = await getCloudSession();
   if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
-  const response = await fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
+  const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages, max_tokens: maxTokens, temperature: 0.3 });
+  const send = (accessToken: string) => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY,
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify({ action: "chat", model_id: modelId, provider, messages, max_tokens: maxTokens, temperature: 0.3 }),
+    body: requestBody,
     signal,
   });
+  let response = await send(session.access_token);
+  if (response.status === 401 && !signal.aborted) {
+    const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
+    if (!refreshError && refreshed.session) {
+      session = refreshed.session;
+      response = await send(session.access_token);
+    }
+  }
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     let message = detail.slice(0, 500);

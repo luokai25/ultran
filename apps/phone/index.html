@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="./src/learning.css" />
     <link rel="stylesheet" href="./src/design-system.css" />
     <link rel="stylesheet" href="./src/quiet-ui.css" />
+    <link rel="stylesheet" href="./src/motion-experience.css" />
   </head>
   <body>
     <div id="app">
@@ -108,7 +109,7 @@
       <section id="llm-api-keys-screen" class="feature-screen llm-api-keys-screen" aria-label="LLM API keys" hidden>
         <header class="feature-head">
           <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>One secure place for compatible model-provider keys.</p></div>
-          <button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button>
+          <div class="llm-key-header-actions"><button id="cloud-llm-refresh" class="ghost" type="button">Refresh connection</button><button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></div>
         </header>
         <section class="llm-key-card llm-cloud-card">
           <div class="llm-key-heading"><strong>Ultron Supabase · Cloud brain</strong><span id="cloud-brain-state">Checking cloud…</span></div>

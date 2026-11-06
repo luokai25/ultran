@@ -102,10 +102,27 @@ function stableFingerprint(value: unknown): string {
   return JSON.stringify(value);
 }
 
+let sessionRefreshInFlight: Promise<Session | null> | null = null;
+
+/** Return a usable owner session, refreshing before expiry so long-lived web/PWA
+ * tabs and Android WebViews do not keep sending stale bearer tokens. Refreshes
+ * are coalesced because chat, realtime and the key screen can wake together. */
 export async function getCloudSession(): Promise<Session | null> {
   const { data, error } = await cloudClient.auth.getSession();
   if (error) throw error;
-  return data.session;
+  const session = data.session;
+  if (!session) return null;
+  const expiresAt = Number(session.expires_at ?? 0);
+  if (!expiresAt || expiresAt > Math.floor(Date.now() / 1000) + 90) return session;
+  if (!sessionRefreshInFlight) {
+    sessionRefreshInFlight = cloudClient.auth.refreshSession()
+      .then(({ data: refreshed, error: refreshError }) => {
+        if (refreshError) throw refreshError;
+        return refreshed.session;
+      })
+      .finally(() => { sessionRefreshInFlight = null; });
+  }
+  return sessionRefreshInFlight;
 }
 
 export async function signInToCloud(email: string, password: string): Promise<Session> {

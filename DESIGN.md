@@ -45,6 +45,11 @@ components:
   reading-width: "720px"
   mobile-gutter: "16px"
   floating-shadow: "0 16px 44px rgba(0,0,0,.18)"
+motion:
+  enter: "620ms cubic-bezier(.16,1,.3,1)"
+  surface: "400ms cubic-bezier(.16,1,.3,1)"
+  ambient: "5.6s-42s"
+  reduced-motion: "required"
 ---
 
 # ULTRON Design System
@@ -58,7 +63,7 @@ components:
 - Secondary web application: `apps/web`, a separate Next.js prototype/console. It must share the same design tokens and visual language, but it is not the production web app and must not be reported as feature parity with `apps/phone`.
 - Backend: Supabase. Design changes must not weaken auth, RLS, secret storage, connector scopes, or approval gates.
 
-**Design direction:** a capable personal operating environment, not a stripped-down chat page, generic SaaS dashboard, or noisy sci-fi cockpit. The interface should feel deliberate, premium, information-rich and tactile. Use strong hierarchy, layered surfaces, purposeful depth, and clear page-specific compositions. Restraint means removing noise, not removing features or visual character.
+**Design direction:** a cinematic personal operating environment, not a stripped-down chat page, generic SaaS dashboard, or noisy sci-fi cockpit. The interface should feel extraordinary, premium, information-rich and tactile. Use volumetric atmosphere, kinetic identity, purposeful depth, spatial desktop composition, and page-specific layouts. Motion is part of ULTRON's identity, not decoration pasted onto generic cards. Restraint means removing noise, not removing features or visual character.
 
 - Mood: confident, quiet, intelligent, focused. The animated core is ULTRON's signature brand element; the interface around it remains useful and legible.
 - Brand expression: obsidian surfaces, cool titanium text, and a controlled warm-metal interaction accent. The animated core may retain its crimson energy identity. Avoid flooding every button, border, icon, or heading with the accent.
@@ -123,6 +128,15 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 - Keep global search, account/agent identity, connection state, and new conversation in consistent locations.
 - Avoid duplicating mobile bottom-nav patterns on desktop.
 - Use responsive breakpoints based on content fit, not device names.
+
+## Motion language
+
+- The ULTRON core is the signature motion anchor: slow vertical drift, breathing plasma light, and orbital geometry. When WebGL is unavailable, the CSS sphere fallback must remain spherical and preserve the same visual hierarchy.
+- Ambient atmosphere uses low-contrast moving grid/nebula layers. It must never reduce text contrast, steal pointer input, or create horizontal scroll.
+- Page entry uses a short opacity/transform transition. Secondary sections may reveal as they enter the viewport, but content must remain readable without animation and never wait for an animation to become usable.
+- Interactive surfaces use small, purposeful lift and focus feedback. Avoid springy overshoot, constant motion on controls, and full-page parallax that fights scrolling.
+- Motion durations: 250–450ms for surfaces, 600–700ms for page entry, 5–42s for ambient loops. Honor `prefers-reduced-motion` by removing continuous and scroll-linked motion.
+- Keep animation on `transform` and `opacity`; do not animate layout geometry. All animated layers are pointer-transparent and decorative.
 
 ## Elevation & Depth
 

@@ -149,6 +149,20 @@ function req<T extends Element>(selector: string): T {
   return node;
 }
 
+// Desktop-only cursor lighting adds depth without moving or obscuring controls.
+const cinematicPointer = window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)");
+if (cinematicPointer.matches) {
+  let pointerFrame = 0;
+  window.addEventListener("pointermove", (event) => {
+    if (pointerFrame) return;
+    pointerFrame = window.requestAnimationFrame(() => {
+      document.documentElement.style.setProperty("--pointer-x", `${event.clientX}px`);
+      document.documentElement.style.setProperty("--pointer-y", `${event.clientY}px`);
+      pointerFrame = 0;
+    });
+  }, { passive: true });
+}
+
 const app = req<HTMLElement>("#app");
 const threadEl = req<HTMLElement>("#thread");
 const messagesEl = req<HTMLElement>("#messages");
@@ -3632,14 +3646,27 @@ async function refreshCloudLlmScreen(): Promise<void> {
   try {
     const session = await getCloudSession();
     if (!session) {
-      cloudBrainStateEl.textContent = "Not signed in";
+      cloudBrainStateEl.textContent = "Owner session required";
       cloudBrainStatusEl.dataset.state = "missing";
-      cloudBrainStatusEl.textContent = "Connect the ULTRON owner account in Cloud Sync before saving provider keys.";
+      cloudBrainStatusEl.textContent = "Reconnect the ULTRON owner account in Settings. Your saved Vault keys remain untouched.";
       cloudLlmKeysEl.replaceChildren();
       return;
     }
-    const [keys, status] = await Promise.all([listUltronCloudKeys(), getUltronCloudStatus()]);
+    // Key inventory and worker health are independent. A transient health
+    // endpoint failure must never make already-saved keys disappear.
+    const [keysResult, statusResult] = await Promise.allSettled([listUltronCloudKeys(), getUltronCloudStatus()]);
+    if (keysResult.status === "rejected") throw keysResult.reason;
+    const keys = keysResult.value;
     renderCloudKeyGroups(keys.providers);
+    if (statusResult.status === "rejected") {
+      cloudBrainStateEl.textContent = "Keys loaded · health check delayed";
+      cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : "unreachable";
+      cloudBrainStatusEl.textContent = keys.connected_keys > 0
+        ? `${keys.connected_keys} verified key(s) loaded from Supabase Vault. The separate worker health check is temporarily unavailable; saved credentials are still present.`
+        : "Saved key inventory loaded. The cloud health check is temporarily unavailable.";
+      return;
+    }
+    const status = statusResult.value;
     const state = status.status?.state ?? "unknown";
     cloudBrainStateEl.textContent = state === "active" ? "Cloud brain active" : state === "waiting_for_keys" ? "Waiting for keys" : state;
     cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : state === "degraded" ? "expired" : "missing";
@@ -3648,7 +3675,7 @@ async function refreshCloudLlmScreen(): Promise<void> {
       : "No usable free-tier models yet. Add another provider key or check whether the provider account has free-tier model access. The cloud worker will keep checking the pool.";
     void refreshFreeProviderDirectory(false);
   } catch (error) {
-    cloudBrainStateEl.textContent = "Cloud unavailable";
+    cloudBrainStateEl.textContent = "Cloud reconnect needed";
     cloudBrainStatusEl.dataset.state = "unreachable";
     cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not load ULTRON cloud provider status.";
   }
@@ -4662,6 +4689,30 @@ voiceUpdatesToggle.addEventListener("change", () => {
 });
 cloudConnectButton.addEventListener("click", () => void connectCloudAccount());
 cloudDisconnectButton.addEventListener("click", () => void disconnectCloudAccount());
+// Keep the visible cloud/key state in step with Supabase refresh, sign-in and
+// sign-out events. Defer work out of the auth callback to avoid Supabase lock
+// re-entrancy while its token storage transaction is still running.
+cloudClient.auth.onAuthStateChange((event, session) => {
+  window.setTimeout(() => {
+    if (event === "SIGNED_OUT" || !session) {
+      cloudUnsubscribe?.();
+      cloudUnsubscribe = null;
+      stopUltronJobWorker();
+      cloudDisconnectButton.disabled = true;
+      cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
+      cloudBrainStateEl.textContent = "Owner session required";
+      cloudBrainStatusEl.dataset.state = "missing";
+      cloudBrainStatusEl.textContent = "Reconnect the ULTRON owner account in Settings to load private provider keys.";
+      cloudLlmKeysEl.replaceChildren();
+      return;
+    }
+    cloudDisconnectButton.disabled = false;
+    if (event === "TOKEN_REFRESHED") {
+      cloudSyncStatusEl.textContent = `Secure cloud session renewed · ${session.user.email ?? "ULTRON owner"}.`;
+      if (!req<HTMLElement>("#llm-api-keys-screen").hidden) void refreshCloudLlmScreen();
+    }
+  }, 0);
+});
 void restoreCloudAccount();
 
 req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeSheet);
@@ -4724,6 +4775,12 @@ req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener("click", () => {
   void refreshCloudLlmScreen();
 });
 req<HTMLButtonElement>("#llm-api-keys-back").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); });
+req<HTMLButtonElement>("#cloud-llm-refresh").addEventListener("click", () => {
+  const refresh = req<HTMLButtonElement>("#cloud-llm-refresh");
+  refresh.disabled = true;
+  refresh.textContent = "Reconnecting…";
+  void refreshCloudLlmScreen().finally(() => { refresh.disabled = false; refresh.textContent = "Refresh connection"; });
+});
 req<HTMLButtonElement>("#workspace-btn").addEventListener("click", () => { hideFeatureScreens(); setActiveNavigation(navChatButton); openWorkspace(); });
 req<HTMLButtonElement>("#workspace-back").addEventListener("click", () => { closeWorkspace(); hideFeatureScreens(); setActiveNavigation(navChatButton); });
 req<HTMLButtonElement>("#workspace-refresh").addEventListener("click", () => void refreshWorkspace().catch(e => workspaceNotice(e instanceof Error ? e.message : "Refresh failed")));

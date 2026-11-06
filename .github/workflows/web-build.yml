@@ -63,8 +63,9 @@ jobs:
           const html = await readFile("apps/phone/dist/index.html", "utf8");
           let response;
           for (let attempt = 0; attempt < 8; attempt++) {
-            response = await fetch("https://ultron-app-web.luo-chat-ops.workers.dev/");
+            response = await fetch("https://ultron-app-web.luo-chat-ops.workers.dev/", { signal: AbortSignal.timeout(15_000) });
             if (response.ok) break;
+            await response.body?.cancel();
             await new Promise(resolve => setTimeout(resolve, 2500));
           }
           if (!response?.ok) throw new Error(`Cloudflare app returned HTTP ${response?.status}: ${await response.text()}`);
@@ -74,11 +75,14 @@ jobs:
           for (const name of assets) {
             let asset;
             for (let attempt = 0; attempt < 8; attempt++) {
-              asset = await fetch(`https://ultron-app-web.luo-chat-ops.workers.dev/assets/${name}`);
+              asset = await fetch(`https://ultron-app-web.luo-chat-ops.workers.dev/assets/${name}`, { signal: AbortSignal.timeout(15_000) });
               if (asset.ok) break;
+              await asset.body?.cancel();
               if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
             }
             if (!asset?.ok) throw new Error(`Cloudflare asset ${name} returned HTTP ${asset?.status} after 8 attempts`);
+            const bytes = await asset.arrayBuffer();
+            if (!bytes.byteLength) throw new Error(`Cloudflare asset ${name} returned an empty body`);
           }
           console.log(`Cloudflare web smoke test passed: ${assets.length} built assets, ${liveHtml.length} HTML bytes`);
           NODE

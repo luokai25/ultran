@@ -254,7 +254,10 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(main, /#settings-close-btn/);
   assert.match(html, /id="settings-close-btn"/);
   assert.match(experience, /\.bottom-nav/);
-  assert.match(experience, /bottom-nav\{display:none!important\}/);
+  assert.doesNotMatch(experience, /bottom-nav\{display:none!important\}/);
+  const design = await read("src/design-system.css");
+  assert.match(design, /\.bottom-nav\{[^}]*display:grid/);
+  assert.match(html, /<nav class="bottom-nav"/);
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));

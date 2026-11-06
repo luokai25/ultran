@@ -371,6 +371,7 @@ export function subscribeCloudWorkspace(onChange: () => void): () => void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_conversations', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_messages', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_memory_items', filter: `owner_id=eq.${ownerId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_memory_relations', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_settings', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_agent_runs', filter: `owner_id=eq.${ownerId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ultron_generated_tools', filter: `owner_id=eq.${ownerId}` }, onChange)

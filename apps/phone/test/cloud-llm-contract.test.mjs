@@ -35,6 +35,8 @@ assert.match(jobsSource, /gpt-oss-120b/);
 assert.ok(jobs.includes(String.raw`/gemini-3(?:\.\d+)?-flash/`), "Gemini 3 Flash rank matcher must parse model versions");
 assert.match(jobsSource, /candidates\.sort/);
 assert.match(jobsSource, /memory_model_returned_invalid_schema/);
+assert.match(jobsSource, /const deadline = Date\.now\(\) \+ 42_000/);
+assert.match(jobsSource, /Math\.min\(12_000, Math\.max\(1_000, remainingMs\)\)/);
 assert.match(jobsSource, /Only propose memories with importance 3-5/);
 assert.match(jobsSource, /importance < 3/);
 assert.match(jobsSource, /REDACTED_PHONE/);

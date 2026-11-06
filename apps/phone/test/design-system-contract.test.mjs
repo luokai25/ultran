@@ -45,3 +45,11 @@ test("mobile and desktop design requirements remain explicit", async () => {
     assert.ok(design.includes(`#${id}`), `missing screen inventory entry: #${id}`);
   }
 });
+
+test("desktop client promotes the mobile bottom navigation into a persistent side rail", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /@media\s*\(min-width:\s*900px\)/);
+  assert.match(css, /\.bottom-nav\s*\{[\s\S]*?inset:\s*0 auto 0 0/);
+  assert.match(css, /\.feature-screen\s*\{[\s\S]*?inset:\s*0 0 0 80px/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
+});

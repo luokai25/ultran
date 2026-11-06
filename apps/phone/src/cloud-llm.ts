@@ -66,6 +66,7 @@ export async function streamUltronSupabaseChat(
   maxTokens: number,
   signal: AbortSignal,
   onToken: (token: string | null) => void,
+  provider?: CloudProviderId,
 ): Promise<string> {
   const session = await getCloudSession();
   if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
@@ -77,7 +78,7 @@ export async function streamUltronSupabaseChat(
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify({ action: "chat", model_id: modelId, messages, max_tokens: maxTokens, temperature: 0.3 }),
+    body: JSON.stringify({ action: "chat", model_id: modelId, provider, messages, max_tokens: maxTokens, temperature: 0.3 }),
     signal,
   });
   if (!response.ok) {

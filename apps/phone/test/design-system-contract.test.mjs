@@ -94,3 +94,10 @@ test("primary navigation remains visible and the composer stays clear of it", as
   assert.match(css, /\.composer-model-row \.chat-model-button #chat-model-label\s*\{[^}]*max-width:\s*none !important/);
   assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?padding-bottom: 0 !important/);
 });
+
+
+test("mobile hero keeps the complete ULTRON core visible above navigation", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*?\.hero\s*\{[\s\S]*?justify-content:\s*flex-start/);
+  assert.match(css, /\.stage\s*\{\s*width:\s*clamp\(132px, 34vw, 160px\)/);
+});

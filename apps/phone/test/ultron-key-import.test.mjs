@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { providerFromKeyFilename, parseProviderKeyFile } from "../src/ultron-key-import.mjs";
+import { providerFromKeyFilename, parseProviderKeyFile, validateProviderKeyFiles } from "../src/ultron-key-import.mjs";
 
 test("provider import recognises provider names in filenames", () => {
   assert.equal(providerFromKeyFilename("openrouter-keys.txt"), "openrouter");
@@ -36,4 +36,27 @@ test("single pasted cloud API key is auto-detected, verified and sent through th
   assert.match(main, /Accepted · securely saved and enabled/);
   assert.match(cloud, /functions\.invoke\("ultron-brain"/);
   assert.match(cloud, /invokeUltronBrain\("add_key"/);
+});
+
+
+test("provider file import accepts safe multi-file batches and rejects invalid batches", () => {
+  const files = [
+    { name: "openrouter-keys.txt", size: 1024 },
+    { name: "groq-api-keys.txt", size: 2048 },
+    { name: "google-ai-studio.txt", size: 4096 },
+  ];
+  assert.equal(validateProviderKeyFiles(files), null);
+  assert.equal(validateProviderKeyFiles([]), "Choose at least one provider .txt file.");
+  assert.match(validateProviderKeyFiles(Array.from({ length: 7 }, (_, index) => ({ name: `provider-${index}.txt`, size: 10 }))), /six provider files/);
+  assert.match(validateProviderKeyFiles([{ name: "keys.json", size: 10 }]), /Only .txt/);
+  assert.match(validateProviderKeyFiles([{ name: "keys.txt", size: 1024 * 1024 + 1 }]), /1 MB/);
+});
+
+test("the LLM API Keys screen exposes the local provider-file importer", () => {
+  assert.match(html, /class="ultron-key-file-import"/);
+  assert.match(html, /id="cloud-llm-files" type="file" accept="\.txt,text\/plain" multiple/);
+  assert.match(html, /id="cloud-llm-import" class="ghost" type="button">Import and verify keys/);
+  assert.match(html, /id="cloud-llm-import-status"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(main, /validateProviderKeyFiles\(files\)/);
+  assert.match(main, /The source file stays on this device/);
 });

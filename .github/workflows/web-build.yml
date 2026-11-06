@@ -56,3 +56,24 @@ jobs:
           files: |
             apps/phone/dist/index.html
             apps/phone/dist/assets/*
+      - name: Smoke-test the live Cloudflare web app and its bundles
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const source = await readFile("apps/phone/dist/index.html", "utf8");
+          const paths = [...source.matchAll(/(?:src|href)="([^"]+\\.\\w+)"/g)].map(match => new URL(match[1], "https://ultron-app-web.luo-chat-ops.workers.dev/").pathname);
+          let response;
+          for (let attempt = 0; attempt < 8; attempt++) {
+            response = await fetch("https://ultron-app-web.luo-chat-ops.workers.dev/");
+            if (response.ok) break;
+            await new Promise(resolve => setTimeout(resolve, 2500));
+          }
+          if (!response?.ok) throw new Error(`Cloudflare app returned HTTP ${response?.status}`);
+          const html = await response.text();
+          if (!html.includes("ULTRON")) throw new Error("Cloudflare app HTML did not contain the ULTRON shell");
+          for (const path of paths) {
+            const asset = await fetch(new URL(path, "https://ultron-app-web.luo-chat-ops.workers.dev"));
+            if (!asset.ok) throw new Error(`Cloudflare asset ${path} returned HTTP ${asset.status}`);
+          }
+          console.log(`Cloudflare web smoke test passed: ${paths.length} entry assets, ${html.length} HTML bytes`);
+          NODE

@@ -483,6 +483,35 @@ export async function pullCloudMemories(): Promise<Array<{
   return memories;
 }
 
+export async function pullCloudMemoryRelations(): Promise<Array<{
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relation: string;
+  weight: number;
+}>> {
+  const session = await getCloudSession();
+  if (!session) return [];
+  const data = await fetchAllPages(async (from, to) => {
+    const { data: page, error } = await cloudClient
+      .from('ultron_memory_relations')
+      .select('id,source_memory_id,target_memory_id,relation_type,weight')
+      .order('created_at', { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  }, 500);
+  const idMap = readIdMap();
+  const reverse = new Map(Object.entries(idMap.memories).map(([localId, cloudId]) => [cloudId, localId]));
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    sourceId: reverse.get(String(row.source_memory_id)) ?? `cloud_${row.source_memory_id}`,
+    targetId: reverse.get(String(row.target_memory_id)) ?? `cloud_${row.target_memory_id}`,
+    relation: String(row.relation_type ?? "related_to"),
+    weight: Number(row.weight ?? 0.7),
+  }));
+}
+
 export async function syncCloudMemories(records: CloudMemoryRecord[]): Promise<void> {
   const session = await getCloudSession();
   if (!session) return;

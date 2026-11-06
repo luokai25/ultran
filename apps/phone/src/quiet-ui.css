@@ -247,6 +247,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media(max-width:520px){.chat-model-button{width:min(250px,calc(100vw - 32px))}.chat-model-menu{padding:10px}.llm-cloud-card{padding:13px}}
 
 /* ULTRON shared page layer: consistent secondary-page structure and controls. */
+.feature-screen {
+  inset: 58px 0 calc(62px + var(--safe-bottom)) !important;
+}
+
 .feature-screen,
 .panel,
 .workspace-panel {
@@ -424,7 +428,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     margin-inline: auto;
   }
   .feature-screen {
-    inset: 0 0 0 80px;
+    inset: 68px 0 0 80px !important;
     padding: 34px clamp(28px, 5vw, 76px) 48px;
   }
   .feature-screen > * {

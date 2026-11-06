@@ -22,10 +22,11 @@ test("Ultron quiet UI stylesheet is loaded after all existing theme layers", asy
     "quiet layer must load after base, workspace, experience and finishing styles");
 });
 
-test("quiet layer maintains a monochrome palette and supports narrow devices and accessibility", async () => {
+test("quiet layer uses canonical ULTRON tokens and supports narrow devices and accessibility", async () => {
   const css = await read("src/quiet-ui.css");
-  assert.match(css, /--void:\s*#090a0b/i);
-  assert.match(css, /--accent:\s*#aeb4bd/i);
+  assert.match(css, /--u-bg:\s*#090a0c/i);
+  assert.match(css, /--u-accent:\s*#d5b779/i);
+  assert.match(css, /--accent:\s*var\(--u-accent\)/i);
   assert.doesNotMatch(css, /#e52d41|#ff7180|#8d071d/i);
   assert.match(css, /max-width:\s*390px/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
@@ -37,8 +38,10 @@ test("quiet layer maintains a monochrome palette and supports narrow devices and
 });
 
 
-test("phone experience visuals do not reintroduce the retired gold palette", async () => {
+test("phone experience uses a restrained warm-metal accent rather than legacy decorative golds", async () => {
   const css = await read("src/quiet-ui.css");
+  assert.match(css, /--u-accent:\s*#d5b779/i);
+  assert.match(css, /--u-accent-strong:\s*#e8cb91/i);
   for (const legacyColor of [
     "#fff5d8", "#f2ead8", "#f1d58e", "#a58f5b", "#e6cb83",
     "#e6c77a", "#e6c878", "#8e7140", "#6d532c", "#f0d99a", "#c49b4d",

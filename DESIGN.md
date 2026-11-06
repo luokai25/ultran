@@ -170,3 +170,25 @@ A page is not complete until it passes:
 | Obsidian + titanium + restrained warm-metal accent | Makes the interface calm and technical while preserving a recognizable ULTRON core. |
 | Four typography tiers and two radii | Reduces visual noise and prevents every feature from inventing its own design language. |
 | Full screen inventory required | Secondary pages must receive the same design quality as chat. |
+
+## Initial implementation audit
+
+Source-level inspection on 2026-11-06 found these concrete design issues. These are audit findings, not claims of browser-tested behavior:
+
+1. **Competing theme layers.** The phone shell loads base, workspace, experience, finishing, design-system and quiet-UI styles in sequence. Several layers define overlapping colors and component styles. Canonical `--u-*` tokens are now defined in the final phone layer and mirrored in the Next.js stylesheet; legacy aliases remain temporarily for compatibility.
+2. **Brand expression drift.** The phone shell had drifted to a fully monochrome accent while the separate Next.js app used a different gold palette and the older phone base layer still contained a crimson palette. The new shared tokens define warm-metal interaction accents and reserve crimson for the ULTRON core. Remaining hard-coded legacy values must be migrated page by page.
+3. **Desktop layout is under-specified.** The final phone override layer focuses mostly on narrow-width breakpoints. The desktop client needs an intentional navigation/content layout rather than merely stretching the mobile shell.
+4. **Secondary screens are functional but visually uneven.** Agents & Identities, LLM API Keys, Mind Map, Learning Review and Capabilities each have distinct content structures; connectors, workspace, approvals, search and model selection are separate overlay surfaces. They need page-specific hierarchy built from shared primitives, not one generic card treatment.
+5. **Two web surfaces exist.** The canonical deployed web client is the `apps/phone` static bundle, also used by the Android APK. `apps/web` is a separate Next.js pre-alpha surface with a small landing page and ModelHub, not the production app shell. Both now share the token vocabulary; do not assume they have identical feature coverage.
+
+## Redesign execution order
+
+1. App shell, desktop navigation, mobile bottom navigation, drawer, page headers and global overlays.
+2. Chat, streaming states, composer, model picker and global search.
+3. Model library, API keys, agent identities and voice/presence.
+4. Mind Map and Learning Review.
+5. Capabilities, connectors, OAuth detail, approvals and Agent Workspace.
+6. Settings, nested sheets, dialogs, empty/loading/error/permission states.
+7. Align the Next.js surface to the same system and remove its pre-alpha visual mismatch without falsely presenting it as the canonical production client.
+
+A phase is complete only after the page inventory, interaction states, responsive checks and relevant regression tests are updated.

@@ -450,7 +450,7 @@ export async function pullCloudMemories(): Promise<Array<{
   const data = await fetchAllPages(async (from, to) => {
     const { data: page, error } = await cloudClient
       .from('ultron_memory_items')
-      .select('id,memory_type,content,summary,confidence,source,metadata,updated_at')
+      .select('id,memory_type,content,summary,confidence,source,source_ref,metadata,updated_at')
       .is('archived_at', null)
       .order('updated_at', { ascending: false })
       .order('id', { ascending: true })

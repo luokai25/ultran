@@ -1,30 +1,50 @@
 /* ULTRON quiet interface: functional, monochrome, touch-first. */
 :root {
   color-scheme: dark;
-  --void: #090a0b;
-  --obsidian: #0d0e10;
-  --carbon: #141518;
-  --graphite: #1b1d21;
-  --steel: #25282d;
-  --hairline: #292c31;
-  --line: #292c31;
-  --line-strong: #3a3e45;
-  --gold: #aeb4bd;
-  --gold-bright: #e2e5e9;
-  --gold-deep: #555b64;
-  --accent: #aeb4bd;
-  --accent-bright: #e2e5e9;
-  --accent-glow: rgba(210, 216, 224, .10);
-  --eye: #d5d9df;
-  --ink: #f1f2f4;
-  --ink-soft: #c3c6cc;
-  --muted: #8b9098;
-  --text-primary: #f1f2f4;
-  --text-secondary: #b7bbc2;
-  --text-tertiary: #858b94;
-  --brand: #aeb4bd;
-  --brand-soft: rgba(210,216,224,.08);
-  --radius: 14px;
+  /* Canonical ULTRON tokens. Keep legacy aliases below for feature styles. */
+  --u-bg: #090a0c;
+  --u-surface-1: #101216;
+  --u-surface-2: #171b21;
+  --u-surface-3: #202630;
+  --u-border: rgba(220,228,238,.10);
+  --u-border-strong: rgba(220,228,238,.18);
+  --u-text: #f2f4f7;
+  --u-text-secondary: #b5bdc8;
+  --u-text-muted: #828d9b;
+  --u-accent: #d5b779;
+  --u-accent-strong: #e8cb91;
+  --u-core: #e34b58;
+  --u-success: #55c99a;
+  --u-warning: #e8b45d;
+  --u-danger: #ef6b73;
+  --u-info: #78a9e8;
+  --u-radius-control: 12px;
+  --u-radius-panel: 16px;
+  --u-space-unit: 4px;
+  --void: var(--u-bg);
+  --obsidian: var(--u-surface-1);
+  --carbon: var(--u-surface-2);
+  --graphite: var(--u-surface-3);
+  --steel: #2a313c;
+  --hairline: var(--u-border);
+  --line: var(--u-border);
+  --line-strong: var(--u-border-strong);
+  --gold: var(--u-accent);
+  --gold-bright: var(--u-accent-strong);
+  --gold-deep: #88734d;
+  --accent: var(--u-accent);
+  --accent-bright: var(--u-accent-strong);
+  --accent-glow: rgba(213,183,121,.12);
+  --eye: #e2c58e;
+  --ink: var(--u-text);
+  --ink-soft: var(--u-text-secondary);
+  --muted: var(--u-text-muted);
+  --text-primary: var(--u-text);
+  --text-secondary: var(--u-text-secondary);
+  --text-tertiary: var(--u-text-muted);
+  --brand: var(--u-accent);
+  --brand-soft: rgba(213,183,121,.08);
+  --radius: var(--u-radius-control);
 }
 [hidden], [hidden] * { display: none !important; }
 html, body { overscroll-behavior: none; background: var(--void) !important; color: var(--ink); }

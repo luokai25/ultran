@@ -835,3 +835,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .conn-card:focus-visible {
   border-color: rgba(213,183,121,.38) !important;
 }
+
+
+#capability-feedback[data-tone="error"] {
+  border-color: rgba(213,183,121,.32) !important;
+  background: rgba(213,183,121,.055) !important;
+  color: var(--u-text-secondary) !important;
+}

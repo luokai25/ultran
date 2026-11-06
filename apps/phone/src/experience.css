@@ -235,8 +235,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .identity-editor{display:grid;gap:9px;margin:14px 0}.identity-editor span{font-size:13px;font-weight:650}.identity-editor textarea{width:100%;resize:vertical;min-height:140px;padding:13px;border:1px solid var(--line,#343039);border-radius:13px;background:#100e12;color:inherit;font:inherit;line-height:1.5}
 #connectors-refresh{margin-left:auto;min-height:36px;padding:7px 10px;font-size:11px;white-space:nowrap}
 #connectors-refresh:disabled{opacity:.6}
-/* Chat is the entire primary product surface; secondary tools are drawer destinations. */
-.bottom-nav{display:none!important}
+/* Five primary destinations stay in the bottom bar; secondary destinations remain in the drawer. */
 .mindmap-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #mindmap-search{flex:1 1 150px;min-width:0;max-width:260px;padding:9px 11px;border:1px solid var(--line,#343039);border-radius:11px;background:#100e12;color:inherit;font:inherit;font-size:12px}
 .mindmap-dot.person{background:#d5a65d}.mindmap-dot.preference{background:#a99be8}

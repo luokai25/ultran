@@ -72,6 +72,12 @@ underlying reasoning ceiling.
 └────────────────────────────────────────────────────────────────┘
 ```
 
+The single production web entrypoint is
+[`https://ultron-app-web.luo-chat-ops.workers.dev/`](https://ultron-app-web.luo-chat-ops.workers.dev/).
+It serves the same `apps/phone` bundle used by the Android APK. The legacy
+Cloudflare Pages project was retired on 2026-11-06; do not deploy a second
+public ULTRON site.
+
 Dependencies point **downward only**. Read the full design in
 [docs/architecture.md](docs/architecture.md).
 
@@ -81,8 +87,9 @@ Dependencies point **downward only**. Read the full design in
 
 | Path | Purpose |
 | --- | --- |
-| [`apps/mobile`](apps/mobile) | React Native (Expo) client — the pocket console. |
-| [`apps/web`](apps/web) | Next.js web console — runs, connectors, billing. |
+| [`apps/phone`](apps/phone) | **Production web client + Android APK release channel** — one shared Vite/Capacitor app. |
+| [`apps/mobile`](apps/mobile) | React Native (Expo) client — the longer-term native target. |
+| [`apps/web`](apps/web) | Non-production Next.js prototype — not deployed as a separate public site. |
 | [`services/api`](services/api) | Cloud control plane: sync, auth, marketplace, billing. |
 | [`services/agent-core`](services/agent-core) | Local brain runtime + orchestrator. Runs on-device. |
 | [`packages/connectors`](packages/connectors) | Connector SDK, manifest schema, built-in connectors. |

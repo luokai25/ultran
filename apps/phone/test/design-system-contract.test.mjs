@@ -116,3 +116,10 @@ test("connector filters, paid-tier badges and capability approvals use warm-meta
   assert.match(css, /\.badge\.tier-paid\s*\{[\s\S]*?var\(--u-accent-strong\)/);
   assert.match(css, /\.capability-source summary,[\s\S]*?\.capability-approve[\s\S]*?var\(--u-accent-strong\)/);
 });
+
+
+test("secondary feature screens start below the persistent top bar", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /\.feature-screen\s*\{\s*inset:\s*58px 0 calc\(62px \+ var\(--safe-bottom\)\) !important/);
+  assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?\.feature-screen\s*\{\s*inset:\s*68px 0 0 80px !important/);
+});

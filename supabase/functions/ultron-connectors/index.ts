@@ -10,6 +10,17 @@ async function kickDurableWorker(url:string,authorization:string,publishableKey:
   return {triggered:response.ok,response_status:response.status,...(obj(data)?data:{})};
  }catch(error){return {triggered:false,deferred:true,reason:error instanceof Error?error.message:"worker_kick_failed"};}
 }
+async function getComposioKey(serviceDb:ReturnType<typeof createClient>,ownerId:string):Promise<string>{
+ const {data:row,error}=await serviceDb.from("ultron_settings").select("setting_value").eq("owner_id",ownerId).eq("setting_key","composio_gateway").maybeSingle();
+ if(error)throw error;
+ const value=obj(row?.setting_value)?row.setting_value:{};
+ const secretId=str(value.vault_secret_id,80);
+ if(secretId){
+  const {data,error:secretError}=await serviceDb.rpc("ultron_read_llm_secret",{p_secret_id:secretId});
+  if(!secretError&&typeof data==="string"&&data)return data;
+ }
+ return Deno.env.get("COMPOSIO_API_KEY")??"";
+}
 async function composio(path:string,key:string,method="GET",body?:unknown){
  const r=await fetch("https://backend.composio.dev/api/v3.1"+path,{method,headers:{"x-api-key":key,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
  const raw=await r.text();let data:unknown={};try{data=raw?JSON.parse(raw):{};}catch{data={};}
@@ -44,7 +55,27 @@ Deno.serve(async(req:Request)=>{
   const raw=await req.text();if(new TextEncoder().encode(raw).byteLength>24000)return reply({error:"payload_too_large"},413);
   const body:unknown=JSON.parse(raw);if(!obj(body)||typeof body.action!=="string")return reply({error:"invalid_request"},400);
   if(internalWorker&&body.action!=="execute")return reply({error:"worker_action_not_allowed"},403);
-  const key=Deno.env.get("COMPOSIO_API_KEY");
+  if(body.action==="save_key"){
+   if(internalWorker)return reply({error:"worker_action_not_allowed"},403);
+   const apiKey=str(body.api_key,8192);
+   if(apiKey.length<8)return reply({error:"invalid_composio_api_key"},400);
+   await composio("/auth_configs?limit=1",apiKey);
+   const {data:previous,error:readError}=await serviceDb.from("ultron_settings").select("setting_value").eq("owner_id",ownerId).eq("setting_key","composio_gateway").maybeSingle();
+   if(readError)throw readError;
+   const {data:secretId,error:storeError}=await serviceDb.rpc("ultron_store_llm_secret",{p_owner_id:ownerId,p_secret:apiKey,p_name:"ultron-composio-gateway-"+ownerId});
+   if(storeError||typeof secretId!=="string")throw new Error("composio_vault_store_failed");
+   const {error:settingError}=await serviceDb.from("ultron_settings").upsert({
+    owner_id:ownerId,setting_key:"composio_gateway",
+    setting_value:{configured:true,vault_secret_id:secretId,updated_at:new Date().toISOString()},
+    updated_at:new Date().toISOString()
+   },{onConflict:"owner_id,setting_key"});
+   if(settingError){await serviceDb.rpc("ultron_delete_llm_secret",{p_secret_id:secretId});throw settingError;}
+   const previousValue=obj(previous?.setting_value)?previous.setting_value:{};
+   const previousId=str(previousValue.vault_secret_id,80);
+   if(previousId&&previousId!==secretId)await serviceDb.rpc("ultron_delete_llm_secret",{p_secret_id:previousId});
+   return reply({ok:true,configured:true,storage:"vault"});
+  }
+  const key=await getComposioKey(serviceDb,ownerId);
   if(body.action==="list"){
    const {data,error}=await db.from("ultron_connector_connections").select("id,provider_key,toolkit_slug,auth_config_id,connection_key,display_name,status,scopes,external_account_id,external_account_label,last_verified_at,last_error,metadata,created_at,updated_at").eq("owner_id",ownerId).order("provider_key");
    if(error)throw error;return reply({ok:true,configured:Boolean(key),connections:data??[]});

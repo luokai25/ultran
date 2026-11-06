@@ -164,11 +164,29 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   const conversationId = typeof payload.conversation_id === "string" ? payload.conversation_id : "";
   if (!conversationId) {
     if (!modelAvailable) return { skipped: true, reason: "model_not_configured_or_free_quota_exhausted", memories_created: 0 };
-    const { data: recent, error: recentError } = await db.from("ultron_conversations").select("id").eq("owner_id", ownerId).order("updated_at", { ascending: false }).limit(5);
+    const { data: recent, error: recentError } = await db.from("ultron_conversations")
+      .select("id,updated_at").eq("owner_id", ownerId)
+      .order("updated_at", { ascending: false }).limit(5);
     if (recentError) throw recentError;
-    const results: Record<string, unknown>[] = [];
-    for (const row of recent ?? []) results.push(await consolidateConversationMemory(db, ownerId, { conversation_id: row.id }, secretDb));
-    return { conversations_processed: results.length, memories_created: results.reduce((sum, row) => sum + (Number(row.memories_created) || 0), 0), maintenance: true };
+    let enqueued = 0;
+    for (const row of recent ?? []) {
+      const updatedAt = Date.parse(String(row.updated_at ?? ""));
+      if (!row.id || !Number.isFinite(updatedAt)) continue;
+      const idempotencyKey = "memory:auto:" + String(row.id) + ":" + String(updatedAt);
+      const { error: enqueueError } = await db.from("ultron_jobs").insert({
+        owner_id: ownerId,
+        job_type: "memory.consolidate",
+        title: "Consolidate conversation memory",
+        payload: { conversation_id: row.id },
+        priority: -7,
+        max_attempts: 3,
+        idempotency_key: idempotencyKey,
+      });
+      if (enqueueError?.code === "23505") continue;
+      if (enqueueError) throw enqueueError;
+      enqueued++;
+    }
+    return { conversations_enqueued: enqueued, maintenance: true };
   }
   if (!localProposal && !modelAvailable) return { skipped: true, reason: "model_not_configured_or_free_quota_exhausted", conversation_id: conversationId, memories_created: 0 };
   const { data: conversation, error: conversationError } = await db.from("ultron_conversations").select("id,title,summary").eq("owner_id", ownerId).eq("id", conversationId).maybeSingle();

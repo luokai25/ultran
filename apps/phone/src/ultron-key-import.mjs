@@ -22,3 +22,13 @@ export function parseProviderKeyFile(contents) {
   }
   return [...keys];
 }
+
+
+/** Validate a batch of provider-specific text files before reading any contents. */
+export function validateProviderKeyFiles(files) {
+  if (!Array.isArray(files) || files.length === 0) return "Choose at least one provider .txt file.";
+  if (files.length > 6) return "Select no more than six provider files at a time.";
+  if (files.some((file) => !String(file.name ?? "").toLowerCase().endsWith(".txt"))) return "Only .txt provider files are supported.";
+  if (files.some((file) => !Number.isFinite(file.size) || file.size < 0 || file.size > 1024 * 1024)) return "Each provider file must be no larger than 1 MB.";
+  return null;
+}

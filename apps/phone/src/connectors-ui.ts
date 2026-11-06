@@ -11,7 +11,7 @@
  */
 
 import catalogJson from "./connectors.catalog.json";
-import { listUltronConnectors, listUltronConnectorTools, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector } from "./connectors-cloud";
+import { listUltronConnectors, listUltronConnectorTools, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector, saveUltronComposioApiKey } from "./connectors-cloud";
 
 export type CatalogEntry = {
   id: string;
@@ -83,6 +83,9 @@ export function initConnectors(deps: Deps): void {
   const composioHealth = need<HTMLElement>("#composio-health");
   const composioHealthLabel = need<HTMLElement>("#composio-health-label");
   const composioHealthDetail = need<HTMLElement>("#composio-health-detail");
+  const composioKeyInput = need<HTMLInputElement>("#composio-api-key");
+  const composioKeySave = need<HTMLButtonElement>("#composio-api-key-save");
+  const composioKeyStatus = need<HTMLElement>("#composio-key-status");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
   const approvalPanel = need<HTMLElement>("#composio-approvals");
@@ -266,6 +269,10 @@ export function initConnectors(deps: Deps): void {
       composioHealthDetail.textContent = result.configured
         ? (oauthConnected.size ? `${oauthConnected.size} provider accounts are available through the central gateway.` : "The gateway is reachable. Connect a provider to make its tools available.")
         : "The Supabase gateway is reachable, but its Composio server credential is not configured.";
+      composioKeyStatus.dataset.tone = result.configured ? "ok" : "";
+      composioKeyStatus.textContent = result.configured
+        ? "Composio API key verified and stored in Supabase Vault. You can replace it here."
+        : "Add your Composio API key here. It is verified first, stored in Vault, and cleared from this field.";
     } catch (error) {
       if (!panelOpen || generation !== refreshGeneration) return;
       composioHealth.dataset.state = "error";
@@ -590,7 +597,31 @@ export function initConnectors(deps: Deps): void {
     delete document.body.dataset.panel;
   }
 
-  refreshButton.addEventListener("click", () => void refreshAll());
+  composioKeySave.addEventListener("click", async () => {
+    const value = composioKeyInput.value.trim();
+    if (!value) {
+      composioKeyStatus.dataset.tone = "bad";
+      composioKeyStatus.textContent = "Paste your Composio API key first.";
+      composioKeyInput.focus();
+      return;
+    }
+    composioKeySave.disabled = true;
+    composioKeyStatus.dataset.tone = "";
+    composioKeyStatus.textContent = "Verifying the key with Composio and saving it to Vault…";
+    try {
+      await saveUltronComposioApiKey(value);
+      composioKeyInput.value = "";
+      composioKeyStatus.dataset.tone = "ok";
+      composioKeyStatus.textContent = "Verified and saved securely. The key was cleared from this screen.";
+      await refreshOAuthConnections();
+    } catch (error) {
+      composioKeyStatus.dataset.tone = "bad";
+      composioKeyStatus.textContent = error instanceof Error ? error.message : "Could not verify and save the Composio key.";
+    } finally {
+      composioKeySave.disabled = false;
+    }
+  });
+    refreshButton.addEventListener("click", () => void refreshAll());
   need<HTMLButtonElement>("#connectors-btn").addEventListener("click", open);
   need<HTMLButtonElement>("#connectors-back").addEventListener("click", close);
   detailWrap.addEventListener("click", (event) => {

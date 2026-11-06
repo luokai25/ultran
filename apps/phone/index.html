@@ -278,6 +278,13 @@
           <span>GITHUB ACCOUNT</span><strong id="composio-health-label">Checking connection</strong>
           <small id="composio-health-detail">Checking GitHub authorization and repository access.</small>
         </div>
+        <section class="composio-key-setup" aria-label="Composio gateway key">
+          <div><strong>Composio gateway</strong><p>Connect the central OAuth gateway. Your key is verified and stored in Supabase Vault, never in browser storage.</p></div>
+          <label for="composio-api-key">Composio API key</label>
+          <input id="composio-api-key" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste Composio API key" />
+          <button id="composio-api-key-save" class="ghost" type="button">Verify and save securely</button>
+          <small id="composio-key-status" role="status" aria-live="polite">Checking gateway configuration…</small>
+        </section>
         <small class="panel-status">Repository reads are limited to the connected account. Issue creation and future write operations require explicit approval.</small>
         <section id="composio-approvals" class="approval-panel" hidden aria-label="Pending tool approvals">
           <h3>Agent action approvals</h3>

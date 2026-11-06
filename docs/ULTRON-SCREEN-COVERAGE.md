@@ -129,7 +129,7 @@ These selectors are grounded in the current `apps/phone/index.html` source. Rech
 | Learning Review | `#learning-screen`, `#learning-proposals`, `#learning-events` |
 | Capabilities | `#capabilities-screen`, `#capability-tools`, `#capability-cloud-tools`, `#capability-runs` |
 | Connectors | `#connectors-panel`, `#connectors-list`, `#connector-detail-wrap`, `#connector-detail` |
-| Approvals | `#composio-approvals`, `#composio-approval-list`, `#approval-panel` |
+| Approvals | `#composio-approvals`, `#composio-approval-list` |
 | Agent Workspace | `#workspace-panel`, `#workspace-team-builder`, `#workspace-tasks`, `#workspace-artifacts` |
 | Settings | `#sheet-wrap`, `#sheet-title`, `#settings-close-btn` |
 | Voice and presence | `#voice-status`, `#proactive-updates-toggle`, `#voice-updates-toggle` |

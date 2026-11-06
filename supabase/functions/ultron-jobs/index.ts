@@ -55,51 +55,90 @@ async function hasAvailableCloudModel(secretDb: ReturnType<typeof createClient>,
   }
   return false;
 }
+function memoryModelScore(provider: CloudProvider, model: string): number {
+  const id = model.toLowerCase();
+  if (/gpt-oss-120b/.test(id)) return 1200;
+  if (/gemini-3(?:\\.\\d+)?-flash/.test(id)) return 1150;
+  if (/llama-3[.-]3.*70b|llama-4.*scout/.test(id)) return 1050;
+  if (/qwen3.*32b/.test(id)) return 1000;
+  if (/command-a/.test(id)) return 950;
+  if (/deepseek.*(r1|v3)|qwen.*235b/.test(id)) return 900;
+  if (provider === "openrouter" && id.endsWith(":free")) return 700;
+  if (/allam.*2.*7b/.test(id)) return 200;
+  return 500;
+}
+
 async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>, ownerId: string, messages: Array<{ role: string; content: string }>): Promise<{ proposal: Record<string, unknown>; model: string }> {
+  const candidates: Array<{
+    provider: typeof CLOUD_PROVIDERS[number];
+    key: Record<string, unknown>;
+    model: string;
+    score: number;
+  }> = [];
+
   for (const provider of CLOUD_PROVIDERS) {
-    const { data: keys, error } = await secretDb.from(`ultron_${provider.id}_keys`).select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at").eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected").order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(20);
+    const { data: keys, error } = await secretDb.from(`ultron_${provider.id}_keys`)
+      .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at")
+      .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
+      .order("priority", { ascending: false })
+      .order("last_used_at", { ascending: true, nullsFirst: true }).limit(20);
     if (error) throw error;
     for (const key of keys ?? []) {
-      const model = Array.isArray(key.models) ? key.models.find((value): value is string => typeof value === "string" && isFreeModel(provider.id, value)) : undefined;
-      if (!model) continue;
-      const { data: secret, error: secretError } = await secretDb.rpc("ultron_read_llm_secret", { p_secret_id: key.vault_secret_id });
-      if (secretError || typeof secret !== "string" || !secret) continue;
-      const endpoint = provider.protocol === "cohere" ? `${provider.base}/chat` : `${provider.base}/chat/completions`;
-      const payload = provider.protocol === "cohere"
-        ? { model, messages, temperature: 0.1, max_tokens: 1800 }
-        : { model, messages, temperature: 0.1, max_tokens: 1800, response_format: { type: "json_object" } };
-      try {
-        const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(45000) });
-        const raw = await response.text();
-        if (!response.ok) {
-          const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";
-          await secretDb.from(`ultron_${provider.id}_keys`).update({ status: state, last_error: `HTTP ${response.status}: ${raw.slice(0, 300)}`, last_checked_at: new Date().toISOString(), cooldown_until: response.status === 429 ? new Date(Date.now() + 60000).toISOString() : null }).eq("id", key.id).eq("owner_id", ownerId);
-          continue;
-        }
-        const envelope = JSON.parse(raw) as Record<string, unknown>;
-        let content = "";
-        let usage = 0;
-        if (provider.protocol === "cohere") {
-          const message = isObject(envelope.message) ? envelope.message : {};
-          const parts = Array.isArray(message.content) ? message.content : [];
-          content = parts.map((part) => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
-          const meta = isObject(envelope.usage) ? envelope.usage : {};
-          const billed = isObject(meta.billed_units) ? meta.billed_units : {};
-          usage = Number(billed.input_tokens ?? 0) + Number(billed.output_tokens ?? 0);
-        } else {
-          const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
-          const message = isObject(choices[0]?.message) ? choices[0].message : {};
-          content = typeof message.content === "string" ? message.content : "";
-          const meta = isObject(envelope.usage) ? envelope.usage : {};
-          usage = Number(meta.total_tokens ?? (Number(meta.prompt_tokens ?? 0) + Number(meta.completion_tokens ?? 0)));
-        }
-        content = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
-        const proposal = JSON.parse(content) as Record<string, unknown>;
-        await secretDb.from(`ultron_${provider.id}_keys`).update({ status: "connected", request_count: Number(key.request_count ?? 0) + 1, tokens_used: Number(key.tokens_used ?? 0) + Math.max(0, usage), last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(), last_error: null, cooldown_until: null }).eq("id", key.id).eq("owner_id", ownerId);
-        return { proposal, model: `${provider.id}:${model}` };
-      } catch (error) {
-        console.warn(`[ULTRON memory model ${provider.id}]`, error instanceof Error ? error.message : "provider_call_failed");
+      const models = Array.isArray(key.models) ? key.models : [];
+      for (const value of models) {
+        if (typeof value !== "string" || !isFreeModel(provider.id, value)) continue;
+        candidates.push({ provider, key: key as Record<string, unknown>, model: value, score: memoryModelScore(provider.id, value) });
       }
+    }
+  }
+
+  candidates.sort((a, b) =>
+    b.score - a.score ||
+    Number(b.key.priority ?? 0) - Number(a.key.priority ?? 0) ||
+    Date.parse(String(a.key.last_used_at ?? "1970-01-01")) - Date.parse(String(b.key.last_used_at ?? "1970-01-01"))
+  );
+
+  for (const candidate of candidates.slice(0, 24)) {
+    const { provider, key, model } = candidate;
+    const keyId = String(key.id ?? "");
+    const { data: secret, error: secretError } = await secretDb.rpc("ultron_read_llm_secret", { p_secret_id: key.vault_secret_id });
+    if (secretError || typeof secret !== "string" || !secret) continue;
+    const endpoint = provider.protocol === "cohere" ? `${provider.base}/chat` : `${provider.base}/chat/completions`;
+    const payload = provider.protocol === "cohere"
+      ? { model, messages, temperature: 0.1, max_tokens: 2400 }
+      : { model, messages, temperature: 0.1, max_tokens: 2400, response_format: { type: "json_object" } };
+    try {
+      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(45000) });
+      const raw = await response.text();
+      if (!response.ok) {
+        const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";
+        await secretDb.from(`ultron_${provider.id}_keys`).update({ status: state, last_error: `HTTP ${response.status}: ${raw.slice(0, 300)}`, last_checked_at: new Date().toISOString(), cooldown_until: response.status === 429 ? new Date(Date.now() + 60000).toISOString() : null }).eq("id", keyId).eq("owner_id", ownerId);
+        continue;
+      }
+      const envelope = JSON.parse(raw) as Record<string, unknown>;
+      let content = "";
+      let usage = 0;
+      if (provider.protocol === "cohere") {
+        const message = isObject(envelope.message) ? envelope.message : {};
+        const parts = Array.isArray(message.content) ? message.content : [];
+        content = parts.map((part) => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
+        const meta = isObject(envelope.usage) ? envelope.usage : {};
+        const billed = isObject(meta.billed_units) ? meta.billed_units : {};
+        usage = Number(billed.input_tokens ?? 0) + Number(billed.output_tokens ?? 0);
+      } else {
+        const choices = Array.isArray(envelope.choices) ? envelope.choices as Array<Record<string, unknown>> : [];
+        const message = isObject(choices[0]?.message) ? choices[0].message : {};
+        content = typeof message.content === "string" ? message.content : "";
+        const meta = isObject(envelope.usage) ? envelope.usage : {};
+        usage = Number(meta.total_tokens ?? (Number(meta.prompt_tokens ?? 0) + Number(meta.completion_tokens ?? 0)));
+      }
+      content = content.replace(/^\\s*\\`\\`\\`(?:json)?/i, "").replace(/\\`\\`\\`\\s*$/, "").trim();
+      const proposal = JSON.parse(content) as Record<string, unknown>;
+      if (!Array.isArray(proposal.memories)) throw new Error("memory_model_returned_invalid_schema");
+      await secretDb.from(`ultron_${provider.id}_keys`).update({ status: "connected", request_count: Number(key.request_count ?? 0) + 1, tokens_used: Number(key.tokens_used ?? 0) + Math.max(0, usage), last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(), last_error: null, cooldown_until: null }).eq("id", keyId).eq("owner_id", ownerId);
+      return { proposal, model: `${provider.id}:${model}` };
+    } catch (error) {
+      console.warn(`[ULTRON memory model ${provider.id}:${model}]`, error instanceof Error ? error.message : "provider_call_failed");
     }
   }
   throw new Error("model_not_configured_or_free_quota_exhausted");

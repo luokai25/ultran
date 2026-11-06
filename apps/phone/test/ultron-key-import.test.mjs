@@ -30,7 +30,7 @@ const cloud = readFileSync(resolve(root, "src/cloud-llm.ts"), "utf8");
 test("single pasted cloud API key is auto-detected, verified and sent through the authenticated Vault gateway", () => {
   assert.match(html, /id="cloud-llm-key"/);
   assert.match(html, /id="cloud-llm-detected"/);
-  assert.match(html, /Paste an OpenRouter, Groq or Google AI Studio key/);
+  assert.match(html, /Paste any supported API key/);
   assert.match(html, /id="cloud-llm-provider"/);
   assert.match(main, /function detectCloudLlmProvider/);
   assert.match(main, /cloudLlmKeyInput\.addEventListener\("paste"/);

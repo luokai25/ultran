@@ -193,3 +193,30 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .llm-key-import>.text-action{grid-column:2;grid-row:2;align-self:end}
 .llm-key-import input[type=file]{width:100%;min-height:42px;padding:8px;border:1px dashed rgba(255,255,255,.16);border-radius:10px;background:#0b0e10;color:#c9c8c0;font:11px var(--font-mono)}
 .llm-key-import .text-action{justify-self:start;min-height:40px;padding:0 13px}
+
+
+/* Floating model chooser: anchored above the composer control, with a compact provider-first flow. */
+.composer-model-row{position:relative;display:flex;align-items:center}
+.chat-model-button{width:min(280px,calc(100vw - 32px));max-width:none;min-height:42px;justify-content:space-between;border-radius:13px;padding-inline:13px}
+.chat-model-menu{position:fixed;z-index:90;padding:12px;border:1px solid rgba(229,45,65,.36);border-radius:17px;background:linear-gradient(155deg,rgba(27,30,34,.98),rgba(10,12,15,.99));box-shadow:0 22px 70px rgba(0,0,0,.7),0 0 28px rgba(229,45,65,.09);backdrop-filter:blur(18px);animation:ultron-model-pop .2s cubic-bezier(.2,.8,.2,1)}
+.chat-model-menu[hidden]{display:none!important}
+@keyframes ultron-model-pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.chat-model-menu-head{padding-bottom:10px}.chat-model-menu-head .section-eyebrow{font-size:9px;letter-spacing:.16em;color:#ff7180}.chat-model-menu-head strong{font-size:13px}
+.chat-model-menu #chat-model-status{font-size:9px;margin:8px 0;color:#9298a2}
+.chat-model-options{gap:6px}
+.chat-model-option{min-height:53px;padding:10px 34px 10px 11px;border-radius:11px;background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.07)}
+.chat-model-option strong{font-size:10px}.chat-model-option small{font-size:8px}
+.chat-model-option[aria-current="true"]{border-color:rgba(229,45,65,.58);background:rgba(229,45,65,.11)}
+.ultron-provider-choice{min-height:48px;display:flex;align-items:center;gap:8px}
+.ultron-provider-choice strong{flex:1}
+.ultron-provider-more,.chat-model-back{width:100%;min-height:40px;padding:9px 11px;border:1px dashed rgba(229,45,65,.35);border-radius:10px;background:rgba(229,45,65,.06);color:#ff8792;text-align:left;font-size:10px;font-weight:650}
+.chat-model-back{margin-bottom:7px;border-style:solid;background:rgba(255,255,255,.035);color:#d8dce3}
+.ultron-provider-auto{margin-top:7px;border-color:rgba(229,45,65,.2);background:rgba(229,45,65,.045)}
+.ultron-universal-key-entry{display:grid;gap:9px;padding:14px;border:1px solid rgba(229,45,65,.2);border-radius:14px;background:rgba(0,0,0,.16)}
+.ultron-universal-key-entry .llm-key-field>span{font-size:10px;letter-spacing:.08em;color:#c5c9d0}
+.ultron-universal-key-entry .llm-key-field input{min-height:52px;font-size:12px}
+.ultron-key-detected{margin:0;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.035);color:#9ea5af;font-size:10px;line-height:1.5}
+.ultron-key-detected[data-state="connected"]{color:#69dda3;border:1px solid rgba(61,214,140,.22)}
+.llm-cloud-card{gap:12px}
+.llm-cloud-card .llm-api-key-status{font-size:10px}
+@media(max-width:520px){.chat-model-button{width:min(250px,calc(100vw - 32px))}.chat-model-menu{padding:10px}.llm-cloud-card{padding:13px}}

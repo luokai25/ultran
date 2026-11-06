@@ -56,6 +56,17 @@ jobs:
           files: |
             apps/phone/dist/index.html
             apps/phone/dist/assets/*
+      - name: Point Cloudflare to this immutable web release
+        run: |
+          mkdir -p docs/web
+          printf '{\n  "tag": "ultron-web-%s"\n}\n' "$GITHUB_SHA" > docs/web/latest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/web/latest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(web): point Cloudflare to latest web build"
+            git push origin HEAD:main
+          fi
       - name: Smoke-test the live Cloudflare web app and its bundles
         run: |
           node --input-type=module <<'NODE'

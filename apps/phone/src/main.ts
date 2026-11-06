@@ -2952,13 +2952,37 @@ async function submit(raw: string): Promise<void> {
         : { content: "On-device inference failed: " + (error instanceof Error ? error.message : "unknown error") + ". Your conversation remains saved on this phone.", session_id: "" };
     }
   } else if (cloudBrainActive || (llmProviderState === "connected" && llmApiKey && selectedLlmModel)) {
+    let streamPaintTimer: number | null = null;
+    let lastStreamPaint = 0;
+    const paintStream = (): void => {
+      streamPaintTimer = null;
+      lastStreamPaint = performance.now();
+      if (!streamedText) return;
+      renderStreamedReply(reply.body, streamedText);
+      if (nearBottom()) scrollToEnd(false);
+    };
+    const scheduleStreamPaint = (): void => {
+      const elapsed = performance.now() - lastStreamPaint;
+      if (elapsed >= 48) paintStream();
+      else if (streamPaintTimer === null) streamPaintTimer = window.setTimeout(paintStream, 48 - elapsed);
+    };
+    const flushStreamPaint = (): void => {
+      if (streamPaintTimer !== null) window.clearTimeout(streamPaintTimer);
+      streamPaintTimer = null;
+      if (streamedText) {
+        renderStreamedReply(reply.body, streamedText);
+        if (nearBottom()) scrollToEnd(false);
+      }
+    };
     try {
       result = await providerModelReply(convo, turnController.signal, (token) => {
-        streamedText += token; renderStreamedReply(reply.body, streamedText);
-        if (nearBottom()) scrollToEnd(false);
+        streamedText += token;
+        scheduleStreamPaint();
       }, executionLedger, priorCheckpoint ?? undefined);
+      flushStreamPaint();
       setLink("online", cloudBrainActive ? "Ultron Supabase" : llmProvider.label + " API");
     } catch (error) {
+      flushStreamPaint();
       setLink("error", cloudBrainActive ? "Supabase brain unavailable" : "API model unavailable");
       const why = error instanceof Error ? error.message : "unknown error";
       const providerLabel = cloudBrainActive ? "Ultron Supabase" : llmProvider.label;

@@ -20,7 +20,7 @@ const googleProviderMigration = read("supabase/migrations/20261106171000_ultron_
 const jobsSource = jobs;
 const phone = read("apps/phone/src/cloud-llm.ts");
 const cloudSync = read("apps/phone/src/cloud-sync.ts");
-const memoryRealtime = read("supabase/migrations/20261106202000_ultron_memory_relations_realtime.sql");
+assert.ok(memoryRealtime.includes("alter publication supabase_realtime add table public.ultron_memory_relations"));
 const main = read("apps/phone/src/main.ts");
 const html = read("apps/phone/index.html");
 

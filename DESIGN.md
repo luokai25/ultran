@@ -192,3 +192,11 @@ Source-level inspection on 2026-11-06 found these concrete design issues. These 
 7. Align the Next.js surface to the same system and remove its pre-alpha visual mismatch without falsely presenting it as the canonical production client.
 
 A phase is complete only after the page inventory, interaction states, responsive checks and relevant regression tests are updated.
+
+## Product workflow and screen coverage
+
+The complete product-to-production workflow is defined in `.agents/skills/ultron-gstack/SKILL.md`. Use it for product framing, design planning, implementation review, QA, safe integration and retrospective.
+
+The detailed UI implementation workflow is defined in `.agents/skills/ultron-design/SKILL.md`.
+
+The current screen-by-screen completion ledger is `docs/ULTRON-SCREEN-COVERAGE.md`. It distinguishes source inspection from actual interaction, responsive, accessibility, browser and Android-device verification. An unchecked item must not be reported as complete. Update the ledger whenever screens or states are added, removed or redesigned.

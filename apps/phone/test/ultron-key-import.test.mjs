@@ -58,5 +58,5 @@ test("the LLM API Keys screen exposes the local provider-file importer", () => {
   assert.match(html, /id="cloud-llm-import" class="ghost" type="button">Import and verify keys/);
   assert.match(html, /id="cloud-llm-import-status"[^>]*role="status"[^>]*aria-live="polite"/);
   assert.match(main, /validateProviderKeyFiles\(files\)/);
-  assert.match(main, /The source file stays on this device/);
+  assert.match(main, /Source files stay on this device/);
 });

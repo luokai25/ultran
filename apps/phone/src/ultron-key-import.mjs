@@ -10,15 +10,15 @@ export function providerFromKeyFilename(filename) {
 /** Parse plain keys, KEY=value entries, and labelled "label: key" lines without logging or persisting values. */
 export function parseProviderKeyFile(contents) {
   const keys = new Set();
-  for (const rawLine of contents.replace(/^\\uFEFF/, "").split(/\\r?\\n/)) {
+  for (const rawLine of contents.replace(/^\uFEFF/, "").split(/\r?\n/)) {
     let line = rawLine.trim();
     if (!line || line.startsWith("#") || line.startsWith(";") || line.startsWith("//")) continue;
-    const assignment = line.match(/^(?:export\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*(.*)$/);
-    const labelled = line.match(/^[A-Za-z][A-Za-z0-9 _.-]{0,80}:\\s*(\\S+)\\s*$/);
+    const assignment = line.match(/^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*(.*)$/);
+    const labelled = line.match(/^[A-Za-z][A-Za-z0-9 _.-]{0,80}:\s*(\S+)\s*$/);
     if (assignment) line = assignment[1].trim();
     else if (labelled) line = labelled[1].trim();
     if ((line.startsWith('"') && line.endsWith('"')) || (line.startsWith("'") && line.endsWith("'"))) line = line.slice(1, -1).trim();
-    if (line.length >= 8 && !/\\s/.test(line) && !/[<>]/.test(line)) keys.add(line);
+    if (line.length >= 8 && !/\s/.test(line) && !/[<>]/.test(line)) keys.add(line);
   }
   return [...keys];
 }

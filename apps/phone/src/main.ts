@@ -3633,7 +3633,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   const label = "ULTRON · " + (provider ?? "API key");
   if (!provider) {
     cloudLlmDetected.dataset.state = "invalid";
-    cloudLlmDetected.textContent = "Provider not recognized. Supported automatic detection: OpenRouter, Groq and Google AI Studio.";
+    cloudLlmDetected.textContent = "Provider not recognized. Supported automatic detection: OpenRouter, Groq, Google AI Studio and Cerebras.";
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = "This key format is not recognized. Nothing was sent or stored.";
     return;
@@ -4082,7 +4082,6 @@ async function openChatModelMenu(): Promise<void> {
       { id: "google_ai_studio", label: "Google AI Studio" },
       { id: "mistral", label: "Mistral" },
       { id: "cerebras", label: "Cerebras" },
-      { id: "cohere", label: "Cohere" },
     ];
     const renderCloudProviderModels = (providerId: CloudProviderId): void => {
       const provider = providerDirectory.find((item) => item.id === providerId)!;

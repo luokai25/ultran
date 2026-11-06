@@ -562,8 +562,9 @@ async function handleWorker(db: ReturnType<typeof service>, ownerId: string, lim
   for (const { provider, key } of rows) {
     if (probed >= Math.max(1, Math.min(2, limit))) break;
     if (!key.enabled) continue;
-    if (key.status === "rate_limited" && key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) continue;
-    if (key.status !== "pending" && key.status !== "rate_limited" && key.last_checked_at && Date.now() - Date.parse(key.last_checked_at) < 6 * 60 * 60 * 1000) continue;
+    if (key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) continue;
+    const probeInterval = key.status === "unreachable" ? 5 * 60 * 1000 : 6 * 60 * 60 * 1000;
+    if (key.status !== "pending" && key.status !== "rate_limited" && key.last_checked_at && Date.now() - Date.parse(key.last_checked_at) < probeInterval) continue;
     try {
       const secret = await getKeySecret(db, key.vault_secret_id);
       const checked = await providerModels(provider, secret);

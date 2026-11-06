@@ -58,7 +58,7 @@ async function hasAvailableCloudModel(secretDb: ReturnType<typeof createClient>,
 function memoryModelScore(provider: CloudProvider, model: string): number {
   const id = model.toLowerCase();
   if (/gpt-oss-120b/.test(id)) return 1200;
-  if (/gemini-3(?:\\.\\d+)?-flash/.test(id)) return 1150;
+  if (/gemini-3(?:\.\d+)?-flash/.test(id)) return 1150;
   if (/llama-3[.-]3.*70b|llama-4.*scout/.test(id)) return 1050;
   if (/qwen3.*32b/.test(id)) return 1000;
   if (/command-a/.test(id)) return 950;
@@ -98,8 +98,12 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
     Date.parse(String(a.key.last_used_at ?? "1970-01-01")) - Date.parse(String(b.key.last_used_at ?? "1970-01-01"))
   );
 
+  const attemptedModels = new Set<string>();
+  let emptyProposal: { proposal: Record<string, unknown>; model: string } | null = null;
   for (const candidate of candidates.slice(0, 24)) {
     const { provider, key, model } = candidate;
+    const modelKey = provider.id + ":" + model;
+    if (attemptedModels.has(modelKey)) continue;
     const keyId = String(key.id ?? "");
     const { data: secret, error: secretError } = await secretDb.rpc("ultron_read_llm_secret", { p_secret_id: key.vault_secret_id });
     if (secretError || typeof secret !== "string" || !secret) continue;
@@ -134,13 +138,19 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
       }
       content = content.replace(/^\\s*\\`\\`\\`(?:json)?/i, "").replace(/\\`\\`\\`\\s*$/, "").trim();
       const proposal = JSON.parse(content) as Record<string, unknown>;
+      attemptedModels.add(modelKey);
       if (!Array.isArray(proposal.memories)) throw new Error("memory_model_returned_invalid_schema");
       await secretDb.from(`ultron_${provider.id}_keys`).update({ status: "connected", request_count: Number(key.request_count ?? 0) + 1, tokens_used: Number(key.tokens_used ?? 0) + Math.max(0, usage), last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(), last_error: null, cooldown_until: null }).eq("id", keyId).eq("owner_id", ownerId);
+      if (proposal.memories.length === 0) {
+        emptyProposal = { proposal, model: `${provider.id}:${model}` };
+        continue;
+      }
       return { proposal, model: `${provider.id}:${model}` };
     } catch (error) {
       console.warn(`[ULTRON memory model ${provider.id}:${model}]`, error instanceof Error ? error.message : "provider_call_failed");
     }
   }
+  if (emptyProposal) return emptyProposal;
   throw new Error("model_not_configured_or_free_quota_exhausted");
 }
 async function consolidateConversationMemory(db: ReturnType<typeof createClient>, ownerId: string, payload: Record<string, unknown>, secretDb: ReturnType<typeof createClient>): Promise<Record<string, unknown>> {

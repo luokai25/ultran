@@ -805,3 +805,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--u-accent) !important;
   box-shadow: 0 0 12px rgba(213,183,121,.28) !important;
 }
+
+
+/* Connector and capability controls use the same warm-metal interaction language. */
+.chip[aria-pressed="true"] {
+  border-color: rgba(213,183,121,.34) !important;
+  background: rgba(213,183,121,.09) !important;
+  color: var(--u-accent-strong) !important;
+}
+.badge.tier-paid {
+  border-color: rgba(213,183,121,.30) !important;
+  background: rgba(213,183,121,.07) !important;
+  color: var(--u-accent-strong) !important;
+}
+.capability-source summary,
+.capability-approve {
+  color: var(--u-accent-strong) !important;
+}
+.capability-approve {
+  border-color: rgba(213,183,121,.34) !important;
+  background: rgba(213,183,121,.075) !important;
+}
+.capability-approve:hover,
+.conn-card:hover,
+.conn-card:focus-visible {
+  border-color: rgba(213,183,121,.38) !important;
+}

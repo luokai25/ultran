@@ -20,6 +20,7 @@ const googleProviderMigration = read("supabase/migrations/20261106171000_ultron_
 const jobsSource = jobs;
 const phone = read("apps/phone/src/cloud-llm.ts");
 const cloudSync = read("apps/phone/src/cloud-sync.ts");
+const memoryRealtime = read("supabase/migrations/20261106202000_ultron_memory_relations_realtime.sql");
 const main = read("apps/phone/src/main.ts");
 const html = read("apps/phone/index.html");
 
@@ -126,6 +127,7 @@ assert.match(main, /cloud-memory-edge-/);
 assert.match(main, /pullCloudMemoryRelations/);
 assert.match(cloudSync, /export async function pullCloudMemoryRelations/);
 assert.match(cloudSync, /table: 'ultron_memory_relations'/);
+assert.match(memoryRealtime, /alter publication supabase_realtime add table public\\.ultron_memory_relations/);
 assert.match(cloudSync, /ultron_memory_relations/);
 assert.match(main, /mergeCloudMemoryGraph\(remoteMemories\)/);
 assert.match(cloudSync, /sourceRef: typeof row\.source_ref/);

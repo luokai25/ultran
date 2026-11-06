@@ -53,15 +53,15 @@ button, a, input, textarea, select, label[role="button"] { touch-action: manipul
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [role="button"]:focus-visible { outline: 2px solid #b9bec6; outline-offset: 2px; }
 #app { padding-bottom: 0 !important; }
 .topbar { min-height: 58px; flex-basis: 58px; gap: 8px; padding: 6px 12px; background: #0d0e10; border-bottom: 1px solid var(--line); backdrop-filter: none; }
-.topbar > .menu-trigger, .topbar-actions .icon-btn { width: 44px; height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: 12px; background: #141518; }
+.topbar > .menu-trigger, .topbar-actions .icon-btn { width: 48px; height: 48px; min-width: 48px; border: 1px solid var(--line); border-radius: 12px; background: #141518; }
 .brand { gap: 8px; }
 .brand-mark { filter: none; }
 .wordmark { color: #f0f1f3; font-size: 12px; letter-spacing: .18em; }
 .brand-copy small { color: #888e97; letter-spacing: .12em; }
 .topbar-actions { gap: 7px; }
-.chat-model-button { min-height: 44px; max-width: 145px; border: 1px solid var(--line); border-radius: 12px; background: #141518; color: #d1d4d9; }
+.chat-model-button { min-height: 48px; max-width: 145px; border: 1px solid var(--line); border-radius: 12px; background: #141518; color: #d1d4d9; }
 .chat-model-indicator { background: var(--u-accent); box-shadow: 0 0 10px var(--accent-glow); }
-.active-identity-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; border: 1px solid #3b4047; border-radius: 12px; background: #1b1d21; color: #f1f2f4; font-size: 10px; letter-spacing: .06em; }
+.active-identity-button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 12px; border: 1px solid #3b4047; border-radius: 12px; background: #1b1d21; color: #f1f2f4; font-size: 10px; letter-spacing: .06em; }
 .new-trigger { background: var(--u-accent) !important; color: #17191d !important; border-color: var(--u-accent) !important; }
 .thread { padding: 0 16px 12px; }
 .hero { justify-content: center; gap: 0; padding: 26px 0 30px; }
@@ -305,7 +305,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .feature-screen button,
 .panel button,
 .workspace-panel button {
-  min-height: 44px;
+  min-height: 48px;
   border-radius: var(--u-radius-control);
 }
 .feature-screen button:focus-visible,

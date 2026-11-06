@@ -3623,7 +3623,7 @@ function detectCloudLlmProvider(key: string): CloudProviderId | null {
   const value = key.trim();
   if (/^sk-or-v1-[A-Za-z0-9_-]{16,}$/i.test(value)) return "openrouter";
   if (/^gsk_[A-Za-z0-9]{16,}$/i.test(value)) return "groq";
-  if (/^(?:AQ\\.|AIza)[A-Za-z0-9_-]{16,}$/i.test(value)) return "google_ai_studio";
+  if (/^(?:AQ\.|AIza)[A-Za-z0-9_-]{16,}$/i.test(value)) return "google_ai_studio";
   if (/^csk-[A-Za-z0-9_-]{16,}$/i.test(value)) return "cerebras";
   return null;
 }
@@ -3875,7 +3875,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       // Up to eight verified tool actions, followed by one final model turn.
       for (let modelTurn = 0; modelTurn <= iterationLimit; modelTurn++) {
         let generated = "";
-        await streamUltronSupabaseChat("", messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; });
+        await streamUltronSupabaseChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; }, selectedCloudProvider ?? undefined);
         tokensUsed += Math.max(1, Math.ceil(generated.length / 4));
         const request = parseLocalToolRequest(generated);
         if (!request) {

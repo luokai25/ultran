@@ -41,6 +41,7 @@ export default function ModelHub() {
   const [password, setPassword] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [pasteReady, setPasteReady] = useState(false);
   const [keyNotice, setKeyNotice] = useState("");
   const [savingKey, setSavingKey] = useState(false);
   const [connected, setConnected] = useState<string[]>([]);
@@ -101,6 +102,7 @@ export default function ModelHub() {
     const detected = detectProvider(apiKey);
     if (!detected) { setKeyNotice("Provider not recognized. Paste an OpenRouter, Groq, or Google AI Studio key."); return; }
     if (savingKey) return;
+    setPasteReady(false);
     setSavingKey(true); setKeyNotice("");
     try {
       const result = await invoke("add_key", { provider: detected.id, key: apiKey.trim(), label: detected.name });
@@ -111,6 +113,12 @@ export default function ModelHub() {
       setKeyNotice(err instanceof Error ? err.message : "Key could not be saved.");
     } finally { setSavingKey(false); }
   }
+
+  useEffect(() => {
+    if (!pasteReady || !signedIn || !detectProvider(apiKey) || savingKey) return;
+    const timer = window.setTimeout(() => { void saveKey(); }, 350);
+    return () => window.clearTimeout(timer);
+  }, [pasteReady, apiKey, signedIn, savingKey]);
 
   async function searchModels(event?: FormEvent) {
     event?.preventDefault(); setLoading(true); setError("");
@@ -165,7 +173,7 @@ export default function ModelHub() {
     {tab === "settings" && <div className="ultron-model-panel ultron-key-settings">
       <div className="ultron-settings-title"><div><span className="ultron-settings-kicker">CONNECTIONS</span><h3>API keys</h3><p>Paste a key. ULTRON identifies its provider, verifies it, saves it in Supabase Vault and enables it automatically.</p></div><span className="ultron-secure-mark">SECURE</span></div>
       {!sessionReady ? <p className="ultron-model-hint">Checking owner session…</p> : !signedIn ? <form className="ultron-owner-login" onSubmit={signIn}><strong>Owner sign in</strong><p>Sign in with the ULTRON owner account to manage its private provider keys.</p><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Owner email" autoComplete="username" required/><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" required/><button type="submit">Sign in</button>{authNotice && <small role="status">{authNotice}</small>}</form> : <form className="ultron-universal-key-form" onSubmit={saveKey}>
-        <label htmlFor="ultron-universal-key">PASTE API KEY</label><div className="ultron-key-input-wrap"><input id="ultron-universal-key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(e) => { setApiKey(e.target.value); setKeyNotice(""); }} placeholder="Paste any supported provider key…" /><button type="submit" disabled={savingKey || apiKey.trim().length < 8}>{savingKey ? "Checking…" : "＋"}</button></div>
+        <label htmlFor="ultron-universal-key">PASTE API KEY</label><div className="ultron-key-input-wrap"><input id="ultron-universal-key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(e) => { setApiKey(e.target.value); setKeyNotice(""); }} onPaste={() => setPasteReady(true)} placeholder="Paste any supported provider key…" /><button type="submit" disabled={savingKey || apiKey.trim().length < 8}>{savingKey ? "Checking…" : "＋"}</button></div>
         <div className="ultron-detected-provider">{detectProvider(apiKey) ? <><span className="ultron-live-dot"/> Detected: <strong>{detectProvider(apiKey)?.name}</strong></> : "Supported now: OpenRouter · Groq · Google AI Studio"}</div>
         {keyNotice && <p className={keyNotice.includes("accepted") || keyNotice.includes("already exists") ? "ultron-key-success" : "ultron-key-error"} role="status">{keyNotice}</p>}
       </form>}

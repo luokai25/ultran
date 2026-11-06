@@ -5,10 +5,13 @@ The Ultron phone client. A Vite + three.js shell wrapped by Capacitor, and the
 
 ## Why this app exists
 
-The web console (`apps/web`) is a Next.js server app: it needs a Node process to
-render. A phone cannot run one. This app is the same avatar and voice console
-compiled to a static bundle, so it can be dropped into a WebView and shipped as
-an APK.
+The production website and Android APK use this same Vite client. The public
+web endpoint is
+[`https://ultron-app-web.luo-chat-ops.workers.dev/`](https://ultron-app-web.luo-chat-ops.workers.dev/).
+GitHub Actions builds `apps/phone`, publishes one immutable release bundle,
+and the single Cloudflare Worker serves it. Do not deploy a second public
+ULTRON site from `apps/web`; that Next.js console is a non-production
+prototype and is not the APK-matched client.
 
 ## Relationship to `apps/mobile`
 
@@ -32,6 +35,21 @@ apps/phone/
 ├── capacitor.config.ts   # appId app.ultron.mobile, webDir dist
 └── android/              # the generated Capacitor Android project (committed)
 ```
+
+## Persistent Supabase connection
+
+The owner signs in once. The web client persists the Supabase session and
+refreshes tokens automatically; Android stores the session through its secure
+Keystore-backed plugin. On startup, the client restores the owner session and
+synchronizes conversations, settings and memory. When the browser or WebView
+returns online or becomes visible again, it revalidates the session, refreshes
+cloud data and re-subscribes to owner-scoped Realtime channels.
+
+The cloud runtime is independent of an open client: Supabase Cron runs the
+brain supervisor every minute and the maintenance queue every five minutes.
+Provider credentials remain in Supabase Vault; the brain worker checks stale
+provider connections and processes durable jobs. Keep API keys out of this
+repository and out of browser environment variables.
 
 ## Local development
 

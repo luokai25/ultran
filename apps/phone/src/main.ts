@@ -234,6 +234,10 @@ const cloudSyncStatusEl = req<HTMLElement>("#cloud-sync-status");
 let cloudUnsubscribe: (() => void) | null = null;
 let cloudRefreshInFlight = false;
 let cloudRefreshQueued = false;
+let cloudAccountConnected = false;
+let cloudRestoreInFlight = false;
+let cloudResumeInFlight = false;
+let lastCloudResumeAt = 0;
 const nativeModelSelect = req<HTMLSelectElement>("#native-model-select");
 const nativeProjectorSelect = req<HTMLSelectElement>("#native-projector-select");
 const nativeProjectorButton = req<HTMLButtonElement>("#native-projector-import-btn");
@@ -812,6 +816,7 @@ async function connectCloudAccount(): Promise<void> {
     await applyInitialCloudSync();
     startCloudRealtime();
     startUltronJobWorker();
+    cloudAccountConnected = true;
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not connect to ULTRON cloud.";
@@ -821,9 +826,12 @@ async function connectCloudAccount(): Promise<void> {
 }
 
 async function restoreCloudAccount(): Promise<void> {
+  if (cloudRestoreInFlight) return;
+  cloudRestoreInFlight = true;
   try {
     const session = await getCloudSession();
     if (!session) {
+      cloudAccountConnected = false;
       cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
       return;
     }
@@ -833,6 +841,7 @@ async function restoreCloudAccount(): Promise<void> {
       .eq("owner_id", session.user.id)
       .maybeSingle();
     if (error || !owner) {
+      cloudAccountConnected = false;
       await signOutOfCloud();
       cloudSyncStatusEl.textContent = "Saved session was not authorized for this ULTRON instance. Sign in with the owner account.";
       return;
@@ -842,9 +851,35 @@ async function restoreCloudAccount(): Promise<void> {
     await applyInitialCloudSync();
     startCloudRealtime();
     startUltronJobWorker();
+    cloudAccountConnected = true;
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not restore ULTRON cloud session.";
+  } finally {
+    cloudRestoreInFlight = false;
+  }
+}
+
+async function resumeCloudConnection(): Promise<void> {
+  if (!navigator.onLine || cloudResumeInFlight || cloudRestoreInFlight) return;
+  const now = Date.now();
+  if (now - lastCloudResumeAt < 5_000) return;
+  lastCloudResumeAt = now;
+  cloudResumeInFlight = true;
+  try {
+    const session = await getCloudSession();
+    if (!session || !cloudAccountConnected) {
+      cloudAccountConnected = false;
+      await restoreCloudAccount();
+      return;
+    }
+    await refreshFromCloud();
+    startCloudRealtime();
+    cloudSyncStatusEl.textContent = `Connected · ${store.conversations.length} conversations synchronized.`;
+  } catch (error) {
+    cloudSyncStatusEl.textContent = "Cloud reconnect pending: " + (error instanceof Error ? error.message : "connection unavailable");
+  } finally {
+    cloudResumeInFlight = false;
   }
 }
 
@@ -855,6 +890,7 @@ async function disconnectCloudAccount(): Promise<void> {
     cloudUnsubscribe = null;
     stopUltronJobWorker();
     await signOutOfCloud();
+    cloudAccountConnected = false;
     cloudSyncStatusEl.textContent = "Disconnected. Your local conversations and on-device model remain available.";
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not disconnect cloud account.";
@@ -4695,6 +4731,7 @@ cloudDisconnectButton.addEventListener("click", () => void disconnectCloudAccoun
 cloudClient.auth.onAuthStateChange((event, session) => {
   window.setTimeout(() => {
     if (event === "SIGNED_OUT" || !session) {
+      cloudAccountConnected = false;
       cloudUnsubscribe?.();
       cloudUnsubscribe = null;
       stopUltronJobWorker();
@@ -4712,6 +4749,13 @@ cloudClient.auth.onAuthStateChange((event, session) => {
       if (!req<HTMLElement>("#llm-api-keys-screen").hidden) void refreshCloudLlmScreen();
     }
   }, 0);
+});
+window.addEventListener("online", () => { void resumeCloudConnection(); });
+window.addEventListener("offline", () => {
+  if (cloudAccountConnected) cloudSyncStatusEl.textContent = "Offline. ULTRON will resume cloud synchronization when internet returns.";
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void resumeCloudConnection();
 });
 void restoreCloudAccount();
 

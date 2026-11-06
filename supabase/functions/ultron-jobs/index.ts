@@ -121,7 +121,9 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
       const raw = await response.text();
       if (!response.ok) {
         const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";
-        await secretDb.from(`ultron_${provider.id}_keys`).update({ status: state, last_error: `HTTP ${response.status}: ${raw.slice(0, 300)}`, last_checked_at: new Date().toISOString(), cooldown_until: response.status === 429 ? new Date(Date.now() + 60000).toISOString() : null }).eq("id", keyId).eq("owner_id", ownerId);
+        const transient = response.status === 429 || response.status >= 500;
+        const cooldownMs = response.status === 429 ? 60_000 : response.status >= 500 ? 120_000 : 0;
+        await secretDb.from(`ultron_${provider.id}_keys`).update({ status: state, last_error: `HTTP ${response.status}: ${raw.slice(0, 300)}`, last_checked_at: new Date().toISOString(), cooldown_until: transient ? new Date(Date.now() + cooldownMs).toISOString() : null }).eq("id", keyId).eq("owner_id", ownerId);
         continue;
       }
       const envelope = JSON.parse(raw) as Record<string, unknown>;

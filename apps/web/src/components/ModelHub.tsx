@@ -14,7 +14,7 @@ const PROVIDERS: Provider[] = [
   { id: "cohere", name: "Cohere", note: "Command models", url: "https://dashboard.cohere.com/api-keys" },
 ];
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://vshoxrtrfleptqxkrmtc.supabase.co";
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "sb_publishable_OuRYpP7YP76xv4mfUgd_ng_NF4nWVoV";
 function detectProvider(value: string): Provider | undefined {
   const key = value.trim();
   if (/^sk-or-v1-/i.test(key)) return PROVIDERS[0];

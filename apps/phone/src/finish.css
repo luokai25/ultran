@@ -1,13 +1,13 @@
-/* Ultron v3 finishing layer: one plasma-red identity, accessible sizing, no legacy gold accents. */
+/* ULTRON finishing layer: canonical warm-metal controls, semantic states and accessible sizing. */
 :root {
-  --gold: #e52d41;
-  --gold-bright: #ff7180;
-  --gold-deep: #791a2a;
-  --accent: #e52d41;
-  --accent-bright: #ff7180;
-  --accent-glow: rgba(229, 45, 65, .2);
-  --line: rgba(255, 91, 111, .14);
-  --line-strong: rgba(255, 91, 111, .28);
+  --gold: var(--u-accent);
+  --gold-bright: var(--u-accent-strong);
+  --gold-deep: #88734d;
+  --accent: var(--u-accent);
+  --accent-bright: var(--u-accent-strong);
+  --accent-glow: rgba(213, 183, 121, .12);
+  --line: var(--u-border);
+  --line-strong: var(--u-border-strong);
   --elevation-2: 0 18px 52px rgba(0, 0, 0, .42);
 }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -15,10 +15,10 @@ body { min-width: 0; overscroll-behavior-x: none; }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 button, [role="button"], input, select { min-width: 0; }
 .gold-button, .solid {
-  color: #fff5f6 !important;
-  border: 1px solid rgba(255, 113, 128, .3) !important;
-  background: linear-gradient(145deg, #e52d41, #9f1d30) !important;
-  box-shadow: 0 7px 20px rgba(229, 45, 65, .16) !important;
+  color: #17191d !important;
+  border: 1px solid rgba(213, 183, 121, .38) !important;
+  background: var(--u-accent) !important;
+  box-shadow: none !important;
 }
 .gold-button:hover, .solid:hover { filter: brightness(1.08); }
 .gold-link, .gold-link b, .feature-eyebrow, .section-eyebrow,
@@ -26,7 +26,7 @@ button, [role="button"], input, select { min-width: 0; }
 .workspace-stat strong { color: var(--gold-bright) !important; }
 .feature-callout {
   border-color: var(--line) !important;
-  background: linear-gradient(120deg, rgba(229,45,65,.075), rgba(255,255,255,.015)) !important;
+  background: linear-gradient(120deg, rgba(213,183,121,.07), rgba(255,255,255,.015)) !important;
 }
 .agent-card:hover, .more-row:hover, .vault-entry:hover, .world-tile:hover,
 .conn-card:focus-within { border-color: var(--line-strong) !important; }

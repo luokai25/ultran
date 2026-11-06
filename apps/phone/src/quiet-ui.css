@@ -778,16 +778,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* Mobile hero: keep the complete core in view when the primary navigation is present. */
 @media (max-width: 520px) {
-  .hero {
+  #app[data-page="chat"] .hero {
     justify-content: flex-start;
     gap: 14px;
-    padding: 14px 0 18px;
+    padding: 22px 0 18px;
   }
-  .stage {
+  #app[data-page="chat"] .stage {
     width: clamp(132px, 34vw, 160px);
-    margin: 0 auto;
+    margin: 8px auto 0;
   }
-  .quick-start {
+  #app[data-page="chat"] .quick-start {
     margin-top: 16px;
   }
 }

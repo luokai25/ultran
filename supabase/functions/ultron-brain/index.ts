@@ -45,10 +45,13 @@ async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-function parseModels(_provider: Provider, payload: unknown): string[] {
+function parseModels(provider: Provider, payload: unknown): string[] {
   if (!isObject(payload)) return [];
   const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload.models) ? payload.models : [];
-  const ids = rows.map((row) => isObject(row) ? clean(row.id ?? row.name ?? row.model, 180) : "").filter(Boolean);
+  const ids = rows.map((row) => {
+    const id = isObject(row) ? clean(row.id ?? row.name ?? row.model, 180) : "";
+    return provider === "google_ai_studio" ? id.replace(/^models\//i, "") : id;
+  }).filter(Boolean);
   return chatModelFilter(ids);
 }
 function taskComplexity(messages: Json[]): number {
@@ -82,7 +85,7 @@ function bestFreeModel(provider: Provider, models: string[], complexity: number)
     .sort((a, b) => modelCapabilityScore(b, complexity) - modelCapabilityScore(a, complexity))[0] ?? "";
 }
 function isFreeModel(provider: Provider, model: string): boolean {
-  const id = model.toLowerCase();
+  const id = model.toLowerCase().replace(/^models\//, "");
   if (provider === "openrouter") return id.endsWith(":free");
   if (provider === "cerebras") return false; // One-time trial only; exclude from recurring zero-cost routing.
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);

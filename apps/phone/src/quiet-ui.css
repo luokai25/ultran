@@ -126,19 +126,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
-/* Remove the old red/amber accents from secondary local screens too. */
-.identity-card.is-active { border-color: #626973 !important; background: #1b1d21 !important; }
-.identity-symbol { background: #25282d !important; color: #d1d5db !important; }
-.identity-card i, .identity-program-grid article strong, .identity-brain-pulse { color: #c4c9d1 !important; }
-.identity-brain-pulse { background: #aeb4bd !important; box-shadow: none !important; }
-.identity-brain-link, .identity-visual-section { border-color: var(--line) !important; background: #141619 !important; }
-.workspace-status.status-running, .workspace-status.status-queued, .workspace-status.status-retrying,
-.workspace-status.status-succeeded, .workspace-status.status-failed, .workspace-status.status-interrupted {
-  color: #c4c9d1 !important; background: #25282d !important;
+/* Secondary screens use the same warm-metal selection and semantic status colors. */
+.identity-card.is-active { border-color: rgba(213,183,121,.48) !important; background: rgba(213,183,121,.07) !important; }
+.identity-symbol { background: rgba(213,183,121,.12) !important; color: var(--u-accent-strong) !important; }
+.identity-card i, .identity-program-grid article strong { color: var(--u-accent-strong) !important; }
+.identity-brain-pulse { color: var(--u-accent-strong) !important; background: var(--u-accent) !important; box-shadow: 0 0 12px rgba(213,183,121,.2) !important; }
+.identity-brain-link, .identity-visual-section { border-color: var(--line) !important; background: var(--u-surface-1) !important; }
+.workspace-status.status-running, .workspace-status.status-queued, .workspace-status.status-retrying {
+  color: var(--u-info) !important; background: rgba(120,169,232,.10) !important;
 }
-.workspace-actions button, .workspace-file button, .workspace-file-icon { border-color: #3a3e45 !important; background: #202329 !important; color: #d1d5db !important; }
-.learning-status, .learning-severity, .learning-category { filter: grayscale(1); }
-.conn-status, .capability-status, .status-badge { filter: grayscale(1); }
+.workspace-status.status-succeeded {
+  color: var(--u-success) !important; background: rgba(85,201,154,.10) !important;
+}
+.workspace-status.status-failed, .workspace-status.status-interrupted {
+  color: var(--u-danger) !important; background: rgba(239,107,115,.10) !important;
+}
+.workspace-actions button, .workspace-file button, .workspace-file-icon { border-color: var(--u-border-strong) !important; background: var(--u-surface-3) !important; color: var(--u-text-secondary) !important; }
+.learning-status, .learning-severity, .learning-category,
+.conn-status, .capability-status, .status-badge { filter: none; }
 
 
 /* Composer refinements: compact model switcher above the input, aligned actions. */

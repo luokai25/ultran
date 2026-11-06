@@ -72,8 +72,13 @@ jobs:
           if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Personal AI System")) throw new Error("Cloudflare app did not serve the APK-matched ULTRON shell");
           const assets = await readdir("apps/phone/dist/assets");
           for (const name of assets) {
-            const asset = await fetch(`https://ultron-app-web.luo-chat-ops.workers.dev/assets/${name}`);
-            if (!asset.ok) throw new Error(`Cloudflare asset ${name} returned HTTP ${asset.status}`);
+            let asset;
+            for (let attempt = 0; attempt < 8; attempt++) {
+              asset = await fetch(`https://ultron-app-web.luo-chat-ops.workers.dev/assets/${name}`);
+              if (asset.ok) break;
+              if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+            }
+            if (!asset?.ok) throw new Error(`Cloudflare asset ${name} returned HTTP ${asset?.status} after 8 attempts`);
           }
           console.log(`Cloudflare web smoke test passed: ${assets.length} built assets, ${liveHtml.length} HTML bytes`);
           NODE

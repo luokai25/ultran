@@ -118,11 +118,16 @@ cd ultron
 corepack enable
 pnpm install
 
-# Everything in watch mode
+# The one production web app (also the Android APK frontend)
 pnpm dev
 
-# Or a single workspace
+# Run every workspace only when you deliberately need multiple development servers
+pnpm dev:workspace
+
+# Non-production Next.js prototype, only when working on that prototype
 pnpm --filter @ultron/web dev
+
+# Cloud API workspace
 pnpm --filter @ultron/api dev
 ```
 

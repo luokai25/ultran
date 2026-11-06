@@ -51,7 +51,7 @@ html, body { overscroll-behavior: none; background: var(--void) !important; colo
 body { background-image: none !important; }
 button, a, input, textarea, select, label[role="button"] { touch-action: manipulation; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [role="button"]:focus-visible { outline: 2px solid #b9bec6; outline-offset: 2px; }
-#app { padding-bottom: 0 !important; }
+#app { padding-bottom: calc(62px + var(--safe-bottom)) !important; }
 .topbar { min-height: 58px; flex-basis: 58px; gap: 8px; padding: 6px 12px; background: #0d0e10; border-bottom: 1px solid var(--line); backdrop-filter: none; }
 .topbar > .menu-trigger, .topbar-actions .icon-btn { width: 48px; height: 48px; min-width: 48px; border: 1px solid var(--line); border-radius: 12px; background: #141518; }
 .brand { gap: 8px; }
@@ -375,6 +375,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     max-width: none;
     margin-left: 80px;
     height: 100dvh;
+    padding-bottom: 0 !important;
   }
   .topbar {
     min-height: 68px;
@@ -634,6 +635,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .ultron-key-file-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
 
+
+.composer-model-row .chat-model-button #chat-model-label {
+  flex: 1;
+  min-width: 0;
+  max-width: none !important;
+}
 
 /* Finish the warm-metal migration on active main and secondary surfaces.
    Crimson remains reserved for the animated ULTRON core and semantic danger states. */

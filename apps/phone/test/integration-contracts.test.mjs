@@ -586,3 +586,10 @@ test("cloud owner email is never hard-coded into the public app shell", async ()
   assert.match(input, /type="email"/);
   assert.doesNotMatch(input, /value="/);
 });
+
+
+test("settings voice controls use explicit toggle labels", async () => {
+  const html = await read("index.html");
+  assert.match(html, /class="toggle-label"><input id="proactive-updates-toggle"/);
+  assert.match(html, /class="toggle-label"><input id="voice-updates-toggle"/);
+});

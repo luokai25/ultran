@@ -80,3 +80,17 @@ test("active product surfaces use warm-metal accents while semantic danger remai
   assert.match(css, /\.message-feedback button\[aria-pressed="true"\][\s\S]*?var\(--u-accent-strong\)/);
   assert.match(css, /--u-core:\s*#e34b58/);
 });
+
+
+test("primary navigation remains visible and the composer stays clear of it", async () => {
+  const [experience, design, css] = await Promise.all([
+    read("apps/phone/src/experience.css"),
+    read("apps/phone/src/design-system.css"),
+    read("apps/phone/src/quiet-ui.css"),
+  ]);
+  assert.doesNotMatch(experience, /\.bottom-nav\s*\{\s*display:\s*none\s*!important/);
+  assert.match(design, /\.bottom-nav\{[^}]*display:grid/);
+  assert.match(css, /#app\s*\{\s*padding-bottom:\s*calc\(62px \+ var\(--safe-bottom\)\) !important/);
+  assert.match(css, /\.composer-model-row \.chat-model-button #chat-model-label\s*\{[^}]*max-width:\s*none !important/);
+  assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?padding-bottom: 0 !important/);
+});

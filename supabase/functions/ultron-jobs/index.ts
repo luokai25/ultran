@@ -27,8 +27,8 @@ function redactMemorySecrets(value: string): string {
     .replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, "[REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{16,}/gi, "Bearer [REDACTED]")
     .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
-    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, "[REDACTED_EMAIL]")
-    .replace(/(?<!\\w)\\+?\\d[\\d\\s().-]{7,}\\d(?!\\w)/g, "[REDACTED_PHONE]");
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
+    .replace(/(?<!\w)\+?\d[\d\s().-]{7,}\d(?!\w)/g, "[REDACTED_PHONE]");
 }
 
 type CloudProvider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";

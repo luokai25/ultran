@@ -42,6 +42,7 @@ Separate visual defects from functional defects. Do not silently alter business 
 ### 3. Plan the system
 
 - Follow root `DESIGN.md` tokens and page archetypes.
+- Validate the machine-readable design spec with upstream `gstack-design-md check DESIGN.md` and `gstack-design-md tokens DESIGN.md` whenever the gstack runtime is installed; keep the `colors`, `typography`, `rounded`, `spacing` and `components` token groups in sync with CSS.
 - Prefer shared primitives and CSS tokens over page-specific overrides.
 - Keep mobile and desktop intentionally responsive, not merely scaled versions of each other.
 - Preserve existing element IDs, selectors and event contracts unless every consumer and test is migrated.

@@ -187,4 +187,4 @@ A screen is not complete because its route renders. It is complete only when its
 
 ## Runtime honesty
 
-The upstream gstack repository contains its own install scripts, binaries, browser engine, hooks and host-specific registration. This project skill does not claim those binaries or slash commands are installed. If the gstack runtime is actually available in the active coding environment, use its relevant commands. Otherwise, execute this documented workflow directly with the available repository, browser and test tools. Never fabricate a gstack command result.
+The upstream gstack repository contains its own install scripts, binaries, browser engine, hooks and host-specific registration. The Codex setup path is documented in `docs/ULTRON-GSTACK-SETUP.md` and automated by `scripts/setup-gstack-codex.sh`. If the runtime is available, verify it with `./setup --status` and `bin/gstack-doctor`, then use its relevant design, review and browser commands. Otherwise, execute this documented workflow directly with the available repository, browser and test tools. Never fabricate a gstack command result.

@@ -1,73 +1,56 @@
 "use client";
 
-/**
- * AvatarHero - the interactive Ultron stage for the landing page.
- *
- * The 3D scene is loaded on the client only (three.js + WebGL), and the page
- * keeps a same-height placeholder so layout never jumps while it loads.
- */
+/** Interactive core stage. Voice state is owned by the real voice console. */
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { EmotionId, SceneId } from "@/theme/palette";
 import { scenes } from "@/theme/palette";
 
 const AvatarScene3D = dynamic(() => import("./AvatarScene3D"), {
   ssr: false,
-  loading: () => <div className="ultron-stage" style={{ height: 460 }} aria-hidden="true" />,
+  loading: () => <div className="ultron-stage" data-core-fallback="true" style={{ height: 320 }} role="img" aria-label="ULTRON core loading" />,
 });
 
 const EMOTIONS: readonly EmotionId[] = ["calm", "focused", "alert", "triumphant"];
 const SCENE_IDS = Object.keys(scenes) as SceneId[];
 
-export default function AvatarHero() {
+type Props = { speaking: boolean };
+
+export default function AvatarHero({ speaking }: Props) {
   const [scene, setScene] = useState<SceneId>("palace");
   const [emotion, setEmotion] = useState<EmotionId>("calm");
-  const [speaking, setSpeaking] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  const speak = useCallback(() => {
-    if (timer.current) window.clearTimeout(timer.current);
-    setSpeaking(true);
-    timer.current = window.setTimeout(() => setSpeaking(false), 5000);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (timer.current) window.clearTimeout(timer.current);
-    },
-    [],
-  );
 
   return (
-    <section aria-label="Ultron avatar" style={{ marginTop: 40 }}>
-      <AvatarScene3D scene={scene} emotion={emotion} speaking={speaking} />
-      <div className="ultron-row" style={{ marginTop: 14, flexWrap: "wrap" }}>
-        <button className="ultron-btn" onClick={speak} disabled={speaking}>
-          {speaking ? "Animating" : "Preview speech"}
-        </button>
-        {EMOTIONS.map((id) => (
-          <button
-            key={id}
-            className={`ultron-btn ${emotion === id ? "" : "ultron-btn--ghost"}`}
-            aria-pressed={emotion === id}
-            onClick={() => setEmotion(id)}
-          >
-            {id}
-          </button>
-        ))}
+    <section className="ultron-avatar-panel" aria-label="ULTRON core controls">
+      <div className="ultron-avatar-heading">
+        <div>
+          <span className="ultron-eyebrow">ULTRON CORE</span>
+          <h2>System presence</h2>
+        </div>
+        <span className={`ultron-core-status ${speaking ? "is-speaking" : ""}`}>
+          <span aria-hidden="true" />
+          {speaking ? "Speaking" : "Standby"}
+        </span>
       </div>
-      <div className="ultron-row" style={{ marginTop: 8, flexWrap: "wrap" }}>
-        {SCENE_IDS.map((id) => (
-          <button
-            key={id}
-            className={`ultron-btn ${scene === id ? "" : "ultron-btn--ghost"}`}
-            aria-pressed={scene === id}
-            onClick={() => setScene(id)}
-          >
-            {scenes[id].label}
-          </button>
-        ))}
+      <AvatarScene3D scene={scene} emotion={emotion} speaking={speaking} height={320} quality="auto" />
+      <div className="ultron-avatar-controls">
+        <div className="ultron-control-group" role="group" aria-label="Core expression">
+          <span className="ultron-control-label">Expression</span>
+          {EMOTIONS.map((id) => (
+            <button key={id} type="button" className={emotion === id ? "is-selected" : ""} aria-pressed={emotion === id} onClick={() => setEmotion(id)}>
+              {id}
+            </button>
+          ))}
+        </div>
+        <div className="ultron-control-group" role="group" aria-label="Core environment">
+          <span className="ultron-control-label">Environment</span>
+          {SCENE_IDS.map((id) => (
+            <button key={id} type="button" className={scene === id ? "is-selected" : ""} aria-pressed={scene === id} onClick={() => setScene(id)}>
+              {scenes[id].label}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

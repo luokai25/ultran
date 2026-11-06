@@ -29,6 +29,6 @@ test("identity screen always has explicit back and Escape exits to chat", () => 
   assert.match(html, /id="identity-back"/);
   assert.match(main, /function leaveIdentityScreen\(\)/);
   assert.match(main, /identityBackButton\.addEventListener\("click"/);
-  assert.match(main, /event\.key === "Escape" && app\.dataset\.page === "agent-identities"/);
+  assert.match(main, /app\.dataset\.page === "agent-identities"\) leaveIdentityScreen\(\)/);
   assert.match(main, /app\.dataset\.page = "chat"/);
 });

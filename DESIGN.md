@@ -1,12 +1,55 @@
 ---
+# gstack: design-md-format=spec
 name: ultron
 design-md-format: spec
 version: 1
+colors:
+  background: "#090A0C"
+  surface-1: "#101216"
+  surface-2: "#171B21"
+  surface-3: "#202630"
+  border: "rgba(220,228,238,.10)"
+  border-strong: "rgba(220,228,238,.18)"
+  text: "#F2F4F7"
+  text-secondary: "#B5BDC8"
+  text-muted: "#828D9B"
+  accent: "#D5B779"
+  accent-strong: "#E8CB91"
+  core: "#E34B58"
+  success: "#55C99A"
+  warning: "#E8B45D"
+  danger: "#EF6B73"
+  info: "#78A9E8"
+typography:
+  display: "28-36px"
+  section: "18-20px"
+  body: "14-16px"
+  meta: "12px"
+rounded:
+  control: "12px"
+  panel: "16px"
+  pill: "999px"
+spacing:
+  base: "4px"
+  x1: "4px"
+  x2: "8px"
+  x3: "12px"
+  x4: "16px"
+  x5: "20px"
+  x6: "24px"
+  x8: "32px"
+  x10: "40px"
+components:
+  touch-target: "48px"
+  content-max: "1120px"
+  reading-width: "720px"
+  mobile-gutter: "16px"
+  floating-shadow: "0 16px 44px rgba(0,0,0,.18)"
 ---
 
 # ULTRON Design System
 
-## Product and surface map
+## Overview
 
 - Product: ULTRON, a personal AI agent that can chat, reason, use approved tools, manage models, connect services, and work across files and memory.
 - Primary user: one owner operating ULTRON from an Android phone and a desktop browser.
@@ -15,18 +58,15 @@ version: 1
 - Secondary web application: `apps/web`, a separate Next.js prototype/console. It must share the same design tokens and visual language, but it is not the production web app and must not be reported as feature parity with `apps/phone`.
 - Backend: Supabase. Design changes must not weaken auth, RLS, secret storage, connector scopes, or approval gates.
 
-## Design direction
+**Design direction:** a capable personal operating environment, not a stripped-down chat page, generic SaaS dashboard, or noisy sci-fi cockpit. The interface should feel deliberate, premium, information-rich and tactile. Use strong hierarchy, layered surfaces, purposeful depth, and clear page-specific compositions. Restraint means removing noise, not removing features or visual character.
 
-- Direction: **Precision instrument, not sci-fi dashboard**. Calm, deliberate, tactile, and capable. ULTRON should feel like a serious personal operating system rather than a generic SaaS admin panel.
-- Mood: confident, quiet, intelligent, focused. The orb/helm is the signature brand element; the interface around it stays useful and restrained.
-- Brand expression: obsidian surfaces, cool titanium text, and a controlled warm-metal accent. The animated core may retain its crimson energy identity. Avoid flooding every button, border, icon, or heading with the accent.
+- Mood: confident, quiet, intelligent, focused. The animated core is ULTRON's signature brand element; the interface around it remains useful and legible.
+- Brand expression: obsidian surfaces, cool titanium text, and a controlled warm-metal interaction accent. The animated core may retain its crimson energy identity. Avoid flooding every button, border, icon, or heading with the accent.
 - Density: comfortable on phones, information-dense but orderly on desktop. Prefer progressive disclosure over hiding essential actions.
 - Personality: concise labels, plain language, clear system state. No fake activity, fake progress, decorative stats, or status claims that cannot be verified.
 - Reference qualities: Linear's hierarchy and consistency, Raycast's compact command surfaces, native Android touch ergonomics, and the clarity of a well-made developer tool. Do not copy their layouts.
 
-## Tokens
-
-### Color
+## Colors
 
 | Token | Value | Use |
 |---|---|---|
@@ -47,36 +87,27 @@ version: 1
 | `--u-danger` | `#EF6B73` | Errors and destructive actions |
 | `--u-info` | `#78A9E8` | Informational state |
 
-Never use color alone to communicate state. Pair it with text or an icon and preserve contrast.
+Never use color alone to communicate state. Pair it with text or an icon and preserve contrast. Crimson is reserved for the ULTRON core and relevant danger states, not ordinary navigation selection.
 
-### Typography
+## Typography
 
 Use the existing system font stack unless a bundled font already exists and has a clear performance benefit. Do not add a remote font dependency just for appearance.
 
 Keep the UI to four functional size tiers:
-- Display: 28–32px, only for page titles or empty-state hero.
+- Display: 28–36px, only for page titles or the empty-state hero.
 - Section: 18–20px, section headings.
 - Body: 14–16px, primary controls and readable content.
-- Meta: 12px minimum, labels, timestamps and hints.
+- Meta: 12px minimum for labels, timestamps and hints. Technical identifiers, logs and code may use a compact monospace face.
 
 Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabular numerals for counters and model/usage values. Monospace is reserved for technical identifiers, logs and code.
 
-### Spacing and shape
+## Layout
 
 - 4px base grid; common spacing: 4, 8, 12, 16, 20, 24, 32, 40.
-- Two component radii: 12px for controls and compact cards; 16px for large panels and sheets. Pills may be fully rounded only when the shape communicates status or selection.
-- One restrained elevation shadow for floating menus/sheets. Prefer borders and surface contrast for normal cards.
 - Content max width: 1120px on desktop; reading width 720px; mobile gutters 16px.
 - Minimum interactive target: 48×48 CSS px on touch surfaces; 44px minimum only for tightly grouped secondary icon actions when necessary.
-
-### Motion
-
-- Functional motion only: 120–180ms for hover/press, 180–260ms for panels and navigation.
-- Use opacity/transform and avoid animating layout dimensions.
-- Respect `prefers-reduced-motion`.
-- No infinite animation except the assistant core when it communicates a real state. No pulsing dots as generic decoration.
-
-## Layout rules
+- Use a 12-column desktop grid where a page needs multiple information groups. Use two-column hero/workspace compositions when the viewport has room; do not stretch short reading content across the screen.
+- Secondary pages need their own hierarchy and useful density. Do not style every page as one generic stack of cards.
 
 ### Mobile / Android
 
@@ -93,7 +124,21 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 - Avoid duplicating mobile bottom-nav patterns on desktop.
 - Use responsive breakpoints based on content fit, not device names.
 
-## Shared components
+## Elevation & Depth
+
+- Use one restrained elevation shadow for floating menus and sheets: `0 16px 44px rgba(0,0,0,.18)`.
+- Prefer borders, surface contrast, and subtle inner highlights for normal cards instead of stacking shadows.
+- The core may use a stronger localized glow. Do not apply glow to ordinary controls or every panel.
+- Use backdrop blur only for floating chrome that must remain legible over content; keep normal surfaces opaque enough for contrast.
+
+## Shapes
+
+- Two component radii: 12px for controls and compact cards; 16px for large panels and sheets.
+- Pills may be fully rounded only when the shape communicates status or selection.
+- Avoid excessive nested borders, ornamental outlines, and unrelated corner radii.
+- Keep the assistant core circular and geometrically distinct from the rectangular workspace surfaces.
+
+## Components
 
 Build and reuse a small set of primitives before creating page-specific styling:
 - App shell, navigation item, page header, section header.
@@ -106,7 +151,17 @@ Build and reuse a small set of primitives before creating page-specific styling:
 - Model/provider row, connector row, permission/approval row, artifact row.
 - Mind-map node and edge styles.
 
-Each component must define default, hover, focus-visible, pressed, disabled, loading, success, and error behavior where applicable.
+Each component must define default, hover, focus-visible, pressed, disabled, loading, success, and error behavior where applicable. Components should preserve stable IDs and event contracts unless a migration updates every consumer and test.
+
+## Do's and Don'ts
+
+- Do not change provider routing, chat transport, model formats, Supabase schema, authentication, RLS, Vault, connector permissions or tool execution as part of a visual-only change.
+- Do not remove features to make a page look simpler. Make dense functionality understandable through hierarchy, grouping and progressive disclosure.
+- Do not invent fake charts, metrics, model availability, connection states or progress.
+- Do not add a UI framework, component library, icon library, font CDN or animation dependency without proving it is needed.
+- Keep ULTRON standalone; do not couple it to Luo Chat.
+- Preserve the existing app shell and Capacitor architecture.
+- Keep destructive actions explicit and approvals specific to the exact action and scope.
 
 ## Page inventory and design requirements
 
@@ -154,15 +209,6 @@ A page is not complete until it passes:
 6. Existing behavior and integration tests remain green.
 7. The same `apps/phone` build works as web and inside the Android WebView.
 
-## Non-goals and guardrails
-
-- Do not change provider routing, chat transport, model formats, Supabase schema, authentication, RLS, Vault, connector permissions or tool execution as part of a visual-only change.
-- Do not remove features to make a page look simpler.
-- Do not invent fake charts, metrics, model availability, connection states or progress.
-- Do not add a UI framework, component library, icon library, font CDN or animation dependency without proving it is needed.
-- Keep ULTRON standalone; do not couple it to Luo Chat.
-- Preserve the existing app shell and Capacitor architecture.
-
 ## Decisions log
 
 | Decision | Rationale |
@@ -177,10 +223,10 @@ A page is not complete until it passes:
 Source-level inspection on 2026-11-06 found these concrete design issues. These are audit findings, not claims of browser-tested behavior:
 
 1. **Competing theme layers.** The phone shell loads base, workspace, experience, finishing, design-system and quiet-UI styles in sequence. Several layers define overlapping colors and component styles. Canonical `--u-*` tokens are now defined in the final phone layer and mirrored in the Next.js stylesheet; legacy aliases remain temporarily for compatibility.
-2. **Brand expression drift.** The phone shell had drifted to a fully monochrome accent while the separate Next.js app used a different gold palette and the older phone base layer still contained a crimson palette. The new shared tokens define warm-metal interaction accents and reserve crimson for the ULTRON core. Remaining hard-coded legacy values must be migrated page by page.
-3. **Desktop layout needed an intentional composition.** The initial source audit found only narrow-width overrides. A persistent 80px desktop navigation rail, wider content canvas, full-height secondary screens and desktop sheet sizing have since been added. These are source-implemented but remain unchecked in the screen-coverage ledger until browser/device QA runs at the required viewports.
+2. **Brand expression drift.** The phone shell had drifted to a fully monochrome accent while the separate Next.js app used a different gold palette and the older phone base layer still contained a crimson palette. The shared tokens define warm-metal interaction accents and reserve crimson for the ULTRON core. Remaining hard-coded legacy values must be migrated page by page.
+3. **Desktop layout needed an intentional composition.** The initial source audit found only narrow-width overrides. A persistent 80px desktop navigation rail, wider content canvas, full-height secondary screens and desktop sheet sizing have since been added. Browser review then caught a legacy `width:100%` overriding the desktop insets on feature screens and Settings; both now use inset-driven `width:auto` and align to the content area. The latest browser audit checks the five required viewport sizes.
 4. **Secondary screens are functional but visually uneven.** Agents & Identities, LLM API Keys, Mind Map, Learning Review and Capabilities each have distinct content structures; connectors, workspace, approvals, search and model selection are separate overlay surfaces. They need page-specific hierarchy built from shared primitives, not one generic card treatment.
-5. **Two web surfaces exist.** The canonical deployed web client is the `apps/phone` static bundle, also used by the Android APK. `apps/web` is a separate Next.js pre-alpha surface with a small landing page and ModelHub, not the production app shell. Both now share the token vocabulary; do not assume they have identical feature coverage.
+5. **Two web surfaces exist.** The canonical deployed web client is the `apps/phone` static bundle, also used by the Android APK. `apps/web` is a separate Next.js pre-alpha surface with a small landing page and ModelHub, not the production app shell. Both must share the same design tokens; do not assume they have identical feature coverage.
 
 ## Redesign execution order
 

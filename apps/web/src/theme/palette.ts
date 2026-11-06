@@ -1,25 +1,25 @@
 /**
- * The golden-black design system, mirrored from the backend palette.
+ * The obsidian, titanium and warm-metal design system, mirrored from the backend palette.
  *
  * These are the same hex values the API returns from `/v1/workspace/theme`, so a
  * server-driven scene and a client-rendered card can never drift apart.
  */
 
 export const palette = {
-  void: "#050505",
-  obsidian: "#0b0b0d",
-  carbon: "#131317",
-  graphite: "#1b1b21",
-  hairline: "#2a2a33",
-  gold: "#d4af37",
-  goldBright: "#f5d76e",
-  goldDeep: "#8a6d1f",
-  goldGlow: "rgba(212, 175, 55, 0.35)",
-  ember: "#ff8a3d",
-  danger: "#e5484d",
-  ok: "#3dd68c",
-  ink: "#f4f1e8",
-  muted: "#8d8778",
+  void: "#090a0c",
+  obsidian: "#101216",
+  carbon: "#171b21",
+  graphite: "#202630",
+  hairline: "rgba(220,228,238,.10)",
+  gold: "#d5b779",
+  goldBright: "#e8cb91",
+  goldDeep: "#88734d",
+  goldGlow: "rgba(213,183,121,.12)",
+  ember: "#e34b58",
+  danger: "#ef6b73",
+  ok: "#55c99a",
+  ink: "#f2f4f7",
+  muted: "#828d9b",
 } as const;
 
 export type SceneId = "palace" | "forge" | "marketplace" | "war-room";
@@ -29,15 +29,15 @@ export const scenes: Record<
   SceneId,
   { label: string; accent: string; floor: string; fog: string; spawn: [number, number, number] }
 > = {
-  palace: { label: "Obsidian Palace", accent: palette.gold, floor: "#0b0b0d", fog: "#050505", spawn: [0, 0, 0] },
-  forge: { label: "The Forge", accent: palette.ember, floor: "#120d07", fog: "#0a0603", spawn: [-2, 0, 1.5] },
-  marketplace: { label: "Marketplace Vault", accent: palette.goldBright, floor: "#0a0a0e", fog: "#050507", spawn: [2, 0, -1] },
-  "war-room": { label: "War Room", accent: palette.danger, floor: "#0d0a0a", fog: "#070404", spawn: [0, 0, 2.5] },
+  palace: { label: "Obsidian Palace", accent: palette.gold, floor: "#101216", fog: "#090a0c", spawn: [0, 0, 0] },
+  forge: { label: "The Forge", accent: palette.ember, floor: "#171216", fog: "#0c090d", spawn: [-2, 0, 1.5] },
+  marketplace: { label: "Marketplace Vault", accent: palette.goldBright, floor: "#10151b", fog: "#090a0c", spawn: [2, 0, -1] },
+  "war-room": { label: "War Room", accent: palette.danger, floor: "#151116", fog: "#09090c", spawn: [0, 0, 2.5] },
 };
 
 export const emotions: Record<EmotionId, { tint: string; pulseHz: number; intensity: number }> = {
-  calm: { tint: "#d4af37", pulseHz: 0.4, intensity: 0.55 },
-  focused: { tint: "#f5d76e", pulseHz: 1.1, intensity: 0.75 },
-  alert: { tint: "#ff8a3d", pulseHz: 2.2, intensity: 0.9 },
-  triumphant: { tint: "#3dd68c", pulseHz: 1.6, intensity: 1.0 },
+  calm: { tint: "#d5b779", pulseHz: 0.4, intensity: 0.55 },
+  focused: { tint: "#e8cb91", pulseHz: 1.1, intensity: 0.75 },
+  alert: { tint: "#e34b58", pulseHz: 2.2, intensity: 0.9 },
+  triumphant: { tint: "#55c99a", pulseHz: 1.6, intensity: 1.0 },
 };

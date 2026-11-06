@@ -51,21 +51,8 @@ button,input,textarea,select{font:inherit}button{touch-action:manipulation}butto
 .workspace-team-open{display:flex;align-items:center;justify-content:center;gap:9px}
 .workspace-team-open svg{flex:0 0 auto}
 
-/* Reference-matched five-destination mobile shell. */
+/* The final ULTRON shell is owned by quiet-ui.css. */
 #app[data-page="chat"] .topbar{background:rgba(7,8,9,.88)}
-#app[data-page="chat"] .hero{padding-top:clamp(14px,3vh,28px);gap:15px}
-#app[data-page="chat"] .hero-kicker{display:none}
-#app[data-page="chat"] .stage{width:min(43vw,174px);margin:0 0 -4px}
-#app[data-page="chat"] .stage canvas{opacity:0;pointer-events:none}
-.hero-brand-mark{position:absolute;z-index:3;inset:0;display:grid;place-items:center;filter:drop-shadow(0 0 24px rgba(229,45,65,.24))}
-.hero-brand-mark svg{width:100%;height:100%;overflow:visible}
-#app[data-page="chat"] .greeting{font-size:clamp(23px,6vw,29px);letter-spacing:-.045em;margin:2px 0 4px}
-#app[data-page="chat"] .subgreeting{font-size:13px;margin-bottom:0}
-#app[data-page="chat"] .hero-status{margin-top:12px}
-#app[data-page="chat"] .quick-start{padding:15px;border-radius:20px}
-#app[data-page="chat"] .quick-start-heading{margin-bottom:11px}
-#app[data-page="chat"] .suggestions{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-#app[data-page="chat"] .suggestion{min-height:58px;padding:10px 24px 10px 11px;font-size:11px}
 .bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr));width:100%;padding-inline:6px;gap:3px}
 .nav-compat{display:none!important}
 .feature-screen{position:fixed;z-index:10;inset:0 0 calc(62px + var(--safe-bottom));overflow-y:auto;overscroll-behavior:contain;padding:calc(var(--safe-top) + 20px) 17px 28px;background:radial-gradient(ellipse 90% 30% at 50% 0%,rgba(229,45,65,.09),transparent 80%),#080a0b;color:var(--ink);scrollbar-width:thin;scrollbar-color:rgba(229,45,65,.22) transparent}
@@ -224,7 +211,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 
 .attachment-snippet{display:block;max-width:220px;overflow:hidden;color:rgba(232,229,220,.68);font-size:9px;line-height:1.35;white-space:normal}
 
-/* Single-chat navigation: secondary destinations live in the three-line drawer. */
+/* Five primary destinations stay in the bottom bar; secondary destinations remain in the drawer. */
 .bottom-nav .nav-item[hidden]{display:none!important}
 .identity-cards{display:grid;gap:10px;margin:18px 0}
 .identity-card{display:flex;align-items:center;gap:14px;width:100%;padding:15px;border:1px solid var(--line,#343039);border-radius:16px;background:rgba(255,255,255,.025);color:inherit;text-align:left;min-height:76px}

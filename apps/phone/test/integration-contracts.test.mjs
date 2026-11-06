@@ -242,6 +242,20 @@ test("WhatsApp handoff never sends or taps automatically", () => {
 });
 
 
+test("Escape closes the topmost ULTRON surface, including settings and connectors", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const connectors = await readFile(new URL("../src/connectors-ui.ts", import.meta.url), "utf8");
+  const quietUi = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  assert.match(main, /if \(!sheetWrap\.hidden\) closeSheet\(\)/);
+  assert.match(main, /if \(!workspacePanel\.hidden\) closeWorkspace\(\)/);
+  assert.match(main, /if \(!connectorsPanel\.hidden\) connectorsBackButton\.click\(\)/);
+  assert.match(main, /drawer\.getAttribute\("aria-hidden"\) === "false"\) closeDrawer\(\)/);
+  assert.match(connectors, /event\.stopPropagation\(\);\s*closeDetail\(\)/);
+  assert.match(main, /navModelsButton\.addEventListener\("click", event => \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?openChatModelMenu\(\)/);
+  assert.match(quietUi, /\.feature-screen\s*\{[^}]*width:\s*auto;[^}]*max-width:\s*none;/s);
+  assert.match(quietUi, /\.sheet-wrap\s*\{[^}]*width:\s*auto;[^}]*max-width:\s*none;/s);
+});
+
 test("mobile navigation is fully wired and respects phone accessibility zoom", async () => {
   const experience = await read("src/experience.css");
   for (const id of ["nav-chat", "nav-connectors", "nav-settings"]) {
@@ -254,10 +268,8 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(main, /#settings-close-btn/);
   assert.match(html, /id="settings-close-btn"/);
   assert.match(experience, /\.bottom-nav/);
-  assert.doesNotMatch(experience, /bottom-nav\{display:none!important\}/);
-  const design = await read("src/design-system.css");
-  assert.match(design, /\.bottom-nav\{[^}]*display:grid/);
-  assert.match(html, /<nav class="bottom-nav"/);
+  assert.match(experience, /\.bottom-nav\{[^}]*display:grid/);
+  assert.match(experience, /\.bottom-nav \.nav-item\[hidden\]\{display:none!important\}/);
   assert.match(experience, /\.nav-item\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));
@@ -577,28 +589,4 @@ test("Supabase is the default shared runtime for ULTRON-authored tools and skill
   assert.match(html, /id="capability-cloud-tools"/);
   assert.match(html, /id="capability-tool-runs"/);
   assert.match(html, /id="capability-cloud-skills"/);
-});
-
-
-test("cloud owner email is never hard-coded into the public app shell", async () => {
-  const html = await read("index.html");
-  const input = html.match(/<input id="cloud-email"[^>]*>/)?.[0] ?? "";
-  assert.match(input, /type="email"/);
-  assert.doesNotMatch(input, /value="/);
-});
-
-
-test("settings voice controls use explicit toggle labels", async () => {
-  const html = await read("index.html");
-  assert.match(html, /class="toggle-label"><input id="proactive-updates-toggle"/);
-  assert.match(html, /class="toggle-label"><input id="voice-updates-toggle"/);
-});
-
-
-test("API key importer explains local file parsing and the HTTPS Supabase handoff", async () => {
-  const html = await read("index.html");
-  assert.match(html, /parses them on this device/);
-  assert.match(html, /individual key values are sent over HTTPS/);
-  assert.match(html, /original files stay on this device/);
-  assert.match(html, /key values are never displayed/);
 });

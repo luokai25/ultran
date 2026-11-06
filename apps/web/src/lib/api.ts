@@ -1,6 +1,6 @@
 /** Typed client for the Ultron control plane. */
 
-export const API_BASE = process.env.NEXT_PUBLIC_ULTRON_API ?? "http://127.0.0.1:8080/v1";
+export const API_BASE = (process.env.NEXT_PUBLIC_ULTRON_API ?? "").replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(
@@ -90,6 +90,7 @@ export type VoiceRendered = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!API_BASE) throw new Error("Voice render API is not configured for this web console.");
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {

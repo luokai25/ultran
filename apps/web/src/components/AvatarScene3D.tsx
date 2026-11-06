@@ -348,6 +348,7 @@ function FaceCount({ value }: { value: number }) {
 export default function AvatarScene3D({ scene, emotion, speaking = false, height = 460, quality = "auto" }: AvatarScene3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [fallback, setFallback] = useState(false);
   const [faces, setFaces] = useState(faceCount(FACE_TIERS.low));
 
   // Live props, read by the animation loop without re-running the effect.
@@ -362,7 +363,27 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
     const initialAccent = new THREE.Color(scenes[live.current.scene]?.accent ?? palette.gold);
     const initialFog = new THREE.Color(scenes[live.current.scene]?.fog ?? palette.void);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("webgl2", { antialias: true, alpha: true, powerPreference: "high-performance" });
+      if (!context) {
+        // Probe first so Three.js does not emit a cascade of renderer errors
+        // on browsers that intentionally disable GPU contexts.
+        setFallback(true);
+        setReady(false);
+        return;
+      }
+      renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: "high-performance" });
+      setFallback(false);
+    } catch (error) {
+      // Restricted WebViews and low-power browsers may not expose WebGL. Keep
+      // the product identity visible instead of crashing the whole page.
+      console.warn("ULTRON 3D core unavailable; showing the CSS-rendered core.", error);
+      setFallback(true);
+      setReady(false);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -635,6 +656,13 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       running = false;
       cancelAnimationFrame(raf);
     };
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      stop();
+      setFallback(true);
+      setReady(false);
+    };
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost, false);
 
     const onVisibility = () => (document.hidden ? stop() : start());
     document.addEventListener("visibilitychange", onVisibility);
@@ -670,6 +698,7 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
       intersection.disconnect();
       resize.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost, false);
       document.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("ultron:avatar-gesture", onAvatarGesture);
@@ -689,22 +718,22 @@ export default function AvatarScene3D({ scene, emotion, speaking = false, height
   }, [height, quality]);
 
   return (
-    <div className="ultron-stage" ref={mountRef} style={{ height }} aria-label="3D Ultron avatar">
+    <div className="ultron-stage" ref={mountRef} style={{ height }} data-core-fallback={fallback ? "true" : undefined} data-speaking={speaking ? "true" : "false"} role="img" aria-label="3D ULTRON core">
       <div className="ultron-stage-overlay">
         <div>
           <div className="ultron-stage-caption">Ultron</div>
           <div className="ultron-stage-scene">{scenes[scene]?.label ?? "Obsidian Palace"}</div>
         </div>
         <div>
-          <FaceCount value={faces} />
-          <span className="ultron-chip ultron-chip--free">legion x{LEGION_COUNT}</span>
+          {fallback ? <span className="ultron-chip">CSS core</span> : <FaceCount value={faces} />}
+          {!fallback && <span className="ultron-chip ultron-chip--free">legion x{LEGION_COUNT}</span>}
           <span
             key={emotion}
             className={`ultron-chip ultron-chip--pop ${emotion === "alert" ? "ultron-chip--paid" : "ultron-chip--free"}`}
           >
             {emotion}
           </span>
-          {!ready && <span className="ultron-chip">initialising</span>}
+          {!ready && !fallback && <span className="ultron-chip">initialising</span>}
         </div>
       </div>
     </div>

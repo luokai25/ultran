@@ -110,13 +110,30 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
   assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
 });
 
-test("chat shell has no stray literal newline and composer stays above primary navigation", async () => {
+test("chat shell has no stray literal newline and composer stays above bottom navigation", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
   assert.doesNotMatch(html, /\\\\n<nav/);
-  assert.match(quiet, /#app\s*\{\s*padding-bottom:\s*calc\(62px \+ var\(--safe-bottom\)\) !important;/);
-  assert.match(quiet, /@media \(min-width: 900px\) \{[\s\S]*?#app\s*\{[\s\S]*?padding-bottom: 0 !important;/);
+  assert.match(quiet, /#app\s*\{\s*padding-bottom:\s*calc\(62px \+ var\(--safe-bottom\)\)\s*!important;/);
   assert.match(quiet, /\.dock\s*\{\s*flex:\s*0\s+0\s+auto;/);
+});
+
+test("empty home state never auto-scrolls the greeting out of view", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  assert.match(main, /if \(has\) scrollToEnd\(false\);\s*else threadEl\.scrollTop = 0;/);
+});
+
+test("ULTRON core remains visible when WebGL cannot initialize", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  assert.match(main, /stage\.dataset\.coreFallback = "true"/);
+  assert.match(quiet, /\.stage\[data-core-fallback="true"\]::after/);
+});
+
+test("mobile empty state is compact enough to keep quick starts above the composer", async () => {
+  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  assert.match(quiet, /@media \(max-width: 600px\)[\s\S]*?\.hero \{[\s\S]*?min-height: auto/);
+  assert.match(quiet, /\.quick-start \{ margin: 0; padding: 12px; \}/);
 });
 
 test("model picker lives above the composer and request progress survives streamed tokens", async () => {

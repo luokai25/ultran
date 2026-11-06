@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ULTRON | Secondary Owner Console",
+  title: "ULTRON · Personal AI Control Console",
   description:
-    "A secondary ULTRON console for the 3D avatar and Model Hub. Production chat, tools and task workflows use the shared apps/phone client.",
+    "A local-first personal AI system for model orchestration, private memory, approved tools, voice and real work.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

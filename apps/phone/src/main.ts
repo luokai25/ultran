@@ -200,6 +200,8 @@ const featureScreens = Array.from(document.querySelectorAll<HTMLElement>(".featu
 const connectorsButton = req<HTMLButtonElement>("#connectors-btn");
 const connectorsBackButton = req<HTMLButtonElement>("#connectors-back");
 const drawer = req<HTMLElement>("#drawer");
+const connectorsPanel = req<HTMLElement>("#connectors-panel");
+const connectorDetailWrap = req<HTMLElement>("#connector-detail-wrap");
 const scrim = req<HTMLElement>("#scrim");
 const historyEl = req<HTMLElement>("#history");
 const sheetWrap = req<HTMLElement>("#sheet-wrap");
@@ -1712,7 +1714,13 @@ function renderConversation(): void {
       messagesEl.appendChild(root);
     }
   }
-  requestAnimationFrame(() => scrollToEnd(false));
+  requestAnimationFrame(() => {
+    // The empty home state is taller than a short viewport. Scrolling it to
+    // the bottom on boot hides the greeting and makes the app look broken.
+    // Only transcripts should auto-scroll; a fresh home always starts at top.
+    if (has) scrollToEnd(false);
+    else threadEl.scrollTop = 0;
+  });
   syncRender();
 }
 
@@ -3253,8 +3261,10 @@ async function initializeAvatar(): Promise<void> {
   if (avatarInit) return avatarInit;
   avatarInit = (async () => {
     try {
+      const context = canvas.getContext("webgl2", { antialias: true, alpha: true, powerPreference: "high-performance" });
+      if (!context) throw new Error("WebGL2 is unavailable in this WebView");
       const THREE = await import("three");
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+      const renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: "high-performance" });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
       const scene3d = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
@@ -3406,7 +3416,9 @@ async function initializeAvatar(): Promise<void> {
       avatarSync();
     } catch (error) {
       avatarInit = null;
-      console.warn("Ultron core could not be initialized", error);
+      console.warn("Ultron core could not be initialized; using the CSS core fallback", error);
+      const stage = canvas.closest<HTMLElement>(".stage");
+      if (stage) stage.dataset.coreFallback = "true";
       canvas.hidden = true;
     }
   })();
@@ -4304,7 +4316,6 @@ req<HTMLButtonElement>("#chat-model-download").addEventListener("click", () => {
   openSheet();
   window.setTimeout(() => modelLibraryResults.scrollIntoView({behavior:"smooth",block:"start"}), 180);
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeChatModelMenu(); });
 document.addEventListener("click", (event) => {
   if (!chatModelMenu.hidden && !chatModelMenu.contains(event.target as Node) && !chatModelButton.contains(event.target as Node)) closeChatModelMenu();
 });
@@ -4423,12 +4434,15 @@ navChatButton.addEventListener("click", () => {
   hideFeatureScreens();
   setActiveNavigation(navChatButton);
 });
-navModelsButton.addEventListener("click", () => {
+navModelsButton.addEventListener("click", event => {
+  // Stop the outer click from being mistaken for an outside click after the
+  // model menu opens from the navigation rail.
+  event.stopPropagation();
+  const wasOpen = !chatModelMenu.hidden;
   closeOtherSurfaces();
   setActiveNavigation(navModelsButton);
-  // Reuse the visible model button's click path so the document-level
-  // outside-click handler recognises this as an intentional open action.
-  chatModelButton.click();
+  if (wasOpen) closeChatModelMenu();
+  else void openChatModelMenu();
 });
 navVaultButton.addEventListener("click", () => {
   showFeatureScreen("vault-screen", navVaultButton);
@@ -4451,7 +4465,36 @@ navSettingsButton.addEventListener("click", () => {
 connectorsButton.addEventListener("click", () => setActiveNavigation(navConnectorsButton));
 connectorsBackButton.addEventListener("click", () => { setActiveNavigation(navChatButton); });
 setActiveNavigation(navChatButton);
-globalSearchOpen.addEventListener("click",()=>{closeDrawer();openGlobalSearch();});req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!globalSearch.hidden)closeGlobalSearch();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});
+globalSearchOpen.addEventListener("click",()=>{closeDrawer();openGlobalSearch();});
+req<HTMLButtonElement>("#global-search-close").addEventListener("click",closeGlobalSearch);
+globalSearch.addEventListener("click",e=>{if(e.target===globalSearch)closeGlobalSearch();});
+globalSearchInput.addEventListener("input",()=>renderGlobalSearch(globalSearchInput.value));
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    // Close only the topmost transient surface. Previously Escape handled the
+    // model menu and search, but left settings, connectors and the drawer open.
+    if (!chatModelMenu.hidden) closeChatModelMenu();
+    else if (!globalSearch.hidden) closeGlobalSearch();
+    else if (!connectorDetailWrap.hidden) {
+      connectorDetailWrap.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    } else if (!sheetWrap.hidden) closeSheet();
+    else if (!workspacePanel.hidden) closeWorkspace();
+    else if (!connectorsPanel.hidden) connectorsBackButton.click();
+    else if (drawer.getAttribute("aria-hidden") === "false") closeDrawer();
+    else if (app.dataset.page === "agent-identities") leaveIdentityScreen();
+    else if (featureScreens.some(screen => !screen.hidden)) {
+      hideFeatureScreens();
+      setActiveNavigation(navChatButton);
+    } else return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    openGlobalSearch();
+  }
+});
 menuBtn.addEventListener("click", openDrawer);
 req<HTMLButtonElement>("#close-btn").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
@@ -4591,12 +4634,6 @@ identityBackButton.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
   leaveIdentityScreen();
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && app.dataset.page === "agent-identities") {
-    event.preventDefault();
-    leaveIdentityScreen();
-  }
 });
 req<HTMLButtonElement>("#identity-save").addEventListener("click", () => {
   identityState.customInstructions = identityDetails.value.trim().slice(0, 6000);

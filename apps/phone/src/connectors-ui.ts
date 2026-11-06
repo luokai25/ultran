@@ -600,6 +600,7 @@ export function initConnectors(deps: Deps): void {
     if (detailWrap.hidden) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       closeDetail();
       return;
     }

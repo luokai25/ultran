@@ -128,7 +128,7 @@ async function requireOperationPermission(db: ReturnType<typeof createClient>, o
   if (!data || data.access_mode !== "allow" || data.require_confirmation !== false) throw new Error(`approval_required:${op}`);
 }
 
-async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string, internalWorker = false): Promise<unknown> {
+async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string, serviceDb: ReturnType<typeof createClient>, internalWorker = false): Promise<unknown> {
   const op = String(step.op);
   const params = resolveValue(isObject(step.params) ? step.params : {}, input, results) as Record<string, unknown>;
   if (op === "text.template") {
@@ -188,9 +188,9 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
   if(op==="database.ddl"){
     const statement=String(params.statement??"").trim();
     if(!statement||statement.length>50000)throw new Error("database.ddl requires a schema statement up to 50 KB.");
-    const {data,error}=internalWorker
-      ? await db.rpc("ultron_apply_schema_change_system",{p_owner_id:ownerId,statement})
-      : await db.rpc("ultron_apply_schema_change",{statement});
+    // DDL is owner-authorized by this Edge Function, then executed through the
+    // service-only RPC. Never expose a SECURITY DEFINER DDL function to JWT users.
+    const {data,error}=await serviceDb.rpc("ultron_apply_schema_change_system",{p_owner_id:ownerId,statement});
     if(error)throw error;return data;
   }
   if(op==="database.rpc"){
@@ -320,7 +320,7 @@ Deno.serve(async (req: Request) => {
       if(runError)throw runError;
       const started=Date.now(),results:Record<string,unknown>={};
       try{
-        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");await requireOperationPermission(db,owner_id,step);results[String(step.id)]=await runStep(step,input,results,db,owner_id,internalWorker);}
+        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");await requireOperationPermission(db,owner_id,step);results[String(step.id)]=await runStep(step,input,results,db,owner_id,serviceDb,internalWorker);}
         const output={tool_key,version:tool.version,steps:results};
         await db.from("ultron_tool_runs").update({status:"succeeded",output,finished_at:new Date().toISOString(),metadata:{tool_spec_id:tool.id,version:tool.version,workflow_sha256:tool.workflow_sha256,latency_ms:Date.now()-started}}).eq("id",run.id).eq("owner_id",owner_id);
         await db.from("ultron_tool_specs").update({run_count:Number(tool.run_count??0)+1,last_run_at:new Date().toISOString(),last_run_status:"succeeded"}).eq("id",tool.id).eq("owner_id",owner_id);

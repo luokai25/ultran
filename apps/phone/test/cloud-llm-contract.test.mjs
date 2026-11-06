@@ -40,6 +40,8 @@ assert.match(jobs, /ultron_claim_jobs_system/);
 assert.match(runtime, /requireOperationPermission/);
 assert.match(runtime, /approval_required/);
 assert.match(runtime, /ultron_apply_schema_change_system/);
+assert.match(runtime, /serviceDb\.rpc\(\"ultron_apply_schema_change_system\"/);
+assert.doesNotMatch(runtime, /db\.rpc\(\"ultron_apply_schema_change\"/);
 assert.match(runtime, /x-ultron-cron-secret/);
 assert.match(systemDdlMigration, /p_owner_id uuid/);
 assert.match(systemDdlMigration, /service_role/);

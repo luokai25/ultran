@@ -121,6 +121,8 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 - 2026-11-06, touch-target audit: Learning Review's short `All` filter was 38px wide on mobile. Its filter controls now measure at least 48×48px; the browser check confirmed the three filter targets are 48×48px, 108×48px and 69×48px at 390px viewport width.
 - Still unverified: Android physical-device visual parity, live authenticated owner key operations, actual local model import/download/load, OAuth provider callbacks, backend voice rendering, and every secondary screen's full loading/error/permission matrix. Do not mark those complete based on this pass.
 
+- 2026-11-06, Android release: Signed ULTRON 3.0.4 build 896 was published from the canonical phone client. CI verified the merged manifest and APK signature, then installed and launched the APK in an Android 12 emulator successfully. This is install/launch smoke coverage, not physical-device visual parity.
+
 ## Source selector map
 
 These selectors are grounded in the current `apps/phone/index.html` source. Recheck them when the shell changes; do not invent IDs or use this map as proof that a screen has passed QA.

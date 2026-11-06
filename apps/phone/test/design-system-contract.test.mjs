@@ -69,3 +69,14 @@ test("desktop client promotes the mobile bottom navigation into a persistent sid
   assert.match(css, /\.feature-screen\s*\{[\s\S]*?inset:\s*0 0 0 80px/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
 });
+
+
+test("active product surfaces use warm-metal accents while semantic danger remains separate", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /\.chat-model-option\[aria-current="true"\][\s\S]*?var\(--u-accent-strong\)/);
+  assert.match(css, /\.curated-model-card\s*\{[\s\S]*?var\(--u-border\)/);
+  assert.match(css, /\.workspace-stat strong\s*\{\s*color:\s*var\(--u-accent-strong\)/);
+  assert.match(css, /\.learning-safety-note\s*\{[\s\S]*?rgba\(213,183,121/);
+  assert.match(css, /\.message-feedback button\[aria-pressed="true"\][\s\S]*?var\(--u-accent-strong\)/);
+  assert.match(css, /--u-core:\s*#e34b58/);
+});

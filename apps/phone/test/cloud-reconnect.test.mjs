@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const [main, cloudSync] = await Promise.all([
+const [main, cloudSync, html, quietUi] = await Promise.all([
   readFile(path.join(root, "src/main.ts"), "utf8"),
   readFile(path.join(root, "src/cloud-sync.ts"), "utf8"),
+  readFile(path.join(root, "index.html"), "utf8"),
+  readFile(path.join(root, "src/quiet-ui.css"), "utf8"),
 ]);
 
 test("Supabase owner session restores automatically and reconnects after network recovery", () => {
@@ -34,4 +36,16 @@ test("Supabase sessions persist and refresh without embedding service-role crede
   assert.match(cloudSync, /autoRefreshToken:\s*true/);
   assert.match(cloudSync, /cloudClient\.auth\.refreshSession\(\)/);
   assert.doesNotMatch(cloudSync, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+});
+
+
+test("the cinematic landing concept is integrated into the real app and wakes the composer", () => {
+  assert.match(html, /An intelligence that stays ready/);
+  assert.match(html, /WATCHING[\s\S]*REASONING[\s\S]*ACTING/);
+  assert.match(html, /It sees[\s\S]*It thinks[\s\S]*It acts/);
+  assert.match(html, /id="hero-wake"/);
+  assert.match(main, /heroWakeButton\.addEventListener\("click"/);
+  assert.match(main, /promptEl\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(quietUi, /\.hero-manifesto/);
+  assert.match(quietUi, /\.hero-wake/);
 });

@@ -987,3 +987,101 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   min-height: 48px;
   padding-inline: 12px;
 }
+
+
+/* The landing-page manifesto is part of the real app shell, not a second site. */
+.hero-manifesto {
+  width: min(100%, 600px);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--u-border);
+}
+.hero-manifesto-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--u-core);
+  font: 8px var(--font-mono);
+  letter-spacing: .19em;
+}
+.hero-manifesto-line::before {
+  content: "";
+  width: 16px;
+  height: 1px;
+  background: var(--u-core);
+  box-shadow: 0 0 12px rgba(227,75,88,.45);
+}
+.hero-capabilities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.hero-capabilities article {
+  min-width: 0;
+  padding: 9px 8px 8px;
+  border-left: 1px solid rgba(227,75,88,.24);
+  background: linear-gradient(90deg, rgba(227,75,88,.05), transparent 75%);
+  text-align: left;
+}
+.hero-capabilities strong {
+  display: block;
+  color: var(--u-text);
+  font-size: 11px;
+  font-weight: 650;
+}
+.hero-capabilities small {
+  display: block;
+  margin-top: 3px;
+  color: var(--u-text-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+.hero-wake {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 148px;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 14px;
+  border: 1px solid rgba(227,75,88,.38);
+  border-radius: 12px;
+  background: rgba(227,75,88,.07);
+  color: var(--u-text);
+  font: 9px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.hero-wake:hover {
+  border-color: rgba(227,75,88,.65);
+  background: rgba(227,75,88,.14);
+}
+.hero-wake:active { transform: translateY(1px); }
+.hero-wake span:last-child { color: var(--u-core); }
+.hero-wake:focus-visible {
+  outline: 2px solid var(--u-core);
+  outline-offset: 3px;
+}
+@media (min-width: 900px) {
+  .hero-wake { align-self: flex-start; }
+}
+@media (max-width: 520px) {
+  .hero-manifesto { margin-top: 10px; padding-top: 9px; }
+  .hero-manifesto-line { font-size: 7px; letter-spacing: .15em; }
+  .hero-capabilities { gap: 5px; margin-top: 7px; }
+  .hero-capabilities article { padding: 7px 6px; }
+  .hero-capabilities small { font-size: 8px; }
+  .hero-wake { min-height: 40px; margin-top: 9px; }
+}
+@media (max-height: 700px) {
+  .hero-manifesto { margin-top: 8px; padding-top: 8px; }
+  .hero-capabilities small { display: none; }
+  .hero-wake { min-height: 38px; margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-wake { transition: none; }
+}

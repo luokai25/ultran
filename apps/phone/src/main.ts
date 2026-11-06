@@ -167,6 +167,7 @@ const app = req<HTMLElement>("#app");
 const threadEl = req<HTMLElement>("#thread");
 const messagesEl = req<HTMLElement>("#messages");
 const heroEl = req<HTMLElement>("#hero");
+const heroWakeButton = req<HTMLButtonElement>("#hero-wake");
 const suggestionsEl = req<HTMLElement>("#suggestions");
 const greetingEl = req<HTMLElement>("#greeting");
 const canvas = req<HTMLCanvasElement>("#avatar");
@@ -4452,6 +4453,9 @@ sendBtn.addEventListener("click", (event) => {
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!busy) void submit(promptEl.value);
+});
+heroWakeButton.addEventListener("click", () => {
+  promptEl.focus({ preventScroll: true });
 });
 
 function setActiveNavigation(active: HTMLButtonElement): void {

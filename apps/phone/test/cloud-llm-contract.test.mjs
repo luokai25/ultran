@@ -68,7 +68,7 @@ assert.match(main, /renderCloudProviderModels/);
 assert.match(main, /selectedCloudProvider/);
 assert.match(phone, /provider\?: CloudProviderId/);
 assert.match(main, /cloudBrainActive/);
-assert.match(main, /cloudConnectedKeys < 1/);
+assert.match(main, /!cloudConnectedKeys/);
 
 assert.ok(brain.includes('provider === "cerebras") return false'));
 assert.ok(jobs.includes('provider === "cerebras") return false'));

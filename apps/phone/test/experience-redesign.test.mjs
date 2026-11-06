@@ -270,3 +270,11 @@ test("the existing ULTRON identity appearance control lives in Agents & Identiti
   assert.match(html.slice(identityStart, themePicker), /ULTRON IDENTITY/);
   assert.ok(settingsStart < 0 || themePicker < settingsStart || !html.slice(settingsStart).includes('id="themes"'));
 });
+
+test("empty mind map hides the empty SVG canvas and removes its forced horizontal pan", async () => {
+  const source = await readFile(path.join(root, "src/main.ts"), "utf8");
+  const css = await readFile(path.join(root, "src/quiet-ui.css"), "utf8");
+  assert.match(source, /classList\.toggle\("is-empty",empty\)/);
+  assert.match(css, /\.mindmap-canvas-wrap\.is-empty \.mindmap-canvas \{ display: none; \}/);
+  assert.match(css, /\.mindmap-canvas-wrap\.is-empty \{[\s\S]*?overflow: hidden/);
+});

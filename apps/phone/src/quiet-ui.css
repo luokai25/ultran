@@ -437,6 +437,38 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border-radius: var(--u-radius-panel);
   background: radial-gradient(ellipse at center, rgba(213,183,121,.045), transparent 68%), var(--u-surface-1);
 }
+.mindmap-canvas-wrap.is-empty {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 320px;
+}
+.mindmap-canvas-wrap.is-empty .mindmap-canvas { display: none; }
+.mindmap-canvas-wrap.is-empty::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - 104px);
+  left: 50%;
+  width: 66px;
+  height: 66px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(213,183,121,.28);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.8) 0 2%, transparent 12%), radial-gradient(circle at 58% 62%, #e34b58 0 7%, #6c1724 20%, #252b35 48%, #090a0c 72%);
+  box-shadow: 0 0 34px rgba(227,75,88,.2), inset 0 0 22px rgba(213,183,121,.08);
+}
+.mindmap-canvas-wrap.is-empty .mindmap-empty {
+  position: relative;
+  inset: auto;
+  display: grid;
+  width: min(100%, 420px);
+  height: auto;
+  margin: 72px auto 0;
+  padding: 22px 28px;
+  color: var(--u-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
 .llm-key-card,
 .llm-cloud-card {
   max-width: 760px;

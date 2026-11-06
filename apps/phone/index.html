@@ -260,7 +260,7 @@
         <button id="connectors-back" class="icon-btn" aria-label="Back">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
         </button>
-        <div class="connector-brand-heading"><h2>GitHub</h2><small>ULTRON CONNECTOR · 01</small></div>
+        <div class="connector-brand-heading"><h2>Connectors</h2><small>CENTRAL OAUTH GATEWAY</small></div>
         <span id="connectors-count" class="panel-count"></span>
         <button id="connectors-refresh" class="ghost" type="button">Refresh</button>
       </header>
@@ -275,7 +275,7 @@
           <p id="permission-description">Checking your backend grants. The local catalogue remains available while we check.</p>
         </section>
         <div id="composio-health" class="composio-health" data-state="loading" role="status" aria-live="polite">
-          <span>GITHUB ACCOUNT</span><strong id="composio-health-label">Checking connection</strong>
+          <span>COMPOSIO GATEWAY</span><strong id="composio-health-label">Checking connection</strong>
           <small id="composio-health-detail">Checking GitHub authorization and repository access.</small>
         </div>
         <section class="composio-key-setup" aria-label="Composio gateway key">
@@ -285,7 +285,7 @@
           <button id="composio-api-key-save" class="ghost" type="button">Verify and save securely</button>
           <small id="composio-key-status" role="status" aria-live="polite">Checking gateway configuration…</small>
         </section>
-        <small class="panel-status">Repository reads are limited to the connected account. Issue creation and future write operations require explicit approval.</small>
+        <small class="panel-status">External write actions require explicit approval. Read-only access is the default.</small>
         <section id="composio-approvals" class="approval-panel" hidden aria-label="Pending tool approvals">
           <h3>Agent action approvals</h3>
           <p>Review the exact action and arguments before an agent can change or send anything.</p>

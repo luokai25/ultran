@@ -533,3 +533,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     max-width: 760px;
   }
 }
+
+/* Brand accents are warm metal across controls; crimson stays with the animated core. */
+.nav-item[aria-current="page"],
+.nav-item.is-active {
+  color: var(--u-accent-strong);
+  border-color: rgba(213,183,121,.18);
+  background: linear-gradient(180deg, rgba(213,183,121,.10), rgba(213,183,121,.025));
+}
+.nav-item[aria-current="page"]::before,
+.nav-item.is-active::before {
+  background: linear-gradient(90deg, var(--u-accent), var(--u-accent-strong));
+  box-shadow: 0 0 10px rgba(213,183,121,.18);
+}
+.tool[aria-pressed="true"],
+.tool[data-active="true"] {
+  border-color: rgba(213,183,121,.30);
+  background: rgba(213,183,121,.09);
+  color: var(--u-accent-strong);
+}
+.composer:focus-within {
+  border-color: rgba(213,183,121,.48);
+  box-shadow: 0 0 0 2px rgba(213,183,121,.08);
+}

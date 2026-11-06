@@ -30,7 +30,8 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 - [x] Chat/home empty state and suggested tasks
 - [ ] Conversation thread and message rendering
 - [ ] Streaming, stop, retry and empty-response states
-- [ ] Composer, attachments, file previews and keyboard behavior
+- [x] Composer and model-picker visual layout
+- [ ] Attachments, file previews and keyboard behavior
 - [ ] Background tasks, event timeline, cancel, retry and reconnect
 - [ ] Artifact tray, artifact preview, download and error states
 - [ ] New conversation, conversation history and deletion confirmation
@@ -38,9 +39,9 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 ### Navigation and discovery
 - [x] Mobile bottom navigation
 - [x] Desktop navigation/sidebar and responsive collapse
-- [ ] Navigation drawer and nested navigation
+- [x] Navigation drawer and secondary-page entry points
+- [x] Model picker overlay: provider groups, no-model and disconnected states
 - [ ] Global search: query, filters, results, empty, loading and error
-- [ ] Model picker: provider groups, selected model, unavailable and disconnected
 - [ ] Workspace tray and task/artifact counts
 
 ### Models and provider credentials
@@ -48,42 +49,42 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 - [ ] Model import: GGUF and supported archive/model formats, validation and failure recovery
 - [ ] Model download: source, progress, pause/resume, storage and integrity errors
 - [ ] Model loading, unloading, benchmark and insufficient-memory states
-- [ ] LLM API Keys: universal paste/import, visible batch import for up to six provider-specific .txt files (1 MB each, 100 keys total), provider detection, verification, masked display, expiry and removal
-- [ ] Provider detection, masked display, verification, save, expiry and removal
+- [x] LLM API Keys page and universal paste/import entry UI
+- [x] Batch provider file import UI, filename detection and labelled-line parser contract
+- [ ] Authenticated provider verification, save, masked display, expiry, removal and key rotation
 - [ ] Provider routing and fallback status without exposing secret material
 
 ### Memory and learning
-- [ ] Memory / Mind Map graph, pan, zoom and node selection
-- [ ] Mind Map search, selected-node detail, empty and error states
+- [x] Mind Map layout, graph empty state and search entry
+- [ ] Graph pan, zoom, node selection, selected-node detail and export
 - [ ] Semantic memory synchronization and offline/conflict states
-- [ ] Learning Review queue and evidence detail
-- [ ] Proposal approve, reject, undo and no-evidence states
+- [x] Learning Review layout, filters and empty-queue state
+- [ ] Evidence detail, proposal approve/reject/undo and no-evidence states
 
 ### Agent configuration and capabilities
-- [ ] Agents and Identities list
+- [x] Agent Identities page layout and default identity state
 - [ ] Active identity selection and identity-specific state
 - [ ] Agent model, brain and capability status
-- [ ] ULTRON Capabilities inventory and category filters
-- [ ] Tool, skill and run detail
+- [x] Capabilities page layout, owner-session error and explicit empty states
+- [ ] ULTRON Capabilities inventory, category filters, tool/skill/run detail
 - [ ] Permission levels, approval requirements, enabled/disabled and failure states
 
 ### Connectors and workspace
-- [ ] Connector catalog, search and category filters
-- [ ] Connector detail, OAuth start/callback, granted scopes
-- [ ] Connected, disconnected, expired, revoked and failed states
+- [x] Connector panel layout and backend-offline/disconnected state
+- [ ] Connector catalog breadth, search, categories and connector detail (current catalogue shows GitHub only)
+- [ ] OAuth start/callback, granted scopes, connected/expired/revoked/failed states
 - [ ] Disconnect and reconnect confirmation
-- [ ] Agent Workspace objective and run list
+- [x] Agent Workspace panel layout and backend-disconnected empty state
 - [ ] Team builder and 2–5 agent configuration
 - [ ] Task progress, events, completion, failure, retry and cancel
 - [ ] Artifact list, preview and download
 - [ ] Approval request detail, exact action, scope, approve and deny
 
 ### Settings and transient surfaces
-- [ ] Settings entry and every nested section
-- [ ] Model/provider settings
-- [ ] Memory and sync settings
-- [ ] Voice, microphone, listening, speaking and permission recovery
-- [ ] Presence and proactive-notification preferences
+- [x] Settings sheet layout, voice/proactive switches, Cloud Sync form, backend and local-model sections
+- [ ] Authenticated Cloud Sync sign-in/out, persistence and recovery
+- [ ] Model import/load/unload/benchmark and storage failure states
+- [ ] Microphone, notifications, Android permission and background-access recovery
 - [ ] Workspace/account/session settings
 - [ ] Confirmation dialogs and destructive actions
 - [ ] Sheets, popovers, menus, tooltips and toast feedback
@@ -116,7 +117,11 @@ Source redesign and Node contract tests are in place. The avatar button is label
 
 - 2026-11-06: Production web is the canonical `apps/phone` bundle at `https://ultron-app-web.luo-chat-ops.workers.dev/`; the latest `ultron-web-latest` release and Worker smoke test passed. The old Pages URL is not the production source of truth. `apps/web` is a separate Next.js prototype/console.
 - 2026-11-06: Source audit covered all five full-screen feature pages plus connectors, workspace, settings, model picker and global search. The LLM API Keys importer is now visible and accepts up to six provider-specific `.txt` files (1 MB each, 100 keys total), detects providers from filenames, parses labelled lines and verifies keys without rendering secret values.
-- 2026-11-06: Main chat shell visually checked at 390×844 and 1440×900. The empty state, core, top bar, suggested tasks, mobile bottom navigation, desktop rail, composer/model chooser and warm-metal active states were verified. Secondary-page interaction/state review, tablet and Android emulator/device parity remain unchecked.
+- 2026-11-06: Main chat shell visually checked at 390×844 and 1440×900. The empty state, core, top bar, suggested tasks, composer/model picker, mobile bottom navigation, desktop rail and warm-metal active states were verified.
+- 2026-11-06: Mobile visual review at 390×844 also covered LLM API Keys, Agent Identities, Mind Map, Learning Review, Capabilities, Connectors, Workspace and Settings. Feature-page headings/back controls now sit below the persistent top bar. Capability-load failures clear stale skeletons and show explicit disconnected empty states. Settings now uses compact accessible switches and gold primary actions.
+- 2026-11-06: The browser review used a fresh unauthenticated session. Cloud pages correctly showed disconnected states. The connector catalogue currently exposes GitHub only and reports its backend offline; full Composio catalogue/OAuth verification remains open. Workspace and capability actions requiring an owner session remain unverified.
+- 2026-11-06: The LLM API Keys importer reads selected `.txt` files locally, parses them in-browser and sends individual key values to the Supabase function over HTTPS; it does not upload the original text file. The owner email is no longer hard-coded in the public app HTML. Only rotated keys should be imported because the previously shared credentials were exposed in chat.
+- 2026-11-06: Local model archive import currently extracts GGUF files from `.tgz`/`.tar.gz`; Safetensors and PyTorch checkpoints are not executable in this build. The model picker visual review confirms provider groups and Import/Find/Settings actions, but model installation and runtime behavior remain unverified.
 - 2026-11-06: The `apps/web` secondary console now has section navigation, a production-app handoff, responsive avatar/ModelHub/architecture sections and accurate secondary-surface metadata. Node contract tests were added; typecheck, lint, test and build passed. Browser visual QA remains open.
 - 2026-11-06: CI verification and web build/Worker smoke test pass. The latest Android release is still pending. Web smoke tests now retry transient Cloudflare asset-propagation failures.
 

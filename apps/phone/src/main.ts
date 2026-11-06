@@ -3658,6 +3658,7 @@ async function importCloudLlmKeyFiles(): Promise<void> {
   let failed = 0;
   let skipped = 0;
   let attempted = 0;
+  const failureReasons = new Set<string>();
   try {
     for (const file of files) {
       if (!file.name.toLowerCase().endsWith(".txt")) { skipped++; continue; }
@@ -3675,9 +3676,11 @@ async function importCloudLlmKeyFiles(): Promise<void> {
         try {
           const result = await addUltronCloudKey(provider, secret, `${file.name.slice(0, 72)} · ${index + 1}`);
           if (result.duplicate === true) duplicates++; else saved++;
-        } catch {
-          // Never print or render a secret or provider request payload in import diagnostics.
+        } catch (error) {
+          // Show only the server's safe error message, never the submitted key or request payload.
           failed++;
+          const reason = error instanceof Error ? error.message : "Unknown provider registration error.";
+          failureReasons.add(reason.replace(/[\\r\\n]+/g, " ").slice(0, 180));
         }
       }
       keys.fill("");
@@ -3689,7 +3692,8 @@ async function importCloudLlmKeyFiles(): Promise<void> {
     cloudLlmImportButton.disabled = false;
   }
   cloudLlmImportStatus.dataset.state = failed ? "unreachable" : attempted ? "connected" : "invalid";
-  cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped. The source file was not uploaded.`;
+  const failureDetail = failureReasons.size ? ` First error: ${[...failureReasons][0]}` : "";
+  cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped.${failureDetail} The source file stays on this device.`;
   try { await refreshCloudLlmScreen(); } catch { /* Preserve the import result if the status refresh fails. */ }
 }
 

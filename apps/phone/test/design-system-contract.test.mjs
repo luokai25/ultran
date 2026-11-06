@@ -108,3 +108,11 @@ test("active navigation uses warm-metal rather than the legacy red theme", async
   assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\][\s\S]*?color:\s*var\(--u-accent-strong\) !important/);
   assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\]::before[\s\S]*?background:\s*var\(--u-accent\) !important/);
 });
+
+
+test("connector filters, paid-tier badges and capability approvals use warm-metal accents", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /\.chip\[aria-pressed="true"\][\s\S]*?var\(--u-accent-strong\)/);
+  assert.match(css, /\.badge\.tier-paid\s*\{[\s\S]*?var\(--u-accent-strong\)/);
+  assert.match(css, /\.capability-source summary,[\s\S]*?\.capability-approve[\s\S]*?var\(--u-accent-strong\)/);
+});

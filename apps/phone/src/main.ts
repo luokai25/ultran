@@ -3989,7 +3989,11 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
 }
 
 function activeModelLabel(): string {
-  if (cloudBrainActive) return selectedCloudModelId || "Ultron Supabase · Auto";
+  if (cloudBrainActive) {
+    const providerLabel = selectedCloudProvider === "google_ai_studio" ? "Google AI Studio"
+      : selectedCloudProvider ? selectedCloudProvider.charAt(0).toUpperCase() + selectedCloudProvider.slice(1) : "ULTRON";
+    return selectedCloudModelId ? providerLabel + " · " + selectedCloudModelId : "ULTRON · Auto";
+  }
   if (nativeModelLoaded && nativeLoadedModelName) return nativeLoadedModelName.replace(/\.gguf$/i, "");
   if (llmProviderState === "connected" && selectedLlmModel) return selectedLlmModel;
   if (settings.localModelEndpoint.trim() && settings.localModel.trim()) return settings.localModel.trim();

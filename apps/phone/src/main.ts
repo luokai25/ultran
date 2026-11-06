@@ -1,7 +1,7 @@
 import { normalizeToolCall } from "@ultron/connectors/tool-contract";
 import { CURATED_MODELS } from "./model-library";
 import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel, type ProviderProfile, type ProviderState } from "./llm-provider";
-import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, removeUltronCloudKey, setUltronCloudKey, streamUltronSupabaseChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
+import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, getUltronCloudModels, removeUltronCloudKey, setUltronCloudKey, streamUltronSupabaseChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
 import { parseProviderKeyFile, providerFromKeyFilename } from "./ultron-key-import.mjs";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
@@ -397,6 +397,8 @@ let llmProviderState: ProviderState = "missing";
 let llmProviderModels: string[] = [];
 let selectedLlmModel = "";
 let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", false);
+let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
+let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;
@@ -3614,10 +3616,27 @@ async function refreshCloudLlmScreen(): Promise<void> {
   }
 }
 
+function detectCloudLlmProvider(key: string): CloudProviderId | null {
+  const value = key.trim();
+  if (/^sk-or-v1-[A-Za-z0-9_-]{16,}$/i.test(value)) return "openrouter";
+  if (/^gsk_[A-Za-z0-9]{16,}$/i.test(value)) return "groq";
+  if (/^(?:AQ\\.|AIza)[A-Za-z0-9_-]{16,}$/i.test(value)) return "google_ai_studio";
+  if (/^csk-[A-Za-z0-9_-]{16,}$/i.test(value)) return "cerebras";
+  return null;
+}
+
 async function addCloudLlmKeyFromScreen(): Promise<void> {
-  const provider = cloudLlmProvider.value as CloudProviderId;
   const key = cloudLlmKeyInput.value.trim();
-  const label = cloudLlmLabelInput.value.trim();
+  const provider = detectCloudLlmProvider(key);
+  const label = "ULTRON · " + (provider ?? "API key");
+  if (!provider) {
+    cloudLlmDetected.textContent = "Provider not recognized. Supported automatic detection: OpenRouter, Groq and Google AI Studio.";
+    cloudBrainStatusEl.dataset.state = "invalid";
+    cloudBrainStatusEl.textContent = "This key format is not recognized. Nothing was sent or stored.";
+    return;
+  }
+  cloudLlmProvider.value = provider;
+  cloudLlmDetected.textContent = "Detected " + provider.replaceAll("_", " ") + " · verifying…";
   if (!key) {
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = "Paste an API key first.";
@@ -3630,12 +3649,15 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   try {
     const result = await addUltronCloudKey(provider, key, label);
     cloudLlmKeyInput.value = ""; cloudLlmLabelInput.value = "";
+    cloudLlmDetected.textContent = "Accepted · securely saved and enabled. Paste another key whenever you are ready.";
+    cloudLlmKeyInput.focus();
     cloudBrainStatusEl.dataset.state = "connected";
     cloudBrainStatusEl.textContent = `Saved and verified. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
     await refreshCloudLlmScreen();
   } catch (error) {
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not verify and save this provider key.";
+    cloudLlmDetected.textContent = "Not saved · check the key and try again.";
   } finally { cloudLlmAddButton.disabled = false; }
 }
 async function importCloudLlmKeyFiles(): Promise<void> {
@@ -3801,7 +3823,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       ...history.map((item) => ({ role: item.role, content: item.content })),
     ];
     if (!usePrometheus) {
-      const content = await streamUltronSupabaseChat("", messages, cloudMaxTokens, externalSignal, onToken);
+      const content = await streamUltronSupabaseChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, onToken, selectedCloudProvider ?? undefined);
       return { content, session_id: "" };
     }
     const runId = typeof priorRun?.id === "string" ? priorRun.id : crypto.randomUUID();
@@ -3961,7 +3983,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
 }
 
 function activeModelLabel(): string {
-  if (cloudBrainActive) return "Ultron Supabase";
+  if (cloudBrainActive) return selectedCloudModelId || "Ultron Supabase · Auto";
   if (nativeModelLoaded && nativeLoadedModelName) return nativeLoadedModelName.replace(/\.gguf$/i, "");
   if (llmProviderState === "connected" && selectedLlmModel) return selectedLlmModel;
   if (settings.localModelEndpoint.trim() && settings.localModel.trim()) return settings.localModel.trim();
@@ -4578,6 +4600,10 @@ req<HTMLButtonElement>("#settings-close-btn").addEventListener("click", closeShe
 apiKeySaveButton.addEventListener("click", () => void verifyProviderKey(true));
 apiKeyRemoveButton.addEventListener("click", () => void removeProviderKey());
 cloudLlmAddButton.addEventListener("click", () => void addCloudLlmKeyFromScreen());
+cloudLlmKeyInput.addEventListener("paste", () => {
+  cloudLlmDetected.textContent = "Reading pasted key and detecting provider…";
+  window.setTimeout(() => { void addCloudLlmKeyFromScreen(); }, 120);
+});
 cloudLlmImportButton.addEventListener("click", () => void importCloudLlmKeyFiles());
 cloudLlmProvider.addEventListener("change", () => {
   const links: Record<string, { url: string; label: string }> = {

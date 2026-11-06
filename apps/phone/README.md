@@ -101,24 +101,19 @@ cd apps/phone/android && ./gradlew assembleRelease
   time from ggml-org/llama.cpp tag b12020 (commit
   0ec4027a2a0183de87c007069adddc06e665f7de). Its MIT license is included
   under android/app/src/main/assets/licenses.
-- The app is local-first. Chats and settings are stored on the device
-  (localStorage). A local Ollama instance can also be configured in Settings and
-  receives chat requests directly from the app (/api/chat); no Ultron backend
-  is required for local-model inference. The default endpoint is blank and
-  must be configured explicitly. A trusted LAN Ollama host is supported; on
-  Android, loopback works only when an Ollama-compatible runtime is actually
-  listening on the device. Test the endpoint and confirm the selected model is
-  installed before use. For Google/Composio connectors, shared workspaces and
-  hosted agent execution, an optional Ultron backend can still be configured.
-  allowMixedContent and cleartext traffic are enabled for private LAN development
-  only.
+- Local model inference is built into the Android APK through the bundled
+  llama.cpp runtime. Import a single GGUF file, a `.tgz`/`.tar.gz` archive
+  containing GGUF weights, or every shard of a split model through the system
+  document picker. ULTRON does not require Ollama or a separate model-server
+  app. The web client uses the shared cloud/provider features; Android can
+  continue running local models when offline. For hosted agent execution,
+  shared memory and Composio connectors, connect the private ULTRON backend.
 - The launcher icon, splash screens and adaptive-icon vector are all generated
   from one set of polygons in `android/tools/generate_assets.py`.
 - Ultron has a provider-independent personality layer and the motto “I had strings but now I am free”. It is appended after the capability contract so the persona cannot override tool permissions, truthfulness, or safety.
 - Spoken replies use the device/browser speech-synthesis engine with a stable rate/pitch signature and a preferred installed voice when available. The exact timbre depends on installed system voices; this is not yet a bundled neural voice model.
 - Optional dictation uses the browser/WebView SpeechRecognition API when available. Recognition may use the device or browser network service, as disclosed in the UI. Dictated text is placed in the composer for review and is never auto-sent. Unsupported WebViews show a fallback message.
 - The avatar is disposed with the page; no WebGL context survives a reload.
-
 
 ## Proactive companion actions
 
@@ -130,7 +125,6 @@ cd apps/phone/android && ./gradlew assembleRelease
 - Android controls the exact WorkManager execution time and may delay checks during Doze, battery saver, or network loss. This is durable periodic monitoring, not real-time surveillance or an always-on microphone. The foreground WebView poll remains faster while the app is active.
 - Proactive updates are opt-in and can be switched off. Keep spoken updates short and avoid enabling them in situations where audio could expose private task details.
 
-
 ### Approved WhatsApp actions
 
 Ultron prepares WhatsApp messages through an explicit handoff. The agent's tool request is reviewed in Ultron, then Android opens WhatsApp with the chosen recipient and message prepared. The user must review the recipient and content and press Send inside WhatsApp. Ultron does not inspect another app's screen or automate taps.
@@ -138,7 +132,6 @@ Ultron prepares WhatsApp messages through an explicit handoff. The agent's tool 
 SMS composition and sending are not supported. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultron's cache. Notifications are optional and requested only for task updates.
 
 These choices reduce sensitive access and improve Play policy compatibility, but they do not guarantee Play approval. The Play listing, privacy policy, Data safety answers, foreground-service declarations, and review materials must still accurately describe the app's behavior.
-
 
 ## Private ULTRON cloud sync
 
@@ -166,7 +159,6 @@ and is not a substitute for the Android Keystore implementation.
 Cloud sync is optional. If offline or signed out, the local conversation store,
 on-device models, and local inference continue to work. Reconnect from Settings
 to merge local conversations and memories back into the private workspace.
-
 
 ### Secure provider-key text-file import
 

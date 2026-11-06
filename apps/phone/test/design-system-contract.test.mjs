@@ -101,3 +101,10 @@ test("mobile hero keeps the complete ULTRON core visible above navigation", asyn
   assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*?\.hero\s*\{[\s\S]*?justify-content:\s*flex-start/);
   assert.match(css, /\.stage\s*\{\s*width:\s*clamp\(132px, 34vw, 160px\)/);
 });
+
+
+test("active navigation uses warm-metal rather than the legacy red theme", async () => {
+  const css = await read("apps/phone/src/quiet-ui.css");
+  assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\][\s\S]*?color:\s*var\(--u-accent-strong\) !important/);
+  assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\]::before[\s\S]*?background:\s*var\(--u-accent\) !important/);
+});

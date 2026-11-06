@@ -24,6 +24,13 @@ test("shared model runtime receives the owner constitution", () => {
   assert.ok(source.includes("LOCAL_AGENT_SYSTEM_PROMPT"));
 });
 
+test("Prometheus checkpoints retain bounded context for cloud continuation", () => {
+  assert.ok(source.includes("schema_version: 2, mode: \"prometheus\""));
+  assert.ok(source.includes("system_prompt: messages.find"));
+  assert.ok(source.includes("messages: messages.filter"));
+  assert.ok(source.includes("slice(-8)"));
+});
+
 test("owner source requires auditable evolution rather than unverified self-modification", () => {
   for (const phrase of ["backup", "isolation", "regression", "benchmark", "roll back", "announce"]) {
     assert.ok(source.toLowerCase().includes(phrase), `runtime prompt is missing ${phrase}`);

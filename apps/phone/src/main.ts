@@ -247,6 +247,7 @@ const cloudLlmProvider = req<HTMLSelectElement>("#cloud-llm-provider");
 const cloudLlmProviderNote = req<HTMLElement>("#cloud-llm-provider-note");
 const cloudLlmProviderConsoleLink = req<HTMLAnchorElement>("#cloud-llm-provider-console");
 const cloudLlmKeyInput = req<HTMLInputElement>("#cloud-llm-key");
+const cloudLlmDetected = req<HTMLElement>("#cloud-llm-detected");
 const cloudLlmLabelInput = req<HTMLInputElement>("#cloud-llm-label");
 const cloudLlmAddButton = req<HTMLButtonElement>("#cloud-llm-add");
 const cloudLlmFilesInput = req<HTMLInputElement>("#cloud-llm-files");

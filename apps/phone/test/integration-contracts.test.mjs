@@ -593,3 +593,12 @@ test("settings voice controls use explicit toggle labels", async () => {
   assert.match(html, /class="toggle-label"><input id="proactive-updates-toggle"/);
   assert.match(html, /class="toggle-label"><input id="voice-updates-toggle"/);
 });
+
+
+test("API key importer explains local file parsing and the HTTPS Supabase handoff", async () => {
+  const html = await read("index.html");
+  assert.match(html, /parses them on this device/);
+  assert.match(html, /individual key values are sent over HTTPS/);
+  assert.match(html, /original files stay on this device/);
+  assert.match(html, /key values are never displayed/);
+});

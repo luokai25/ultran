@@ -127,8 +127,8 @@
             <input id="cloud-llm-files" type="file" /><button id="cloud-llm-import" type="button"></button><p id="cloud-llm-import-status"></p>
           </div>
           <div id="cloud-llm-keys" class="cloud-llm-keys" aria-live="polite"><small>Loading saved provider keys…</small></div>
-          <div class="cloud-provider-directory"><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>
-          <a class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>
+          <div class="cloud-provider-directory" hidden><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>
+          <a hidden class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>
           <small class="llm-key-note">Keys are encrypted in Supabase Vault. ULTRON stores only secret references in its six provider tables, rotates between your valid keys, tracks usage and cools down rate-limited keys. It cannot create provider accounts or mint API keys on your behalf.</small>
         </section>
         <section class="llm-key-card" hidden>

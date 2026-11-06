@@ -267,6 +267,7 @@ const apiKeySaveButton = req<HTMLButtonElement>("#llm-api-key-save");
 const apiKeyRemoveButton = req<HTMLButtonElement>("#llm-api-key-remove");
 const apiKeyModels = req<HTMLElement>("#llm-api-key-models");
 const cloudLlmProvider = req<HTMLSelectElement>("#cloud-llm-provider");
+const cloudLlmProviderFallback = req<HTMLElement>("#cloud-llm-provider-fallback");
 const cloudLlmProviderNote = req<HTMLElement>("#cloud-llm-provider-note");
 const cloudLlmProviderConsoleLink = req<HTMLAnchorElement>("#cloud-llm-provider-console");
 const cloudLlmKeyInput = req<HTMLInputElement>("#cloud-llm-key");
@@ -3750,30 +3751,38 @@ function detectCloudLlmProvider(key: string): CloudProviderId | null {
 
 async function addCloudLlmKeyFromScreen(): Promise<void> {
   const key = cloudLlmKeyInput.value.trim();
-  const provider = detectCloudLlmProvider(key);
-  const label = "ULTRON · " + (provider ?? "API key");
-  if (!provider) {
-    cloudLlmDetected.dataset.state = "invalid";
-    cloudLlmDetected.textContent = "Provider not recognized. Supported automatic detection: OpenRouter, Groq, Google AI Studio and Cerebras.";
-    cloudBrainStatusEl.dataset.state = "invalid";
-    cloudBrainStatusEl.textContent = "This key format is not recognized. Nothing was sent or stored.";
-    return;
-  }
-  cloudLlmProvider.value = provider;
-  cloudLlmDetected.dataset.state = "pending";
-  cloudLlmDetected.textContent = "Detected " + provider.replace(/_/g, " ") + " · verifying…";
+  const detectedProvider = detectCloudLlmProvider(key);
+  const selectedProvider = cloudLlmProvider.value as CloudProviderId | "";
+  const provider = detectedProvider ?? (cloudLlmProviderFallback.hidden ? null : selectedProvider || null);
   if (!key) {
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = "Paste an API key first.";
     cloudLlmKeyInput.focus();
     return;
   }
+  if (!provider) {
+    cloudLlmProviderFallback.hidden = false;
+    cloudLlmAddButton.hidden = false;
+    cloudLlmDetected.dataset.state = "pending";
+    cloudLlmDetected.textContent = "This key format is ambiguous. Choose its provider below; the key stays in this single field.";
+    cloudBrainStatusEl.dataset.state = "pending";
+    cloudBrainStatusEl.textContent = "Nothing has been sent yet. Select the provider that issued this key.";
+    return;
+  }
+  const label = "ULTRON · " + provider;
+  cloudLlmProvider.value = provider;
+  cloudLlmProviderFallback.hidden = true;
+  cloudLlmAddButton.hidden = true;
+  cloudLlmDetected.dataset.state = "pending";
+  cloudLlmDetected.textContent = (detectedProvider ? "Detected " : "Selected ") + provider.replace(/_/g, " ") + " · verifying…";
   cloudLlmAddButton.disabled = true;
   cloudBrainStatusEl.dataset.state = "unreachable";
   cloudBrainStatusEl.textContent = `Verifying ${provider} key and discovering chat models…`;
   try {
     const result = await addUltronCloudKey(provider, key, label);
     cloudLlmKeyInput.value = ""; cloudLlmLabelInput.value = "";
+    cloudLlmProvider.value = "";
+    cloudLlmProviderFallback.hidden = true;
     cloudLlmDetected.dataset.state = "connected";
     cloudLlmDetected.textContent = "Accepted · securely saved and enabled. Paste another key whenever you are ready.";
     cloudLlmKeyInput.focus();
@@ -3781,6 +3790,8 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
     cloudBrainStatusEl.textContent = `Saved and verified. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
     await refreshCloudLlmScreen();
   } catch (error) {
+    cloudLlmProviderFallback.hidden = !detectedProvider;
+    cloudLlmAddButton.hidden = !detectedProvider;
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not verify and save this provider key.";
     cloudLlmDetected.dataset.state = "invalid";
@@ -4800,6 +4811,13 @@ cloudLlmKeyInput.addEventListener("paste", () => {
 });
 cloudLlmImportButton.addEventListener("click", () => void importCloudLlmKeyFiles());
 cloudLlmProvider.addEventListener("change", () => {
+  if (!cloudLlmProviderFallback.hidden && cloudLlmProvider.value) {
+    cloudLlmAddButton.hidden = false;
+    cloudLlmDetected.dataset.state = "pending";
+    cloudLlmDetected.textContent = "Selected " + cloudLlmProvider.value.replace(/_/g, " ") + " · press Save and verify key.";
+    cloudBrainStatusEl.dataset.state = "pending";
+    cloudBrainStatusEl.textContent = "The key has not been sent yet. Save and verify it when ready.";
+  }
   const links: Record<string, { url: string; label: string }> = {
     openrouter: { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" },
     mistral: { url: "https://console.mistral.ai/api-keys/", label: "Open Mistral API keys ↗" },

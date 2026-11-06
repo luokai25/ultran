@@ -35,11 +35,13 @@ test("shared canonical design tokens are defined in both shipped UI surfaces", a
 });
 
 test("mobile and desktop design requirements remain explicit", async () => {
-  const design = await read("DESIGN.md");
+  const [design, html] = await Promise.all([read("DESIGN.md"), read("apps/phone/index.html")]);
   for (const viewport of ["360×800", "390×844", "768×1024", "1280×800", "1440×900"]) {
     assert.ok(design.includes(viewport), `missing viewport contract: ${viewport}`);
   }
-  for (const screen of ["#thread", "#global-search", "#chat-model-menu", "#agent-identities-screen", "#llm-api-keys-screen", "#vault-screen", "#learning-screen", "#capabilities-screen", "#connectors-panel", "#workspace-panel"]) {
-    assert.ok(design.includes(screen), `missing screen inventory entry: ${screen}`);
+  const fullScreens = [...html.matchAll(/<section id="([^"]+)" class="feature-screen[^"]*"/g)].map((match) => match[1]);
+  assert.ok(fullScreens.length >= 5, "the inventory should cover all full-screen destinations");
+  for (const id of [...fullScreens, "thread", "global-search", "chat-model-menu", "connectors-panel", "connector-detail-wrap", "workspace-panel", "workspace-team-builder", "workspace-tray", "composio-approvals", "sheet-wrap"]) {
+    assert.ok(design.includes(`#${id}`), `missing screen inventory entry: #${id}`);
   }
 });

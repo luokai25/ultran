@@ -23,16 +23,15 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
-test("LLM key file import reads locally and routes individual keys through the authenticated Vault gateway", () => {
-  assert.match(html, /id="cloud-llm-files"/);
-  assert.match(html, /<strong>Import<\/strong>/);
-  assert.match(html, />Send<\/button>/);
-  assert.match(html, /google_ai_studio/);
-  assert.match(html, /id="cloud-llm-import"/);
-  assert.match(main, /providerFromKeyFilename/);
-  assert.match(main, /contents = await file\.text\(\)/);
-  assert.match(main, /parseProviderKeyFile\(contents\)/);
-  assert.match(main, /addUltronCloudKey\(provider, secret/);
-  assert.match(main, /attempted < 100/);
-  assert.match(html, /The file is read locally, never uploaded/);
+test("single pasted cloud API key is auto-detected, verified and sent through the authenticated Vault gateway", () => {
+  assert.match(html, /id="cloud-llm-key"/);
+  assert.match(html, /id="cloud-llm-detected"/);
+  assert.match(html, /Paste an OpenRouter, Groq or Google AI Studio key/);
+  assert.match(html, /id="cloud-llm-provider"/);
+  assert.match(main, /function detectCloudLlmProvider/);
+  assert.match(main, /cloudLlmKeyInput\.addEventListener\("paste"/);
+  assert.match(main, /addUltronCloudKey\(provider, key, label\)/);
+  assert.match(main, /cloudLlmKeyInput\.value = ""/);
+  assert.match(main, /Accepted · securely saved and enabled/);
+  assert.match(main, /ultron_store_llm_secret/);
 });

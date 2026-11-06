@@ -29,6 +29,10 @@ test("Prometheus checkpoints retain bounded context for cloud continuation", () 
   assert.ok(source.includes("system_prompt: messages.find"));
   assert.ok(source.includes("messages: messages.filter"));
   assert.ok(source.includes("slice(-8)"));
+  assert.ok(source.includes("goal: goal.slice(0, 4000)"));
+  assert.ok(source.includes("task: task.slice(0, 2000)"));
+  assert.ok(source.includes("content.slice(0, 12000)"));
+  assert.ok(source.includes("content: message.content.slice(0, 2000)"));
 });
 
 test("owner source requires auditable evolution rather than unverified self-modification", () => {

@@ -400,6 +400,8 @@ let selectedLlmModel = "";
 let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", false);
 let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
 let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
+let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
+let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;
@@ -3637,6 +3639,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
     return;
   }
   cloudLlmProvider.value = provider;
+  cloudLlmDetected.dataset.state = "pending";
   cloudLlmDetected.textContent = "Detected " + provider.replaceAll("_", " ") + " · verifying…";
   if (!key) {
     cloudBrainStatusEl.dataset.state = "invalid";
@@ -3650,6 +3653,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   try {
     const result = await addUltronCloudKey(provider, key, label);
     cloudLlmKeyInput.value = ""; cloudLlmLabelInput.value = "";
+    cloudLlmDetected.dataset.state = "connected";
     cloudLlmDetected.textContent = "Accepted · securely saved and enabled. Paste another key whenever you are ready.";
     cloudLlmKeyInput.focus();
     cloudBrainStatusEl.dataset.state = "connected";
@@ -3658,6 +3662,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   } catch (error) {
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not verify and save this provider key.";
+    cloudLlmDetected.dataset.state = "invalid";
     cloudLlmDetected.textContent = "Not saved · check the key and try again.";
   } finally { cloudLlmAddButton.disabled = false; }
 }

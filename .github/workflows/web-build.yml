@@ -1,0 +1,51 @@
+name: ULTRON Web Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/phone/**"
+      - "packages/connectors/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/web-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ultron-web-main
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK-matched web client
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.11
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck and build the same client used by Android
+        run: pnpm --filter @ultron/phone build
+
+      - name: Upload deployable web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultron-apk-matched-web
+          path: apps/phone/dist/
+          if-no-files-found: error
+          retention-days: 7

@@ -400,8 +400,7 @@ let selectedLlmModel = "";
 let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", false);
 let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
 let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
-let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
-let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
+
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
   if (convo.cognitiveCheckpoint) convo.cognitiveCheckpoint = validateUltronCheckpoint(convo.cognitiveCheckpoint, convo.id) ?? undefined;

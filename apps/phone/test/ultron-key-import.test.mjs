@@ -5,8 +5,11 @@ import { providerFromKeyFilename, parseProviderKeyFile, validateProviderKeyFiles
 test("provider import recognises provider names in filenames", () => {
   assert.equal(providerFromKeyFilename("openrouter-keys.txt"), "openrouter");
   assert.equal(providerFromKeyFilename("Open Router.txt"), "openrouter");
+  assert.equal(providerFromKeyFilename("open router api keys.txt"), "openrouter");
   assert.equal(providerFromKeyFilename("GROQ_API_KEYS.txt"), "groq");
+  assert.equal(providerFromKeyFilename("groq api keys.txt"), "groq");
   assert.equal(providerFromKeyFilename("google-ai-studio.txt"), "google_ai_studio");
+  assert.equal(providerFromKeyFilename("google ai studio api keys.txt"), "google_ai_studio");
   assert.equal(providerFromKeyFilename("gemini-keys.txt"), "google_ai_studio");
   assert.equal(providerFromKeyFilename("mistral.txt"), "mistral");
   assert.equal(providerFromKeyFilename("random.txt"), null);
@@ -59,4 +62,14 @@ test("the LLM API Keys screen exposes the local provider-file importer", () => {
   assert.match(html, /id="cloud-llm-import-status"[^>]*role="status"[^>]*aria-live="polite"/);
   assert.match(main, /validateProviderKeyFiles\(files\)/);
   assert.match(main, /Source files stay on this device/);
+});
+
+
+test("provider key files parse the numbered labels used by the ULTRON import workflow", () => {
+  const keys = parseProviderKeyFile([
+    "ultron 1: sk-or-v1-test123456",
+    "groq1: gsk_test123456",
+    "google ai studio 1: AQ.test123456",
+  ].join("\\n"));
+  assert.deepEqual(keys, ["sk-or-v1-test123456", "gsk_test123456", "AQ.test123456"]);
 });

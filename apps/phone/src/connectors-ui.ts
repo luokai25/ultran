@@ -271,7 +271,7 @@ export function initConnectors(deps: Deps): void {
         : "The Supabase gateway is reachable, but its Composio server credential is not configured.";
       composioKeyStatus.dataset.tone = result.configured ? "ok" : "";
       composioKeyStatus.textContent = result.configured
-        ? "Composio API key verified and stored in Supabase Vault. You can replace it here."
+        ? "Composio API key is configured. Keys saved here are stored in Supabase Vault; you can replace the current key."
         : "Add your Composio API key here. It is verified first, stored in Vault, and cleared from this field.";
     } catch (error) {
       if (!panelOpen || generation !== refreshGeneration) return;

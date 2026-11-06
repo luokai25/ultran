@@ -440,6 +440,8 @@ export async function pullCloudMemories(): Promise<Array<{
   text: string;
   kind: string;
   source: string;
+  sourceRef?: string;
+  summary?: string;
   confidence: number;
   updatedAt: number;
 }>> {
@@ -471,6 +473,8 @@ export async function pullCloudMemories(): Promise<Array<{
       text: row.content,
       kind: row.memory_type,
       source: row.source ?? 'cloud',
+      sourceRef: typeof row.source_ref === 'string' ? row.source_ref : undefined,
+      summary: typeof row.summary === 'string' ? row.summary : undefined,
       confidence: Number(row.confidence ?? 0.8),
       updatedAt: new Date(row.updated_at).getTime(),
     };

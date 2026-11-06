@@ -37,6 +37,8 @@ assert.match(brain, /function isFreeModel/);
 assert.ok(brain.includes('id.replace(/^models\\//i, "")'), "Google model resource names must be normalized before storing");
 assert.ok(brain.includes('model.toLowerCase().replace(/^models\\//, "")'), "brain routing must tolerate legacy Google model resource names");
 assert.ok(jobs.includes('model.toLowerCase().replace(/^models\\//, "")'), "maintenance model routing must tolerate legacy Google model resource names");
+assert.ok(brain.includes('3\\.5-flash(?:-lite)?'), "Google 3.5 Flash and Flash-Lite are free-tier eligible");
+assert.ok(jobs.includes('3\\.5-flash(?:-lite)?'), "maintenance routing must recognize Google 3.5 Flash models");
 assert.match(brain, /id\.endsWith\(":free"\)/);
 assert.match(brain, /rate_limited/);
 assert.match(brain, /ultron_store_llm_secret/);

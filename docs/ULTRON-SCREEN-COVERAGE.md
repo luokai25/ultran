@@ -48,7 +48,7 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 - [ ] Model import: GGUF and supported archive/model formats, validation and failure recovery
 - [ ] Model download: source, progress, pause/resume, storage and integrity errors
 - [ ] Model loading, unloading, benchmark and insufficient-memory states
-- [ ] LLM API Keys: universal paste/import flow and file import
+- [ ] LLM API Keys: universal paste/import, visible batch import for up to six provider-specific .txt files (1 MB each, 100 keys total), provider detection, verification, masked display, expiry and removal
 - [ ] Provider detection, masked display, verification, save, expiry and removal
 - [ ] Provider routing and fallback status without exposing secret material
 

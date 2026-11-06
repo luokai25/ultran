@@ -80,6 +80,42 @@ export async function getUltronFreeProviders(refresh = false): Promise<CloudProv
   return result.registry && typeof result.registry === "object" ? result.registry as CloudProviderRegistry : null;
 }
 
+const MAX_CLOUD_MESSAGE_CHARS = 22_000;
+const MAX_CLOUD_TOTAL_CHARS = 90_000;
+
+/** Keep every message inside the Edge Function's per-message and total payload limits.
+ * Capability prompts can grow as ULTRON accumulates tools and recovery notes, so
+ * trim oversized context before sending rather than letting Supabase reject the turn. */
+export function prepareCloudChatMessages(
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+): Array<{ role: "system" | "user" | "assistant"; content: string }> {
+  const normalized = messages
+    .filter((message) => ["system", "user", "assistant"].includes(message.role) && typeof message.content === "string" && message.content.trim())
+    .map((message) => {
+      const content = message.content.trim();
+      if (content.length <= MAX_CLOUD_MESSAGE_CHARS) return { role: message.role, content };
+      const marker = "\n\n[Earlier context shortened to fit ULTRON's cloud request limits.]\n\n";
+      const head = Math.floor((MAX_CLOUD_MESSAGE_CHARS - marker.length) * 0.72);
+      const tail = MAX_CLOUD_MESSAGE_CHARS - marker.length - head;
+      return { role: message.role, content: content.slice(0, head) + marker + content.slice(-tail) };
+    });
+  let total = normalized.reduce((sum, message) => sum + message.content.length, 0);
+  while (total > MAX_CLOUD_TOTAL_CHARS && normalized.length > 2) {
+    const lastIndex = normalized.length - 1;
+    const removable = normalized.findIndex((message, index) => index > 0 && index < lastIndex && message.role === "assistant");
+    const index = removable >= 0 ? removable : 1;
+    const [removed] = normalized.splice(index, 1);
+    total -= removed?.content.length ?? 0;
+  }
+  if (total > MAX_CLOUD_TOTAL_CHARS && normalized.length >= 2) {
+    const system = normalized[0];
+    const latest = normalized[normalized.length - 1];
+    const systemBudget = Math.max(0, MAX_CLOUD_TOTAL_CHARS - (latest?.content.length ?? 0));
+    if (system) system.content = system.content.slice(-systemBudget);
+  }
+  return normalized;
+}
+
 export async function streamUltronSupabaseChat(
   modelId: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
@@ -90,7 +126,11 @@ export async function streamUltronSupabaseChat(
 ): Promise<string> {
   let session = await getCloudSession();
   if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
-  const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages, max_tokens: maxTokens, temperature: 0.3 });
+  const safeMessages = prepareCloudChatMessages(messages);
+  if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
+    throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
+  }
+  const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3 });
   const send = (accessToken: string) => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
     method: "POST",
     headers: {
@@ -114,6 +154,10 @@ export async function streamUltronSupabaseChat(
     const detail = await response.text().catch(() => "");
     let message = detail.slice(0, 500);
     try { const parsed = JSON.parse(detail) as Record<string, unknown>; message = String(parsed.message ?? parsed.error ?? message); } catch { /* provider or gateway returned plain text */ }
+    if (response.status === 400 && /valid_messages_required/.test(message)) {
+      throw new Error("ULTRON's cloud prompt exceeded a message-size limit. The request was shortened safely; send again.");
+    }
+    if (response.status === 413) throw new Error("This conversation is too large for the cloud request. Start a fresh chat or shorten the attached context.");
     throw new Error(`ULTRON Supabase returned HTTP ${response.status}: ${message}`);
   }
   if (!response.body) throw new Error("ULTRON Supabase did not return a readable response stream.");

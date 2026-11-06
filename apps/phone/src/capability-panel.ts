@@ -40,7 +40,8 @@ export function initCapabilityPanel(invoke: Invoke, runtimeInvoke: RuntimeInvoke
   const refresh = async (quiet = false) => {
     if (loading) return;
     loading = true;
-    if (!quiet) feedback.textContent = "Refreshing private capability records…";
+    root.dataset.state = "loading";
+    if (!quiet) { feedback.dataset.tone = "loading"; feedback.textContent = "Refreshing private capability records…"; }
     try {
       const [data,cloudToolsResult,toolRunsResult,cloudSkillsResult] = await Promise.all([
         invoke("list") as Promise<CapabilityData>,
@@ -50,6 +51,7 @@ export function initCapabilityPanel(invoke: Invoke, runtimeInvoke: RuntimeInvoke
       ]);
       const tools = asRows(data.tools), proposals = asRows(data.proposals), runs = asRows(data.runs), events = asRows(data.events);
       const cloudTools=asRows(cloudToolsResult.tools), toolRuns=asRows(toolRunsResult.runs), cloudSkills=asRows(cloudSkillsResult.skills);
+      root.dataset.state = "ready";
       connection.textContent = "Connected · " + String(data.instance ?? "ULTRON owner instance") + " · authenticated owner session";
       stats.replaceChildren();
       for (const [label, value] of [["TOOLS", tools.length], ["PROPOSALS", proposals.length], ["AGENT RUNS", runs.length], ["EVENTS", events.length]] as const) {
@@ -157,10 +159,24 @@ export function initCapabilityPanel(invoke: Invoke, runtimeInvoke: RuntimeInvoke
         const node=el("article","capability-event");node.append(el("strong","","#"+String(event.id??"")+" · "+str(event,"event_type")),el("small",""," "+date(event.created_at)));
         const detail=el("details","capability-source");detail.append(el("summary","","Event details"));detail.append(el("pre","capability-code",JSON.stringify(event.details??{},null,2)));node.append(detail);eventsEl.append(node);
       }
+      feedback.dataset.tone = "success";
       feedback.textContent="Synced · latest records loaded from Supabase. "+(tools.length?"Tool source hashes and lifecycle states are visible.":"Ready for ULTRON to propose its first tool.");
     } catch(error) {
+      root.dataset.state = "error";
       connection.textContent="Not connected · owner session required";
+      feedback.dataset.tone = "error";
       feedback.textContent="Could not load capability records: "+(error instanceof Error?error.message:String(error));
+      toolsEl.replaceChildren(empty("Generated tools appear here after the owner session connects."));
+      proposalsEl.replaceChildren(empty("Capability proposals are private to the authenticated owner session."));
+      runsEl.replaceChildren(empty("Agent run checkpoints are unavailable until the owner session connects."));
+      eventsEl.replaceChildren(empty("Capability events are unavailable until the owner session connects."));
+      cloudToolsEl.replaceChildren(empty("Cloud workflow tools appear here after the owner session connects."));
+      toolRunsEl.replaceChildren(empty("Cloud tool execution history appears here after the owner session connects."));
+      cloudSkillsEl.replaceChildren(empty("Shared cloud skills appear here after the owner session connects."));
+      for (const selector of ["#capability-tool-count","#capability-proposal-count","#capability-run-count","#capability-event-count","#capability-cloud-tool-count","#capability-tool-run-count","#capability-cloud-skill-count"]) {
+        const count = root.querySelector<HTMLElement>(selector);
+        if (count) count.textContent = "—";
+      }
     } finally { loading=false; }
   };
   root.querySelector("#capability-refresh")!.addEventListener("click",()=>void refresh());

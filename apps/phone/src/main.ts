@@ -757,7 +757,13 @@ function mergeCloudMemoryGraph(
     sources: ["cloud-memory-relation"],
     confidence: Number(relation.weight),
   }));
-  const next = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges }), "cloud-memory-sync");
+  let next = semanticGraph;
+  for (let index = 0; index < nodes.length; index += 40) {
+    next = mergeGraphProposal(next, JSON.stringify({ nodes: nodes.slice(index, index + 40), edges: [] }), "cloud-memory-sync");
+  }
+  for (let index = 0; index < edges.length; index += 80) {
+    next = mergeGraphProposal(next, JSON.stringify({ nodes: [], edges: edges.slice(index, index + 80) }), "cloud-memory-sync");
+  }
   if (next === semanticGraph) return;
   semanticGraph = next;
   writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);

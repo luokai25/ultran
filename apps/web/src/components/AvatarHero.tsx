@@ -44,7 +44,7 @@ export default function AvatarHero() {
       <AvatarScene3D scene={scene} emotion={emotion} speaking={speaking} />
       <div className="ultron-row" style={{ marginTop: 14, flexWrap: "wrap" }}>
         <button className="ultron-btn" onClick={speak} disabled={speaking}>
-          {speaking ? "Speaking" : "Speak"}
+          {speaking ? "Animating" : "Preview speech"}
         </button>
         {EMOTIONS.map((id) => (
           <button

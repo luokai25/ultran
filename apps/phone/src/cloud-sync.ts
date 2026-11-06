@@ -498,6 +498,7 @@ export async function pullCloudMemoryRelations(): Promise<Array<{
       .from('ultron_memory_relations')
       .select('id,source_memory_id,target_memory_id,relation_type,weight')
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, to);
     if (error) throw error;
     return page ?? [];

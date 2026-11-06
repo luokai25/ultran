@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo no tests yet",
+    "test": "node --test",
     "clean": "rm -rf .next dist"
   },
   "dependencies": {

@@ -62,7 +62,7 @@ Deno.serve(async(req:Request)=>{
    await composio("/auth_configs?limit=1",apiKey);
    const {data:previous,error:readError}=await serviceDb.from("ultron_settings").select("setting_value").eq("owner_id",ownerId).eq("setting_key","composio_gateway").maybeSingle();
    if(readError)throw readError;
-   const {data:secretId,error:storeError}=await serviceDb.rpc("ultron_store_llm_secret",{p_owner_id:ownerId,p_secret:apiKey,p_name:"ultron-composio-gateway-"+ownerId});
+   const {data:secretId,error:storeError}=await serviceDb.rpc("ultron_store_llm_secret",{p_owner_id:ownerId,p_secret:apiKey,p_name:"ultron-composio-gateway-"+ownerId+"-"+Date.now()});
    if(storeError||typeof secretId!=="string")throw new Error("composio_vault_store_failed");
    const {error:settingError}=await serviceDb.from("ultron_settings").upsert({
     owner_id:ownerId,setting_key:"composio_gateway",

@@ -578,3 +578,11 @@ test("Supabase is the default shared runtime for ULTRON-authored tools and skill
   assert.match(html, /id="capability-tool-runs"/);
   assert.match(html, /id="capability-cloud-skills"/);
 });
+
+
+test("cloud owner email is never hard-coded into the public app shell", async () => {
+  const html = await read("index.html");
+  const input = html.match(/<input id="cloud-email"[^>]*>/)?.[0] ?? "";
+  assert.match(input, /type="email"/);
+  assert.doesNotMatch(input, /value="/);
+});

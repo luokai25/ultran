@@ -5,7 +5,7 @@ import {resolve} from "node:path";
 const root=resolve(import.meta.dirname,"..","..","..");
 const gateway=readFileSync(resolve(root,"supabase/functions/ultron-connectors/index.ts"),"utf8");
 const client=readFileSync(resolve(root,"apps/phone/src/connectors-cloud.ts"),"utf8");
-const migration=readFileSync(resolve(root,"supabase/migrations/20261105041000_ultron_connector_gateway_metadata.sql"),"utf8");
+const migration=readFileSync(resolve(root,"supabase/migrations/20261105040627_ultron_connector_gateway_metadata.sql"),"utf8");
 const screen=readFileSync(resolve(root,"apps/phone/src/connectors-ui.ts"),"utf8");
 const runtime=readFileSync(resolve(root,"supabase/functions/ultron-runtime/index.ts"),"utf8");
 test("Composio API key stays server-side and owner auth is enforced",()=>{assert.match(gateway,/auth\.getUser\(token\)/);assert.match(gateway,/ultron_instance/);assert.match(gateway,/Deno\.env\.get\("COMPOSIO_API_KEY"\)/);assert.match(gateway,/backend\.composio\.dev\/api\/v3\.1/);assert.match(gateway,/composio\("\/connected_accounts\/link"/);});

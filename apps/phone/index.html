@@ -127,6 +127,12 @@
           <label class="llm-key-field"><span>Key label <small>(optional)</small></span><input id="cloud-llm-label" type="text" maxlength="100" placeholder="e.g. OpenRouter key 2" autocomplete="off" /></label>
           <label class="llm-key-field"><span>Paste API key</span><input id="cloud-llm-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="API key is encrypted in Supabase Vault…" /></label>
           <button id="cloud-llm-add" class="gold-button" type="button">Save to Supabase &amp; test</button>
+          <div class="llm-key-import">
+            <label class="llm-key-field"><span>Import provider text files</span><input id="cloud-llm-files" type="file" accept=".txt,text/plain" multiple /></label>
+            <small class="llm-key-note">Use one file per provider. Name each file with openrouter, mistral, cerebras, groq or cohere; put one API key on each line. Files are read locally and are never uploaded or saved. Individual keys go directly to the authenticated ULTRON Vault gateway over HTTPS.</small>
+            <button id="cloud-llm-import" class="text-action" type="button">Import selected key files</button>
+            <p id="cloud-llm-import-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">No files selected.</p>
+          </div>
           <div id="cloud-llm-keys" class="cloud-llm-keys" aria-live="polite"><small>Loading saved provider keys…</small></div>
           <div class="cloud-provider-directory"><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>
           <a class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>

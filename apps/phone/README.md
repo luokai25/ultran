@@ -148,3 +148,8 @@ and is not a substitute for the Android Keystore implementation.
 Cloud sync is optional. If offline or signed out, the local conversation store,
 on-device models, and local inference continue to work. Reconnect from Settings
 to merge local conversations and memories back into the private workspace.
+
+
+### Secure provider-key text-file import
+
+Open **LLM API KEYS → Ultron Supabase · Cloud brain → Import provider text files**. Select up to 20 `.txt` files (maximum 1 MB each). Name each file with its provider ID (`openrouter`, `mistral`, `cerebras`, `groq`, or `cohere`) and put one key per line. Blank lines, `#`/`;`/`//` comments, duplicate lines, and `NAME=value` entries are supported. A file may contain up to 100 keys. The browser reads each file locally; it does not upload or persist the source file. Individual keys are sent over HTTPS to the authenticated `ultron-brain` Edge Function, verified against the provider, and stored in Supabase Vault. Do not send key files through chat, email, GitHub, or commit them to the repository.

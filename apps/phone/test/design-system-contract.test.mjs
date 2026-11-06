@@ -134,3 +134,11 @@ test("capability error state clears loading placeholders and neutralizes unavail
   assert.match(source, /count\.textContent = "—"/);
   assert.match(source, /feedback\.dataset\.tone = "error"/);
 });
+
+
+test("settings sheet uses accessible switches and warm-metal primary actions", async () => {
+  const css = await read("src/quiet-ui.css");
+  assert.match(css, /\.sheet \.field > \.toggle-label\s*\{[\s\S]*?text-transform:\s*none/);
+  assert.match(css, /\.sheet \.toggle-label input\[type="checkbox"\]\s*\{[\s\S]*?border-radius:\s*999px/);
+  assert.match(css, /\.sheet \.solid\s*\{[\s\S]*?background:\s*var\(--u-accent\) !important/);
+});

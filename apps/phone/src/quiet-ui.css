@@ -556,3 +556,80 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border-color: rgba(213,183,121,.48);
   box-shadow: 0 0 0 2px rgba(213,183,121,.08);
 }
+
+
+/* Provider key-file import: visible, local-first and consistent with the shared tokens. */
+.ultron-key-file-import {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 14px;
+  border: 1px dashed var(--u-border-strong);
+  border-radius: var(--u-radius-panel);
+  background: var(--u-surface-1);
+}
+.ultron-key-file-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ultron-key-file-heading strong {
+  color: var(--u-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+.ultron-key-file-heading span {
+  color: var(--u-text-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.ultron-key-file-help {
+  margin: 0;
+  color: var(--u-text-secondary);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.ultron-key-file-import #cloud-llm-files {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px;
+  border: 1px solid var(--u-border);
+  border-radius: var(--u-radius-control);
+  background: var(--u-surface-2);
+  color: var(--u-text-secondary);
+  font: 11px var(--font-sans);
+}
+.ultron-key-file-import #cloud-llm-files::file-selector-button {
+  min-height: 32px;
+  margin-right: 9px;
+  padding: 0 10px;
+  border: 1px solid var(--u-border-strong);
+  border-radius: 8px;
+  background: var(--u-surface-3);
+  color: var(--u-text);
+  font: 600 10px var(--font-sans);
+}
+.ultron-key-file-import #cloud-llm-import {
+  width: 100%;
+  min-height: 44px;
+  border-color: var(--u-border-strong);
+  background: var(--u-surface-2);
+  color: var(--u-accent-strong);
+}
+.ultron-key-import-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--u-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ultron-key-import-status[data-state="connected"] { color: var(--u-success); }
+.ultron-key-import-status[data-state="invalid"] { color: var(--u-warning); }
+.ultron-key-import-status[data-state="unreachable"] { color: var(--u-danger); }
+@media (max-width: 380px) {
+  .ultron-key-file-import { padding: 12px; }
+  .ultron-key-file-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+}

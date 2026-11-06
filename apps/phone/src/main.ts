@@ -728,7 +728,7 @@ function mergeCloudMemoryGraph(
   memories: Array<{ id: string; text: string; kind: string; source: string; sourceRef?: string; summary?: string; confidence: number }>,
   relations: Array<{ id: string; sourceId: string; targetId: string; relation: string; weight: number }> = [],
 ): void {
-  if (!memories.length) return;
+  if (!memories.length && !relations.length) return;
   const graphId = (id: string): string => "cloud-memory-" + String(id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60);
   const nodes = memories.slice(0, 500).map((memory) => {
     const safeId = String(memory.id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60);

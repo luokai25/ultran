@@ -102,7 +102,10 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
 
   const attemptedModels = new Set<string>();
   let emptyProposal: { proposal: Record<string, unknown>; model: string } | null = null;
-  for (const candidate of candidates.slice(0, 24)) {
+  const deadline = Date.now() + 42_000;
+  for (const candidate of candidates.slice(0, 16)) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 1_000) break;
     const { provider, key, model } = candidate;
     const modelKey = provider.id + ":" + model;
     if (attemptedModels.has(modelKey)) continue;
@@ -114,7 +117,7 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
       ? { model, messages, temperature: 0.1, max_tokens: 2400 }
       : { model, messages, temperature: 0.1, max_tokens: 2400, response_format: { type: "json_object" } };
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(45000) });
+      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(Math.min(12_000, Math.max(1_000, remainingMs))) });
       const raw = await response.text();
       if (!response.ok) {
         const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";

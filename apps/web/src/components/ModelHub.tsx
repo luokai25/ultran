@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type HubModel = { id: string; downloads?: number; likes?: number; pipeline_tag?: string; tags?: string[]; library_name?: string };
 type Provider = { id: string; name: string; note: string; url: string };

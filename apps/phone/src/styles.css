@@ -1594,7 +1594,7 @@ button {
 .connector-brand-heading { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .connector-brand-heading h2 { margin:0; }
 .connector-brand-heading small { color:var(--muted); font-size:10px; letter-spacing:.14em; font-weight:800; }
-.github-intro { display:flex; align-items:center; gap:14px; padding:16px; margin:4px 0 14px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
+.github-intro { display:flex; align-items:center; gap:14px; padding:16px; margin:4px 0 14px; border:1px solid var(--hairline); border-radius:16px; background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
 .github-intro > div:last-child { min-width:0; }
 .github-intro strong { display:block; font-size:15px; letter-spacing:-.02em; }
 .github-intro p { margin:5px 0 0; color:var(--muted); font-size:12px; line-height:1.55; }
@@ -1606,7 +1606,7 @@ button {
 .github-detail-title h2 { margin:0; }
 .github-detail-mark { width:44px; height:44px; }
 .github-capability-list { display:grid; gap:8px; margin:10px 0 16px; }
-.github-capability-row { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font-size:13px; }
+.github-capability-row { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--hairline); border-radius:12px; font-size:13px; }
 .conn-tool-details { min-width:0; display:grid; gap:4px; }
 .conn-tool-name { overflow-wrap:anywhere; font-size:12px; letter-spacing:.02em; }
 .conn-tool-description { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
@@ -1656,12 +1656,12 @@ button {
 .capability-tool-run{border-color:color-mix(in srgb,var(--accent) 55%,var(--hairline));color:var(--accent-bright);}
 
 
-.composio-key-setup{display:grid;gap:9px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel,rgba(255,255,255,.025))}
+.composio-key-setup{display:grid;gap:9px;padding:14px;border:1px solid var(--hairline);border-radius:14px;background:var(--carbon)}
 .composio-key-setup strong{display:block;font-size:13px}
 .composio-key-setup p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
 .composio-key-setup label{font-size:11px;color:var(--muted)}
-.composio-key-setup input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit}
+.composio-key-setup input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;background:var(--obsidian);color:var(--ink);font:inherit}
 .composio-key-setup button{min-height:42px;justify-self:start}
 .composio-key-setup small{font-size:11px;line-height:1.45;color:var(--muted)}
-.composio-key-setup small[data-tone="ok"]{color:var(--success,#68c79a)}
+.composio-key-setup small[data-tone="ok"]{color:var(--ok)}
 .composio-key-setup small[data-tone="bad"]{color:var(--danger,#e58c8c)}

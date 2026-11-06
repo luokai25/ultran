@@ -240,3 +240,242 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .llm-cloud-card{gap:12px}
 .llm-cloud-card .llm-api-key-status{font-size:10px}
 @media(max-width:520px){.chat-model-button{width:min(250px,calc(100vw - 32px))}.chat-model-menu{padding:10px}.llm-cloud-card{padding:13px}}
+
+/* ULTRON shared page layer: consistent secondary-page structure and controls. */
+.feature-screen,
+.panel,
+.workspace-panel {
+  color: var(--u-text);
+  scrollbar-color: var(--u-border-strong) transparent;
+}
+.feature-head {
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--u-border);
+}
+.feature-head h1,
+.panel-head h2,
+.workspace-head h2 {
+  color: var(--u-text);
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: -.04em;
+}
+.feature-head p,
+.feature-disclaimer,
+.feature-screen article p {
+  color: var(--u-text-secondary);
+}
+.feature-eyebrow,
+.section-eyebrow {
+  color: var(--u-text-muted) !important;
+}
+.feature-screen article,
+.capability-hero,
+.capability-stat,
+.capability-feedback,
+.capability-boundary,
+.mindmap-detail,
+.learning-section,
+.identity-card,
+.identity-brain-link,
+.conn-card,
+.workspace-card,
+.llm-key-card {
+  border: 1px solid var(--u-border) !important;
+  border-radius: var(--u-radius-panel) !important;
+  background: var(--u-surface-1) !important;
+  box-shadow: none !important;
+}
+.feature-screen input:not([type="checkbox"]):not([type="radio"]),
+.feature-screen select,
+.feature-screen textarea,
+.panel input:not([type="checkbox"]):not([type="radio"]),
+.panel select,
+.panel textarea,
+.workspace-panel input,
+.workspace-panel select,
+.workspace-panel textarea {
+  min-height: 48px;
+  border: 1px solid var(--u-border-strong);
+  border-radius: var(--u-radius-control);
+  background: var(--u-surface-2);
+  color: var(--u-text);
+}
+.feature-screen button,
+.panel button,
+.workspace-panel button {
+  min-height: 44px;
+  border-radius: var(--u-radius-control);
+}
+.feature-screen button:focus-visible,
+.panel button:focus-visible,
+.workspace-panel button:focus-visible {
+  outline: 2px solid var(--u-accent-strong);
+  outline-offset: 3px;
+}
+.feature-screen .gold-button,
+.panel .gold-button,
+.workspace-panel .gold-button {
+  border-color: rgba(213,183,121,.38);
+  background: rgba(213,183,121,.12);
+  color: var(--u-accent-strong);
+}
+.feature-screen .ghost,
+.panel .ghost,
+.workspace-panel .ghost {
+  border-color: var(--u-border);
+  background: var(--u-surface-2);
+  color: var(--u-text-secondary);
+}
+.feature-screen .ghost:active,
+.panel .ghost:active,
+.workspace-panel .ghost:active {
+  background: var(--u-surface-3);
+}
+.feature-screen .feature-head .icon-btn,
+.panel-head .icon-btn {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--u-border);
+  border-radius: var(--u-radius-control);
+  background: var(--u-surface-2);
+}
+.identity-program-grid,
+.capability-stats,
+.learning-stats,
+.workspace-stats {
+  gap: 12px;
+}
+.mindmap-canvas-wrap {
+  border: 1px solid var(--u-border);
+  border-radius: var(--u-radius-panel);
+  background: radial-gradient(ellipse at center, rgba(213,183,121,.045), transparent 68%), var(--u-surface-1);
+}
+.llm-key-card,
+.llm-cloud-card {
+  max-width: 760px;
+}
+.feature-screen .section-eyebrow {
+  letter-spacing: .12em;
+}
+.feature-screen :where(p, li) {
+  line-height: 1.55;
+}
+
+@media (min-width: 900px) {
+  #app {
+    width: calc(100% - 80px);
+    max-width: none;
+    margin-left: 80px;
+    height: 100dvh;
+  }
+  .topbar {
+    min-height: 68px;
+    flex-basis: 68px;
+    padding-inline: clamp(20px, 3vw, 44px);
+  }
+  .bottom-nav {
+    position: fixed;
+    z-index: 70;
+    inset: 0 auto 0 0;
+    transform: none;
+    width: 80px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 8px;
+    padding: calc(var(--safe-top) + 18px) 8px 18px;
+    border-top: 0;
+    border-right: 1px solid var(--u-border);
+    background: var(--u-surface-1);
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .nav-item {
+    width: 100%;
+    min-height: 66px;
+    flex: 0 0 auto;
+    gap: 6px;
+    border-radius: 13px;
+    font-size: 10px;
+  }
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+  }
+  .thread {
+    padding: 0 clamp(24px, 4vw, 64px) 24px;
+  }
+  .thread > * {
+    max-width: 900px;
+  }
+  .composer {
+    width: min(100%, 900px);
+    margin-inline: auto;
+  }
+  .feature-screen {
+    inset: 0 0 0 80px;
+    padding: 34px clamp(28px, 5vw, 76px) 48px;
+  }
+  .feature-screen > * {
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+  .feature-head {
+    position: sticky;
+    top: -1px;
+    z-index: 5;
+    padding: 10px 0 18px;
+    background: linear-gradient(180deg, var(--u-bg) 82%, rgba(9,10,12,0));
+  }
+  .panel,
+  .workspace-panel {
+    inset: 0 0 0 80px;
+    padding-inline: clamp(24px, 4vw, 64px);
+  }
+  .panel-head,
+  .workspace-head,
+  .panel-tools,
+  .workspace-panel > * {
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+  .sheet-wrap {
+    left: 80px;
+  }
+  .sheet {
+    width: min(760px, calc(100vw - 128px));
+    border: 1px solid var(--u-border-strong);
+    border-radius: var(--u-radius-panel);
+    margin-block: auto;
+  }
+  .scrim {
+    left: 80px;
+  }
+  .identity-cards,
+  .identity-program-grid,
+  .capability-stats,
+  .learning-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mindmap-canvas-wrap {
+    min-height: 480px;
+    height: min(60vh, 680px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-screen *,
+  .panel *,
+  .workspace-panel * {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

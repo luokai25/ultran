@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ultron - Local AI Agentic Workspace",
+  title: "ULTRON | Secondary Owner Console",
   description:
-    "A local-first agent workspace: connector marketplace, local AI brains, builder, forge, billing and 3D Ultron avatar.",
+    "A secondary ULTRON console for the 3D avatar and Model Hub. Production chat, tools and task workflows use the shared apps/phone client.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

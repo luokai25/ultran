@@ -84,7 +84,7 @@ export default function ModelHub() {
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSignedIn(!!session);
-      if (session) void refreshCatalog();
+      if (session) window.setTimeout(() => { void refreshCatalog(); }, 0);
       else { setCatalog([]); setConnected([]); }
     });
     return () => data.subscription.unsubscribe();

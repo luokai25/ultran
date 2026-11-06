@@ -60,29 +60,53 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { readFile, readdir } from "node:fs/promises";
-          const html = await readFile("apps/phone/dist/index.html", "utf8");
-          let response;
-          for (let attempt = 0; attempt < 8; attempt++) {
-            response = await fetch("https://ultron-app-web.luo-chat-ops.workers.dev/", { signal: AbortSignal.timeout(15_000) });
-            if (response.ok) break;
-            await response.body?.cancel();
-            await new Promise(resolve => setTimeout(resolve, 2500));
-          }
-          if (!response?.ok) throw new Error(`Cloudflare app returned HTTP ${response?.status}: ${await response.text()}`);
-          const liveHtml = await response.text();
-          if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Personal AI System")) throw new Error("Cloudflare app did not serve the APK-matched ULTRON shell");
-          const assets = await readdir("apps/phone/dist/assets");
-          for (const name of assets) {
-            let asset;
-            for (let attempt = 0; attempt < 8; attempt++) {
-              asset = await fetch(`https://ultron-app-web.luo-chat-ops.workers.dev/assets/${name}`, { signal: AbortSignal.timeout(15_000) });
-              if (asset.ok) break;
-              await asset.body?.cancel();
-              if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+          const localHtml = await readFile("apps/phone/dist/index.html", "utf8");
+          const base = "https://ultron-app-web.luo-chat-ops.workers.dev";
+          const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function fetchWithRetry(url, label, readBody) {
+            let lastError;
+            for (let attempt = 0; attempt < 6; attempt++) {
+              try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+                if (!response.ok) {
+                  await response.body?.cancel();
+                  throw new Error(`${label} returned HTTP ${response.status}`);
+                }
+                const body = await readBody(response);
+                return { response, body };
+              } catch (error) {
+                lastError = error;
+                if (attempt < 5) {
+                  console.warn(`${label} attempt ${attempt + 1}/6 failed: ${error instanceof Error ? error.message : String(error)}`);
+                  await sleep(1500 * (attempt + 1));
+                }
+              }
             }
-            if (!asset?.ok) throw new Error(`Cloudflare asset ${name} returned HTTP ${asset?.status} after 8 attempts`);
-            const bytes = await asset.arrayBuffer();
-            if (!bytes.byteLength) throw new Error(`Cloudflare asset ${name} returned an empty body`);
+            throw new Error(`${label} failed after 6 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
           }
-          console.log(`Cloudflare web smoke test passed: ${assets.length} built assets, ${liveHtml.length} HTML bytes`);
+
+          const { body: liveHtml } = await fetchWithRetry(
+            base + "/", "Cloudflare app", response => response.text()
+          );
+          if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Personal AI System")) {
+            throw new Error("Cloudflare app did not serve the APK-matched ULTRON shell");
+          }
+
+          const assets = await readdir("apps/phone/dist/assets");
+          for (let offset = 0; offset < assets.length; offset += 6) {
+            const batch = assets.slice(offset, offset + 6);
+            await Promise.all(batch.map(async name => {
+              await fetchWithRetry(
+                `${base}/assets/${name}`,
+                `Cloudflare asset ${name}`,
+                async response => {
+                  const bytes = await response.arrayBuffer();
+                  if (!bytes.byteLength) throw new Error("asset body was empty");
+                  return bytes;
+                }
+              );
+            }));
+          }
+          console.log(`Cloudflare web smoke test passed: ${assets.length} built assets, ${liveHtml.length} HTML bytes; local bundle ${localHtml.length} bytes`);
           NODE

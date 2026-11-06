@@ -233,7 +233,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
       const { data: inserted, error: insertError } = await db.from("ultron_memory_items").insert({
         owner_id: ownerId, memory_type: type, content: text,
         summary: String(rawMemory.summary ?? text.slice(0, 300)).slice(0, 500),
-        importance: Math.max(1, Math.min(5, Math.round(Number(rawMemory.importance) || 3))),
+        importance: Math.max(3, Math.min(5, Math.round(importance))),
         confidence: Math.max(0, Math.min(1, Number(rawMemory.confidence) || 0.8)),
         source: "model_consolidation", source_ref: sourceRef, local_embedding: embedding,
         metadata: { model, conversation_id: conversationId, sequence_watermark: watermark, consolidation_version: 1 },

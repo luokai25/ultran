@@ -93,6 +93,9 @@ importers:
       three:
         specifier: ^0.169.0
         version: 0.169.0
+      '@supabase/supabase-js':
+        specifier: ^2.57.0
+        version: 2.119.0
     devDependencies:
       '@capacitor/cli':
         specifier: ^6.2.0

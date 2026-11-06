@@ -633,3 +633,137 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .ultron-key-file-import { padding: 12px; }
   .ultron-key-file-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
+
+
+/* Finish the warm-metal migration on active main and secondary surfaces.
+   Crimson remains reserved for the animated ULTRON core and semantic danger states. */
+.chat-model-button {
+  border-color: rgba(213,183,121,.24) !important;
+  background: rgba(213,183,121,.055) !important;
+  color: var(--u-accent-strong) !important;
+}
+.chat-model-option[aria-current="true"],
+.chat-model-menu-actions button,
+.filter-chip.is-selected {
+  border-color: rgba(213,183,121,.34) !important;
+  background: rgba(213,183,121,.09) !important;
+  color: var(--u-accent-strong) !important;
+}
+.chat-model-option-marker,
+.global-search-input-wrap,
+.global-search-result small,
+.suggestion b,
+.suggestion::after,
+.drawer-new {
+  color: var(--u-accent-strong) !important;
+}
+.drawer-label { color: var(--u-text-muted) !important; }
+.msg.user .body { border-color: var(--u-border) !important; }
+.msg.assistant .who,
+.msg.assistant .who::before,
+.msg.assistant .body code {
+  color: var(--u-accent-strong) !important;
+}
+.msg.assistant .who::before { border-color: rgba(213,183,121,.32) !important; }
+.msg.assistant .body code { background: rgba(213,183,121,.08) !important; }
+.suggestion:hover,
+.suggestion:focus-visible,
+.more-row:hover,
+.vault-entry:hover,
+.world-tile:hover {
+  border-color: rgba(213,183,121,.30) !important;
+  background: rgba(213,183,121,.055) !important;
+}
+.model-discovery,
+.native-model-manager {
+  border-color: var(--u-border) !important;
+  background: var(--u-surface-1) !important;
+  box-shadow: none !important;
+}
+.model-library-badge,
+.hub-model-tag,
+.curated-model-card .model-source-link {
+  color: var(--u-accent-strong) !important;
+}
+.curated-model-card {
+  border-color: var(--u-border) !important;
+  background: linear-gradient(145deg, rgba(213,183,121,.055), var(--u-surface-1)) !important;
+}
+.agent-avatar {
+  border-color: rgba(213,183,121,.26) !important;
+  background: rgba(213,183,121,.08) !important;
+  color: var(--u-accent-strong) !important;
+}
+.agent-status-idle { color: var(--u-text-muted) !important; }
+.agent-status-idle i { background: var(--u-text-muted) !important; box-shadow: none !important; }
+.feature-callout {
+  border-color: var(--u-border) !important;
+  background: var(--u-surface-1) !important;
+}
+.callout-icon,
+.more-icon {
+  border-color: rgba(213,183,121,.24) !important;
+  background: rgba(213,183,121,.08) !important;
+  color: var(--u-accent-strong) !important;
+}
+.more-row > b,
+.vault-entry > b,
+.card-chevron { color: var(--u-accent-strong) !important; }
+.live-run {
+  border-color: var(--u-border) !important;
+  background: var(--u-surface-1) !important;
+}
+.live-run-heading,
+.deliverables-heading,
+.tool-activity-details > .tool-timeline-title::after {
+  color: var(--u-accent-strong) !important;
+}
+.live-run-progress {
+  border-color: var(--u-border-strong) !important;
+  border-top-color: var(--u-accent) !important;
+}
+.chat-deliverable {
+  border-color: var(--u-border-strong) !important;
+  background: var(--u-surface-1) !important;
+}
+.artifact-file-icon,
+.chat-deliverable button,
+.attachment-chip,
+.message-attachment {
+  border-color: rgba(213,183,121,.28) !important;
+  background: rgba(213,183,121,.08) !important;
+  color: var(--u-accent-strong) !important;
+}
+.active-identity-button {
+  border-color: rgba(213,183,121,.32) !important;
+  background: rgba(213,183,121,.08) !important;
+  color: var(--u-accent-strong) !important;
+}
+.workspace-stat {
+  border-color: var(--u-border) !important;
+  background: var(--u-surface-1) !important;
+}
+.workspace-stat strong { color: var(--u-accent-strong) !important; }
+.workspace-team-open,
+.workspace-synthesis-bar button,
+.workspace-team-actions button:last-child {
+  border-color: rgba(213,183,121,.30) !important;
+  background: rgba(213,183,121,.09) !important;
+  color: var(--u-accent-strong) !important;
+}
+.workspace-team-builder {
+  border-color: var(--u-border) !important;
+  background: var(--u-surface-1) !important;
+}
+.learning-safety-note {
+  border-color: rgba(213,183,121,.22) !important;
+  background: rgba(213,183,121,.055) !important;
+  color: var(--u-text-secondary) !important;
+}
+.learning-safety-note > span { color: var(--u-accent-strong) !important; }
+.learning-filters button[aria-pressed="true"],
+.message-feedback button[aria-pressed="true"] {
+  border-color: rgba(213,183,121,.32) !important;
+  background: rgba(213,183,121,.09) !important;
+  color: var(--u-accent-strong) !important;
+}

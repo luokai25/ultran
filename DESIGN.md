@@ -11,7 +11,8 @@ version: 1
 - Product: ULTRON, a personal AI agent that can chat, reason, use approved tools, manage models, connect services, and work across files and memory.
 - Primary user: one owner operating ULTRON from an Android phone and a desktop browser.
 - Canonical shared client: `apps/phone`. It is the Vite + TypeScript client used by both the production web URL and the Capacitor Android APK. Changes here must work in both surfaces.
-- Secondary web application: `apps/web`, a Next.js application. It must share the same design tokens and visual language, but it is not the static bundle currently served at the canonical Pages URL.
+- Production web endpoint: `https://ultron-app-web.luo-chat-ops.workers.dev/` serves the canonical `apps/phone` bundle from the `ultron-web-latest` release; the Capacitor Android APK uses the same client. `https://ultron-web-6et.pages.dev` is a legacy Pages deployment, not the production source of truth.
+- Secondary web application: `apps/web`, a separate Next.js prototype/console. It must share the same design tokens and visual language, but it is not the production web app and must not be reported as feature parity with `apps/phone`.
 - Backend: Supabase. Design changes must not weaken auth, RLS, secret storage, connector scopes, or approval gates.
 
 ## Design direction

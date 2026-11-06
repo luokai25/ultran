@@ -3790,8 +3790,8 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
     cloudBrainStatusEl.textContent = `Saved and verified. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
     await refreshCloudLlmScreen();
   } catch (error) {
-    cloudLlmProviderFallback.hidden = !detectedProvider;
-    cloudLlmAddButton.hidden = !detectedProvider;
+    cloudLlmProviderFallback.hidden = Boolean(detectedProvider);
+    cloudLlmAddButton.hidden = Boolean(detectedProvider);
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = error instanceof Error ? error.message : "Could not verify and save this provider key.";
     cloudLlmDetected.dataset.state = "invalid";

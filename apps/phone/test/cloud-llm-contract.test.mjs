@@ -62,7 +62,11 @@ assert.match(recoveryMigration, /ultron_restore_generated_tool_lifecycle/);
 assert.match(recoveryMigration, /ultron\.recovery_mode/);
 assert.match(phone, /streamUltronSupabaseChat/);
 assert.match(phone, /functions\.invoke\("ultron-brain"/);
-assert.match(main, /addModelChoice\("Ultron Supabase"/);
+assert.match(main, /getUltronCloudModels/);
+assert.match(main, /providerDirectory/);
+assert.match(main, /renderCloudProviderModels/);
+assert.match(main, /selectedCloudProvider/);
+assert.match(phone, /provider\?: CloudProviderId/);
 assert.match(main, /cloudBrainActive/);
 assert.match(main, /cloudConnectedKeys < 1/);
 

@@ -112,3 +112,28 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 ## Audit notes
 
 - 2026-11-06: Repository source inventory confirmed. Recent `main` commits include secondary-page redesign, complete screen-inventory enforcement and responsive desktop navigation. This ledger starts with visual/device completion unchecked because a source-level repository review is not a substitute for running the app at each viewport.
+
+## Source selector map
+
+These selectors are grounded in the current `apps/phone/index.html` source. Recheck them when the shell changes; do not invent IDs or use this map as proof that a screen has passed QA.
+
+| Experience | Current entry / selectors |
+|---|---|
+| Main chat | `#thread`, `#hero`, `#messages`, `#composer`, `#prompt` |
+| Global search | `#global-search`, `#global-search-input`, `#global-search-results` |
+| Model picker | `#chat-model-menu`, `#chat-model-options` |
+| Model library and local runtime | `#native-model-heading`, `#native-model-select`, `#model-discovery-title`, `#model-library-results`, `#model-download-progress` |
+| Agents and identities | `#agent-identities-screen`, `#identity-cards`, `#identity-details` |
+| LLM API Keys | `#llm-api-keys-screen`, `#cloud-llm-files`, `#cloud-llm-import`, `#cloud-llm-keys` |
+| Mind Map | `#vault-screen`, `#mindmap-search`, `#mindmap-canvas`, `#mindmap-detail` |
+| Learning Review | `#learning-screen`, `#learning-proposals`, `#learning-events` |
+| Capabilities | `#capabilities-screen`, `#capability-tools`, `#capability-cloud-tools`, `#capability-runs` |
+| Connectors | `#connectors-panel`, `#connectors-list`, `#connector-detail-wrap`, `#connector-detail` |
+| Approvals | `#composio-approvals`, `#composio-approval-list`, `#approval-panel` |
+| Agent Workspace | `#workspace-panel`, `#workspace-team-builder`, `#workspace-tasks`, `#workspace-artifacts` |
+| Settings | `#sheet-wrap`, `#sheet-title`, `#settings-close-btn` |
+| Voice and presence | `#voice-status`, `#proactive-updates-toggle`, `#voice-updates-toggle` |
+| Workspace tray | `#workspace-tray`, `#workspace-tray-items` |
+| Navigation | `#drawer`, `.bottom-nav`, `#nav-chat`, `#nav-models`, `#nav-vault`, `#nav-connectors`, `#nav-settings` |
+
+The secondary Next.js surface currently has one route at `apps/web/src/app/page.tsx`, with `AvatarHero`, `ModelHub` and `UltronVoice` components. Treat their internal tabs and states as part of that page's coverage; do not report this surface as feature-parity with the canonical client.

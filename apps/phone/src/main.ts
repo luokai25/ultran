@@ -53,6 +53,7 @@ import {
   rememberCloudWorkspace,
   deleteCloudConversation,
   pullCloudMemories,
+  pullCloudMemoryRelations,
   syncCloudMemories,
   scheduleCloudMemorySync,
   rememberCloudMemories,
@@ -723,8 +724,12 @@ function mergeRemoteSemanticGraph(value: unknown): void {
   });
 }
 
-function mergeCloudMemoryGraph(memories: Array<{ id: string; text: string; kind: string; source: string; sourceRef?: string; summary?: string; confidence: number }>): void {
+function mergeCloudMemoryGraph(
+  memories: Array<{ id: string; text: string; kind: string; source: string; sourceRef?: string; summary?: string; confidence: number }>,
+  relations: Array<{ id: string; sourceId: string; targetId: string; relation: string; weight: number }> = [],
+): void {
   if (!memories.length) return;
+  const graphId = (id: string): string => "cloud-memory-" + String(id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60);
   const nodes = memories.slice(0, 500).map((memory) => {
     const safeId = String(memory.id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60);
     const kind = memory.kind === "identity" || memory.kind === "relationship" ? "person"
@@ -735,7 +740,7 @@ function mergeCloudMemoryGraph(memories: Array<{ id: string; text: string; kind:
       : "concept";
     const summary = String(memory.summary || memory.text || "").replace(/\s+/g, " ").trim().slice(0, 700);
     return {
-      id: "cloud-memory-" + safeId,
+      id: graphId(safeId),
       label: summary.slice(0, 90),
       kind,
       summary,
@@ -744,7 +749,15 @@ function mergeCloudMemoryGraph(memories: Array<{ id: string; text: string; kind:
     };
   }).filter((node) => node.label.length >= 3 && node.summary.length >= 12);
   if (!nodes.length) return;
-  const next = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges: [] }), "cloud-memory-sync");
+  const edges = relations.slice(0, 2000).map((relation) => ({
+    id: "cloud-memory-edge-" + String(relation.id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60),
+    from: graphId(relation.sourceId),
+    to: graphId(relation.targetId),
+    relation: String(relation.relation || "related_to").slice(0, 60),
+    sources: ["cloud-memory-relation"],
+    confidence: Number(relation.weight),
+  }));
+  const next = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges }), "cloud-memory-sync");
   if (next === semanticGraph) return;
   semanticGraph = next;
   writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);
@@ -773,7 +786,8 @@ async function applyInitialCloudSync(): Promise<void> {
   rememberCloudWorkspace(store.conversations);
 
   const remoteMemories = await pullCloudMemories();
-  mergeCloudMemoryGraph(remoteMemories);
+  const remoteMemoryRelations = await pullCloudMemoryRelations();
+  mergeCloudMemoryGraph(remoteMemories, remoteMemoryRelations);
   const newerRemoteMemories = remoteMemories.filter((memory) => {
     const local = vectorMemory.records.find((record) => record.id === memory.id);
     return !local || memory.updatedAt > local.updatedAt;
@@ -806,7 +820,8 @@ async function refreshFromCloud(): Promise<void> {
       rememberCloudWorkspace(store.conversations);
 
       const remoteMemories = await pullCloudMemories();
-      mergeCloudMemoryGraph(remoteMemories);
+      const remoteMemoryRelations = await pullCloudMemoryRelations();
+      mergeCloudMemoryGraph(remoteMemories, remoteMemoryRelations);
       const newerRemoteMemories = remoteMemories.filter((memory) => {
         const local = vectorMemory.records.find((record) => record.id === memory.id);
         return !local || memory.updatedAt > local.updatedAt;

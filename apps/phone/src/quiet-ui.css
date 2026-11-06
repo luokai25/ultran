@@ -774,3 +774,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: rgba(213,183,121,.09) !important;
   color: var(--u-accent-strong) !important;
 }
+
+
+/* Mobile hero: keep the complete core in view when the primary navigation is present. */
+@media (max-width: 520px) {
+  .hero {
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 14px 0 18px;
+  }
+  .stage {
+    width: clamp(132px, 34vw, 160px);
+    margin: 0 auto;
+  }
+  .quick-start {
+    margin-top: 16px;
+  }
+}

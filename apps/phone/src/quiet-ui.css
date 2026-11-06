@@ -484,3 +484,52 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     transition-duration: .01ms !important;
   }
 }
+
+/* Keep the ULTRON core visible: the orb is the product's signature, not decoration to delete. */
+.hero {
+  justify-content: center;
+  padding: 18px 0 28px;
+}
+.hero-intro {
+  align-items: center !important;
+  text-align: center !important;
+}
+.hero-kicker {
+  justify-content: center;
+}
+.hero-kicker-line {
+  display: block !important;
+  background: var(--u-accent);
+}
+.stage {
+  display: block !important;
+  position: relative;
+  width: clamp(148px, 36vw, 204px);
+  aspect-ratio: 1;
+  margin: 10px auto 2px;
+}
+.avatar-orbit,
+.halo {
+  display: block !important;
+}
+.halo {
+  background: radial-gradient(circle, rgba(227,75,88,.18), rgba(213,183,121,.05) 48%, transparent 72%);
+}
+.quick-start-mark {
+  display: none !important;
+}
+.greeting {
+  margin-top: 4px;
+}
+.subgreeting {
+  max-width: 48ch;
+  margin-inline: auto;
+}
+@media (min-width: 900px) {
+  .stage {
+    width: clamp(176px, 18vw, 232px);
+  }
+  .quick-start {
+    max-width: 760px;
+  }
+}

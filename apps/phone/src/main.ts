@@ -723,6 +723,36 @@ function mergeRemoteSemanticGraph(value: unknown): void {
   });
 }
 
+function mergeCloudMemoryGraph(memories: Array<{ id: string; text: string; kind: string; source: string; sourceRef?: string; summary?: string; confidence: number }>): void {
+  if (!memories.length) return;
+  const nodes = memories.slice(0, 500).map((memory) => {
+    const safeId = String(memory.id).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 60);
+    const kind = memory.kind === "identity" || memory.kind === "relationship" ? "person"
+      : memory.kind === "preference" ? "preference"
+      : memory.kind === "decision" ? "decision"
+      : memory.kind === "goal" ? "project"
+      : memory.kind === "episodic" ? "session"
+      : "concept";
+    const summary = String(memory.summary || memory.text || "").replace(/\s+/g, " ").trim().slice(0, 700);
+    return {
+      id: "cloud-memory-" + safeId,
+      label: summary.slice(0, 90),
+      kind,
+      summary,
+      sources: [String(memory.sourceRef || memory.source || "cloud-memory")],
+      confidence: Number(memory.confidence),
+    };
+  }).filter((node) => node.label.length >= 3 && node.summary.length >= 12);
+  if (!nodes.length) return;
+  const next = mergeGraphProposal(semanticGraph, JSON.stringify({ nodes, edges: [] }), "cloud-memory-sync");
+  if (next === semanticGraph) return;
+  semanticGraph = next;
+  writeJson(SEMANTIC_GRAPH_KEY, semanticGraph);
+  scheduleCloudSetting("semantic_graph", semanticGraph, (error) => {
+    cloudSyncStatusEl.textContent = "Cloud memories loaded locally; knowledge graph sync failed: " + (error instanceof Error ? error.message : "unknown error");
+  });
+}
+
 async function applyInitialCloudSync(): Promise<void> {
   saveStore();
   const remoteSettings = await pullCloudSetting("phone_settings");
@@ -743,6 +773,7 @@ async function applyInitialCloudSync(): Promise<void> {
   rememberCloudWorkspace(store.conversations);
 
   const remoteMemories = await pullCloudMemories();
+  mergeCloudMemoryGraph(remoteMemories);
   const newerRemoteMemories = remoteMemories.filter((memory) => {
     const local = vectorMemory.records.find((record) => record.id === memory.id);
     return !local || memory.updatedAt > local.updatedAt;
@@ -775,6 +806,7 @@ async function refreshFromCloud(): Promise<void> {
       rememberCloudWorkspace(store.conversations);
 
       const remoteMemories = await pullCloudMemories();
+      mergeCloudMemoryGraph(remoteMemories);
       const newerRemoteMemories = remoteMemories.filter((memory) => {
         const local = vectorMemory.records.find((record) => record.id === memory.id);
         return !local || memory.updatedAt > local.updatedAt;

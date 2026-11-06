@@ -192,6 +192,8 @@ const workspaceTeamBuilder = req<HTMLElement>("#workspace-team-builder");
 const workspaceTeamAgents = req<HTMLElement>("#workspace-team-agents");
 const workspaceTeamObjective = req<HTMLTextAreaElement>("#workspace-team-objective");
 const linkPill = req<HTMLElement>("#link-pill");
+const heroStatusEl = req<HTMLElement>(".hero-status");
+const coreStatusLabelEl = req<HTMLElement>("#core-status-label");
 const jumpBtn = req<HTMLButtonElement>("#jump-btn");
 const menuBtn = req<HTMLButtonElement>("#menu-btn");
 const newBtn = req<HTMLButtonElement>("#new-btn");
@@ -818,6 +820,7 @@ async function connectCloudAccount(): Promise<void> {
     startCloudRealtime();
     startUltronJobWorker();
     cloudAccountConnected = true;
+    updateHeroCloudStatus();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not connect to ULTRON cloud.";
@@ -833,6 +836,7 @@ async function restoreCloudAccount(): Promise<void> {
     const session = await getCloudSession();
     if (!session) {
       cloudAccountConnected = false;
+      updateHeroCloudStatus();
       cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
       return;
     }
@@ -843,6 +847,7 @@ async function restoreCloudAccount(): Promise<void> {
       .maybeSingle();
     if (error || !owner) {
       cloudAccountConnected = false;
+      updateHeroCloudStatus();
       await signOutOfCloud();
       cloudSyncStatusEl.textContent = "Saved session was not authorized for this ULTRON instance. Sign in with the owner account.";
       return;
@@ -853,8 +858,10 @@ async function restoreCloudAccount(): Promise<void> {
     startCloudRealtime();
     startUltronJobWorker();
     cloudAccountConnected = true;
+    updateHeroCloudStatus();
     cloudSyncStatusEl.textContent = `Connected as ${session.user.email ?? "ULTRON owner"} · ${store.conversations.length} conversations synchronized.`;
   } catch (error) {
+    updateHeroCloudStatus();
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not restore ULTRON cloud session.";
   } finally {
     cloudRestoreInFlight = false;
@@ -871,6 +878,7 @@ async function resumeCloudConnection(): Promise<void> {
     const session = await getCloudSession();
     if (!session || !cloudAccountConnected) {
       cloudAccountConnected = false;
+      updateHeroCloudStatus();
       await restoreCloudAccount();
       return;
     }
@@ -892,6 +900,7 @@ async function disconnectCloudAccount(): Promise<void> {
     stopUltronJobWorker();
     await signOutOfCloud();
     cloudAccountConnected = false;
+    updateHeroCloudStatus();
     cloudSyncStatusEl.textContent = "Disconnected. Your local conversations and on-device model remain available.";
   } catch (error) {
     cloudSyncStatusEl.textContent = error instanceof Error ? error.message : "Could not disconnect cloud account.";
@@ -1862,6 +1871,18 @@ async function removeConversation(id: string): Promise<void> {
  * ------------------------------------------------------------------ */
 
 type LinkState = "offline" | "online" | "error";
+
+function updateHeroCloudStatus(checking = false): void {
+  const state = !navigator.onLine ? "offline" : checking ? "checking" : cloudAccountConnected ? "cloud" : "local";
+  heroStatusEl.dataset.connection = state;
+  coreStatusLabelEl.textContent = state === "cloud"
+    ? "SUPABASE CLOUD LINKED"
+    : state === "checking"
+      ? "CHECKING SUPABASE"
+      : state === "offline"
+        ? "OFFLINE · LOCAL AVAILABLE"
+        : "LOCAL MODE · CLOUD NOT LINKED";
+}
 
 function setLink(state: LinkState, label?: string): void {
   linkPill.dataset.state = state;
@@ -4736,6 +4757,7 @@ cloudClient.auth.onAuthStateChange((event, session) => {
   window.setTimeout(() => {
     if (event === "SIGNED_OUT" || !session) {
       cloudAccountConnected = false;
+      updateHeroCloudStatus();
       cloudUnsubscribe?.();
       cloudUnsubscribe = null;
       stopUltronJobWorker();
@@ -4754,8 +4776,13 @@ cloudClient.auth.onAuthStateChange((event, session) => {
     }
   }, 0);
 });
-window.addEventListener("online", () => { void resumeCloudConnection(); });
+updateHeroCloudStatus(true);
+window.addEventListener("online", () => {
+  updateHeroCloudStatus(true);
+  void resumeCloudConnection();
+});
 window.addEventListener("offline", () => {
+  updateHeroCloudStatus();
   if (cloudAccountConnected) cloudSyncStatusEl.textContent = "Offline. ULTRON will resume cloud synchronization when internet returns.";
 });
 document.addEventListener("visibilitychange", () => {

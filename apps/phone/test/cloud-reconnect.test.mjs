@@ -49,3 +49,14 @@ test("the cinematic landing concept is integrated into the real app and wakes th
   assert.match(quietUi, /\.hero-manifesto/);
   assert.match(quietUi, /\.hero-wake/);
 });
+
+
+test("home status never claims Supabase is linked before an owner session is restored", () => {
+  assert.match(main, /function updateHeroCloudStatus\(checking = false\)/);
+  assert.match(main, /SUPABASE CLOUD LINKED/);
+  assert.match(main, /LOCAL MODE · CLOUD NOT LINKED/);
+  assert.match(main, /OFFLINE · LOCAL AVAILABLE/);
+  assert.match(main, /updateHeroCloudStatus\(\);/);
+  assert.match(html, /id="core-status-label">CHECKING SUPABASE/);
+  assert.match(quietUi, /hero-status\[data-connection="local"\]/);
+});

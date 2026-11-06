@@ -1085,3 +1085,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   .hero-wake { transition: none; }
 }
+
+
+/* The home status reflects the real owner-session state, never a hard-coded cloud claim. */
+.hero-status[data-connection="checking"] .status-pulse {
+  background: var(--u-text-muted);
+  box-shadow: none;
+}
+.hero-status[data-connection="local"] .status-pulse {
+  background: var(--u-core);
+  box-shadow: 0 0 8px rgba(227,75,88,.28);
+}
+.hero-status[data-connection="offline"] .status-pulse {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(255,104,115,.3);
+}

@@ -980,3 +980,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border-color: rgba(213,183,121,.30) !important;
   color: var(--u-accent-strong) !important;
 }
+
+/* Review filters remain comfortable touch targets even for short labels. */
+.learning-filters button {
+  min-width: 48px;
+  min-height: 48px;
+  padding-inline: 12px;
+}

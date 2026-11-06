@@ -278,3 +278,8 @@ test("empty mind map hides the empty SVG canvas and removes its forced horizonta
   assert.match(css, /\.mindmap-canvas-wrap\.is-empty \.mindmap-canvas \{ display: none; \}/);
   assert.match(css, /\.mindmap-canvas-wrap\.is-empty \{[\s\S]*?overflow: hidden/);
 });
+
+test("Learning Review filter controls meet the minimum touch target", async () => {
+  const css = await read("src/quiet-ui.css");
+  assert.match(css, /\.learning-filters button \{[\s\S]*?min-width: 48px;[\s\S]*?min-height: 48px;/);
+});

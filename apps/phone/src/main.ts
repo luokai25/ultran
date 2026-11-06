@@ -3765,7 +3765,12 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
         id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
         iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
         checkpoint: {
-          schema_version: 1, mode: "prometheus", conversation_id: convo.id,
+          schema_version: 2, mode: "prometheus", conversation_id: convo.id,
+          goal: goal.slice(0, 4000), task: task.slice(0, 2000),
+          system_prompt: messages.find((message) => message.role === "system")?.content.slice(0, 12000) ?? "",
+          messages: messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({
+            role: message.role, content: message.content.slice(0, 2000),
+          })),
           completed_tools: toolHistory.slice(-iterationLimit),
           updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
         },

@@ -35,5 +35,5 @@ test("single pasted cloud API key is auto-detected, verified and sent through th
   assert.match(main, /cloudLlmKeyInput\.value = ""/);
   assert.match(main, /Accepted · securely saved and enabled/);
   assert.match(cloud, /functions\.invoke\("ultron-brain"/);
-  assert.match(cloud, /action: "add_key"/);
+  assert.match(cloud, /invokeUltronBrain\("add_key"/);
 });

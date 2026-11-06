@@ -157,10 +157,16 @@ async function keyRows(db: ReturnType<typeof service>, ownerId: string): Promise
 }
 
 async function handleAddKey(db: ReturnType<typeof service>, ownerId: string, body: Json): Promise<Response> {
-  const provider = body.provider;
   const secret = clean(body.key, 8192);
+  const detectedProvider: Provider | undefined = isProvider(body.provider) ? body.provider : (
+    /^sk-or-v1-/i.test(secret) ? "openrouter" :
+    /^gsk_/i.test(secret) ? "groq" :
+    /^(AQ\\.|AIza)/i.test(secret) ? "google_ai_studio" :
+    /^csk-/i.test(secret) ? "cerebras" : undefined
+  );
+  const provider = detectedProvider;
   const label = clean(body.label, 100) || "API key";
-  if (!isProvider(provider) || secret.length < 8) return json({ error: "provider_and_api_key_required" }, 400);
+  if (!provider || secret.length < 8) return json({ error: "provider_not_detected_or_key_invalid", message: "Could not identify this provider key. Supported automatic detection: OpenRouter, Groq, Google AI Studio and Cerebras." }, 400);
   const fingerprint = await sha256(secret);
   const existing = await db.from(tableFor(provider)).select("id,label,status,models").eq("owner_id", ownerId).eq("key_fingerprint", fingerprint).maybeSingle();
   if (existing.error) throw existing.error;

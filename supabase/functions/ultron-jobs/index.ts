@@ -39,7 +39,7 @@ const CLOUD_PROVIDERS: Array<{ id: CloudProvider; base: string; protocol: "opena
   { id: "google_ai_studio", base: "https://generativelanguage.googleapis.com/v1beta/openai", protocol: "openai" },
 ];
 function isFreeModel(provider: CloudProvider, model: string): boolean {
-  const id = model.toLowerCase();
+  const id = model.toLowerCase().replace(/^models\//, "");
   if (provider === "openrouter") return id.endsWith(":free");
   if (provider === "cerebras") return false; // One-time trial only; exclude from recurring zero-cost routing.
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);

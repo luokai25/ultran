@@ -7,8 +7,20 @@ const gateway=readFileSync(resolve(root,"supabase/functions/ultron-connectors/in
 const client=readFileSync(resolve(root,"apps/phone/src/connectors-cloud.ts"),"utf8");
 const migration=readFileSync(resolve(root,"supabase/migrations/20261105040627_ultron_connector_gateway_metadata.sql"),"utf8");
 const screen=readFileSync(resolve(root,"apps/phone/src/connectors-ui.ts"),"utf8");
+const html=readFileSync(resolve(root,"apps/phone/index.html"),"utf8");
 const runtime=readFileSync(resolve(root,"supabase/functions/ultron-runtime/index.ts"),"utf8");
 test("Composio API key stays server-side and owner auth is enforced",()=>{assert.match(gateway,/auth\.getUser\(token\)/);assert.match(gateway,/ultron_instance/);assert.match(gateway,/Deno\.env\.get\("COMPOSIO_API_KEY"\)/);assert.match(gateway,/backend\.composio\.dev\/api\/v3\.1/);assert.match(gateway,/composio\("\/connected_accounts\/link"/);});
+test("Composio gateway credentials are verified and stored in Supabase Vault",()=>{
+ assert.match(gateway,/body\.action==="save_key"/);
+ assert.match(gateway,/composio\("\/auth_configs\?limit=1",apiKey\)/);
+ assert.match(gateway,/ultron_store_llm_secret/);
+ assert.match(gateway,/ultron_read_llm_secret/);
+ assert.match(gateway,/storage:"vault"/);
+ assert.match(client,/saveUltronComposioApiKey/);
+ assert.match(screen,/composio-api-key-save/);
+ assert.match(html,/id="composio-api-key"/);
+ assert.match(html,/type="password"/);
+});
 test("connector lifecycle supports list, connect, status and revoke",()=>{for(const a of ["list","connect","tools","enqueue_tool","execute","status","disconnect"])assert.match(gateway,new RegExp('body\.action==="'+a+'"'));assert.match(gateway,/\/revoke/);});
 test("phone client exposes connector lifecycle",()=>{for(const f of ["listUltronConnectors","startUltronConnectorConnection","refreshUltronConnectorStatus","disconnectUltronConnector","executeUltronConnectorTool","queueUltronConnectorTool","listUltronConnectorTools"])assert.match(client,new RegExp("export async function "+f));assert.match(client,/functions\.invoke\("ultron-connectors"/);});
 test("schema adds routing metadata only",()=>{assert.match(migration,/toolkit_slug/);assert.match(migration,/auth_config_id/);assert.doesNotMatch(migration,/access_token|refresh_token|api_key/i);});

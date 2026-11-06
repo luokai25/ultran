@@ -27,6 +27,8 @@ function redactMemorySecrets(value: string): string {
     .replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, "[REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{16,}/gi, "Bearer [REDACTED]")
     .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
+    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, "[REDACTED_EMAIL]")
+    .replace(/(?<!\\w)\\+?\\d[\\d\\s().-]{7,}\\d(?!\\w)/g, "[REDACTED_PHONE]");
 }
 
 type CloudProvider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
@@ -205,7 +207,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
     const importance = Number(rawMemory.importance ?? 0);
     const summary = typeof rawMemory.summary === "string" ? redactMemorySecrets(rawMemory.summary).trim().slice(0, 240) : "";
     if (text.length < 24 || !Number.isFinite(importance) || importance < 3) continue;
-    if (/\\b(typo|spelling|grammar|greeting|quick analysis request|one[- ]off|temporary request)\\b/i.test(summary + " " + text)) continue;
+    if (/\\b(typo|spelling|grammar|greeting|quick analysis request|one[- ]off|temporary request|user phone number|email address|home address|contact details)\\b/i.test(summary + " " + text)) continue;
     const type = typeof rawMemory.memory_type === "string" && allowed.has(rawMemory.memory_type) ? rawMemory.memory_type : "semantic";
     const embedding = embedMemoryText(text);
     const { data: matches, error: matchError } = await secretDb.rpc("ultron_match_local_memories_system", { p_owner_id: ownerId, query_embedding: embedding, match_count: 5, min_similarity: 0.9 });

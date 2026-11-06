@@ -4004,6 +4004,14 @@ async function openChatModelMenu(): Promise<void> {
   if (!opening) return;
   chatModelMenu.hidden = false;
   chatModelButton.setAttribute("aria-expanded", "true");
+  const modelButtonRect = chatModelButton.getBoundingClientRect();
+  const modelMenuWidth = Math.min(modelButtonRect.width, window.innerWidth - 20);
+  chatModelMenu.style.width = modelMenuWidth + "px";
+  chatModelMenu.style.left = Math.max(10, Math.min(modelButtonRect.left, window.innerWidth - modelMenuWidth - 10)) + "px";
+  chatModelMenu.style.right = "auto";
+  chatModelMenu.style.top = "auto";
+  chatModelMenu.style.bottom = (window.innerHeight - modelButtonRect.top + 10) + "px";
+  chatModelMenu.style.maxHeight = Math.max(180, modelButtonRect.top - 20) + "px";
   chatModelOptions.replaceChildren();
   chatModelStatus.textContent = "Checking installed models and connections…";
   syncChatModelLabel();
@@ -4034,26 +4042,94 @@ async function openChatModelMenu(): Promise<void> {
         }, model.loaded);
       }
     }
-    const cloudStatus = await getUltronCloudStatus().catch(() => null);
+    const [cloudStatus, cloudModels, cloudKeys] = await Promise.all([
+      getUltronCloudStatus().catch(() => null),
+      getUltronCloudModels().catch(() => []),
+      listUltronCloudKeys().catch(() => null),
+    ]);
     const cloudConnectedKeys = Number(cloudStatus?.connected_keys ?? 0);
-    {
-      addModelChoice("Ultron Supabase", cloudConnectedKeys > 0
-        ? `${cloudConnectedKeys} connected key(s) · five-provider automatic routing and failover`
-        : "No connected cloud keys · open LLM API KEYS to add or repair credentials",
-      async () => {
-        if (cloudConnectedKeys < 1) {
-          showFeatureScreen("llm-api-keys-screen", navChatButton);
-          void refreshCloudLlmScreen();
-          return;
-        }
+    const providerDirectory: Array<{ id: CloudProviderId; label: string }> = [
+      { id: "openrouter", label: "OpenRouter" },
+      { id: "groq", label: "Groq" },
+      { id: "google_ai_studio", label: "Google AI Studio" },
+      { id: "mistral", label: "Mistral" },
+      { id: "cerebras", label: "Cerebras" },
+      { id: "cohere", label: "Cohere" },
+    ];
+    const renderCloudProviderModels = (providerId: CloudProviderId): void => {
+      const provider = providerDirectory.find((item) => item.id === providerId)!;
+      chatModelOptions.replaceChildren();
+      const back = document.createElement("button");
+      back.type = "button"; back.className = "chat-model-back"; back.textContent = "‹  All providers";
+      back.addEventListener("click", () => renderCloudProviderList(false));
+      chatModelOptions.appendChild(back);
+      const available = cloudModels.filter((model) => model.provider === providerId);
+      if (!available.length) {
+        const empty = document.createElement("p"); empty.className = "chat-model-empty";
+        empty.textContent = provider.label + " has no connected free chat models yet. Add a key in LLM API KEYS or check the provider's free-tier access.";
+        chatModelOptions.appendChild(empty); return;
+      }
+      for (const model of available) {
+        addModelChoice(model.model_id, provider.label + " · Supabase Vault · " + model.key_count + " key(s)", async () => {
+          if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
+          nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = "";
+          cloudBrainActive = true; selectedCloudModelId = model.model_id; selectedCloudProvider = providerId;
+          writeJson("ultron.cloud-brain.active.v1", true);
+          writeJson("ultron.cloud-brain.model.v1", selectedCloudModelId);
+          writeJson("ultron.cloud-brain.provider.v1", selectedCloudProvider);
+          await refreshNativeModels(); syncChatModelLabel();
+          chatModelStatus.textContent = model.model_id + " is locked as the active " + provider.label + " model. ULTRON will use its verified Supabase Vault key.";
+        }, cloudBrainActive && selectedCloudModelId === model.model_id && selectedCloudProvider === providerId);
+      }
+    };
+    const renderCloudProviderList = (showAll: boolean): void => {
+      chatModelOptions.replaceChildren();
+      const visible = showAll ? providerDirectory : providerDirectory.slice(0, 3);
+      for (const provider of visible) {
+        const group = cloudKeys?.providers.find((item) => item.id === provider.id);
+        const count = cloudModels.filter((model) => model.provider === provider.id).length;
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "chat-model-option ultron-provider-choice";
+        button.setAttribute("aria-current", selectedCloudProvider === provider.id && cloudBrainActive ? "true" : "false");
+        const title = document.createElement("strong"); title.textContent = provider.label;
+        const detail = document.createElement("small");
+        detail.textContent = count ? count + " available models · " + (group?.connected_count ?? 0) + " connected key(s)" : group?.key_count ? "Key saved · no free chat models listed" : "Add a key to connect";
+        const marker = document.createElement("span"); marker.className = "chat-model-option-marker";
+        marker.textContent = selectedCloudProvider === provider.id && cloudBrainActive ? "🔒" : "›";
+        button.append(title, detail, marker);
+        button.addEventListener("click", () => renderCloudProviderModels(provider.id));
+        chatModelOptions.appendChild(button);
+      }
+      if (!showAll) {
+        const more = document.createElement("button"); more.type = "button"; more.className = "ultron-provider-more";
+        more.textContent = "+  More providers";
+        more.addEventListener("click", () => renderCloudProviderList(true));
+        chatModelOptions.appendChild(more);
+      } else {
+        const fewer = document.createElement("button"); fewer.type = "button"; fewer.className = "ultron-provider-more";
+        fewer.textContent = "−  Show three providers";
+        fewer.addEventListener("click", () => renderCloudProviderList(false));
+        chatModelOptions.appendChild(fewer);
+      }
+      const automatic = document.createElement("button"); automatic.type = "button"; automatic.className = "chat-model-option ultron-provider-auto";
+      automatic.setAttribute("aria-current", cloudBrainActive && !selectedCloudModelId ? "true" : "false");
+      const autoTitle = document.createElement("strong"); autoTitle.textContent = "ULTRON · Automatic";
+      const autoDetail = document.createElement("small"); autoDetail.textContent = cloudConnectedKeys + " connected keys · automatic routing and failover";
+      const autoMarker = document.createElement("span"); autoMarker.className = "chat-model-option-marker"; autoMarker.textContent = cloudBrainActive && !selectedCloudModelId ? "🔒" : "›";
+      automatic.append(autoTitle, autoDetail, autoMarker);
+      automatic.addEventListener("click", async () => {
+        if (!cloudConnectedKeys) { showFeatureScreen("llm-api-keys-screen", navChatButton); void refreshCloudLlmScreen(); return; }
         if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
-        nativeModelLoaded = false; nativeLoadedModelName = "";
-        cloudBrainActive = true; writeJson("ultron.cloud-brain.active.v1", true);
-        selectedLlmModel = "";
+        nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = "";
+        cloudBrainActive = true; selectedCloudModelId = ""; selectedCloudProvider = null;
+        writeJson("ultron.cloud-brain.active.v1", true); writeJson("ultron.cloud-brain.model.v1", ""); writeJson("ultron.cloud-brain.provider.v1", null);
         await refreshNativeModels(); syncChatModelLabel();
-        chatModelStatus.textContent = "Ultron Supabase is active. It selects from your valid cloud API keys and fails over when a provider is rate-limited.";
-      }, cloudBrainActive);
-    }
+        chatModelStatus.textContent = "ULTRON is using automatic provider routing and failover.";
+        closeChatModelMenu();
+      });
+      chatModelOptions.appendChild(automatic);
+    };
+    renderCloudProviderList(false);
     if (llmProviderState === "connected" && llmApiKey && llmProviderModels.length) {
       for (const modelName of llmProviderModels) {
         addModelChoice(modelName, llmProvider.label + " · API key connected", async () => {

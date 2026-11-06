@@ -123,3 +123,14 @@ test("secondary feature screens start below the persistent top bar", async () =>
   assert.match(css, /\.feature-screen\s*\{\s*inset:\s*58px 0 calc\(62px \+ var\(--safe-bottom\)\) !important/);
   assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?\.feature-screen\s*\{\s*inset:\s*68px 0 0 80px !important/);
 });
+
+
+test("capability error state clears loading placeholders and neutralizes unavailable counts", async () => {
+  const source = await read("apps/phone/src/capability-panel.ts");
+  assert.match(source, /root\.dataset\.state = "error"/);
+  assert.match(source, /toolsEl\.replaceChildren\(empty\(/);
+  assert.match(source, /cloudToolsEl\.replaceChildren\(empty\(/);
+  assert.match(source, /toolRunsEl\.replaceChildren\(empty\(/);
+  assert.match(source, /count\.textContent = "—"/);
+  assert.match(source, /feedback\.dataset\.tone = "error"/);
+});

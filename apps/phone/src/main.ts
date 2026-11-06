@@ -2,7 +2,7 @@ import { normalizeToolCall } from "@ultron/connectors/tool-contract";
 import { CURATED_MODELS } from "./model-library";
 import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel, type ProviderProfile, type ProviderState } from "./llm-provider";
 import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, removeUltronCloudKey, setUltronCloudKey, streamUltronSupabaseChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
-import { parseProviderKeyFile, providerFromKeyFilename } from "./ultron-key-import";
+import { parseProviderKeyFile, providerFromKeyFilename } from "./ultron-key-import.mjs";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
 import { loadSkillResource, searchSkillCatalog } from "./skills-engine";

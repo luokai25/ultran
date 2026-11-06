@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { providerFromKeyFilename, parseProviderKeyFile } from "../src/ultron-key-import.ts";
+import { providerFromKeyFilename, parseProviderKeyFile } from "../src/ultron-key-import.mjs";
 
 test("provider import recognises provider names in filenames", () => {
   assert.equal(providerFromKeyFilename("openrouter-keys.txt"), "openrouter");

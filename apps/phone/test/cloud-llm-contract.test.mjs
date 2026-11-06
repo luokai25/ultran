@@ -13,6 +13,7 @@ const capabilities = read("supabase/functions/ultron-capabilities/index.ts");
 const keysMigration = read("supabase/migrations/20261105150412_ultron_cloud_llm_key_pool.sql");
 const recoveryMigration = read("supabase/migrations/20261105151402_ultron_capability_crash_recovery.sql");
 const systemDdlMigration = read("supabase/migrations/20261105153016_ultron_system_schema_authoring.sql");
+const restrictedDdlMigration = read("supabase/migrations/20261106145244_ultron_restrict_schema_authoring_rpc.sql");
 const phone = read("apps/phone/src/cloud-llm.ts");
 const main = read("apps/phone/src/main.ts");
 
@@ -42,6 +43,8 @@ assert.match(runtime, /approval_required/);
 assert.match(runtime, /ultron_apply_schema_change_system/);
 assert.match(runtime, /serviceDb\.rpc\(\"ultron_apply_schema_change_system\"/);
 assert.doesNotMatch(runtime, /db\.rpc\(\"ultron_apply_schema_change\"/);
+assert.match(restrictedDdlMigration, /security invoker/i);
+assert.match(restrictedDdlMigration, /revoke all .*authenticated/i);
 assert.match(runtime, /x-ultron-cron-secret/);
 assert.match(systemDdlMigration, /p_owner_id uuid/);
 assert.match(systemDdlMigration, /service_role/);

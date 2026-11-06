@@ -23,6 +23,7 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
+const cloud = readFileSync(resolve(root, "src/cloud-llm.ts"), "utf8");
 test("single pasted cloud API key is auto-detected, verified and sent through the authenticated Vault gateway", () => {
   assert.match(html, /id="cloud-llm-key"/);
   assert.match(html, /id="cloud-llm-detected"/);
@@ -33,5 +34,6 @@ test("single pasted cloud API key is auto-detected, verified and sent through th
   assert.match(main, /addUltronCloudKey\(provider, key, label\)/);
   assert.match(main, /cloudLlmKeyInput\.value = ""/);
   assert.match(main, /Accepted · securely saved and enabled/);
-  assert.match(main, /ultron_store_llm_secret/);
+  assert.match(cloud, /functions\.invoke\("ultron-brain"/);
+  assert.match(cloud, /action: "add_key"/);
 });

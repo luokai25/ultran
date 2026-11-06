@@ -7,6 +7,7 @@ For substantial product, design, engineering, review, QA or release work:
 2. Use `.agents/skills/ultron-gstack/SKILL.md` as the product-to-production workflow.
 3. For visual/UI work, also use `.agents/skills/ultron-design/SKILL.md` and read root `DESIGN.md`.
 4. Update `docs/ULTRON-SCREEN-COVERAGE.md` when screens, states or design coverage change.
+5. Consult `docs/ULTRON-GSTACK-SETUP.md` for upstream gstack host installation; never claim a global runtime is installed based only on repository skill files.
 
 ## UI and design work
 

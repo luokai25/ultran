@@ -25,7 +25,7 @@ test("shared model runtime receives the owner constitution", () => {
 });
 
 test("owner source requires auditable evolution rather than unverified self-modification", () => {
-  for (const phrase of ["backup", "isolated", "regression", "benchmark", "rollback", "announce"]) {
+  for (const phrase of ["backup", "isolation", "regression", "benchmark", "roll back", "announce"]) {
     assert.ok(source.toLowerCase().includes(phrase), `runtime prompt is missing ${phrase}`);
   }
 });

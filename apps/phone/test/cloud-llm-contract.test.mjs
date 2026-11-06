@@ -14,6 +14,8 @@ const keysMigration = read("supabase/migrations/20261105150412_ultron_cloud_llm_
 const recoveryMigration = read("supabase/migrations/20261105151402_ultron_capability_crash_recovery.sql");
 const systemDdlMigration = read("supabase/migrations/20261105153016_ultron_system_schema_authoring.sql");
 const restrictedDdlMigration = read("supabase/migrations/20261106145244_ultron_restrict_schema_authoring_rpc.sql");
+const googleProviderMigration = read("supabase/migrations/20261106171000_ultron_google_ai_studio_provider.sql");
+const jobsSource = jobs;
 const phone = read("apps/phone/src/cloud-llm.ts");
 const main = read("apps/phone/src/main.ts");
 
@@ -21,6 +23,11 @@ for (const provider of ["openrouter", "mistral", "cerebras", "groq", "cohere"]) 
   assert.ok(keysMigration.includes(`'${provider}'`), `missing ${provider} key pool table`);
   assert.ok(brain.includes(`${provider}: { label:`), `gateway is missing ${provider} provider configuration`);
 }
+assert.ok(brain.includes('google_ai_studio: { label: "Google AI Studio"'), "gateway is missing Google AI Studio provider configuration");
+assert.match(googleProviderMigration, /ultron_google_ai_studio_keys/);
+assert.match(googleProviderMigration, /ultron_capture_llm_key_input/);
+assert.match(googleProviderMigration, /enable row level security/i);
+assert.match(jobsSource, /google_ai_studio/);
 assert.match(keysMigration, /vault\.create_secret/);
 assert.match(keysMigration, /vault\.decrypted_secrets/);
 assert.match(keysMigration, /revoke insert, update, delete, truncate, references, trigger on public\.%I from anon, authenticated/);

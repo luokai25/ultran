@@ -3604,7 +3604,7 @@ async function refreshCloudLlmScreen(): Promise<void> {
     cloudBrainStateEl.textContent = state === "active" ? "Cloud brain active" : state === "waiting_for_keys" ? "Waiting for keys" : state;
     cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : state === "degraded" ? "expired" : "missing";
     cloudBrainStatusEl.textContent = keys.connected_keys > 0
-      ? `Connected · ${keys.connected_keys} valid key(s) across five providers. Supabase checks the pool every minute and automatically avoids invalid or rate-limited keys.`
+      ? `Connected · ${keys.connected_keys} valid key(s) across six providers. Supabase checks the pool every minute and automatically avoids invalid or rate-limited keys.`
       : "No usable free-tier models yet. Add another provider key or check whether the provider account has free-tier model access. The cloud worker will keep checking the pool.";
     void refreshFreeProviderDirectory(false);
   } catch (error) {
@@ -3642,12 +3642,12 @@ async function importCloudLlmKeyFiles(): Promise<void> {
   const files = Array.from(cloudLlmFilesInput.files ?? []);
   if (!files.length) {
     cloudLlmImportStatus.dataset.state = "invalid";
-    cloudLlmImportStatus.textContent = "Choose one or more provider .txt files first.";
+    cloudLlmImportStatus.textContent = "Choose one provider .txt file first.";
     return;
   }
-  if (files.length > 20 || files.some((file) => file.size > 1024 * 1024)) {
+  if (files.length !== 1 || files.some((file) => file.size > 1024 * 1024)) {
     cloudLlmImportStatus.dataset.state = "invalid";
-    cloudLlmImportStatus.textContent = "Select at most 20 text files, each no larger than 1 MB.";
+    cloudLlmImportStatus.textContent = "Select one text file no larger than 1 MB.";
     return;
   }
   cloudLlmImportButton.disabled = true;
@@ -3664,7 +3664,9 @@ async function importCloudLlmKeyFiles(): Promise<void> {
       if (attempted >= 100) { skipped++; continue; }
       const provider = providerFromKeyFilename(file.name);
       if (!provider) { skipped++; continue; }
-      const keys = parseProviderKeyFile(await file.text());
+      let contents = await file.text();
+      const keys = parseProviderKeyFile(contents);
+      contents = "";
       if (!keys.length || keys.length > 100) { keys.fill(""); skipped++; continue; }
       for (let index = 0; index < keys.length && attempted < 100; index++) {
         const secret = keys[index]!;
@@ -3680,16 +3682,15 @@ async function importCloudLlmKeyFiles(): Promise<void> {
       }
       keys.fill("");
     }
-    cloudLlmImportStatus.dataset.state = failed ? "unreachable" : "connected";
-    cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped. No source files were uploaded.`;
     cloudLlmFilesInput.value = "";
-    await refreshCloudLlmScreen();
   } catch {
-    cloudLlmImportStatus.dataset.state = "invalid";
-    cloudLlmImportStatus.textContent = "Could not read the selected files. Check that they are plain-text UTF-8 files.";
+    failed++;
   } finally {
     cloudLlmImportButton.disabled = false;
   }
+  cloudLlmImportStatus.dataset.state = failed ? "unreachable" : attempted ? "connected" : "invalid";
+  cloudLlmImportStatus.textContent = `Import finished · ${attempted} checked · ${saved} saved · ${duplicates} already saved · ${failed} failed · ${skipped} files skipped. The source file was not uploaded.`;
+  try { await refreshCloudLlmScreen(); } catch { /* Preserve the import result if the status refresh fails. */ }
 }
 
 async function loadSavedProviderKey(): Promise<void> {
@@ -4505,6 +4506,7 @@ cloudLlmProvider.addEventListener("change", () => {
     cerebras: { url: "https://cloud.cerebras.ai", label: "Open Cerebras Cloud ↗" },
     groq: { url: "https://console.groq.com/keys", label: "Open Groq API keys ↗" },
     cohere: { url: "https://dashboard.cohere.com/api-keys", label: "Open Cohere API keys ↗" },
+    google_ai_studio: { url: "https://aistudio.google.com/apikey", label: "Open Google AI Studio API keys ↗" },
   };
   const selected = links[cloudLlmProvider.value] ?? { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" };
   cloudLlmProviderConsoleLink.href = selected.url;
@@ -4515,7 +4517,9 @@ cloudLlmProvider.addEventListener("change", () => {
       ? "Cerebras currently offers a one-time $5 trial after adding a verified payment method. It expires after 30 days, so ULTRON will verify and store this key but will not use it for automatic zero-cost routing."
       : cloudLlmProvider.value === "cohere"
         ? "Cohere trial keys are free but limited to 1,000 calls per month and 20 chat requests per minute."
-        : "Automatic routing uses the provider's eligible free-tier models where available. Rate limits trigger key rotation and cooldown.";
+        : cloudLlmProvider.value === "google_ai_studio"
+          ? "Gemini API keys from Google AI Studio use Google’s OpenAI-compatible endpoint. ULTRON routes only model IDs identified as free-tier eligible; quotas depend on your Google project."
+          : "Automatic routing uses the provider's eligible free-tier models where available. Rate limits trigger key rotation and cooldown.";
 });
 cloudFreeProvidersRefreshButton.addEventListener("click", () => void refreshFreeProviderDirectory(true));
 void loadSavedProviderKey();

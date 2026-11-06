@@ -29,13 +29,14 @@ function redactMemorySecrets(value: string): string {
     .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
 }
 
-type CloudProvider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere";
+type CloudProvider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 const CLOUD_PROVIDERS: Array<{ id: CloudProvider; base: string; protocol: "openai" | "cohere" }> = [
   { id: "groq", base: "https://api.groq.com/openai/v1", protocol: "openai" },
   { id: "cerebras", base: "https://api.cerebras.ai/v1", protocol: "openai" },
   { id: "openrouter", base: "https://openrouter.ai/api/v1", protocol: "openai" },
   { id: "cohere", base: "https://api.cohere.com/v2", protocol: "cohere" },
   { id: "mistral", base: "https://api.mistral.ai/v1", protocol: "openai" },
+  { id: "google_ai_studio", base: "https://generativelanguage.googleapis.com/v1beta/openai", protocol: "openai" },
 ];
 function isFreeModel(provider: CloudProvider, model: string): boolean {
   const id = model.toLowerCase();
@@ -43,6 +44,7 @@ function isFreeModel(provider: CloudProvider, model: string): boolean {
   if (provider === "cerebras") return false; // One-time trial only; exclude from recurring zero-cost routing.
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
   if (provider === "cohere") return /c4ai-aya-expanse-32b|command-a-03-2025|command-a-reasoning-08-2025|command-r-08-2024|command-r-plus-08-2024|command-r7b-12-2024|command-r7b-arabic-02-2025/.test(id);
+  if (provider === "google_ai_studio") return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3-flash-preview|3\.1-flash-lite)/.test(id);
   return /^(mistral|codestral)[-_]/.test(id);
 }
 async function hasAvailableCloudModel(secretDb: ReturnType<typeof createClient>, ownerId: string): Promise<boolean> {

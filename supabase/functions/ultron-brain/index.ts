@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere";
+type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 type Json = Record<string, unknown>;
 type KeyRow = {
   id: string; owner_id: string; label: string; vault_secret_id: string;
@@ -27,6 +27,7 @@ const PROVIDERS: Record<Provider, { label: string; base: string; modelsUrl: stri
   cerebras: { label: "Cerebras", base: "https://api.cerebras.ai/v1", modelsUrl: "https://api.cerebras.ai/v1/models", protocol: "openai" },
   groq: { label: "Groq", base: "https://api.groq.com/openai/v1", modelsUrl: "https://api.groq.com/openai/v1/models", protocol: "openai" },
   cohere: { label: "Cohere", base: "https://api.cohere.com/v2", modelsUrl: "https://api.cohere.com/v2/models?endpoint=chat&limit=100", protocol: "cohere" },
+  google_ai_studio: { label: "Google AI Studio", base: "https://generativelanguage.googleapis.com/v1beta/openai", modelsUrl: "https://generativelanguage.googleapis.com/v1beta/openai/models", protocol: "openai" },
 };
 const PROVIDER_IDS = Object.keys(PROVIDERS) as Provider[];
 const tableFor = (provider: Provider) => `ultron_${provider}_keys`;
@@ -87,6 +88,7 @@ function isFreeModel(provider: Provider, model: string): boolean {
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
   if (provider === "cohere") return /c4ai-aya-expanse-32b|command-a-03-2025|command-a-reasoning-08-2025|command-r-08-2024|command-r-plus-08-2024|command-r7b-12-2024|command-r7b-arabic-02-2025/.test(id);
   if (provider === "mistral") return /^(mistral|codestral)[-_]/.test(id);
+  if (provider === "google_ai_studio") return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3-flash-preview|3\.1-flash-lite)/.test(id);
   return false;
 }
 async function providerModels(provider: Provider, secret: string): Promise<{ models: string[]; status: number; detail?: string }> {

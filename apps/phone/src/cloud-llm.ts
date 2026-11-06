@@ -1,6 +1,6 @@
 import { cloudClient, getCloudSession, ULTRON_SUPABASE_PUBLISHABLE_KEY, ULTRON_SUPABASE_URL } from "./cloud-sync";
 
-export type CloudProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere";
+export type CloudProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 export type CloudKeyRow = {
   id: string; label: string; status: string; enabled: boolean; priority: number;
   models: string[]; free_model_count: number; request_count: number; tokens_used: number;

@@ -2,7 +2,7 @@
 
 ## Cloud LLM gateway
 
-ULTRON uses five provider-specific key pools. The raw API keys are stored in Supabase Vault; the public tables contain only Vault UUID references, SHA-256 fingerprints and non-secret operational metadata.
+ULTRON uses six provider-specific key pools. The raw API keys are stored in Supabase Vault; the public tables contain only Vault UUID references, SHA-256 fingerprints and non-secret operational metadata.
 
 | Provider | Table | API console |
 |---|---|---|

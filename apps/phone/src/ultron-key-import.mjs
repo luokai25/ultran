@@ -1,8 +1,9 @@
-const PROVIDERS = ["openrouter", "mistral", "cerebras", "groq", "cohere"];
+const PROVIDERS = ["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio"];
 
 export function providerFromKeyFilename(filename) {
   const normalized = filename.toLowerCase().replace(/[^a-z0-9]+/g, "_");
   if (normalized.includes("openrouter") || normalized.includes("open_router")) return "openrouter";
+  if (normalized.includes("google") || normalized.includes("gemini") || normalized.includes("aistudio") || normalized.includes("ai_studio")) return "google_ai_studio";
   return PROVIDERS.find((provider) => provider !== "openrouter" && normalized.includes(provider)) ?? null;
 }
 

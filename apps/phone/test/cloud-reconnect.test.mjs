@@ -14,7 +14,7 @@ const [main, cloudSync, html, quietUi] = await Promise.all([
 
 test("Supabase owner session restores automatically and reconnects after network recovery", () => {
   assert.match(main, /void restoreCloudAccount\(\)/);
-  assert.match(main, /window\.addEventListener\("online",\s*\(\)\s*=>\s*\{\s*void resumeCloudConnection\(\)/);
+  assert.match(main, /window\.addEventListener\("online",\s*\(\)\s*=>\s*\{\s*updateHeroCloudStatus\(true\);\s*void resumeCloudConnection\(\);/);
   assert.match(main, /window\.addEventListener\("offline"/);
   assert.match(main, /document\.addEventListener\("visibilitychange"/);
   assert.match(main, /cloudClient\.auth\.onAuthStateChange/);

@@ -125,6 +125,7 @@ assert.match(main, /cloud-memory-sync/);
 assert.match(main, /cloud-memory-edge-/);
 assert.match(main, /pullCloudMemoryRelations/);
 assert.match(cloudSync, /export async function pullCloudMemoryRelations/);
+assert.match(cloudSync, /table: 'ultron_memory_relations'/);
 assert.match(cloudSync, /ultron_memory_relations/);
 assert.match(main, /mergeCloudMemoryGraph\(remoteMemories\)/);
 assert.match(cloudSync, /sourceRef: typeof row\.source_ref/);

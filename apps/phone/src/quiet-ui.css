@@ -791,3 +791,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     margin-top: 16px;
   }
 }
+
+
+/* Active navigation follows the warm-metal system; crimson is reserved for the core. */
+.bottom-nav .nav-item[aria-current="page"],
+.bottom-nav .nav-item.is-active {
+  color: var(--u-accent-strong) !important;
+  border-color: rgba(213,183,121,.32) !important;
+  background: rgba(213,183,121,.08) !important;
+}
+.bottom-nav .nav-item[aria-current="page"]::before,
+.bottom-nav .nav-item.is-active::before {
+  background: var(--u-accent) !important;
+  box-shadow: 0 0 12px rgba(213,183,121,.28) !important;
+}

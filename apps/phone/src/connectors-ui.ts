@@ -131,7 +131,7 @@ export function initConnectors(deps: Deps): void {
     root.setAttribute("aria-label", `${entry.name}, ${entry.tier}, ${AUTH_LABEL[entry.auth]}`);
 
     const head = el("div", "conn-head");
-    const mark = el("span", "github-card-mark", "GH");
+    const mark = el("span", "github-card-mark", entry.name.slice(0, 2).toUpperCase());
     mark.setAttribute("aria-hidden", "true");
     head.append(mark, el("span", "conn-name", entry.name));
     if (enabled.has(entry.id)) head.append(el("span", "conn-on", "On"));

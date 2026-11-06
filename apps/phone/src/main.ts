@@ -3632,6 +3632,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   const provider = detectCloudLlmProvider(key);
   const label = "ULTRON · " + (provider ?? "API key");
   if (!provider) {
+    cloudLlmDetected.dataset.state = "invalid";
     cloudLlmDetected.textContent = "Provider not recognized. Supported automatic detection: OpenRouter, Groq and Google AI Studio.";
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = "This key format is not recognized. Nothing was sent or stored.";
@@ -3639,7 +3640,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
   }
   cloudLlmProvider.value = provider;
   cloudLlmDetected.dataset.state = "pending";
-  cloudLlmDetected.textContent = "Detected " + provider.replaceAll("_", " ") + " · verifying…";
+  cloudLlmDetected.textContent = "Detected " + provider.replace(/_/g, " ") + " · verifying…";
   if (!key) {
     cloudBrainStatusEl.dataset.state = "invalid";
     cloudBrainStatusEl.textContent = "Paste an API key first.";
@@ -4093,8 +4094,10 @@ async function openChatModelMenu(): Promise<void> {
       const available = cloudModels.filter((model) => model.provider === providerId);
       if (!available.length) {
         const empty = document.createElement("p"); empty.className = "chat-model-empty";
-        empty.textContent = provider.label + " has no connected free chat models yet. Add a key in LLM API KEYS or check the provider's free-tier access.";
-        chatModelOptions.appendChild(empty); return;
+        empty.textContent = provider.label + " has no connected free chat models yet. Add a key or check the provider's free-tier access.";
+        const addKey = document.createElement("button"); addKey.type = "button"; addKey.className = "chat-model-back"; addKey.textContent = "+  Add API key";
+        addKey.addEventListener("click", () => { closeChatModelMenu(); showFeatureScreen("llm-api-keys-screen", navChatButton); void refreshCloudLlmScreen(); });
+        chatModelOptions.append(empty, addKey); return;
       }
       for (const model of available) {
         addModelChoice(model.model_id, provider.label + " · Supabase Vault · " + model.key_count + " key(s)", async () => {

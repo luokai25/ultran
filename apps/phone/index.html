@@ -120,7 +120,7 @@
           </div>
           <div class="ultron-key-file-import">
             <div class="ultron-key-file-heading"><strong>Import provider key files</strong><span>Batch import · up to 100 keys</span></div>
-            <p class="ultron-key-file-help" id="cloud-llm-file-help">Choose one or more provider-specific .txt files. ULTRON reads them locally, verifies each key and saves it to the private Vault. The source files stay on this device.</p>
+            <p class="ultron-key-file-help" id="cloud-llm-file-help">Choose provider-specific .txt files. ULTRON parses them on this device; only individual key values are sent over HTTPS to your connected Supabase project for verification and encrypted Vault storage. The original files stay on this device, and key values are never displayed.</p>
             <label class="llm-key-field" for="cloud-llm-files">
               <span>Provider .txt files</span>
               <input id="cloud-llm-files" type="file" accept=".txt,text/plain" multiple aria-describedby="cloud-llm-file-help cloud-llm-import-status" />

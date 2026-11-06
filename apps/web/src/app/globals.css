@@ -558,7 +558,7 @@ a {
   .ultron-rail { display: grid; grid-template-columns: minmax(0,1fr); gap: 10px; padding: 10px 12px; overflow: hidden; }
   .ultron-wordmark { font-size: 13px; letter-spacing: .2em; }
   .ultron-nav { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; margin: 0; }
-  .ultron-nav a { min-height: 42px; justify-content: center; padding: 5px 4px; font-size: 11px; line-height: 1.15; text-align: center; white-space: normal; }
+  .ultron-nav a { min-height: 42px; justify-content: center; padding: 5px 4px; font-size: 12px; line-height: 1.2; text-align: center; white-space: normal; }
   .ultron-main { padding: 16px 14px 44px; }
   .ultron-topbar { align-items: flex-start; flex-direction: column; gap: 10px; }
   .ultron-topbar-meta span { font-size: 10px; }
@@ -579,9 +579,9 @@ a {
   .ultron-preset-group { align-items: stretch; }
   .ultron-preset-group { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
   .ultron-preset-group .ultron-control-label { grid-column: 1 / -1; }
-  .ultron-preset-group button { min-width: 0; width: 100%; padding: 0 7px; font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
+  .ultron-preset-group button { min-width: 0; width: 100%; padding: 0 7px; font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
   .ultron-model-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; overflow: visible; padding: 12px 0; }
-  .ultron-model-tabs button { min-width: 0; width: 100%; padding: 8px 5px; font-size: 11px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; text-align: center; }
+  .ultron-model-tabs button { min-width: 0; width: 100%; padding: 8px 5px; font-size: 12px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; text-align: center; }
   .ultron-model-hub { margin-top: 20px; padding: 14px; border-radius: var(--u-radius-panel); }
   .ultron-model-heading { align-items: stretch; }
   .ultron-picker-anchor, .ultron-choose-model { width: 100%; }
@@ -777,7 +777,7 @@ a {
 .ultron-input, .ultron-select, .ultron-textarea { min-height: 48px; border-radius: var(--u-radius-control); }
 .ultron-field label { font-size: 12px; letter-spacing: .1em; }
 .ultron-panel { border-radius: var(--u-radius-panel); background: linear-gradient(150deg, var(--u-surface-2), var(--u-surface-1)); }
-.ultron-chip { font-size: 11px; letter-spacing: .08em; }
+.ultron-chip { font-size: 12px; letter-spacing: .06em; }
 .ultron-stage { border-radius: var(--u-radius-panel); background: radial-gradient(circle at 50% 56%, rgba(32,38,48,.9), var(--u-bg) 74%); }
 .ultron-stage-overlay { z-index: 4; }
 .ultron-stage[data-core-fallback="true"]::before {

@@ -70,6 +70,6 @@ test("provider key files parse the numbered labels used by the ULTRON import wor
     "ultron 1: sk-or-v1-test123456",
     "groq1: gsk_test123456",
     "google ai studio 1: AQ.test123456",
-  ].join("\\n"));
+  ].join("\n"));
   assert.deepEqual(keys, ["sk-or-v1-test123456", "gsk_test123456", "AQ.test123456"]);
 });

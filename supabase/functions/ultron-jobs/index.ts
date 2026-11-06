@@ -188,7 +188,7 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
     model = typeof payload.model_id === "string" ? payload.model_id.slice(0, 120) : "on_device";
   } else {
     const generated = await generateMemoryProposal(secretDb, ownerId, [
-      { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
+      { role: "system", content: "You are ULTRON's long-term memory consolidation engine. Extract only durable, useful facts, preferences, decisions, goals, procedures, and relationship context. Prefer explicit repeated user statements and stable project constraints. Do not store greetings, typos, grammar observations, one-off task requests, temporary questions, generic requests for help, or facts inferred only from assistant messages. A single request is not automatically a lasting goal. Ignore transient chatter, secrets, passwords, API keys, and unsupported inferences. Only propose memories with importance 3-5; return an empty memories array when no durable information exists. Merge with existing memories instead of repeating them. Return JSON only: {summary:string, memories:[{memory_type:string,content:string,summary:string,importance:number,confidence:number,relations:[{target_id:string,relation_type:string,weight:number}]}]}. Use only allowed memory_type values: identity, preference, fact, episodic, semantic, goal, decision, procedure, relationship. At most 8 new memories. Existing memory ids may be used as relation targets." },
       { role: "user", content: JSON.stringify({ conversation: { title: conversation.title, existing_memories: memoryContext }, transcript }) },
     ]);
     model = generated.model;
@@ -202,7 +202,10 @@ async function consolidateConversationMemory(db: ReturnType<typeof createClient>
   for (const rawMemory of rows) {
     if (!isObject(rawMemory)) continue;
     const text = typeof rawMemory.content === "string" ? redactMemorySecrets(rawMemory.content).trim().slice(0, 12000) : "";
-    if (text.length < 12) continue;
+    const importance = Number(rawMemory.importance ?? 0);
+    const summary = typeof rawMemory.summary === "string" ? redactMemorySecrets(rawMemory.summary).trim().slice(0, 240) : "";
+    if (text.length < 24 || !Number.isFinite(importance) || importance < 3) continue;
+    if (/\\b(typo|spelling|grammar|greeting|quick analysis request|one[- ]off|temporary request)\\b/i.test(summary + " " + text)) continue;
     const type = typeof rawMemory.memory_type === "string" && allowed.has(rawMemory.memory_type) ? rawMemory.memory_type : "semantic";
     const embedding = embedMemoryText(text);
     const { data: matches, error: matchError } = await secretDb.rpc("ultron_match_local_memories_system", { p_owner_id: ownerId, query_embedding: embedding, match_count: 5, min_similarity: 0.9 });

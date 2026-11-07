@@ -1278,27 +1278,6 @@ function artifactMimeType(format: string): string {
     md: "text/markdown;charset=utf-8", txt: "text/plain;charset=utf-8",
     css: "text/css;charset=utf-8", js: "text/javascript;charset=utf-8",
     xml: "application/xml;charset=utf-8", zip: "application/zip",
-  };
-  return types[format] ?? "text/plain;charset=utf-8";
-}
-
-function artifactTypeForFormat(format: string): "pdf" | "report" | "archive" | "image" | "document" | "code" | "data" | "file" {
-  if (format === "pdf") return "pdf";
-  if (["zip", "tgz", "tar", "gz", "7z"].includes(format)) return "archive";
-  if (["png", "jpg", "jpeg", "webp", "svg", "gif"].includes(format)) return "image";
-  if (["docx", "pptx", "xlsx", "odt", "ods"].includes(format)) return "document";
-  if (["csv", "json", "xml"].includes(format)) return "data";
-  if (["py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "css", "scss", "html", "vue", "svelte"].includes(format)) return "code";
-  return "file";
-}
-
-function artifactMimeType(format: string): string {
-  const types: Record<string, string> = {
-    pdf: "application/pdf", html: "text/html;charset=utf-8", svg: "image/svg+xml",
-    json: "application/json;charset=utf-8", csv: "text/csv;charset=utf-8",
-    md: "text/markdown;charset=utf-8", txt: "text/plain;charset=utf-8",
-    css: "text/css;charset=utf-8", js: "text/javascript;charset=utf-8",
-    xml: "application/xml;charset=utf-8", zip: "application/zip",
     tgz: "application/gzip", tar: "application/x-tar", gz: "application/gzip",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",

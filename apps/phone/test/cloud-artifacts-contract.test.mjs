@@ -31,5 +31,7 @@ assert.match(app, /listUltronCloudArtifacts/);
 assert.match(app, /Supabase cloud ·/);
 assert.match(app, /cancelUltronJob/);
 assert.match(app, /deleteUltronCloudArtifact/);
+assert.equal((app.match(/function artifactMimeType\\(/g) ?? []).length, 1);
+assert.equal((app.match(/function artifactTypeForFormat\\(/g) ?? []).length, 1);
 
 console.log("ULTRON private artifact upload, preview, download, delete and workspace contracts passed.");

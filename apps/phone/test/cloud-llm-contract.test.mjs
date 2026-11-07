@@ -111,6 +111,7 @@ assert.match(main, /SIGNED_OUT/);
 assert.match(phone, /functions\.invoke\("ultron-brain"/);
 assert.match(main, /getUltronCloudModels/);
 assert.match(main, /providerDirectory/);
+assert.ok(main.includes('{ id: "cohere", label: "Cohere" }'), "chat model picker must expose every supported cloud provider");
 assert.match(main, /renderCloudProviderModels/);
 assert.match(main, /cloudLlmProviderFallback/);
 assert.match(connectors, /body\.action==="save_key"/);

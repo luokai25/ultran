@@ -4267,6 +4267,7 @@ async function openChatModelMenu(): Promise<void> {
       { id: "google_ai_studio", label: "Google AI Studio" },
       { id: "mistral", label: "Mistral" },
       { id: "cerebras", label: "Cerebras" },
+      { id: "cohere", label: "Cohere" },
     ];
     const renderCloudProviderModels = (providerId: CloudProviderId): void => {
       const provider = providerDirectory.find((item) => item.id === providerId)!;

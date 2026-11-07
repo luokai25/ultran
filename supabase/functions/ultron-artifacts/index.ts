@@ -47,8 +47,8 @@ Deno.serve(async(req:Request)=>{
    if(typeof body.id!=="string")return reply({error:"artifact_id_required"},400);
    const {data:artifact,error:readError}=await db.from("ultron_artifacts").select("id,name,bucket_id,storage_path,mime_type").eq("id",body.id).eq("owner_id",user.id).maybeSingle();
    if(readError)throw readError;if(!artifact)return reply({error:"artifact_not_found"},404);
-   const {data,error}=await db.storage.from(artifact.bucket_id).createSignedUrl(artifact.storage_path,300,{download:artifact.name});if(error)throw error;
-   return reply({ok:true,url:data.signedUrl,expires_in:300,mime_type:artifact.mime_type});
+   const inline=body.inline===true;const {data,error}=await db.storage.from(artifact.bucket_id).createSignedUrl(artifact.storage_path,300,{download:inline?false:artifact.name});if(error)throw error;
+   return reply({ok:true,url:data.signedUrl,expires_in:300,mime_type:artifact.mime_type,inline});
   }
   if(body.action==="delete"){
    if(typeof body.id!=="string")return reply({error:"artifact_id_required"},400);

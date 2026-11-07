@@ -9,7 +9,7 @@ import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
 import { invokeUltronCapabilities } from "./capability-cloud";
 import { initCapabilityPanel } from "./capability-panel";
 import { invokeUltronRuntime } from "./runtime-cloud";
-import { enqueueUltronMemoryConsolidation, listUltronJobs, startUltronJobWorker, stopUltronJobWorker } from "./runtime-jobs";
+import { cancelUltronJob, enqueueUltronMemoryConsolidation, listUltronJobs, startUltronJobWorker, stopUltronJobWorker, type UltronJob } from "./runtime-jobs";
 import { listUltronConnectorTools, queueUltronConnectorTool } from "./connectors-cloud";
 /**
  * Ultron phone client - a conversation console.
@@ -64,14 +64,15 @@ import {
   registerCloudDevice,
   getCloudConversationId,
 } from "./cloud-sync";
+import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
  * ------------------------------------------------------------------ */
 
 type Role = "user" | "assistant";
-type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string; created_at?: string };
-type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; team_id?: string; error?: string; result?: { content?: string }; created_at: string; updated_at: string };
+type ArtifactCard = { id: string; title: string; format: string; size: number; preview_url: string; download_url: string; created_at?: string; storage?: "cloud" | "local" };
+type WorkspaceTask = { id: string; agent_id: string; message: string; status: string; attempts: number; team_id?: string; error?: string; result?: { content?: string }; created_at: string; updated_at: string; source?: "local" | "cloud"; job_type?: string };
 type WorkspaceAgent = { id: string; name: string; persona: string; enabled: boolean; tools: string[] };
 type ToolCall = { connector: string; action: string; ok: boolean; latency_ms?: number; detail?: string; approval_required?: boolean; approval_id?: string; artifact?: ArtifactCard };
 type ChatAttachment = { id: string; name: string; type: string; size: number; text?: string; dataUrl?: string };
@@ -1270,74 +1271,102 @@ function localPdfBlob(title: string, content: string): Blob {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
+function artifactMimeType(format: string): string {
+  const types: Record<string, string> = {
+    pdf: "application/pdf", html: "text/html;charset=utf-8", svg: "image/svg+xml",
+    json: "application/json;charset=utf-8", csv: "text/csv;charset=utf-8",
+    md: "text/markdown;charset=utf-8", txt: "text/plain;charset=utf-8",
+    css: "text/css;charset=utf-8", js: "text/javascript;charset=utf-8",
+    xml: "application/xml;charset=utf-8", zip: "application/zip",
+  };
+  return types[format] ?? "text/plain;charset=utf-8";
+}
+
+function artifactTypeForFormat(format: string): UltronCloudArtifact["artifact_type"] {
+  if (format === "pdf") return "pdf";
+  if (["zip", "tgz", "tar", "gz", "7z"].includes(format)) return "archive";
+  if (["png", "jpg", "jpeg", "webp", "svg", "gif"].includes(format)) return "image";
+  if (["docx", "pptx", "xlsx", "odt", "ods"].includes(format)) return "document";
+  if (["csv", "json", "xml"].includes(format)) return "data";
+  if (["py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "css", "scss", "html", "vue", "svelte"].includes(format)) return "code";
+  return "file";
+}
+
 async function attachRequestedArtifact(task: string, content: string, body: HTMLElement): Promise<ToolCall[]> {
   const format = requestedArtifactFormat(task);
   if (!format) return [];
   renderLiveEvent(body, { type: "thinking", stage: "file", label: `Preparing your ${format.toUpperCase()} document` });
   const title = artifactTitle(task);
-  try {
-    const response = await api("/v1/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, format, content }) });
-    if (response.ok) {
-      const artifact = await response.json() as ArtifactCard;
-      renderLiveEvent(body, { type: "artifact_created", artifact });
-      return [{ connector: "artifacts", action: `create_${format}`, ok: true, detail: `Created ${title}.${format}`, artifact }];
-    }
-  } catch { /* A local PDF fallback keeps offline document creation useful. */ }
-  // Keep file delivery useful offline. Text/source formats are real files, not
-  // just code blocks in chat. If a binary office format needs the unavailable
-  // artifact service, deliver a truthful Markdown fallback rather than a fake
-  // .docx/.xlsx that cannot be opened.
   const textFormats = new Set(["txt", "md", "json", "csv", "py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "xml", "yaml", "yml", "toml", "ini", "css", "scss", "html", "svg", "vue", "svelte", "mdx", "rst", "log", "env"]);
   const localFormat = format === "pdf" || textFormats.has(format) ? format : "md";
-  const localContent = localFormat === format ? content : `# ${title}\n\nUltron could not create the requested ${format.toUpperCase()} binary because its artifact service is unavailable. This portable Markdown version preserves the generated content.\n\n${content}`;
-  const blob = localFormat === "pdf"
-    ? localPdfBlob(title, content)
-    : new Blob([localContent], { type: localFormat === "json" ? "application/json;charset=utf-8" : localFormat === "html" ? "text/html;charset=utf-8" : localFormat === "csv" ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8" });
+  const localContent = localFormat === format ? content : `# ${title}\n\nULTRON could not create the requested ${format.toUpperCase()} binary in this runtime. This portable Markdown file preserves the generated content.\n\n${content}`;
+  const mimeType = artifactMimeType(localFormat);
+  const blob = localFormat === "pdf" ? localPdfBlob(title, content) : new Blob([localContent], { type: mimeType });
+
+  if (cloudAccountConnected) {
+    try {
+      const stored = await createUltronCloudArtifact({
+        name: `${title}.${localFormat}`,
+        description: `Created by ULTRON for: ${task.slice(0, 180)}`,
+        artifactType: artifactTypeForFormat(localFormat), mimeType, file: blob,
+        metadata: { source: "ultron-chat", format: localFormat },
+      });
+      const reference = `ultron-artifact://${stored.id}`;
+      const artifact: ArtifactCard = {
+        id: stored.id, title, format: localFormat, size: Number(stored.byte_size) || blob.size,
+        preview_url: reference, download_url: reference, created_at: stored.created_at, storage: "cloud",
+      };
+      renderLiveEvent(body, { type: "artifact_created", artifact });
+      return [{ connector: "supabase-artifacts", action: `create_${localFormat}`, ok: true, detail: `Stored privately in Supabase as ${title}.${localFormat}`, artifact }];
+    } catch (error) { console.warn("[ULTRON cloud artifact upload]", error); }
+  }
+
+  if (baseUrl()) {
+    try {
+      const response = await api("/v1/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, format, content }) });
+      if (response.ok) {
+        const artifact = await response.json() as ArtifactCard;
+        artifact.storage = "local";
+        renderLiveEvent(body, { type: "artifact_created", artifact });
+        return [{ connector: "artifacts", action: `create_${format}`, ok: true, detail: `Created ${title}.${format}`, artifact }];
+      }
+    } catch { /* A local file fallback keeps document creation useful offline. */ }
+  }
+
   const url = URL.createObjectURL(blob);
-  const artifact: ArtifactCard = { id: `local_${uid()}`, title, format: localFormat, size: blob.size, preview_url: url, download_url: url };
+  const artifact: ArtifactCard = { id: `local_${uid()}`, title, format: localFormat, size: blob.size, preview_url: url, download_url: url, storage: "local" };
   renderLiveEvent(body, { type: "artifact_created", artifact });
   return [{ connector: "local-files", action: `create_${localFormat}`, ok: true, detail: localFormat === format ? "Created on this device; not uploaded" : `Artifact service unavailable; delivered a portable .${localFormat} fallback instead of pretending to create ${format.toUpperCase()}`, artifact }];
 }
-
 function artifactPreviewUrl(url: string): string {
-  return url.startsWith("blob:") || /^https?:\/\//i.test(url) ? url : `${baseUrl()}${url}`;
+  return url.startsWith("blob:") || url.startsWith("ultron-artifact://") || /^https?:\/\//i.test(url) ? url : `${baseUrl()}${url}`;
 }
-
-function downloadArtifact(url: string, filename: string): void {
-  if (url.startsWith("blob:")) {
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); return;
-  }
-  void Browser.open({ url: `${baseUrl()}${url}` });
+async function resolveArtifactUrl(url: string, inline = false): Promise<string> {
+  if (url.startsWith("ultron-artifact://")) return getUltronCloudArtifactUrl(url.slice("ultron-artifact://".length), inline);
+  if (url.startsWith("blob:") || /^https?:\/\//i.test(url)) return url;
+  if (!baseUrl()) throw new Error("No connected backend is available for this artifact.");
+  return `${baseUrl()}${url.startsWith("/") ? url : `/${url}`}`;
 }
-
-function showArtifactPreview(url: string, title: string): void {
+async function downloadArtifact(url: string, filename: string): Promise<void> {
+  if (url.startsWith("blob:")) { const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); return; }
+  try { await Browser.open({ url: await resolveArtifactUrl(url, false) }); }
+  catch (error) { workspaceNotice("Artifact download failed: " + (error instanceof Error ? error.message : "unknown error")); }
+}
+async function showArtifactPreview(url: string, title: string): Promise<void> {
   document.querySelector(".artifact-preview-overlay")?.remove();
-  const overlay = document.createElement("div");
-  overlay.className = "artifact-preview-overlay";
-  overlay.setAttribute("role", "dialog");
-  overlay.setAttribute("aria-modal", "true");
-  overlay.setAttribute("aria-label", `${title} preview`);
-  const panel = document.createElement("section");
-  panel.className = "artifact-preview-panel";
-  const header = document.createElement("header");
-  const heading = document.createElement("strong");
-  heading.textContent = title;
-  const close = document.createElement("button");
-  close.type = "button";
-  close.textContent = "Close";
-  close.addEventListener("click", () => overlay.remove());
+  const overlay = document.createElement("div"); overlay.className = "artifact-preview-overlay";
+  overlay.setAttribute("role", "dialog"); overlay.setAttribute("aria-modal", "true"); overlay.setAttribute("aria-label", `${title} preview`);
+  const panel = document.createElement("section"); panel.className = "artifact-preview-panel";
+  const header = document.createElement("header"), heading = document.createElement("strong"), close = document.createElement("button");
+  heading.textContent = title; close.type = "button"; close.textContent = "Close"; close.addEventListener("click", () => overlay.remove());
   header.append(heading, close);
-  const frame = document.createElement("iframe");
-  frame.title = `${title} preview`;
-  frame.setAttribute("sandbox", "allow-same-origin");
-  frame.src = `${baseUrl()}${url}`;
-  panel.append(header, frame);
-  overlay.appendChild(panel);
+  const frame = document.createElement("iframe"); frame.title = `${title} preview`; frame.setAttribute("sandbox", "allow-same-origin"); frame.referrerPolicy = "no-referrer"; frame.src = "about:blank";
+  panel.append(header, frame); overlay.appendChild(panel);
   overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  close.focus();
+  document.body.appendChild(overlay); close.focus();
+  try { const signedUrl = await resolveArtifactUrl(url, true); if (frame.isConnected) frame.src = signedUrl; }
+  catch (error) { panel.append(workspaceNode("p", "workspace-error", "Preview unavailable: " + (error instanceof Error ? error.message : "unknown error"))); }
 }
-
 function workspaceNode(tag: string, className: string, text = ""): HTMLElement {
   const node = document.createElement(tag); node.className = className; node.textContent = text; return node;
 }
@@ -1352,43 +1381,132 @@ function workspaceNotice(message: string): void {
   }
 }
 
+function cloudJobToWorkspaceTask(job: UltronJob): WorkspaceTask {
+  const statuses: Record<string, string> = { queued: "queued", running: "running", retry_wait: "retrying", completed: "succeeded", failed: "failed", cancelled: "interrupted" };
+  return {
+    id: job.id, agent_id: job.job_type, job_type: job.job_type, message: job.title,
+    status: statuses[job.status] ?? "queued", attempts: job.attempts,
+    ...(job.error_message ? { error: job.error_message } : {}),
+    ...(job.result ? { result: { content: JSON.stringify(job.result, null, 2) } } : {}),
+    created_at: job.created_at, updated_at: job.updated_at ?? job.created_at, source: "cloud",
+  };
+}
+function cloudArtifactToCard(artifact: UltronCloudArtifact): ArtifactCard {
+  const extension = artifact.name.match(/\.([a-z0-9]{1,10})$/i)?.[1]?.toLowerCase() ?? artifact.artifact_type;
+  const title = artifact.name.replace(/\.[^.]+$/, "") || artifact.name, reference = `ultron-artifact://${artifact.id}`;
+  return { id: artifact.id, title, format: extension, size: Number(artifact.byte_size) || 0, preview_url: reference, download_url: reference, created_at: artifact.created_at, storage: "cloud" };
+}
+function showCloudJobDetails(task: WorkspaceTask): void {
+  document.querySelector(".artifact-preview-overlay")?.remove();
+  const overlay = document.createElement("div"); overlay.className = "artifact-preview-overlay";
+  overlay.setAttribute("role", "dialog"); overlay.setAttribute("aria-modal", "true"); overlay.setAttribute("aria-label", `${task.message} details`);
+  const panel = document.createElement("section"); panel.className = "artifact-preview-panel";
+  const header = document.createElement("header"), title = document.createElement("strong"), close = document.createElement("button");
+  title.textContent = task.message; close.type = "button"; close.textContent = "Close"; close.addEventListener("click", () => overlay.remove());
+  header.append(title, close);
+  const meta = workspaceNode("small", "workspace-meta", `${task.job_type ?? task.agent_id} · ${task.status} · ${new Date(task.updated_at).toLocaleString()}`);
+  const output = document.createElement("pre"); output.className = "workspace-job-output";
+  output.textContent = task.error ? `Error: ${task.error}` : task.result?.content ?? "This job has not produced a result yet.";
+  panel.append(header, meta, output); overlay.append(panel);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
+  document.body.append(overlay); close.focus();
+}
 async function refreshWorkspace(): Promise<void> {
-  if (!baseUrl()) { workspaceTasks.replaceChildren(workspaceNode("p", "workspace-empty", "Connect a backend in Settings to view background runs.")); workspaceArtifacts.replaceChildren(workspaceNode("p", "workspace-empty", "No workspace files yet. Create a file in chat and it will appear in your Workspace Tray.")); return; }
-  const [tr, ar] = await Promise.all([api("/v1/tasks?limit=100"), api("/v1/artifacts?limit=100")]);
-  if (!tr.ok || !ar.ok) throw new Error(`Workspace unavailable (${tr.status}/${ar.status})`);
-  const tasks = await tr.json() as WorkspaceTask[];
+  let tasks: WorkspaceTask[] = [], artifacts: ArtifactCard[] = [];
+  const errors: string[] = [];
+  if (baseUrl()) {
+    const [taskResult, artifactResult] = await Promise.allSettled([api("/v1/tasks?limit=100"), api("/v1/artifacts?limit=100")]);
+    if (taskResult.status === "fulfilled" && taskResult.value.ok) {
+      try { const rows = await taskResult.value.json() as WorkspaceTask[]; if (Array.isArray(rows)) tasks.push(...rows.map((row) => ({ ...row, source: "local" as const }))); }
+      catch { errors.push("Local background tasks returned invalid data."); }
+    } else if (taskResult.status === "rejected") errors.push("Local background tasks are unavailable.");
+    else if (taskResult.value.status !== 404) errors.push(`Local background tasks returned HTTP ${taskResult.value.status}.`);
+    if (artifactResult.status === "fulfilled" && artifactResult.value.ok) {
+      try { const payload = await artifactResult.value.json() as { artifacts?: ArtifactCard[] }; if (Array.isArray(payload.artifacts)) artifacts.push(...payload.artifacts.map((row) => ({ ...row, storage: "local" as const }))); }
+      catch { errors.push("Local artifacts returned invalid data."); }
+    } else if (artifactResult.status === "rejected") errors.push("Local artifacts are unavailable.");
+    else if (artifactResult.value.status !== 404) errors.push(`Local artifacts returned HTTP ${artifactResult.value.status}.`);
+  }
+  if (cloudAccountConnected) {
+    const [jobsResult, artifactsResult] = await Promise.allSettled([listUltronJobs({ limit: 100 }), listUltronCloudArtifacts(100)]);
+    if (jobsResult.status === "fulfilled") {
+      const visible = jobsResult.value.filter((job) => ["agent.workflow.execute", "connector.tool.execute", "agent.run"].includes(job.job_type));
+      tasks.push(...visible.map(cloudJobToWorkspaceTask));
+    } else errors.push("Supabase background jobs are unavailable.");
+    if (artifactsResult.status === "fulfilled") artifacts.push(...artifactsResult.value.map(cloudArtifactToCard));
+    else errors.push("Supabase private artifacts are unavailable.");
+  }
+  tasks = [...new Map(tasks.map((task) => [task.id, task])).values()];
+  artifacts = [...new Map(artifacts.map((artifact) => [artifact.id, artifact])).values()];
   await processTaskUpdates(tasks);
-  const payload = await ar.json() as { artifacts?: ArtifactCard[] };
-  const artifacts = payload.artifacts ?? [];
-  const counts = [["Active", tasks.filter(t => ["queued","running","retrying"].includes(t.status)).length], ["Completed", tasks.filter(t => t.status === "succeeded").length], ["Attention", tasks.filter(t => ["failed","interrupted"].includes(t.status)).length], ["Files", artifacts.length]];
-  workspaceStats.replaceChildren(...counts.map(([name, value]) => { const el = workspaceNode("div", "workspace-stat"); el.append(workspaceNode("strong", "", String(value)), workspaceNode("small", "", String(name))); return el; }));
+  const counts = [
+    ["Active", tasks.filter((task) => ["queued", "running", "retrying"].includes(task.status)).length],
+    ["Completed", tasks.filter((task) => task.status === "succeeded").length],
+    ["Attention", tasks.filter((task) => ["failed", "interrupted"].includes(task.status)).length],
+    ["Files", artifacts.length],
+  ];
+  workspaceStats.replaceChildren(...counts.map(([name, value]) => { const element = workspaceNode("div", "workspace-stat"); element.append(workspaceNode("strong", "", String(value)), workspaceNode("small", "", String(name))); return element; }));
   req<HTMLElement>("#workspace-task-count").textContent = `${tasks.length} runs`;
   req<HTMLElement>("#workspace-artifact-count").textContent = `${artifacts.length} files`;
   workspaceTasks.replaceChildren();
-  if (!tasks.length) workspaceTasks.append(workspaceNode("p", "workspace-empty", "No background runs yet. Enable Background in the composer to start one."));
+  if (!tasks.length) workspaceTasks.append(workspaceNode("p", "workspace-empty", cloudAccountConnected ? "No cloud runs yet. Ask ULTRON to create or execute a cloud workflow." : "Sign in to ULTRON Cloud or connect a local backend to view background runs."));
   for (const task of tasks) {
-    const card = workspaceNode("article", "workspace-task"); const top = workspaceNode("div", "workspace-task-top");
-    if (task.status === "succeeded" && task.result?.content) { const select = document.createElement("input"); select.type = "checkbox"; select.className = "workspace-synthesis-select"; select.value = task.id; select.setAttribute("aria-label", "Select result from " + task.message.slice(0,60)); select.addEventListener("change", updateSynthesisControls); top.append(select); }
+    const card = workspaceNode("article", "workspace-task"), top = workspaceNode("div", "workspace-task-top");
+    if (task.status === "succeeded" && task.result?.content) {
+      const select = document.createElement("input"); select.type = "checkbox"; select.className = "workspace-synthesis-select"; select.value = task.id;
+      select.setAttribute("aria-label", "Select result from " + task.message.slice(0, 60)); select.addEventListener("change", updateSynthesisControls); top.append(select);
+    }
     top.append(workspaceNode("strong", "", task.message.slice(0, 100)), workspaceNode("span", `workspace-status status-${task.status}`, task.status));
-    card.append(top, workspaceNode("small", "workspace-meta", `${task.team_id ? `Team ${task.team_id.slice(-6)} · ` : ""}Updated ${new Date(task.updated_at).toLocaleString()} · Attempt ${task.attempts}`));
+    card.append(top, workspaceNode("small", "workspace-meta", `${task.source === "cloud" ? "Supabase cloud · " : ""}Updated ${new Date(task.updated_at).toLocaleString()} · Attempt ${task.attempts}`));
     if (task.error) card.append(workspaceNode("p", "workspace-error", task.error));
-    const actions = workspaceNode("div", "workspace-actions");
-    const open = workspaceNode("button", "", "Open timeline"); open.addEventListener("click", () => { closeWorkspace(); void openTaskTimeline(task.id, task.message); }); actions.append(open);
-    if (task.status === "queued") { const b = workspaceNode("button", "", "Cancel") as HTMLButtonElement; b.addEventListener("click", async () => { b.disabled = true; const res = await api(`/v1/tasks/${task.id}/cancel`, {method:"POST"}); if (!res.ok) workspaceNotice(`Cancel failed (${res.status})`); await refreshWorkspace(); }); actions.append(b); }
-    if (["failed","interrupted"].includes(task.status)) { const b = workspaceNode("button", "", "Retry") as HTMLButtonElement; b.addEventListener("click", async () => { b.disabled = true; const res = await api(`/v1/tasks/${task.id}/retry`, {method:"POST"}); if (!res.ok) workspaceNotice(`Retry failed (${res.status})`); await refreshWorkspace(); }); actions.append(b); }
+    const actions = workspaceNode("div", "workspace-actions"), open = workspaceNode("button", "", task.source === "cloud" ? "View result" : "Open timeline");
+    open.addEventListener("click", () => { closeWorkspace(); if (task.source === "cloud") showCloudJobDetails(task); else void openTaskTimeline(task.id, task.message); });
+    actions.append(open);
+    if (task.status === "queued") {
+      const cancel = workspaceNode("button", "", "Cancel") as HTMLButtonElement;
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        try {
+          if (task.source === "cloud") await cancelUltronJob(task.id);
+          else { const response = await api(`/v1/tasks/${task.id}/cancel`, { method: "POST" }); if (!response.ok) throw new Error(`Cancel failed (${response.status})`); }
+        } catch (error) { workspaceNotice("Cancel failed: " + (error instanceof Error ? error.message : "unknown error")); }
+        await refreshWorkspace();
+      });
+      actions.append(cancel);
+    }
+    if (task.source !== "cloud" && ["failed", "interrupted"].includes(task.status)) {
+      const retry = workspaceNode("button", "", "Retry") as HTMLButtonElement;
+      retry.addEventListener("click", async () => { retry.disabled = true; const response = await api(`/v1/tasks/${task.id}/retry`, { method: "POST" }); if (!response.ok) workspaceNotice(`Retry failed (${response.status})`); await refreshWorkspace(); });
+      actions.append(retry);
+    }
     card.append(actions); workspaceTasks.append(card);
   }
   updateSynthesisControls();
   workspaceArtifacts.replaceChildren();
-  if (!artifacts.length) workspaceArtifacts.append(workspaceNode("p", "workspace-empty", "No files yet. Ask Ultron to create a PDF, ZIP or document. Your next file will appear here."));
+  if (!artifacts.length) workspaceArtifacts.append(workspaceNode("p", "workspace-empty", "No files yet. Ask ULTRON to create a file; cloud files are stored privately in Supabase."));
   for (const file of artifacts) {
-    const card = workspaceNode("article", "workspace-file"); card.append(workspaceNode("span", "workspace-file-icon", file.format.toUpperCase()));
-    const copy = workspaceNode("div", "workspace-file-copy"); copy.append(workspaceNode("strong", "", file.title), workspaceNode("small", "", `${(file.size/1024).toFixed(1)} KB`)); card.append(copy);
-    const preview = workspaceNode("button", "", "Preview"); preview.addEventListener("click", () => showArtifactPreview(artifactPreviewUrl(file.preview_url), file.title));
-    const download = workspaceNode("button", "", "Download"); download.addEventListener("click", () => void Browser.open({url:`${baseUrl()}${file.download_url}`})); card.append(preview, download); workspaceArtifacts.append(card);
+    const card = workspaceNode("article", "workspace-file");
+    card.append(workspaceNode("span", "workspace-file-icon", file.format.toUpperCase()));
+    const copy = workspaceNode("div", "workspace-file-copy");
+    copy.append(workspaceNode("strong", "", file.title), workspaceNode("small", "", `${(file.size / 1024).toFixed(1)} KB${file.storage === "cloud" ? " · Private cloud" : ""}`));
+    card.append(copy);
+    const preview = workspaceNode("button", "", "Preview"); preview.addEventListener("click", () => { void showArtifactPreview(artifactPreviewUrl(file.preview_url), file.title); });
+    const download = workspaceNode("button", "", "Download"); download.addEventListener("click", () => { void downloadArtifact(file.download_url, `${file.title}.${file.format}`); });
+    card.append(preview, download);
+    if (file.storage === "cloud") {
+      const remove = workspaceNode("button", "", "Delete");
+      remove.addEventListener("click", async () => {
+        if (!window.confirm(`Delete ${file.title} from private cloud storage?`)) return;
+        remove.setAttribute("disabled", "true");
+        try { await deleteUltronCloudArtifact(file.id); await refreshWorkspace(); }
+        catch (error) { workspaceNotice("Artifact deletion failed: " + (error instanceof Error ? error.message : "unknown error")); remove.removeAttribute("disabled"); }
+      });
+      card.append(remove);
+    }
+    workspaceArtifacts.append(card);
   }
+  if (errors.length && !tasks.length && !artifacts.length) workspaceNotice(errors[0]!);
 }
-
 async function processTaskUpdates(tasks: WorkspaceTask[]): Promise<void> {
   if (!settings.proactiveUpdates) {
     for (const task of tasks) taskStatusSnapshot.set(task.id, task.status);
@@ -1560,9 +1678,9 @@ function pushWorkspaceArtifact(artifact: ArtifactCard): void {
   share.setAttribute("aria-label", "Share " + artifact.title);
   share.addEventListener("click", async () => {
     const filename = artifact.title + "." + artifact.format.toLowerCase();
-    const url = artifactPreviewUrl(artifact.download_url || artifact.preview_url);
+    const url = artifact.download_url || artifact.preview_url;
     try {
-      const response = await fetch(url);
+      const response = await fetch(await resolveArtifactUrl(url, false));
       if (!response.ok) throw new Error("File download failed");
       const blob = await response.blob();
       const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });

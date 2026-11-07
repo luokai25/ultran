@@ -38,7 +38,7 @@ jobs:
         env:
           ULTRON_BOOTSTRAP_PACKAGES: ${{ inputs.packages }}
           ULTRON_BOOTSTRAP_OUTPUT_DIR: ${{ runner.temp }}/ultron-termux-bootstrap
-        run: ./apps/phone/android/termux-upstream/build-ultron-bootstrap.sh
+        run: bash ./apps/phone/android/termux-upstream/build-ultron-bootstrap.sh
 
       - name: Generate checksums
         working-directory: ${{ runner.temp }}/ultron-termux-bootstrap

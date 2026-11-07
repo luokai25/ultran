@@ -1292,6 +1292,72 @@ function artifactTypeForFormat(format: string): "pdf" | "report" | "archive" | "
   return "file";
 }
 
+function artifactMimeType(format: string): string {
+  const types: Record<string, string> = {
+    pdf: "application/pdf", html: "text/html;charset=utf-8", svg: "image/svg+xml",
+    json: "application/json;charset=utf-8", csv: "text/csv;charset=utf-8",
+    md: "text/markdown;charset=utf-8", txt: "text/plain;charset=utf-8",
+    css: "text/css;charset=utf-8", js: "text/javascript;charset=utf-8",
+    xml: "application/xml;charset=utf-8", zip: "application/zip",
+    tgz: "application/gzip", tar: "application/x-tar", gz: "application/gzip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    odt: "application/vnd.oasis.opendocument.text", ods: "application/vnd.oasis.opendocument.spreadsheet",
+  };
+  return types[format] ?? "application/octet-stream";
+}
+
+function artifactTypeForFormat(format: string): "pdf" | "report" | "archive" | "image" | "document" | "code" | "data" | "file" {
+  if (format === "pdf") return "pdf";
+  if (["zip", "tgz", "tar", "gz", "7z"].includes(format)) return "archive";
+  if (["png", "jpg", "jpeg", "webp", "svg", "gif"].includes(format)) return "image";
+  if (["docx", "pptx", "xlsx", "odt", "ods", "doc", "ppt", "xls"].includes(format)) return "document";
+  if (["csv", "json", "xml"].includes(format)) return "data";
+  if (["py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "css", "scss", "html", "vue", "svelte"].includes(format)) return "code";
+  return "file";
+}
+
+async function uploadLocalArtifactToCloud(artifact: ArtifactCard, task: string): Promise<ArtifactCard | null> {
+  if (!cloudAccountConnected) return null;
+  const sourceUrl = artifact.download_url || artifact.preview_url;
+  if (!sourceUrl || sourceUrl.startsWith("ultron-artifact://")) return null;
+  try {
+    const response = sourceUrl.startsWith("blob:") || /^https?:\/\//i.test(sourceUrl)
+      ? await fetch(sourceUrl)
+      : await api(sourceUrl.startsWith("/") ? sourceUrl : `/${sourceUrl}`);
+    if (!response.ok) return null;
+    const file = await response.blob();
+    const format = artifact.format.toLowerCase();
+    const mimeType = (response.headers.get("content-type") || artifactMimeType(format)).split(";")[0] || artifactMimeType(format);
+    if (mimeType.includes("application/json") && format !== "json") return null;
+    const stored = await createUltronCloudArtifact({
+      name: `${artifact.title}.${format}`,
+      description: `Created by ULTRON for: ${task.slice(0, 180)}`,
+      artifactType: artifactTypeForFormat(format),
+      mimeType,
+      file,
+      metadata: { source: "ultron-local-backend", format },
+    });
+    const reference = `ultron-artifact://${stored.id}`;
+    return { ...artifact, id: stored.id, size: Number(stored.byte_size) || file.size, preview_url: reference, download_url: reference, created_at: stored.created_at, storage: "cloud" };
+  } catch (error) {
+    console.warn("[ULTRON local artifact cloud copy]", error);
+    return null;
+  }
+}
+
+async function createLocalBackendArtifact(task: string, title: string, format: string, content: string): Promise<ArtifactCard | null> {
+  if (!baseUrl()) return null;
+  try {
+    const response = await api("/v1/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, format, content }) });
+    if (!response.ok) return null;
+    const artifact = await response.json() as ArtifactCard;
+    artifact.storage = "local";
+    return await uploadLocalArtifactToCloud(artifact, task) ?? artifact;
+  } catch { return null; }
+}
+
 async function attachRequestedArtifact(task: string, content: string, body: HTMLElement): Promise<ToolCall[]> {
   const format = requestedArtifactFormat(task);
   if (!format) return [];
@@ -1299,44 +1365,55 @@ async function attachRequestedArtifact(task: string, content: string, body: HTML
   const title = artifactTitle(task);
   const textFormats = new Set(["txt", "md", "json", "csv", "py", "js", "ts", "tsx", "jsx", "java", "kt", "go", "rs", "cpp", "hpp", "c", "h", "sh", "bash", "sql", "xml", "yaml", "yml", "toml", "ini", "css", "scss", "html", "svg", "vue", "svelte", "mdx", "rst", "log", "env"]);
   const localFormat = format === "pdf" || textFormats.has(format) ? format : "md";
-  const localContent = localFormat === format ? content : `# ${title}\n\nULTRON could not create the requested ${format.toUpperCase()} binary in this runtime. This portable Markdown file preserves the generated content.\n\n${content}`;
+  const localContent = localFormat === format ? content : `# ${title}\n\nULTRON could not create the requested ${format.toUpperCase()} binary in this runtime. This portable Markdown version preserves the generated content.\n\n${content}`;
   const mimeType = artifactMimeType(localFormat);
   const blob = localFormat === "pdf" ? localPdfBlob(title, content) : new Blob([localContent], { type: mimeType });
+  const deliver = (artifact: ArtifactCard): ToolCall[] => {
+    renderLiveEvent(body, { type: "artifact_created", artifact });
+    const cloud = artifact.storage === "cloud";
+    return [{
+      connector: cloud ? "supabase-artifacts" : "artifacts",
+      action: `create_${artifact.format}`,
+      ok: true,
+      detail: cloud ? `Stored privately in Supabase as ${artifact.title}.${artifact.format}` : `Created ${artifact.title}.${artifact.format}`,
+      artifact,
+    }];
+  };
+
+  let backendAttempted = false;
+  if (localFormat !== format) {
+    backendAttempted = true;
+    const backendArtifact = await createLocalBackendArtifact(task, title, format, content);
+    if (backendArtifact) return deliver(backendArtifact);
+  }
 
   if (cloudAccountConnected) {
     try {
       const stored = await createUltronCloudArtifact({
         name: `${title}.${localFormat}`,
         description: `Created by ULTRON for: ${task.slice(0, 180)}`,
-        artifactType: artifactTypeForFormat(localFormat), mimeType, file: blob,
+        artifactType: artifactTypeForFormat(localFormat),
+        mimeType,
+        file: blob,
         metadata: { source: "ultron-chat", format: localFormat },
       });
       const reference = `ultron-artifact://${stored.id}`;
-      const artifact: ArtifactCard = {
+      return deliver({
         id: stored.id, title, format: localFormat, size: Number(stored.byte_size) || blob.size,
         preview_url: reference, download_url: reference, created_at: stored.created_at, storage: "cloud",
-      };
-      renderLiveEvent(body, { type: "artifact_created", artifact });
-      return [{ connector: "supabase-artifacts", action: `create_${localFormat}`, ok: true, detail: `Stored privately in Supabase as ${title}.${localFormat}`, artifact }];
-    } catch (error) { console.warn("[ULTRON cloud artifact upload]", error); }
+      });
+    } catch (error) {
+      console.warn("[ULTRON cloud artifact upload]", error);
+    }
   }
 
-  if (baseUrl()) {
-    try {
-      const response = await api("/v1/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, format, content }) });
-      if (response.ok) {
-        const artifact = await response.json() as ArtifactCard;
-        artifact.storage = "local";
-        renderLiveEvent(body, { type: "artifact_created", artifact });
-        return [{ connector: "artifacts", action: `create_${format}`, ok: true, detail: `Created ${title}.${format}`, artifact }];
-      }
-    } catch { /* A local file fallback keeps document creation useful offline. */ }
+  if (!backendAttempted) {
+    const backendArtifact = await createLocalBackendArtifact(task, title, format, content);
+    if (backendArtifact) return deliver(backendArtifact);
   }
 
   const url = URL.createObjectURL(blob);
-  const artifact: ArtifactCard = { id: `local_${uid()}`, title, format: localFormat, size: blob.size, preview_url: url, download_url: url, storage: "local" };
-  renderLiveEvent(body, { type: "artifact_created", artifact });
-  return [{ connector: "local-files", action: `create_${localFormat}`, ok: true, detail: localFormat === format ? "Created on this device; not uploaded" : `Artifact service unavailable; delivered a portable .${localFormat} fallback instead of pretending to create ${format.toUpperCase()}`, artifact }];
+  return deliver({ id: `local_${uid()}`, title, format: localFormat, size: blob.size, preview_url: url, download_url: url, storage: "local" });
 }
 function artifactPreviewUrl(url: string): string {
   return url.startsWith("blob:") || url.startsWith("ultron-artifact://") || /^https?:\/\//i.test(url) ? url : `${baseUrl()}${url}`;

@@ -18,7 +18,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), b => b.toString(16).padStart(2,"0")).join("");
 const slug = /^[a-z][a-z0-9_]{1,63}$/;
 const semver = /^\d+\.\d+\.\d+$/;
-const OPS = new Set(["text.template","json.pick","http.request","memory.search","memory.save","database.select","database.insert","database.update","database.ddl","database.rpc"]);
+const OPS = new Set(["text.template","json.pick","http.request","memory.search","memory.save","database.select","database.insert","database.update","database.ddl","database.rpc","artifact.create"]);
 const READ_TABLES = new Set(["ultron_tasks","ultron_conversations","ultron_messages","ultron_memory_items","ultron_documents","ultron_skills","ultron_tool_specs","ultron_tool_runs","ultron_model_profiles","ultron_settings","ultron_capability_events","ultron_generated_tools","ultron_capability_proposals","ultron_agent_runs"]);
 const INSERT_TABLES = new Set(["ultron_tasks","ultron_memory_items","ultron_memory_relations"]);
 const UPDATE_TABLES = new Set(["ultron_tasks","ultron_memory_items","ultron_settings","ultron_model_profiles"]);
@@ -33,6 +33,7 @@ const CATALOG = [
   { id:"memory.save",category:"memory",runtime:"supabase",description:"Write a persistent memory item." },
   { id:"text.template",category:"transform",runtime:"supabase",description:"Compose text from input and earlier step results." },
   { id:"json.pick",category:"transform",runtime:"supabase",description:"Select a value from JSON input or earlier results." },
+  { id:"artifact.create",category:"files",runtime:"supabase",description:"Create a private cloud artifact from text or small base64 content and attach it to the durable job." },
   { id:"runtime.exec",category:"device",runtime:"android",description:"Run commands in the phone's local Termux-compatible workspace." },
   { id:"phone.app.open",category:"device",runtime:"android",description:"Open Android applications." },
   { id:"phone.notifications",category:"device",runtime:"android",description:"Post Android notifications and task alerts." },
@@ -128,7 +129,7 @@ async function requireOperationPermission(db: ReturnType<typeof createClient>, o
   if (!data || data.access_mode !== "allow" || data.require_confirmation !== false) throw new Error(`approval_required:${op}`);
 }
 
-async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string, serviceDb: ReturnType<typeof createClient>, internalWorker = false): Promise<unknown> {
+async function runStep(step: Record<string, unknown>, input: Record<string, unknown>, results: Record<string, unknown>, db: ReturnType<typeof createClient>, ownerId: string, serviceDb: ReturnType<typeof createClient>, internalWorker = false, sourceJobId: string | null = null): Promise<unknown> {
   const op = String(step.op);
   const params = resolveValue(isObject(step.params) ? step.params : {}, input, results) as Record<string, unknown>;
   if (op === "text.template") {
@@ -143,6 +144,72 @@ async function runStep(step: Record<string, unknown>, input: Record<string, unkn
     const resolved = typeof source === "string" && source === "$input" ? input : resolveValue(source,input,results);
     const picked = getPath(resolved, String(params.path ?? ""));
     return picked === undefined ? null : picked;
+  }
+  if (op === "artifact.create") {
+    if (!internalWorker || !sourceJobId) throw new Error("artifact.create requires an authenticated durable cloud job.");
+    const name = String(params.name ?? "").trim();
+    if (!name || name.length > 240) throw new Error("artifact.create requires a filename between 1 and 240 characters.");
+    const safeName = name.replace(/[^A-Za-z0-9._ -]/g, "_").replace(/^\.+/, "").slice(0, 180);
+    if (!safeName || safeName === "." || safeName === "..") throw new Error("artifact.create received an unsafe filename.");
+    const artifactType = String(params.artifact_type ?? "report");
+    const allowedTypes = new Set(["pdf", "report", "archive", "image", "document", "code", "data", "file"]);
+    if (!allowedTypes.has(artifactType)) throw new Error("artifact.create received an unsupported artifact type.");
+    const mimeType = String(params.mime_type ?? "text/markdown;charset=utf-8").trim().slice(0, 160);
+    if (!mimeType.includes("/")) throw new Error("artifact.create requires a valid MIME type.");
+    const encoding = String(params.encoding ?? "text");
+    let bytes: Uint8Array;
+    if (encoding === "base64") {
+      const encoded = String(params.content_base64 ?? "");
+      if (!encoded || encoded.length > 14 * 1024 * 1024) throw new Error("Base64 artifact content must be non-empty and no larger than 10 MB.");
+      let binary: string;
+      try { binary = atob(encoded); } catch { throw new Error("artifact.create received invalid base64 content."); }
+      bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+    } else if (encoding === "text") {
+      const content = String(params.content ?? "");
+      if (!content) throw new Error("artifact.create requires text content or base64 content.");
+      bytes = new TextEncoder().encode(content);
+    } else {
+      throw new Error("artifact.create encoding must be text or base64.");
+    }
+    if (bytes.byteLength < 1 || bytes.byteLength > 10 * 1024 * 1024) throw new Error("Background artifacts are limited to 10 MB.");
+    const artifactId = crypto.randomUUID();
+    const storagePath = ownerId + "/" + artifactId + "/" + safeName;
+    const bucket = serviceDb.storage.from("ultron-private");
+    const { error: uploadError } = await bucket.upload(storagePath, bytes, { contentType: mimeType, upsert: false });
+    if (uploadError) throw uploadError;
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const metadata = { source: "background_workflow", ...(isObject(params.metadata) ? params.metadata : {}) };
+      const { data: artifact, error: insertError } = await serviceDb.from("ultron_artifacts").insert({
+        id: artifactId,
+        owner_id: ownerId,
+        bucket_id: "ultron-private",
+        storage_path: storagePath,
+        name: safeName,
+        description: String(params.description ?? "").slice(0, 2000) || null,
+        artifact_type: artifactType,
+        mime_type: mimeType,
+        byte_size: bytes.byteLength,
+        checksum_sha256: checksum,
+        source_job_id: sourceJobId,
+        metadata,
+      }).select("id,name,artifact_type,mime_type,byte_size,created_at").single();
+      if (insertError) throw insertError;
+      return {
+        artifact_id: artifact.id,
+        name: artifact.name,
+        artifact_type: artifact.artifact_type,
+        mime_type: artifact.mime_type,
+        byte_size: artifact.byte_size,
+        created_at: artifact.created_at,
+        uri: "ultron-artifact://" + artifact.id,
+      };
+    } catch (error) {
+      await bucket.remove([storagePath]).catch(() => undefined);
+      throw error;
+    }
   }
   if (op === "http.request") {
     const url = validatePublicUrl(String(params.url ?? ""));
@@ -316,11 +383,12 @@ Deno.serve(async (req: Request) => {
       if(await sha256(JSON.stringify(tool.workflow))!==tool.workflow_sha256)return reply({error:"workflow_integrity_mismatch"},409);
       const input=isObject(body.input)?body.input:{};
       const inputError=validateInput(isObject(tool.input_schema)?tool.input_schema:{},input);if(inputError)return reply({error:"invalid_tool_input",message:inputError},400);
+      const sourceJobId = internalWorker && typeof body.source_job_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.source_job_id) ? body.source_job_id : null;
       const {data:run,error:runError}=await db.from("ultron_tool_runs").insert({owner_id,tool_key:"ultron."+tool_key,status:"running",input,metadata:{tool_spec_id:tool.id,version:tool.version,workflow_sha256:tool.workflow_sha256}}).select("id").single();
       if(runError)throw runError;
       const started=Date.now(),results:Record<string,unknown>={};
       try{
-        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");await requireOperationPermission(db,owner_id,step);results[String(step.id)]=await runStep(step,input,results,db,owner_id,serviceDb,internalWorker);}
+        for(const step of tool.workflow as Array<Record<string,unknown>>){if(Date.now()-started>45000)throw new Error("Tool execution exceeded the 45-second workflow budget.");await requireOperationPermission(db,owner_id,step);results[String(step.id)]=await runStep(step,input,results,db,owner_id,serviceDb,internalWorker,sourceJobId);}
         const output={tool_key,version:tool.version,steps:results};
         await db.from("ultron_tool_runs").update({status:"succeeded",output,finished_at:new Date().toISOString(),metadata:{tool_spec_id:tool.id,version:tool.version,workflow_sha256:tool.workflow_sha256,latency_ms:Date.now()-started}}).eq("id",run.id).eq("owner_id",owner_id);
         await db.from("ultron_tool_specs").update({run_count:Number(tool.run_count??0)+1,last_run_at:new Date().toISOString(),last_run_status:"succeeded"}).eq("id",tool.id).eq("owner_id",owner_id);

@@ -440,7 +440,7 @@ Deno.serve(async (req: Request) => {
               headers: internalWorker
                 ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
                 : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "run_tool", ...(isObject(job.payload) ? job.payload : {}) }),
+              body: JSON.stringify({ action: "run_tool", ...(isObject(job.payload) ? job.payload : {}), source_job_id: job.id }),
             });
             const data = await response.json() as Record<string, unknown>;
             if (!response.ok || data.ok !== true) throw new Error(String(data.message ?? data.error ?? "workflow_execution_failed"));

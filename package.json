@@ -13,7 +13,7 @@
     "dev": "pnpm --filter @ultron/phone dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "turbo run test && node --test supabase/tests/*.test.mjs",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",

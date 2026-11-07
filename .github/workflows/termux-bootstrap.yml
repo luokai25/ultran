@@ -1,5 +1,6 @@
 name: Build Ultron Termux Bootstrap
 
+# Keep the dispatch package list aligned with the pinned bootstrap builder defaults.
 on:
   push:
     branches: [main]

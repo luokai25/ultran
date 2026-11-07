@@ -1282,7 +1282,7 @@ function artifactMimeType(format: string): string {
   return types[format] ?? "text/plain;charset=utf-8";
 }
 
-function artifactTypeForFormat(format: string): UltronCloudArtifact["artifact_type"] {
+function artifactTypeForFormat(format: string): "pdf" | "report" | "archive" | "image" | "document" | "code" | "data" | "file" {
   if (format === "pdf") return "pdf";
   if (["zip", "tgz", "tar", "gz", "7z"].includes(format)) return "archive";
   if (["png", "jpg", "jpeg", "webp", "svg", "gif"].includes(format)) return "image";

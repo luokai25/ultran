@@ -12,7 +12,7 @@ const edge = read("supabase/functions/ultron-artifacts/index.ts");
 assert.match(client, /functions\.invoke\("ultron-artifacts"/);
 assert.match(client, /prepare_upload/);
 assert.match(client, /uploadToSignedUrl/);
-assert.match(client, /storage\.from\(BUCKET\)\.remove/);
+assert.match(client, /bucket\.remove/);
 assert.match(client, /register/);
 assert.match(client, /listUltronCloudArtifacts/);
 assert.match(client, /getUltronCloudArtifactUrl/);

@@ -60,13 +60,22 @@ function markdownPreview(markdown: string, title: string): string {
   const direction = language === "ar" ? "rtl" : "ltr";
   const lines = markdown.replace(/\r/g, "").split("\n");
   const blocks: string[] = [];
+  const fence = String.fromCharCode(96).repeat(3);
   let index = 0;
+  let skippedTitle = false;
   while (index < lines.length) {
     const trimmed = lines[index].trim();
     if (!trimmed) { index++; continue; }
-    if (trimmed.startsWith("```")) {
+    if (!skippedTitle) {
+      const firstHeading = trimmed.match(/^#\s+(.+)$/);
+      if (firstHeading && firstHeading[1].trim().toLowerCase() === title.trim().toLowerCase()) {
+        skippedTitle = true; index++; continue;
+      }
+      skippedTitle = true;
+    }
+    if (trimmed.startsWith(fence)) {
       const code: string[] = []; index++;
-      while (index < lines.length && !lines[index].trim().startsWith("```")) code.push(lines[index++]);
+      while (index < lines.length && !lines[index].trim().startsWith(fence)) code.push(lines[index++]);
       if (index < lines.length) index++;
       blocks.push("<pre><code>" + htmlEscape(code.join("\n")) + "</code></pre>"); continue;
     }
@@ -78,17 +87,19 @@ function markdownPreview(markdown: string, title: string): string {
       while (index < lines.length && lines[index].trim().startsWith("|") && lines[index].trim().endsWith("|")) rows.push(lines[index++].trim().slice(1, -1).split("|").map(cell => cell.trim()));
       const separator = rows[1]?.every(cell => /^:?-{3,}:?$/.test(cell)) ?? false;
       const header = rows[0] ?? []; const bodyRows = separator ? rows.slice(2) : rows.slice(1);
-      blocks.push("<table><thead><tr>" + header.map(cell => "<th>" + inlineMarkdown(cell) + "</th>").join("") + "</tr></thead><tbody>" + bodyRows.map(row => "<tr>" + row.map(cell => "<td>" + inlineMarkdown(cell) + "</td>").join("") + "</tr>").join("") + "</tbody></table>"); continue;
+      blocks.push("<div class=\"table-wrap\"><table><thead><tr>" + header.map(cell => "<th>" + inlineMarkdown(cell) + "</th>").join("") + "</tr></thead><tbody>" + bodyRows.map(row => "<tr>" + row.map(cell => "<td>" + inlineMarkdown(cell) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>"); continue;
     }
     if (/^>\s?/.test(trimmed)) { const quote: string[] = []; while (index < lines.length && /^>\s?/.test(lines[index].trim())) quote.push(lines[index++].trim().replace(/^>\s?/, "")); blocks.push("<blockquote><p>" + inlineMarkdown(quote.join(" ")) + "</p></blockquote>"); continue; }
     if (/^[-*+]\s+/.test(trimmed)) { const items: string[] = []; while (index < lines.length && /^[-*+]\s+/.test(lines[index].trim())) items.push(lines[index++].trim().replace(/^[-*+]\s+/, "")); blocks.push("<ul>" + items.map(item => "<li>" + inlineMarkdown(item) + "</li>").join("") + "</ul>"); continue; }
     if (/^\d+[.)]\s+/.test(trimmed)) { const items: string[] = []; while (index < lines.length && /^\d+[.)]\s+/.test(lines[index].trim())) items.push(lines[index++].trim().replace(/^\d+[.)]\s+/, "")); blocks.push("<ol>" + items.map(item => "<li>" + inlineMarkdown(item) + "</li>").join("") + "</ol>"); continue; }
     const paragraph: string[] = [];
-    while (index < lines.length && lines[index].trim() && !/^(#{1,6}\s|```|---+$|>\s?|[-*+]\s+|\d+[.)]\s+)/.test(lines[index].trim())) paragraph.push(lines[index++].trim());
+    while (index < lines.length && lines[index].trim() && !/^(#{1,6}\s|---+$|>\s?|[-*+]\s+|\d+[.)]\s+)/.test(lines[index].trim()) && !lines[index].trim().startsWith(fence)) paragraph.push(lines[index++].trim());
     if (!paragraph.length) paragraph.push(lines[index++].trim());
     blocks.push("<p>" + inlineMarkdown(paragraph.join(" ")) + "</p>");
   }
-  return "<!doctype html><html lang=\"" + language + "\" dir=\"" + direction + "\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3,h4,h5,h6{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#aebfd2}li{margin:.45em 0}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{padding:9px 12px;border:1px solid #303743;text-align:left}th{background:#171b22}blockquote{margin:1em 0;padding:4px 16px;border-inline-start:3px solid #777;color:#bbc3cf}pre{overflow:auto;padding:16px;border:1px solid #303743;border-radius:10px;background:#13171d;color:#e3e7ed}code{font-family:ui-monospace,monospace}pre,code{direction:ltr;text-align:left;unicode-bidi:plaintext}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks.join("\n") + "</main></body></html>";
+  const cover = "<header class=\"product-cover\"><span class=\"cover-kicker\">ULTRON · ORIGINAL DIGITAL PRODUCT</span><h1>" + htmlEscape(title) + "</h1><div class=\"cover-rule\"></div><p class=\"cover-meta\">Created with ULTRON · Source register included · Review citations before publication</p></header>";
+  const styles = "body{margin:0;background:#e9edf2;color:#17202c;font:16px/1.8 system-ui,-apple-system,sans-serif}main{max-width:900px;margin:28px auto;padding:28px 34px 80px}.product-cover{min-height:440px;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;padding:54px;border:1px solid #d4dbe4;border-radius:22px;background:radial-gradient(circle at 82% 18%,rgba(148,163,184,.28),transparent 36%),linear-gradient(145deg,#111827,#273449 70%,#334155);color:#f8fafc;margin-bottom:54px;position:relative;overflow:hidden}.product-cover:after{content:'';position:absolute;width:260px;height:260px;right:-70px;top:-70px;border:1px solid rgba(226,232,240,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(226,232,240,.035),0 0 0 54px rgba(226,232,240,.025)}.cover-kicker{font-size:11px;letter-spacing:.16em;font-weight:750;color:#cbd5e1}.product-cover h1{position:relative;z-index:1;max-width:720px;margin:22px 0;font-size:clamp(2.2rem,6vw,4rem);line-height:1.08;letter-spacing:-.04em;color:#fff}.cover-rule{width:64px;height:3px;background:#cbd5e1;margin:8px 0 18px}.cover-meta{position:relative;z-index:1;margin:0;color:#cbd5e1;font-size:12px;letter-spacing:.03em}h1,h2,h3,h4,h5,h6{line-height:1.25;color:#172033;break-after:avoid}h2{margin:2.2em 0 .7em;font-size:1.75rem}h3{margin:1.8em 0 .6em;font-size:1.3rem}p,li{color:#364152}a{color:#334e68;text-decoration-thickness:1px;text-underline-offset:3px}li{margin:.45em 0}.table-wrap{max-width:100%;overflow-x:auto;margin:1.2em 0}table{width:100%;border-collapse:collapse;min-width:420px}th,td{padding:10px 12px;border:1px solid #d4dbe4;text-align:start;vertical-align:top}th{background:#e7ecf2;color:#172033}tbody tr:nth-child(even){background:#f4f6f8}blockquote{margin:1.3em 0;padding:6px 18px;border-inline-start:3px solid #64748b;background:#f1f4f7;color:#475569}pre{overflow:auto;padding:18px;border:1px solid #d4dbe4;border-radius:10px;background:#172033;color:#e2e8f0}code{font-family:ui-monospace,SFMono-Regular,monospace}pre,code{direction:ltr;text-align:left;unicode-bidi:plaintext}hr{border:0;border-top:1px solid #d4dbe4;margin:2em 0}p,li,blockquote,table{orphans:3;widows:3}@media(max-width:640px){main{margin:0;padding:12px 14px 44px}.product-cover{min-height:390px;padding:30px 26px;border-radius:14px;margin-bottom:36px}.product-cover h1{font-size:2.35rem}}@page{size:A4;margin:17mm 16mm}@media print{body{background:#fff;color:#111}main{max-width:none;margin:0;padding:0}.product-cover{min-height:260mm;break-after:page;page-break-after:always;border:0;border-radius:0;background:#f1f4f7;color:#111;padding:24mm;margin:0}.product-cover h1{color:#111}.cover-kicker,.cover-meta{color:#334155}.cover-rule{background:#334155}h1,h2,h3,h4,h5,h6{color:#111}p,li{color:#222}a{color:#1e293b;text-decoration:none}pre{white-space:pre-wrap;overflow-wrap:anywhere;print-color-adjust:exact;-webkit-print-color-adjust:exact}.table-wrap{overflow:visible}table{min-width:0}tr{break-inside:avoid}blockquote{background:#f8fafc}hr{border-color:#cbd5e1}}";
+  return "<!doctype html><html lang=\"" + language + "\" dir=\"" + direction + "\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"light\"><title>" + htmlEscape(title) + "</title><style>" + styles + "</style></head><body><main>" + cover + blocks.join("\n") + "</main></body></html>";
 }
 type StudioProvider = "openrouter" | "groq" | "google_ai_studio";
 type StudioCandidate = { provider: StudioProvider; key: Record<string, unknown>; model: string };

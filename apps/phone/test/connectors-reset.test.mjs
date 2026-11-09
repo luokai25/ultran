@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('the phone connector marketplace exposes GitHub and unified Google Workspace', () => {
   const catalog = JSON.parse(readFileSync(path.join(root, 'src/connectors.catalog.json'), 'utf8'));
-  assert.deepEqual(catalog.map((entry) => entry.id), ['github', 'googlesuper']);
+  assert.deepEqual(catalog.map((entry) => entry.id), ['github', 'googlesuper', 'notion', 'dropbox', 'slack', 'linear']);
   assert.equal(catalog[0].auth, 'oauth2');
   assert.ok(catalog[0].actions.some((action) => action.toLowerCase().includes('repository')));
   assert.equal(catalog[1].name, 'Google Workspace');
@@ -28,6 +28,7 @@ test('the connector screen is branded as a unified gateway and explains approval
 });
 
 test("connector gateway links to Composio project setup and API key guidance",()=>{
+ const html = readFileSync(path.join(root, "index.html"), "utf8");
  assert.match(html,/dashboard\.composio\.dev/);
  assert.match(html,/docs\.composio\.dev\/reference\/authenticating-to-composio/);
  assert.match(html,/connected provider authorization and account access/);

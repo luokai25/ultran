@@ -472,6 +472,25 @@ Deno.serve(async (req: Request) => {
             const data = await response.json() as Record<string, unknown>;
             if (!response.ok || data.ok !== true) throw new Error(String(data.message ?? data.error ?? "product_generation_failed"));
             result = isObject(data.result) ? data.result : data;
+          } else if (job.job_type === "offer_builder.generate") {
+            const payload = isObject(job.payload) ? job.payload : {};
+            const runId = typeof payload.run_id === "string" ? payload.run_id : "";
+            if (!runId) throw new Error("offer_builder_run_id_missing");
+            let offerWorkerSecret = cronSecret;
+            if (!internalWorker) {
+              const { data: expectedOfferSecret, error: offerSecretError } = await serviceDb.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+              if (offerSecretError || typeof expectedOfferSecret !== "string" || !expectedOfferSecret) throw new Error("offer_builder_worker_secret_unavailable");
+              offerWorkerSecret = expectedOfferSecret;
+            }
+            const response = await fetch(url + "/functions/v1/ultron-offer-builder", {
+              method: "POST",
+              headers: { "x-ultron-cron-secret": offerWorkerSecret, "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "worker_process", run_id: runId, job_id: job.id, lock_token: job.lock_token }),
+              signal: AbortSignal.timeout(115_000),
+            });
+            const data = await response.json() as Record<string, unknown>;
+            if (!response.ok || data.ok !== true) throw new Error(String(data.message ?? data.error ?? "offer_builder_generation_failed"));
+            result = isObject(data.result) ? data.result : data;
           } else if (job.job_type === "memory.consolidate") {
             result = await consolidateConversationMemory(db, owner_id, isObject(job.payload) ? job.payload : {}, serviceDb);
           } else {
@@ -489,11 +508,8 @@ Deno.serve(async (req: Request) => {
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
           const dailySearchCap = message.includes("free_google_search_daily_cap_reached");
-          const waitingForProvider = job.job_type === "product.generate" && (dailySearchCap || /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5[0-9]{2})|provider_unavailable|quota|rate.?limit/i.test(message));
-          const nextUtcReset = new Date();
-          nextUtcReset.setUTCHours(24, 0, 0, 0);
-          const secondsUntilUtcReset = Math.max(60, Math.ceil((nextUtcReset.getTime() - Date.now()) / 1000) + 30);
-          const delay = dailySearchCap ? secondsUntilUtcReset : waitingForProvider ? 180 : message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          const waitingForProvider = (job.job_type === "product.generate" || job.job_type === "offer_builder.generate") && (dailySearchCap || /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_available_model_key|all_provider_keys_failed|_http_(429|5[0-9]{2})|provider_unavailable|quota|rate.?limit|timed.?out|timeout|network|fetch failed/i.test(message));
+          const delay = dailySearchCap ? 180 : waitingForProvider ? 180 : message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
           if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};
             const projectId = typeof payload.project_id === "string" ? payload.project_id : "";
@@ -514,6 +530,42 @@ Deno.serve(async (req: Request) => {
                   payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after reviewing the failure." : dailySearchCap ? "The safe daily free Google Search budget was reached. ULTRON will retry after the daily reset; no paid search requests are sent." : waitingForProvider ? "A free provider is temporarily unavailable. ULTRON will retry after its cooldown." : "A temporary worker error occurred. ULTRON will retry this checkpoint.", retry_after_seconds: delay },
                 });
                 if (eventError) throw eventError;
+              }
+            }
+          }
+          if (job.job_type === "offer_builder.generate") {
+            const payload = isObject(job.payload) ? job.payload : {};
+            const runId = typeof payload.run_id === "string" ? payload.run_id : "";
+            if (runId) {
+              const { data: run, error: runReadError } = await db.from("ultron_offer_builder_runs")
+                .select("id,step_index,status").eq("owner_id", owner_id).eq("id", runId).maybeSingle();
+              if (runReadError) throw runReadError;
+              if (run && run.status !== "cancelled" && exhausted && waitingForProvider) {
+                const cycle = Math.floor(attempts / Math.max(1, maxAttempts));
+                const nextKey = "offer-builder:" + runId + ":step:" + run.step_index + ":cycle:" + (cycle + 1);
+                const { data: nextJob, error: nextJobError } = await db.from("ultron_jobs").insert({
+                  owner_id, job_type: "offer_builder.generate", title: "Resume Offer Builder generation",
+                  payload: { run_id: runId }, priority: 5, max_attempts: 20,
+                  idempotency_key: nextKey, run_after: new Date(Date.now() + delay * 1000).toISOString(),
+                }).select("id").single();
+                if (nextJobError && nextJobError.code !== "23505") throw nextJobError;
+                let nextJobId = nextJob?.id;
+                if (!nextJobId) {
+                  const { data: existingJob, error: existingError } = await db.from("ultron_jobs").select("id")
+                    .eq("owner_id", owner_id).eq("idempotency_key", nextKey).maybeSingle();
+                  if (existingError) throw existingError;
+                  nextJobId = existingJob?.id;
+                }
+                await db.from("ultron_offer_builder_runs").update({
+                  status: "waiting_for_provider", current_job_id: nextJobId ?? null,
+                  error_message: message.slice(0, 1000), updated_at: new Date().toISOString(),
+                }).eq("owner_id", owner_id).eq("id", runId);
+              } else if (run) {
+                await db.from("ultron_offer_builder_runs").update({
+                  status: exhausted ? "failed" : waitingForProvider ? "waiting_for_provider" : "retry_wait",
+                  error_message: message.slice(0, 1000), updated_at: new Date().toISOString(),
+                  completed_at: exhausted ? new Date().toISOString() : null,
+                }).eq("owner_id", owner_id).eq("id", runId);
               }
             }
           }

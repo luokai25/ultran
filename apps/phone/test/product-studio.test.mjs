@@ -36,6 +36,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /opportunity_score/);
   assert.match(moduleSource, /validation/);
   assert.match(moduleSource, /function renderQuality/);
+  assert.match(moduleSource, /editorial_review_passed/);
+  assert.match(moduleSource, /editorial_review_score/);
   assert.match(moduleSource, /product-studio-connect/);
   assert.match(moduleSource, /openCloudSettings\(\)/);
   assert.match(css, /\.product-studio-connect/);
@@ -106,6 +108,10 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /body_external_links_match_sources/);
   assert.match(source, /bodyMarkdownLinks/);
   assert.match(source, /quality_checks_passed/);
+  assert.match(source, /editorial\.review\.started/);
+  assert.match(source, /editorial\.review\.completed/);
+  assert.match(source, /editorial_review_passed/);
+  assert.match(source, /editorial\.revision\.started/);
   assert.ok(source.includes("withSearch ? 12_000 : 32_000"));
   assert.ok(source.includes("Math.min(withSearch ? 10_000 : 30_000"));
   assert.ok(source.includes("const deadline = Date.now() + 55_000"));

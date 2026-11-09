@@ -57,8 +57,10 @@ function setNotice(message: string, error = false): void {
   const needsOwnerAccount = /connect your ultron (owner )?account|owner account.*settings/i.test(message);
   if (needsOwnerAccount && options?.openCloudSettings) {
     notice.append(document.createTextNode("Connect your ULTRON owner account to enable private cloud products. "));
-    const connect = node("button", "product-studio-connect", "Open cloud settings");
+    const connect = document.createElement("button");
+    connect.className = "product-studio-connect";
     connect.type = "button";
+    connect.textContent = "Open cloud settings";
     connect.addEventListener("click", () => options?.openCloudSettings());
     notice.append(connect);
     return;

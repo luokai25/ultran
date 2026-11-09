@@ -37,7 +37,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
-  assert.match(source, /callStudioStreaming/);
+  assert.match(source, /callStudioStreaming/);\n  assert.match(source, /runWithProviderWait/);\n  assert.match(source, /provider\.waiting/);\n  assert.match(source, /waiting_for_provider/);
   assert.match(source, /no_free_google_search_model_available/);
   assert.match(source, /google_search/);
   assert.match(source, /cooldown_until/);

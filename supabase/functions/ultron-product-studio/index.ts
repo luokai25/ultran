@@ -667,7 +667,7 @@ Deno.serve(async (req: Request) => {
       }
       const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {
         if (!document.storage_path) return { ...document, download_url: null };
-        const filename = document.format === "html" ? title + ".html" : title + ".md";
+        const filename = document.format === "html" ? project.title + ".html" : project.title + ".md";
         const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600, { download: filename });
         return { ...document, download_url: signedDocument?.signedUrl ?? null };
       }));

@@ -56,7 +56,7 @@ jobs:
         with:
           deno-version: v2.1.4
       - name: Test native Office artifact packages
-        run: deno test --allow-net supabase/functions/ultron-product-studio/formats_test.ts
+        run: deno test --node-modules-dir=auto --allow-net supabase/functions/ultron-product-studio/formats_test.ts
 
   verify:
     name: Verify

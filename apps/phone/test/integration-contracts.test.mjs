@@ -544,7 +544,7 @@ test("Termux bootstrap patches the blocked Dialog host only to a SHA-256-identic
 
 test("connector refreshes run concurrently, discard stale panel responses and bound connection requests", async () => {
   const connectors = await read("src/connectors-ui.ts");
-  assert.match(connectors, /Promise\.allSettled\(\[refreshEnabled\(\), refreshOAuthConnections\(\), refreshApprovals\(\), refreshMcpServers\(\)\]\)/);
+  assert.match(connectors, /Promise\.allSettled\(\[refreshEnabled\(\), refreshOAuthConnections\(\), refreshApprovals\(\), refreshMcpServers\(\), refreshMcpAudit\(\)\]\)/);
   assert.match(connectors, /generation !== refreshGeneration/);
   assert.match(connectors, /refreshInFlight\?\.generation === generation/);
   assert.match(connectors, /}, 20_000\)/);

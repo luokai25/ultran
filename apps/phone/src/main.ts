@@ -2055,14 +2055,16 @@ function renderHistory(): void {
 
 function openDrawer(): void {
   renderHistory();
+  const desktop = window.matchMedia("(min-width: 900px)").matches;
   drawer.dataset.open = "true";
   drawer.setAttribute("aria-hidden", "false");
-  scrim.hidden = false;
+  scrim.hidden = desktop;
 }
 
 function closeDrawer(): void {
-  drawer.dataset.open = "false";
-  drawer.setAttribute("aria-hidden", "true");
+  const desktop = window.matchMedia("(min-width: 900px)").matches;
+  drawer.dataset.open = String(desktop);
+  drawer.setAttribute("aria-hidden", String(!desktop));
   scrim.hidden = true;
 }
 

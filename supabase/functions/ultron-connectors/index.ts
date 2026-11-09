@@ -3,6 +3,12 @@ const headers={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
 const obj=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==="object"&&!Array.isArray(v);
 const str=(v:unknown,n=160)=>typeof v==="string"?v.trim().slice(0,n):"";
+function isReadOnlyTool(toolSlug:string,toolkitSlug:string):boolean{
+ const prefix=toolkitSlug.toUpperCase().replace(/-/g,"_")+"_";
+ if(!toolSlug.startsWith(prefix))return false;
+ const action=toolSlug.slice(prefix.length);
+ return /^(GET|LIST|SEARCH|FETCH|READ|FIND|QUERY|ENUM|DOWNLOAD|PROFILE|STATUS|CHECK|DESCRIBE|EXPORT|FREE_BUSY|EVENTS_LIST|EVENTS_GET)(_|$)/.test(action);
+}
 async function kickDurableWorker(url:string,authorization:string,publishableKey:string):Promise<Record<string,unknown>>{
  try{
   const response=await fetch(url+"/functions/v1/ultron-jobs",{method:"POST",headers:{"Authorization":authorization,"apikey":publishableKey,"Content-Type":"application/json"},body:JSON.stringify({action:"process",limit:1}),signal:AbortSignal.timeout(25000)});
@@ -152,7 +158,7 @@ Deno.serve(async(req:Request)=>{
    const toolkit=String(connection.toolkit_slug??"").toUpperCase().replace(/-/g,"_");
    if(!toolkit||!toolSlug.startsWith(toolkit+"_"))return reply({error:"toolkit_connection_mismatch"},403);
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
-   const readOnly=/(^|_)(GET|LIST|SEARCH|FETCH|READ|FIND|QUERY|ENUM|DOWNLOAD|PROFILE|STATUS)(_|$)/.test(toolSlug);
+   const readOnly=isReadOnlyTool(toolSlug,toolkit);
    if(!readOnly){
     const permissionKey="composio."+toolSlug.toLowerCase();
     const {data:permission,error:permissionError}=await db.from("ultron_tool_permissions").select("access_mode,require_confirmation").eq("owner_id",ownerId).eq("tool_key",permissionKey).maybeSingle();

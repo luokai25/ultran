@@ -41,3 +41,10 @@ test("Google Super is routed through the shared OAuth gateway without exposing G
  assert.match(gateway,/approval_required/);
  assert.match(screen,/Google authorization page/);
 });
+
+test("connector read-only classification is prefix-based and fails closed for mixed write tool names",()=>{
+ assert.match(gateway,/function isReadOnlyTool\(toolSlug:string,toolkitSlug:string\)/);
+ assert.match(gateway,/const action=toolSlug\.slice\(prefix\.length\)/);
+ assert.match(gateway,/const readOnly=isReadOnlyTool\(toolSlug,toolkit\)/);
+ assert.doesNotMatch(gateway,/const readOnly=\/\(\^\|_\)\(GET\|LIST\|SEARCH/);
+});

@@ -3625,7 +3625,7 @@ async function initializeAvatar(): Promise<void> {
       const addThread = (points: InstanceType<typeof THREE.Vector3>[]): void => {
         threads.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), threadMaterial));
       };
-      for (const latitude of [-1.05, -0.68, -0.32, 0, 0.32, 0.68, 1.05]) {
+      for (const latitude of [-0.95, -0.68, -0.32, 0, 0.32, 0.68, 0.95]) {
         const radius = Math.sqrt(1 - latitude * latitude) * 1.035;
         const points: InstanceType<typeof THREE.Vector3>[] = [];
         for (let step = 0; step <= 96; step += 1) {

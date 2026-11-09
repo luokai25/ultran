@@ -170,6 +170,7 @@ function renderQuality(project: ProductProject): void {
     ["reusable_asset", "Reusable template or checklist"],
     ["limitations_and_next_steps", "Limitations and next steps"],
     ["placeholder_free", "No unfinished placeholders"],
+    ["spreadsheet_csv_valid", "Spreadsheet CSV export (when required)"],
   ];
   const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed");
   panel.append(summary);

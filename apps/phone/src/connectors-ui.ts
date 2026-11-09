@@ -649,12 +649,16 @@ if (entry.auth === "oauth2") {
       let preparedExternal: PreparedExternal | null = null;
       try {
         if (entry.auth === "oauth2") {
+          // Must run before even checking the owner session: both checks can
+          // await network I/O, which would make the browser block the popup.
+          preparedExternal = deps.prepareExternal?.() ?? null;
           cloudLinked = await deps.linked();
           if (cloudLinked) await refreshOAuthConnections();
           if (!cloudLinked) {
             note.dataset.tone = "bad";
             note.textContent = "Sign in to your ULTRON owner account first. Opening private cloud settings…";
             deps.openCloudSettings?.();
+            preparedExternal?.cancel();
             act.disabled = false;
             return;
           }
@@ -664,13 +668,13 @@ if (entry.auth === "oauth2") {
             composioKeyInput.focus({ preventScroll: true });
             note.dataset.tone = "bad";
             note.textContent = "One-time setup required: add the Composio Project API key in OAuth gateway below. ULTRON will then open Google's authorization page directly.";
+            preparedExternal?.cancel();
             act.disabled = false;
             return;
           }
           // Browsers block window.open after an awaited fetch. Reserve the tab
           // synchronously inside this user gesture, then navigate it once the
           // server has returned Google's managed OAuth URL.
-          preparedExternal = deps.prepareExternal?.() ?? null;
           const result = await startUltronConnectorConnection({ providerKey: entry.id.replace(/-/g, "_"), toolkitSlug: toolkit });
           if (preparedExternal) await preparedExternal.open(result.redirectUrl);
           else await deps.openExternal(result.redirectUrl);

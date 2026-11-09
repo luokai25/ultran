@@ -540,7 +540,9 @@ async function decodeOfferBuilderHtml(): Promise<string> {
 
   const manuscriptStep = [
     "async function ms(){",
-    " const names=['Introduction',...CHAP,'Conclusion','Bonus: Diagnostic Checklist','Bonus: One-Page Action Card'];",
+    " const proposed=(S.outline?.chapters||[]).slice(0,7).map(ch=>typeof ch==='string'?ch:(ch.title||'')).filter(Boolean);",
+    " const chapterNames=proposed.length===7?proposed:CHAP.slice(0,7);",
+    " const names=['Introduction',...chapterNames,'Conclusion','Bonus: Diagnostic Checklist','Bonus: One-Page Action Card'];",
     " const old=Array.isArray(S.secs)?S.secs:[];",
     " S.secs=names.map((name,i)=>{const prior=old.find(x=>x.t===name);return prior||{t:name,k:i===0?'in':i<8?'ch':'bn',html:'',markdown:''}});",
     " S.secs.forEach(section=>{if(!section.markdown&&section.html){const box=document.createElement('div');box.innerHTML=section.html;section.markdown=box.textContent||''}});",

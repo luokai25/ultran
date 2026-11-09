@@ -189,7 +189,7 @@ function renderOpportunity(project: ProductProject): void {
   panel.replaceChildren();
   const brief = project.opportunity_brief ?? {};
   const synthesis = project.synthesis_summary ?? {};
-  const score = Number(brief.opportunity_score);
+  const score = typeof brief.opportunity_score === "number" ? brief.opportunity_score : Number.NaN;
   if (Number.isFinite(score)) {
     const metric = node("div", "product-opportunity-score");
     metric.append(node("strong", "", String(Math.max(0, Math.min(100, Math.round(score)))) + " / 100"), node("span", "", "Opportunity score · " + String(brief.confidence ?? "unrated") + " confidence"));
@@ -210,7 +210,7 @@ function renderOpportunity(project: ProductProject): void {
     ["Evidence synthesis", synthesis.executive_summary ?? synthesis.overview],
   ];
   for (const [label, value] of fields) {
-    const values = Array.isArray(value) ? value.map(item => typeof item === "string" ? item : isRecord(item) ? String(item.signal ?? item.text ?? item.theme ?? item.description ?? "") : "").filter(Boolean) : [];
+    const values = Array.isArray(value) ? value.map(item => typeof item === "string" ? item : isRecord(item) ? String(item.signal ?? item.text ?? item.theme ?? item.description ?? item.claim ?? item.evidence ?? item.finding ?? "") : "").filter(Boolean) : [];
     const textValue = typeof value === "string" ? value.trim() : "";
     if (!textValue && !values.length) continue;
     const item = node("div", "product-opportunity-item");

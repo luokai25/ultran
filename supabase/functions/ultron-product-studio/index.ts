@@ -116,9 +116,8 @@ function openAIContent(value: unknown): string {
   return "";
 }
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
-  const deadline = Date.now() + 12_000;
-  const db = service();
   const deadline = Date.now() + 18_000;
+  const db = service();
   const candidates = await listStudioCandidates(ownerId, withSearch);
   if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
   let lastError = "provider_unavailable";

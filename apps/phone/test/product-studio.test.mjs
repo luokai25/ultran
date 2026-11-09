@@ -45,6 +45,9 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /isFreeProviderModel/);
   assert.match(source, /callStudioStreaming/);
   assert.match(source, /canonicalReferences/);
+  assert.match(source, /productFormatGuidance/);
+  assert.match(source, /spreadsheet-ready product/);
+  assert.match(source, /presentation-ready product/);
   assert.match(source, /zipSync/);
   assert.match(source, /source-register\\.csv/);
   assert.match(source, /format: "zip"/);

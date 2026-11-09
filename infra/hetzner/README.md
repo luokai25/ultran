@@ -120,6 +120,7 @@ Edit `.env`:
 - Set `ULTRON_DOMAIN` to a DNS name whose A record points to this server.
 - Set `ACME_EMAIL` to an address for TLS certificate notices.
 - Set `ULTRON_CORS_ORIGINS` to the exact HTTPS origin(s) of the web app.
+- Set `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` to your Supabase project values. Production API routes verify the bearer session with Supabase Auth and require the RLS-protected `ultron_instance` owner row. Do not use a service-role key for this check; the publishable key plus the caller session is sufficient. The phone client sends its current owner session automatically. `/v1/health` remains public for monitoring.
 - To enable Composio-managed OAuth connectors, create/copy the project API key
   from your Composio project settings and set `ULTRON_COMPOSIO_API_KEY` in this
   private server-side `.env` file. Keep permissions at `0600`; never commit the

@@ -2130,10 +2130,15 @@ async function api(path: string, init: RequestInit = {}, timeoutMs = 20_000, ext
   else externalSignal?.addEventListener("abort", abortFromCaller, { once: true });
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const session = await getCloudSession().catch(() => null);
     return await fetch(`${baseUrl()}${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(session?.access_token ? { Authorization: "Bearer " + session.access_token } : {}),
+        ...(init.headers ?? {}),
+      },
     });
   } finally {
     window.clearTimeout(timer);
@@ -2369,8 +2374,12 @@ async function remoteBackgroundReply(
   });
   if (!response.ok) throw new Error(`could not queue background task (${response.status})`);
   const task = await response.json() as { id: string };
+  const ownerSession = await getCloudSession().catch(() => null);
   const streamResponse = await fetch(`${baseUrl()}/v1/tasks/${task.id}/events`, {
-    headers: { Accept: "text/event-stream" },
+    headers: {
+      Accept: "text/event-stream",
+      ...(ownerSession?.access_token ? { Authorization: "Bearer " + ownerSession.access_token } : {}),
+    },
   });
   if (!streamResponse.ok || !streamResponse.body) throw new Error(`background event stream returned ${streamResponse.status}`);
   const reader = streamResponse.body.getReader();

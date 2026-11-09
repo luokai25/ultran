@@ -19,13 +19,17 @@ def get_container(request: Request) -> Container:
 
 
 def get_workspace(
+    request: Request,
     x_ultron_workspace: Annotated[str | None, Header(alias="X-Ultron-Workspace")] = None,
 ) -> str:
-    """Workspace scoping.
+    """Use the authenticated owner session as the production workspace boundary.
 
-    Ultron is local-first: the default workspace is the machine itself. A caller
-    that runs several workspaces passes the header and every service keys off it.
+    ULTRON currently has one owner workspace. In production, never allow a
+    caller-supplied workspace header to select another workspace. Local
+    development retains the explicit header for isolated workspaces.
     """
+    if getattr(request.state, "owner_id", None):
+        return DEFAULT_WORKSPACE
     ws = (x_ultron_workspace or DEFAULT_WORKSPACE).strip() or DEFAULT_WORKSPACE
     if len(ws) > 64:
         ws = ws[:64]

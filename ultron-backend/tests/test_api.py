@@ -596,3 +596,30 @@ def test_read_endpoints_are_fast_and_stable(client, path):
     second = client.get(path)
     assert first.status_code == 200
     assert first.json() == second.json()
+
+
+def test_production_operational_routes_require_a_supabase_owner_session(tmp_path):
+    from fastapi.testclient import TestClient
+    from ultron_backend.app import create_app
+    from ultron_backend.config import Settings
+
+    settings = Settings(
+        environment="production",
+        data_dir=tmp_path / "production-data",
+        credential_encryption_key="present-for-test",
+        supabase_url="https://project.supabase.co",
+        supabase_publishable_key="sb_publishable_test",
+    )
+    with TestClient(create_app(settings)) as production:
+        assert production.get("/v1/health").status_code == 200
+        assert production.get("/v1/mcp/servers").status_code == 401
+        assert production.get("/v1/connectors").status_code == 401
+        assert production.options("/v1/mcp/servers").status_code in (200, 204)
+
+
+def test_production_workspace_ignores_a_caller_selected_workspace():
+    from types import SimpleNamespace
+    from ultron_backend.api.deps import get_workspace
+
+    request = SimpleNamespace(state=SimpleNamespace(owner_id="owner-uuid"))
+    assert get_workspace(request, "attacker-selected-workspace") == "local"

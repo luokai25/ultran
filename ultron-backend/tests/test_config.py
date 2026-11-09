@@ -23,6 +23,8 @@ def test_from_env_reads_every_knob():
         {
             "ULTRON_ENV": "production",
             "ULTRON_CREDENTIAL_ENCRYPTION_KEY": "test-key-is-present-for-config-only",
+            "ULTRON_SUPABASE_URL": "https://project.supabase.co",
+            "ULTRON_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_test",
             "ULTRON_API_PREFIX": "/api",
             "ULTRON_BRAIN_BACKEND": "OPENAI",
             "ULTRON_BRAIN_TIMEOUT_S": "12.5",
@@ -33,6 +35,8 @@ def test_from_env_reads_every_knob():
     )
     assert s.environment == "production"
     assert s.is_production is True
+    assert s.supabase_url == "https://project.supabase.co"
+    assert s.supabase_publishable_key == "sb_publishable_test"
     assert s.api_prefix == "/api"
     assert s.brain_backend == "openai"
     assert s.brain_fallbacks == ("echo",)
@@ -91,3 +95,8 @@ def test_environment_defaults_to_offline_echo():
 def test_ollama_backend_is_not_supported():
     with pytest.raises(ValueError, match="brain_backend"):
         Settings(brain_backend="ollama")
+
+
+def test_production_requires_supabase_owner_auth_configuration():
+    with pytest.raises(ValueError, match="ULTRON_SUPABASE_URL"):
+        Settings(environment="production", credential_encryption_key="present")

@@ -60,6 +60,8 @@ class Settings:
     api_prefix: str = "/v1"
     data_dir: Path = Path(".ultron-data")
     credential_encryption_key: str = ""
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
     brain_backend: str = "echo"
     brain_model: str = "default"
     brain_timeout_s: float = 30.0
@@ -116,6 +118,8 @@ class Settings:
             raise ValueError("sandbox_max_ttl_s must be positive")
         if self.is_production and not self.credential_encryption_key:
             raise ValueError("ULTRON_CREDENTIAL_ENCRYPTION_KEY is required in production")
+        if self.is_production and (not self.supabase_url or not self.supabase_publishable_key):
+            raise ValueError("ULTRON_SUPABASE_URL and ULTRON_SUPABASE_PUBLISHABLE_KEY are required in production")
         if self.free_plan_monthly_tokens < 0:
             raise ValueError("free_plan_monthly_tokens must be >= 0")
 
@@ -136,6 +140,8 @@ class Settings:
             api_prefix=e.get("ULTRON_API_PREFIX", "/v1"),
             data_dir=Path(e.get("ULTRON_DATA_DIR", ".ultron-data")),
             credential_encryption_key=e.get("ULTRON_CREDENTIAL_ENCRYPTION_KEY", ""),
+            supabase_url=e.get("ULTRON_SUPABASE_URL", "").rstrip("/"),
+            supabase_publishable_key=e.get("ULTRON_SUPABASE_PUBLISHABLE_KEY", ""),
             brain_backend=e.get("ULTRON_BRAIN_BACKEND", "echo").strip().lower(),
             brain_model=e.get("ULTRON_BRAIN_MODEL", "default"),
             brain_timeout_s=_float(e.get("ULTRON_BRAIN_TIMEOUT_S"), 30.0),

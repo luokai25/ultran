@@ -107,11 +107,28 @@ Deno.serve(async(req:Request)=>{
    const {data,error}=await db.from("ultron_connector_connections").upsert({owner_id:ownerId,provider_key:provider,toolkit_slug:toolkit,auth_config_id:authConfig,connection_key:alias,display_name:display,status:"pending",external_account_id:linked.connected_account_id,last_error:null,metadata:{link_expires_at:linked.expires_at??null}},{onConflict:"owner_id,provider_key,connection_key"}).select("id,provider_key,toolkit_slug,connection_key,display_name,status,external_account_id,metadata").single();
    if(error)throw error;return reply({ok:true,connection:data,redirect_url:linked.redirect_url,expires_at:linked.expires_at??null},201);
   }
+  if(body.action==="set_permission"){
+   const id=str(body.connection_id,80),toolSlug=str(body.tool_slug,120).toUpperCase(),allow=body.allow===true;
+   if(!id||! /^[A-Z][A-Z0-9_]{2,119}$/.test(toolSlug))return reply({error:"invalid_tool_permission"},400);
+   const {data:connection,error:connectionError}=await db.from("ultron_connector_connections").select("toolkit_slug,status").eq("owner_id",ownerId).eq("id",id).maybeSingle();
+   if(connectionError)throw connectionError;
+   if(!connection||connection.status!=="connected")return reply({error:"connector_not_connected"},409);
+   const toolkit=String(connection.toolkit_slug??"").toUpperCase().replace(/-/g,"_");
+   if(!toolkit||!toolSlug.startsWith(toolkit+"_"))return reply({error:"toolkit_connection_mismatch"},403);
+   if(isReadOnlyTool(toolSlug,toolkit))return reply({error:"read_only_tool_does_not_need_a_write_grant"},400);
+   const toolKey="composio."+toolSlug.toLowerCase();
+   const {data:permission,error}=await db.from("ultron_tool_permissions").upsert({owner_id:ownerId,tool_key:toolKey,access_mode:allow?"allow":"deny",require_confirmation:!allow,scopes:[]},{onConflict:"owner_id,tool_key"}).select("tool_key,access_mode,require_confirmation,updated_at").single();
+   if(error)throw error;
+   return reply({ok:true,permission});
+  }
   if(body.action==="tools"){
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
    let query=db.from("ultron_connector_connections").select("id,provider_key,toolkit_slug,display_name,external_account_id").eq("owner_id",ownerId).eq("status","connected");
    const filter=str(body.toolkit_slug,80).toLowerCase();if(filter)query=query.eq("toolkit_slug",filter);
    const {data:connections,error}=await query.order("provider_key");if(error)throw error;
+   const {data:permissionRows,error:permissionError}=await db.from("ultron_tool_permissions").select("tool_key,access_mode,require_confirmation").eq("owner_id",ownerId).like("tool_key","composio.%");
+   if(permissionError)throw permissionError;
+   const permissionMap=new Map((permissionRows??[]).map((row)=>[String(row.tool_key),row]));
    const available:Record<string,unknown>[]=[];
    for(const connection of connections??[]){
     if(!connection.toolkit_slug||!connection.external_account_id)continue;
@@ -120,7 +137,10 @@ Deno.serve(async(req:Request)=>{
     for(const item of candidates){
      if(!obj(item))continue;
      const slug=str(item.slug||item.name||item.tool_slug,120).toUpperCase();if(!/^[A-Z][A-Z0-9_]{2,119}$/.test(slug))continue;
-     available.push({connection_id:connection.id,provider_key:connection.provider_key,toolkit_slug:connection.toolkit_slug,display_name:connection.display_name,tool_slug:slug,description:str(item.description,1000),input_parameters:item.input_parameters??item.parameters??item.input_schema??{}});
+     const readOnly=isReadOnlyTool(slug,String(connection.toolkit_slug));
+     const permission=permissionMap.get("composio."+slug.toLowerCase());
+     const allowed=readOnly||(permission?.access_mode==="allow"&&permission?.require_confirmation===false);
+     available.push({connection_id:connection.id,provider_key:connection.provider_key,toolkit_slug:connection.toolkit_slug,display_name:connection.display_name,tool_slug:slug,description:str(item.description,1000),input_parameters:item.input_parameters??item.parameters??item.input_schema??{},read_only:readOnly,allowed});
     }
    }
    return reply({ok:true,tools:available});
@@ -132,6 +152,12 @@ Deno.serve(async(req:Request)=>{
    if(connectionError)throw connectionError;if(!connection||connection.status!=="connected")return reply({error:"connector_not_connected"},409);
    const toolkit=String(connection.toolkit_slug??"").toUpperCase().replace(/-/g,"_");
    if(!toolkit||!toolSlug.startsWith(toolkit+"_"))return reply({error:"toolkit_connection_mismatch"},403);
+   if(!isReadOnlyTool(toolSlug,toolkit)){
+    const permissionKey="composio."+toolSlug.toLowerCase();
+    const {data:permission,error:permissionError}=await db.from("ultron_tool_permissions").select("access_mode,require_confirmation").eq("owner_id",ownerId).eq("tool_key",permissionKey).maybeSingle();
+    if(permissionError)throw permissionError;
+    if(!permission||permission.access_mode!=="allow"||permission.require_confirmation!==false)return reply({error:"permission_required",tool_slug:toolSlug,permission_key:permissionKey,message:"This write action is disabled. Enable this exact tool in its connector settings before ULTRON can run it."},403);
+   }
    const idempotencyKey=str(body.idempotency_key,160)||null;
    const {data:job,error:jobError}=await db.from("ultron_jobs").insert({
     owner_id:ownerId,job_type:"connector.tool.execute",title:"Run "+toolSlug,

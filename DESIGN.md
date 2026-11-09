@@ -4,18 +4,18 @@ name: ultron
 design-md-format: spec
 version: 1
 colors:
-  background: "#090A0C"
-  surface-1: "#101216"
-  surface-2: "#171B21"
-  surface-3: "#202630"
-  border: "rgba(220,228,238,.10)"
-  border-strong: "rgba(220,228,238,.18)"
-  text: "#F2F4F7"
-  text-secondary: "#B5BDC8"
-  text-muted: "#828D9B"
-  accent: "#D5B779"
-  accent-strong: "#E8CB91"
-  core: "#E34B58"
+  background: "#212121"
+  surface-1: "#2F2F2F"
+  surface-2: "#383838"
+  surface-3: "#414141"
+  border: "rgba(255,255,255,.09)"
+  border-strong: "rgba(255,255,255,.16)"
+  text: "#F5F5F5"
+  text-secondary: "#C5C5C5"
+  text-muted: "#999999"
+  accent: "#10A37F"
+  accent-strong: "#0E9272"
+  core: "#10A37F"
   success: "#55C99A"
   warning: "#E8B45D"
   danger: "#EF6B73"
@@ -26,8 +26,8 @@ typography:
   body: "14-16px"
   meta: "12px"
 rounded:
-  control: "12px"
-  panel: "16px"
+  control: "9px"
+  panel: "12px"
   pill: "999px"
 spacing:
   base: "4px"
@@ -46,9 +46,9 @@ components:
   mobile-gutter: "16px"
   floating-shadow: "0 16px 44px rgba(0,0,0,.18)"
 motion:
-  enter: "620ms cubic-bezier(.16,1,.3,1)"
-  surface: "400ms cubic-bezier(.16,1,.3,1)"
-  ambient: "5.6s-42s"
+  enter: "180ms ease"
+  surface: "150ms ease"
+  ambient: "none"
   reduced-motion: "required"
 ---
 
@@ -63,7 +63,7 @@ motion:
 - Secondary web application: `apps/web`, a non-production Next.js prototype/console. It is not deployed and must not be configured as a second public ULTRON site or reported as feature parity with `apps/phone`.
 - Backend: Supabase. Design changes must not weaken auth, RLS, secret storage, connector scopes, or approval gates.
 
-**Design direction:** a cinematic personal operating environment, not a stripped-down chat page, generic SaaS dashboard, or noisy sci-fi cockpit. The interface should feel extraordinary, premium, information-rich and tactile. Use volumetric atmosphere, kinetic identity, purposeful depth, spatial desktop composition, and page-specific layouts. Motion is part of ULTRON's identity, not decoration pasted onto generic cards. Restraint means removing noise, not removing features or visual character.
+**Design direction:** a clean, familiar conversation workspace inspired by ChatGPT. The entire interface is rebuilt around readable conversations, a bottom composer, a persistent desktop sidebar, restrained charcoal surfaces and subtle green interaction states. ULTRON branding is text-first. No orb, avatar, animated core, HUD, sci-fi decoration, glass panels, ambient effects or stacked card dashboard. Keep every existing capability, but organize secondary functions into clear pages reachable from navigation.
 
 - Mood: confident, quiet, intelligent, focused. The animated core is ULTRON's signature brand element; the interface around it remains useful and legible.
 - Brand expression: obsidian surfaces, cool titanium text, and a controlled warm-metal interaction accent. The animated core may retain its crimson energy identity. Avoid flooding every button, border, icon, or heading with the accent.
@@ -124,15 +124,15 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 
 ### Desktop web
 
-- Use a persistent left navigation rail/sidebar for primary destinations, with a centered content column and optional contextual right rail only when it adds real value.
+- Use a persistent left sidebar for primary destinations and conversation history, with a centered chat column.
 - Keep global search, account/agent identity, connection state, and new conversation in consistent locations.
 - Avoid duplicating mobile bottom-nav patterns on desktop.
 - Use responsive breakpoints based on content fit, not device names.
 
 ## Motion language
 
-- The ULTRON core is the signature motion anchor: slow vertical drift, breathing plasma light, and orbital geometry. When WebGL is unavailable, the CSS sphere fallback must remain spherical and preserve the same visual hierarchy.
-- Ambient atmosphere uses low-contrast moving grid/nebula layers. It must never reduce text contrast, steal pointer input, or create horizontal scroll.
+- No orb, avatar hero, animated core, particle field, HUD, ambient grid or decorative brand animation. ULTRON is expressed through its name, typography and product behavior.
+- No ambient motion or decorative atmosphere. Use short, quiet transitions only for menus, focus and state changes.
 - Page entry uses a short opacity/transform transition. Secondary sections may reveal as they enter the viewport, but content must remain readable without animation and never wait for an animation to become usable.
 - Interactive surfaces use small, purposeful lift and focus feedback. Avoid springy overshoot, constant motion on controls, and full-page parallax that fights scrolling.
 - Motion durations: 250–450ms for surfaces, 600–700ms for page entry, 5–42s for ambient loops. Honor `prefers-reduced-motion` by removing continuous and scroll-linked motion.
@@ -142,7 +142,7 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 
 - Use one restrained elevation shadow for floating menus and sheets: `0 16px 44px rgba(0,0,0,.18)`.
 - Prefer borders, surface contrast, and subtle inner highlights for normal cards instead of stacking shadows.
-- The core may use a stronger localized glow. Do not apply glow to ordinary controls or every panel.
+- Do not use glow, glassmorphism, gradients or layered card stacks. Use flat surfaces and restrained borders.
 - Use backdrop blur only for floating chrome that must remain legible over content; keep normal surfaces opaque enough for contrast.
 
 ## Shapes
@@ -150,7 +150,7 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 - Two component radii: 12px for controls and compact cards; 16px for large panels and sheets.
 - Pills may be fully rounded only when the shape communicates status or selection.
 - Avoid excessive nested borders, ornamental outlines, and unrelated corner radii.
-- Keep the assistant core circular and geometrically distinct from the rectangular workspace surfaces.
+- Keep the interface typographic and functional. Do not introduce an assistant mascot, orb or ornamental identity mark.
 
 ## Components
 

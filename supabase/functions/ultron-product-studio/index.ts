@@ -99,7 +99,7 @@ function isFreeProviderModel(provider: StudioProvider, model: string): boolean {
   return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
 }
 function isFreeGoogleSearchModel(model: string): boolean {
-  return /^gemini-2\.5-(?:flash|flash-lite)$/.test(model.toLowerCase().replace(/^models\//, ""));
+  return /^gemini-2\.5-(?:flash|flash-lite)(?:-|$)/.test(model.toLowerCase().replace(/^models\//, ""));
 }
 function studioModelScore(model: string): number {
   const id = model.toLowerCase();

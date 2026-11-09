@@ -7,7 +7,7 @@ import path from "node:path";
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (relative) => readFile(path.join(repo, relative), "utf8");
 
-test("ULTRON gstack workflow, design skill and screen ledger are installed", async () => {
+test("ULTRON design workflow and complete screen inventory remain installed", async () => {
   const [design, skill, gstack, ledger, agents] = await Promise.all([
     read("DESIGN.md"),
     read(".agents/skills/ultron-design/SKILL.md"),
@@ -17,7 +17,8 @@ test("ULTRON gstack workflow, design skill and screen ledger are installed", asy
   ]);
   assert.match(design, /# ULTRON Design System/);
   assert.match(design, /Page inventory and design requirements/);
-  assert.match(design, /360×800/);
+  assert.match(design, /ChatGPT/);
+  assert.match(design, /No orb/);
   assert.match(skill, /ULTRON Design Studio/);
   assert.match(skill, /Verify every screen/);
   for (const [index, phase] of ["THINK", "PLAN", "DESIGN", "BUILD", "REVIEW", "TEST", "SHIP", "REFLECT"].entries()) {
@@ -30,115 +31,69 @@ test("ULTRON gstack workflow, design skill and screen ledger are installed", asy
   assert.match(agents, /\.agents\/skills\/ultron-design\/SKILL\.md/);
 });
 
-test("shared canonical design tokens are defined in both shipped UI surfaces", async () => {
-  const [phoneHtml, phoneTokens, webTokens] = await Promise.all([
+test("canonical phone client uses one clean stylesheet and keeps the existing backend client", async () => {
+  const [html, css, main] = await Promise.all([
     read("apps/phone/index.html"),
-    read("apps/phone/src/quiet-ui.css"),
-    read("apps/web/src/app/globals.css"),
+    read("apps/phone/src/chatgpt-ui.css"),
+    read("apps/phone/src/main.ts"),
   ]);
-  assert.ok(phoneHtml.indexOf("./src/design-system.css") < phoneHtml.indexOf("./src/quiet-ui.css"));
-  for (const token of ["--u-bg", "--u-surface-1", "--u-surface-2", "--u-accent", "--u-core", "--u-success", "--u-danger"]) {
-    assert.ok(phoneTokens.includes(token), `phone client is missing ${token}`);
-    assert.ok(webTokens.includes(token), `Next.js client is missing ${token}`);
-  }
+  const stylesheetLinks = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(stylesheetLinks, ["./src/chatgpt-ui.css"]);
+  assert.match(html, /<title>ULTRON<\/title>/);
+  assert.match(html, /id="avatar"/); // retained only as a stable DOM contract, hidden by the new design
+  assert.match(css, /\.stage\s*,\s*\.hero-kicker,\s*\.hero-status/);
+  assert.match(css, /\.brand-mark,\s*#drawer-mark/);
+  assert.match(css, /--bg:\s*#212121/);
+  assert.match(css, /--surface:\s*#2f2f2f/);
+  assert.match(css, /--accent:\s*#10a37f/);
+  assert.match(css, /\.composer\s*\{/);
+  assert.match(css, /#prompt\s*\{/);
+  assert.match(css, /#drawer\s*\{/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.doesNotMatch(html, /src\/(?:styles|workspace|experience|finish|learning|design-system|quiet-ui|motion-experience|product-studio)\.css/);
+  assert.match(main, /streamUltronSupabaseChat/);
+  assert.match(main, /getCloudSession/);
+  assert.match(main, /addUltronCloudKey/);
+  assert.doesNotMatch(main, /if \(shouldShow\) void initializeAvatar\(\)/);
 });
 
-test("mobile and desktop design requirements remain explicit", async () => {
-  const [design, ledger, html] = await Promise.all([
+test("responsive requirements and every full-screen destination remain covered", async () => {
+  const [design, ledger, html, css] = await Promise.all([
     read("DESIGN.md"),
     read("docs/ULTRON-SCREEN-COVERAGE.md"),
     read("apps/phone/index.html"),
+    read("apps/phone/src/chatgpt-ui.css"),
   ]);
   for (const viewport of ["360×800", "390×844", "768×1024", "1280×800", "1440×900"]) {
     assert.ok(design.includes(viewport), `missing viewport contract: ${viewport}`);
   }
   const fullScreens = [...html.matchAll(/<section id="([^"]+)" class="feature-screen[^"]*"/g)].map((match) => match[1]);
   assert.ok(fullScreens.length >= 5, "the inventory should cover all full-screen destinations");
-  for (const id of [...fullScreens, "thread", "global-search", "chat-model-menu", "connectors-panel", "connector-detail-wrap", "workspace-panel", "workspace-team-builder", "workspace-tray", "composio-approvals", "sheet-wrap"]) {
+  for (const id of [...fullScreens, "thread", "hero", "global-search", "chat-model-menu", "connectors-panel", "connector-detail-wrap", "workspace-panel", "workspace-team-builder", "workspace-tray", "composio-approvals", "sheet-wrap"]) {
     assert.ok(design.includes(`#${id}`), `missing design inventory entry: #${id}`);
   }
   for (const id of fullScreens) {
     assert.ok(ledger.includes(id), `missing screen coverage ledger entry: ${id}`);
   }
+  assert.match(css, /@media \(min-width:\s*900px\)/);
+  assert.match(css, /#drawer\s*\{[\s\S]*?width:\s*var\(--sidebar-width\)/);
+  assert.match(css, /\.feature-screen,\s*#connectors-panel[\s\S]*?left:\s*var\(--sidebar-width\)/);
+  assert.match(css, /@media \(max-width:\s*899px\)/);
 });
 
-test("desktop client promotes the mobile bottom navigation into a persistent side rail", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /@media\s*\(min-width:\s*900px\)/);
-  assert.match(css, /\.bottom-nav\s*\{[\s\S]*?inset:\s*0 auto 0 0/);
-  assert.match(css, /\.feature-screen\s*\{[\s\S]*?inset:\s*0 0 0 80px/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-});
-
-
-test("active product surfaces use warm-metal accents while semantic danger remains separate", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /\.chat-model-option\[aria-current="true"\][\s\S]*?var\(--u-accent-strong\)/);
-  assert.match(css, /\.curated-model-card\s*\{[\s\S]*?var\(--u-border\)/);
-  assert.match(css, /\.workspace-stat strong\s*\{\s*color:\s*var\(--u-accent-strong\)/);
-  assert.match(css, /\.learning-safety-note\s*\{[\s\S]*?rgba\(213,183,121/);
-  assert.match(css, /\.message-feedback button\[aria-pressed="true"\][\s\S]*?var\(--u-accent-strong\)/);
-  assert.match(css, /--u-core:\s*#e34b58/);
-});
-
-
-test("primary navigation remains visible and the composer stays clear of it", async () => {
-  const [experience, design, css] = await Promise.all([
-    read("apps/phone/src/experience.css"),
-    read("apps/phone/src/design-system.css"),
-    read("apps/phone/src/quiet-ui.css"),
+test("hidden overlays, focus states and mobile composer remain protected", async () => {
+  const [css, html] = await Promise.all([
+    read("apps/phone/src/chatgpt-ui.css"),
+    read("apps/phone/index.html"),
   ]);
-  assert.doesNotMatch(experience, /\.bottom-nav\s*\{\s*display:\s*none\s*!important/);
-  assert.match(design, /\.bottom-nav\{[^}]*display:grid/);
-  assert.match(css, /#app\s*\{\s*padding-bottom:\s*calc\(62px \+ var\(--safe-bottom\)\) !important/);
-  assert.match(css, /\.composer-model-row \.chat-model-button #chat-model-label\s*\{[^}]*max-width:\s*none !important/);
-  assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?padding-bottom: 0 !important/);
-});
-
-
-test("mobile hero keeps the complete ULTRON core visible above navigation", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*?#app\[data-page="chat"\] \.hero\s*\{[\s\S]*?justify-content:\s*flex-start/);
-  assert.match(css, /#app\[data-page="chat"\] \.stage\s*\{\s*width:\s*clamp\(132px, 34vw, 160px\)/);
-});
-
-
-test("active navigation uses warm-metal rather than the legacy red theme", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\][\s\S]*?color:\s*var\(--u-accent-strong\) !important/);
-  assert.match(css, /\.bottom-nav \.nav-item\[aria-current="page"\]::before[\s\S]*?background:\s*var\(--u-accent\) !important/);
-});
-
-
-test("connector filters, paid-tier badges and capability approvals use warm-metal accents", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /\.chip\[aria-pressed="true"\][\s\S]*?var\(--u-accent-strong\)/);
-  assert.match(css, /\.badge\.tier-paid\s*\{[\s\S]*?var\(--u-accent-strong\)/);
-  assert.match(css, /\.capability-source summary,[\s\S]*?\.capability-approve[\s\S]*?var\(--u-accent-strong\)/);
-});
-
-
-test("secondary feature screens start below the persistent top bar", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /\.feature-screen\s*\{\s*inset:\s*58px 0 calc\(62px \+ var\(--safe-bottom\)\) !important/);
-  assert.match(css, /@media \(min-width: 900px\) \{[\s\S]*?\.feature-screen\s*\{\s*inset:\s*68px 0 0 80px !important/);
-});
-
-
-test("capability error state clears loading placeholders and neutralizes unavailable counts", async () => {
-  const source = await read("apps/phone/src/capability-panel.ts");
-  assert.match(source, /root\.dataset\.state = "error"/);
-  assert.match(source, /toolsEl\.replaceChildren\(empty\(/);
-  assert.match(source, /cloudToolsEl\.replaceChildren\(empty\(/);
-  assert.match(source, /toolRunsEl\.replaceChildren\(empty\(/);
-  assert.match(source, /count\.textContent = "—"/);
-  assert.match(source, /feedback\.dataset\.tone = "error"/);
-});
-
-
-test("settings sheet uses accessible switches and warm-metal primary actions", async () => {
-  const css = await read("apps/phone/src/quiet-ui.css");
-  assert.match(css, /\.sheet \.field > \.toggle-label\s*\{[\s\S]*?text-transform:\s*none/);
-  assert.match(css, /\.sheet \.toggle-label input\[type="checkbox"\]\s*\{[\s\S]*?border-radius:\s*999px/);
-  assert.match(css, /\.sheet \.solid\s*\{[\s\S]*?background:\s*var\(--u-accent\) !important/);
+  assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important/);
+  assert.match(css, /:focus-visible/);
+  assert.match(css, /\.bottom-nav\s*\{/);
+  assert.match(css, /\.dock\s*\{/);
+  assert.match(css, /--safe-bottom:\s*env\(safe-area-inset-bottom/);
+  for (const id of ["connectors-panel", "sheet-wrap", "global-search", "chat-model-menu", "workspace-panel", "llm-api-keys-screen"]) {
+    const element = html.match(new RegExp(`<[^>]+\\bid="${id}"[^>]*>`));
+    assert.ok(element, `missing #${id}`);
+    assert.match(element[0], /\shidden(?:\s|>)/, `#${id} must start hidden`);
+  }
 });

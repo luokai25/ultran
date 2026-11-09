@@ -31,49 +31,53 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.ok(design.includes("#product-studio-screen"), "design inventory must list Product Studio");
 });
 
-test("Product Studio backend uses Vault keys, grounded research and bounded public crawling", async () => {
+test("Product Studio routes free inference across existing Vault-backed providers", async () => {
   const source = await read("supabase/functions/ultron-product-studio/index.ts");
   assert.match(source, /ultron_read_llm_secret/);
-  assert.match(source, /ultron_google_ai_studio_keys/);\n  assert.match(source, /ultron_openrouter_keys/);\n  assert.match(source, /ultron_groq_keys/);\n  assert.match(source, /callProductModelStreaming/);\n  assert.match(source, /no_eligible_free_model_across_connected_providers/);
-  assert.match(source, /ultron_openrouter_keys/);
-  assert.match(source, /ultron_groq_keys/);
+  assert.match(source, /providerTable\(provider\)/);
+  assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
+  assert.match(source, /callStudioStreaming/);
   assert.match(source, /no_free_google_search_model_available/);
-  assert.match(source, /isFreeGoogleModel/);
-  assert.match(source, /enabled", true/);
   assert.match(source, /google_search/);
-  assert.match(source, /robots\.txt/);
-  assert.match(source, /isPublicResearchUrl/);
-  assert.match(source, /robotsPathMatches/);
-  assert.match(source, /const deadline = Date\.now\(\) \+ 18_000/);
-  assert.match(source, /const deadline = Date\.now\(\) \+ 68_000/);
-  assert.match(source, /readPublicTextLimited/);
-  assert.match(source, /redirect: "manual"/);
-  assert.match(source, /AbortSignal\.timeout/);
-  assert.match(source, /streamGenerateContent/);
-  assert.match(source, /draft\.block\.updated/);
-  assert.match(source, /ultron-private/);
-  assert.match(source, /content_storage_path/);
-  assert.match(source, /research_round/);
-  assert.match(source, /valid_claimed_product_job_required/);
-  assert.match(source, /x-ultron-cron-secret/);
-  assert.match(source, /stalled_rounds/);
-  assert.match(source, /next_batch_queued/);
-  assert.match(source, /references_section/);
-  assert.match(source, /createSignedUrl/);
-  assert.match(source, /"resume"/);
-  assert.match(source, /"cancel"/);
+  assert.match(source, /cooldown_until/);
+  assert.match(source, /request_count/);
+  assert.match(source, /tokens_used/);
   assert.doesNotMatch(source, /AIza[0-9A-Za-z_-]{20,}/);
 });
 
-test("Product Studio research batches are carried by the existing durable job worker", async () => {
-  const [jobs, migration] = await Promise.all([
+test("Product Studio research obeys public crawl limits and streams safe previews", async () => {
+  const source = await read("supabase/functions/ultron-product-studio/index.ts");
+  assert.match(source, /robots\.txt/);
+  assert.match(source, /robotsPathMatches/);
+  assert.match(source, /isPublicResearchUrl/);
+  assert.match(source, /readPublicTextLimited/);
+  assert.match(source, /redirect: "manual"/);
+  assert.match(source, /AbortSignal\.timeout/);
+  assert.match(source, /draft\.block\.updated/);
+  assert.match(source, /sandbox/);
+  assert.match(source, /ultron-private/);
+  assert.match(source, /content_storage_path/);
+  assert.match(source, /research_round/);
+  assert.match(source, /stalled_rounds/);
+  assert.match(source, /next_batch_queued/);
+  assert.match(source, /references_section/);
+});
+
+test("Product Studio worker requires a claimed lease and private owner-scoped tables", async () => {
+  const [jobs, worker, migration] = await Promise.all([
     read("supabase/functions/ultron-jobs/index.ts"),
+    read("supabase/functions/ultron-product-studio/index.ts"),
     read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),
   ]);
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);
   assert.match(jobs, /lock_token: job\.lock_token/);
+  assert.match(worker, /valid_claimed_product_job_required/);
+  assert.match(worker, /x-ultron-cron-secret/);
+  assert.match(worker, /createSignedUrl/);
+  assert.match(worker, /"resume"/);
+  assert.match(worker, /"cancel"/);
   for (const table of ["ultron_product_projects", "ultron_product_sources", "ultron_product_events", "ultron_product_documents"]) {
     assert.ok(migration.includes("create table if not exists public." + table), "missing table " + table);
     assert.ok(migration.includes("alter table public." + table + " enable row level security"), "RLS not enabled for " + table);

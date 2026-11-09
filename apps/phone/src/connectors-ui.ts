@@ -36,6 +36,7 @@ type Deps = {
   api: (path: string, init?: RequestInit, timeoutMs?: number) => Promise<Response>;
   closeDrawer: () => void;
   openExternal: (url: string) => Promise<void>;
+  openCloudSettings?: () => void;
   /** Reserve a browser tab synchronously in the click gesture, before network awaits. */
   prepareExternal?: () => PreparedExternal;
 };

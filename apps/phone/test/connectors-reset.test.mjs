@@ -23,7 +23,7 @@ test('the connector screen is branded as a unified gateway and explains approval
   assert.match(html, /ULTRON CONNECTOR GATEWAY/);
   assert.match(html, /CONNECTED PROVIDER ACCOUNTS/);
   assert.match(ui, /github-capability-list/);
-  assert.match(ui, /separate approval/);
+  assert.match(ui, /Allow without asking/);
   assert.match(ui, /Google authorization page/);
 });
 

@@ -633,7 +633,7 @@ Deno.serve(async (req: Request) => {
       if (!project) return json({ error: "project_not_found" }, 404);
       const [events, sources, documents] = await Promise.all([
         auth.db.from("ultron_product_events").select("sequence,stage,event_type,payload,created_at").eq("owner_id", auth.id).eq("project_id", id).order("sequence", { ascending: true }).limit(200),
-        auth.db.from("ultron_product_sources").select("id,title,canonical_url,domain,fetch_status,relevance_score,extraction_summary,retrieved_at").eq("owner_id", auth.id).eq("project_id", id).order("relevance_score", { ascending: false }).limit(200),
+        auth.db.from("ultron_product_sources").select("id,title,canonical_url,domain,fetch_status,relevance_score,extraction_summary,retrieved_at").eq("owner_id", auth.id).eq("project_id", id).order("relevance_score", { ascending: false }).limit(500),
         auth.db.from("ultron_product_documents").select("id,title,format,status,version,byte_size,storage_path,created_at").eq("owner_id", auth.id).eq("project_id", id).order("created_at", { ascending: false }),
       ]);
       const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id,name").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
@@ -652,9 +652,14 @@ Deno.serve(async (req: Request) => {
     }
     if (body.action === "resume") {
       const id = clean(body.project_id, 80);
-      const { data: existing, error: existingError } = await auth.db.from("ultron_product_projects").select("id,title,configuration,status").eq("owner_id", auth.id).eq("id", id).maybeSingle();
+      const { data: existing, error: existingError } = await auth.db.from("ultron_product_projects").select("id,title,configuration,status,source_job_id").eq("owner_id", auth.id).eq("id", id).maybeSingle();
       if (existingError) throw existingError;
       if (!existing || !["partial","failed","paused"].includes(existing.status)) return json({ error: "project_not_resumable" }, 409);
+      if (existing.source_job_id) {
+        const { data: previousJob, error: previousJobError } = await auth.db.from("ultron_jobs").select("status").eq("owner_id", auth.id).eq("id", existing.source_job_id).maybeSingle();
+        if (previousJobError) throw previousJobError;
+        if (previousJob && ["queued","retry_wait","running"].includes(previousJob.status)) return json({ error: "project_job_still_retrying" }, 409);
+      }
       const configuration = isObject(existing.configuration) ? existing.configuration : {};
       const resumeKey = "product:" + id + ":resume:" + crypto.randomUUID();
       const { data: job, error: jobError } = await auth.db.from("ultron_jobs").insert({

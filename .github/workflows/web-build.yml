@@ -89,8 +89,8 @@ jobs:
           const { body: liveHtml } = await fetchWithRetry(
             base + "/", "Cloudflare app", response => response.text()
           );
-          if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Personal AI System")) {
-            throw new Error("Cloudflare app did not serve the APK-matched ULTRON shell");
+          if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Message Ultron")) {
+            throw new Error("Cloudflare app did not serve the clean APK-matched ULTRON conversation shell");
           }
 
           const assets = await readdir("apps/phone/dist/assets");

@@ -110,7 +110,7 @@ test("OAuth connection waits for authorization and refreshes tools automatically
 });
 
 test("connector catalogue search and category filters remain visible",()=>{
- assert.doesNotMatch(readFileSync(resolve(root,"apps/phone/src/styles.css"),"utf8"),/#connectors-panel \.github-panel-tools > #connectors-search,[\s\S]*?display: none !important/);
+ assert.doesNotMatch(readFileSync(resolve(root,"apps/phone/src/chatgpt-ui.css"),"utf8"),/#connectors-panel \.github-panel-tools > #connectors-search,[\s\S]*?display: none !important/);
  assert.match(html,/id="connectors-search"/);
  assert.match(html,/id="connectors-chips"/);
 });

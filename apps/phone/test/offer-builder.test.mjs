@@ -39,7 +39,7 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
     assert.notEqual(start, -1, name + " patch exists");
     const end = host.indexOf("].join(", start);
     assert.notEqual(end, -1, name + " patch closes");
-    return host.slice(start + marker.length, end).split(/\\r?\\n/)
+    return host.slice(start + marker.length, end).split(String.fromCharCode(10))
       .map((line) => line.trim().replace(/,$/, ""))
       .filter(Boolean)
       .map((line) => JSON.parse(line))

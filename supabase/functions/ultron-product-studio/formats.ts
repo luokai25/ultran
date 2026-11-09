@@ -6,6 +6,62 @@ function xmlEscape(value: string): string {
 function zipTextFiles(files: Record<string, string>): Uint8Array {
   return zipSync(Object.fromEntries(Object.entries(files).map(([name, content]) => [name, strToU8(content)])));
 }
+
+export function extractCodeFiles(markdown: string): { files: Record<string, Uint8Array>; count: number; languages: string[] } {
+  const fence = String.fromCharCode(96).repeat(3);
+  const extensions: Record<string, string> = {
+    python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts",
+    tsx: "tsx", jsx: "jsx", json: "json", yaml: "yml", yml: "yml", toml: "toml",
+    bash: "sh", sh: "sh", sql: "sql", html: "html", css: "css", go: "go", rust: "rs",
+    rs: "rs", java: "java", kotlin: "kt", swift: "swift", c: "c", cpp: "cpp",
+    csharp: "cs", cs: "cs", ruby: "rb", rb: "rb", php: "php", xml: "xml",
+    markdown: "md", md: "md", text: "txt", txt: "txt", dockerfile: "Dockerfile",
+    docker: "Dockerfile", powershell: "ps1", ps1: "ps1", mermaid: "mmd",
+    graphql: "graphql", proto: "proto", ini: "ini", diff: "diff", csv: "csv",
+    r: "r", lua: "lua", perl: "pl", elixir: "ex", scala: "scala", dart: "dart",
+  };
+  const files: Record<string, Uint8Array> = {};
+  const languages = new Set<string>();
+  let count = 0, header = "", current: string[] | null = null;
+  const flush = () => {
+    if (current === null) return;
+    const content = current.join("\n").trim();
+    const headerParts = header.trim().split(/\s+/).filter(Boolean);
+    const language = (headerParts.shift() || "text").toLowerCase();
+    if (content) {
+      const filenameToken = header.match(/(?:^|\s)(?:file|filename)=["']?([^\s"']+)/i)?.[1];
+      const pathToken = headerParts.find(part => /^[A-Za-z0-9_.-][A-Za-z0-9_./-]*\.[A-Za-z0-9]{1,10}$/.test(part));
+      const requested = filenameToken || pathToken || "";
+      let filename = requested.replace(/\\/g, "/").split("/").pop() || "";
+      filename = filename.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^\.+/, "");
+      if (!filename || filename === "..") filename = "example-" + String(count + 1).padStart(2, "0");
+      const extension = extensions[language] || "txt";
+      if (!/\.[A-Za-z0-9]{1,10}$/.test(filename)) filename += "." + extension;
+      const dot = filename.lastIndexOf(".");
+      const stem = dot > 0 ? filename.slice(0, dot) : filename;
+      const suffix = dot > 0 ? filename.slice(dot) : "";
+      let uniqueName = filename, duplicate = 2;
+      while (files["source-code/" + uniqueName]) uniqueName = stem + "-" + String(duplicate++).padStart(2, "0") + suffix;
+      files["source-code/" + uniqueName] = strToU8(content + "\n");
+      languages.add(language);
+      count++;
+    }
+    current = null;
+    header = "";
+  };
+  for (const line of markdown.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (current === null && trimmed.startsWith(fence)) {
+      header = trimmed.slice(fence.length);
+      current = [];
+    } else if (current !== null && trimmed.startsWith(fence)) {
+      flush();
+    } else if (current !== null) current.push(line);
+  }
+  if (current !== null) flush();
+  return { files, count, languages: [...languages].sort() };
+}
+
 export function makeDocx(title: string, markdown: string): Uint8Array {
   const rtl = /[\u0600-\u06FF]/.test(markdown);
   const paragraph = (value: string, style = "Normal") => {

@@ -2076,7 +2076,7 @@ async function removeConversation(id: string): Promise<void> {
  * Control plane link
  * ------------------------------------------------------------------ */
 
-type LinkState = "offline" | "online" | "error";
+type LinkState = "offline" | "connecting" | "online" | "error";
 
 function updateHeroCloudStatus(checking = false): void {
   const state = !navigator.onLine ? "offline" : checking ? "checking" : cloudAccountConnected ? "cloud" : "local";
@@ -2092,8 +2092,8 @@ function updateHeroCloudStatus(checking = false): void {
 
 function setLink(state: LinkState, label?: string): void {
   linkPill.dataset.state = state;
-  linkPill.textContent = label ?? (state === "online" ? "linked" : state === "error" ? "unreachable" : "local");
-  app.dataset.health = state === "online" ? "ready" : "local";
+  linkPill.textContent = label ?? (state === "online" ? "linked" : state === "connecting" ? "connecting" : state === "error" ? "unreachable" : "local");
+  app.dataset.health = state === "online" ? "ready" : state === "connecting" ? "checking" : "local";
 }
 
 function baseUrl(): string {
@@ -3136,6 +3136,7 @@ async function submitTurn(raw: string): Promise<void> {
 
   promptEl.value = "";
   busy = true;
+  if (cloudBrainActive) setLink("connecting", "Connecting to ULTRON…");
   const turnController = new AbortController();
   activeTurnController = turnController;
   syncSendButton();

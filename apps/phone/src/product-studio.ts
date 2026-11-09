@@ -296,7 +296,7 @@ async function startProject(request: string): Promise<void> {
     const project = result.project as ProductProject;
     selectedProjectId = project.id;
     await loadProject(project.id);
-    setNotice("Project queued. ULTRON will work through the stages and save checkpoints in your private cloud.");
+    setNotice("Project queued. ULTRON will keep working in the cloud, even if you close the app, and save each checkpoint privately.");
     void options?.wakeWorker().catch(() => setNotice("Project is saved. The cloud worker will resume when ULTRON reconnects."));
   } catch (error) {
     setNotice(error instanceof Error ? error.message : "Could not start the project.", true);

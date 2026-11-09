@@ -33,6 +33,19 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /stage:'quality'/);
   assert.match(host, /s\\.markdown=content/);
   assert.match(host, /Resuming saved manuscript sections/);
+  const extractInjectedCode = (name) => {
+    const marker = "const " + name + " = [";
+    const start = host.indexOf(marker);
+    assert.notEqual(start, -1, name + " patch exists");
+    const end = host.indexOf('].join("\\\\n");', start);
+    assert.notEqual(end, -1, name + " patch closes");
+    return host.slice(start + marker.length, end).split("\\n")
+      .map((line) => line.trim().replace(/,$/, ""))
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .join("\\n");
+  };
+  assert.doesNotThrow(() => new Function(extractInjectedCode("summaryStep") + "\\n" + extractInjectedCode("manuscriptStep")));
   assert.match(backend, /functions\/v1\/ultron-brain/);
   assert.match(backend, /action: "chat"/);
   assert.match(backend, /offer_builder/);

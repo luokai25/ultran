@@ -15,7 +15,6 @@ colors:
   text-muted: "#999999"
   accent: "#10A37F"
   accent-strong: "#0E9272"
-  core: "#10A37F"
   success: "#55C99A"
   warning: "#E8B45D"
   danger: "#EF6B73"
@@ -65,8 +64,8 @@ motion:
 
 **Design direction:** a clean, familiar conversation workspace inspired by ChatGPT. The entire interface is rebuilt around readable conversations, a bottom composer, a persistent desktop sidebar, restrained charcoal surfaces and subtle green interaction states. ULTRON branding is text-first. No orb, avatar, animated core, HUD, sci-fi decoration, glass panels, ambient effects or stacked card dashboard. Keep every existing capability, but organize secondary functions into clear pages reachable from navigation.
 
-- Mood: confident, quiet, intelligent, focused. The animated core is ULTRON's signature brand element; the interface around it remains useful and legible.
-- Brand expression: obsidian surfaces, cool titanium text, and a controlled warm-metal interaction accent. The animated core may retain its crimson energy identity. Avoid flooding every button, border, icon, or heading with the accent.
+- Mood: familiar, calm, focused and useful. The product identity comes from ULTRON's name and behavior, not a mascot or animated centerpiece.
+- Brand expression: charcoal surfaces, neutral text, restrained green interaction states and subtle borders. Red is reserved for destructive or error states. Avoid decorative gradients, glow and visual noise.
 - Density: comfortable on phones, information-dense but orderly on desktop. Prefer progressive disclosure over hiding essential actions.
 - Personality: concise labels, plain language, clear system state. No fake activity, fake progress, decorative stats, or status claims that cannot be verified.
 - Reference qualities: Linear's hierarchy and consistency, Raycast's compact command surfaces, native Android touch ergonomics, and the clarity of a well-made developer tool. Do not copy their layouts.
@@ -75,31 +74,29 @@ motion:
 
 | Token | Value | Use |
 |---|---|---|
-| `--u-bg` | `#090A0C` | App canvas |
-| `--u-surface-1` | `#101216` | Main panels |
-| `--u-surface-2` | `#171B21` | Raised controls and cards |
-| `--u-surface-3` | `#202630` | Hover/pressed and selected surfaces |
-| `--u-border` | `rgba(220,228,238,.10)` | Default separators |
-| `--u-border-strong` | `rgba(220,228,238,.18)` | Focused/important boundaries |
-| `--u-text` | `#F2F4F7` | Primary text |
-| `--u-text-secondary` | `#B5BDC8` | Supporting text |
-| `--u-text-muted` | `#828D9B` | Metadata and hints |
-| `--u-accent` | `#D5B779` | Rare primary action and selected emphasis |
-| `--u-accent-strong` | `#E8CB91` | Accent text on dark surfaces |
-| `--u-core` | `#E34B58` | Orb identity and core-only energy details |
-| `--u-success` | `#55C99A` | Verified success |
-| `--u-warning` | `#E8B45D` | Caution / pending |
-| `--u-danger` | `#EF6B73` | Errors and destructive actions |
-| `--u-info` | `#78A9E8` | Informational state |
+| `--bg` | `#212121` | App canvas |
+| `--surface` | `#2F2F2F` | Composer and raised controls |
+| `--surface-raised` | `#383838` | Hovered and active controls |
+| `--surface-soft` | `#262626` | Quiet secondary surfaces |
+| `--border` | `rgba(255,255,255,.09)` | Default separators |
+| `--border-strong` | `rgba(255,255,255,.16)` | Focused boundaries |
+| `--text` | `#F5F5F5` | Primary text |
+| `--text-secondary` | `#C5C5C5` | Supporting text |
+| `--muted` | `#999999` | Metadata and hints |
+| `--accent` | `#10A37F` | Primary actions and selected states |
+| `--accent-hover` | `#0E9272` | Hovered primary actions |
+| `--success` | `#55B98A` | Verified success |
+| `--warning` | `#D5A85D` | Caution / pending |
+| `--danger` | `#E06B6B` | Errors and destructive actions |
+| `--info` | `#8AB8E8` | Informational state |
 
-Never use color alone to communicate state. Pair it with text or an icon and preserve contrast. Crimson is reserved for the ULTRON core and relevant danger states, not ordinary navigation selection.
-
+Never use color alone to communicate state. Pair it with text or an icon and preserve contrast. Green is reserved for active/primary interactions; red is reserved for danger and errors.
 ## Typography
 
 Use the existing system font stack unless a bundled font already exists and has a clear performance benefit. Do not add a remote font dependency just for appearance.
 
 Keep the UI to four functional size tiers:
-- Display: 28–36px, only for page titles or the empty-state hero.
+- Display: 24–32px, only for page titles or the empty-state greeting.
 - Section: 18–20px, section headings.
 - Body: 14–16px, primary controls and readable content.
 - Meta: 12px minimum for labels, timestamps and hints. Technical identifiers, logs and code may use a compact monospace face.
@@ -133,9 +130,9 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 
 - No orb, avatar hero, animated core, particle field, HUD, ambient grid or decorative brand animation. ULTRON is expressed through its name, typography and product behavior.
 - No ambient motion or decorative atmosphere. Use short, quiet transitions only for menus, focus and state changes.
-- Page entry uses a short opacity/transform transition. Secondary sections may reveal as they enter the viewport, but content must remain readable without animation and never wait for an animation to become usable.
-- Interactive surfaces use small, purposeful lift and focus feedback. Avoid springy overshoot, constant motion on controls, and full-page parallax that fights scrolling.
-- Motion durations: 250–450ms for surfaces, 600–700ms for page entry, 5–42s for ambient loops. Honor `prefers-reduced-motion` by removing continuous and scroll-linked motion.
+- Do not animate page entry or reveal content on scroll. Every page and action must be immediately available.
+- Interactive surfaces use restrained color and border feedback. Avoid lift, springy overshoot, continuous motion and full-page parallax.
+- Motion durations: 150–180ms for menus and control feedback. There are no ambient loops or scroll-linked animations. Honor `prefers-reduced-motion`.
 - Keep animation on `transform` and `opacity`; do not animate layout geometry. All animated layers are pointer-transparent and decorative.
 
 ## Elevation & Depth
@@ -143,11 +140,11 @@ Use weight and spacing, not extra font sizes, to establish hierarchy. Use tabula
 - Use one restrained elevation shadow for floating menus and sheets: `0 16px 44px rgba(0,0,0,.18)`.
 - Prefer borders, surface contrast, and subtle inner highlights for normal cards instead of stacking shadows.
 - Do not use glow, glassmorphism, gradients or layered card stacks. Use flat surfaces and restrained borders.
-- Use backdrop blur only for floating chrome that must remain legible over content; keep normal surfaces opaque enough for contrast.
+- Avoid backdrop blur. Keep normal and floating surfaces opaque enough for contrast.
 
 ## Shapes
 
-- Two component radii: 12px for controls and compact cards; 16px for large panels and sheets.
+- Two component radii: 9px for controls; 12px for panels and sheets.
 - Pills may be fully rounded only when the shape communicates status or selection.
 - Avoid excessive nested borders, ornamental outlines, and unrelated corner radii.
 - Keep the interface typographic and functional. Do not introduce an assistant mascot, orb or ornamental identity mark.
@@ -228,20 +225,20 @@ A page is not complete until it passes:
 | Decision | Rationale |
 |---|---|
 | Shared tokens across phone and web | The Android APK and canonical web client share `apps/phone`; the secondary Next.js app should not drift. |
-| Obsidian + titanium + restrained warm-metal accent | Makes the interface calm and technical while preserving a recognizable ULTRON core. |
+| ChatGPT-like charcoal surfaces + restrained green interaction accent | Keeps the interface familiar, calm and focused on conversation rather than decoration. |
 | Four typography tiers and two radii | Reduces visual noise and prevents every feature from inventing its own design language. |
 | Full screen inventory required | Secondary pages must receive the same design quality as chat. |
 
-## Initial implementation audit
+## Current implementation audit
 
-Source-level inspection on 2026-11-06 found these concrete design issues. These are audit findings, not claims of browser-tested behavior:
+Source and live-browser review on 2026-11-09:
 
-1. **Competing theme layers.** The phone shell loads base, workspace, experience, finishing, design-system and quiet-UI styles in sequence. Several layers define overlapping colors and component styles. Canonical `--u-*` tokens are now defined in the final phone layer and mirrored in the Next.js stylesheet; legacy aliases remain temporarily for compatibility.
-2. **Brand expression drift.** The phone shell had drifted to a fully monochrome accent while the separate Next.js app used a different gold palette and the older phone base layer still contained a crimson palette. The shared tokens define warm-metal interaction accents and reserve crimson for the ULTRON core. Remaining hard-coded legacy values must be migrated page by page.
-3. **Desktop layout needed an intentional composition.** The initial source audit found only narrow-width overrides. A persistent 80px desktop navigation rail, wider content canvas, full-height secondary screens and desktop sheet sizing have since been added. Browser review then caught a legacy `width:100%` overriding the desktop insets on feature screens and Settings; both now use inset-driven `width:auto` and align to the content area. The latest browser audit checks the five required viewport sizes.
-4. **Secondary screens are functional but visually uneven.** Agents & Identities, LLM API Keys, Mind Map, Learning Review and Capabilities each have distinct content structures; connectors, workspace, approvals, search and model selection are separate overlay surfaces. They need page-specific hierarchy built from shared primitives, not one generic card treatment.
-5. **One public web surface is deployed.** The canonical production client is the `apps/phone` static bundle, also used by the Android APK. `apps/web` remains a non-production Next.js prototype in the repository and must not be deployed as another public site. Both source trees should share the same design tokens; do not assume they have identical feature coverage.
-
+1. **Design reset shipped to the canonical client.** `apps/phone/index.html` loads only `src/chatgpt-ui.css`; the previous nine-layer style stack is no longer linked. The web build is the same client used by the Android APK.
+2. **Orb and cinematic identity removed from the app shell.** The hero canvas, orbital DOM, SVG brand mark, favicon mark generation and Three.js/WebGL renderer were removed. ULTRON is text-first.
+3. **Conversation-first layout shipped.** The home state says “How can I help?”, the model selector sits above the bottom composer, desktop uses a persistent 260px sidebar, and mobile retains compact bottom navigation.
+4. **Secondary screens remain in the same app.** LLM API Keys, model management, Agents & Identities, Mind Map, Learning Review, Capabilities, Connectors, Workspace and Product Studio remain available. They still require a complete visual and interaction audit against the new shared primitives.
+5. **Backend contracts are retained.** Supabase owner sessions, RLS-backed cloud data, streaming, provider keys, native secure storage, connector permissions and approval gates must remain intact through the visual rebuild.
+6. **Regression cleanup is in progress.** Legacy tests that asserted the old orb and stacked stylesheet design are being replaced with tests for the new single-stylesheet shell. The Vite build has passed; the full CI test suite is being reconciled with the new design contract.
 ## Redesign execution order
 
 1. App shell, desktop navigation, mobile bottom navigation, drawer, page headers and global overlays.

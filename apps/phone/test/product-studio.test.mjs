@@ -34,7 +34,7 @@ test("Product Studio is registered in the canonical shared web and Android clien
 test("Product Studio backend uses Vault keys, grounded research and bounded public crawling", async () => {
   const source = await read("supabase/functions/ultron-product-studio/index.ts");
   assert.match(source, /ultron_read_llm_secret/);
-  assert.match(source, /ultron_google_ai_studio_keys/);
+  assert.match(source, /ultron_google_ai_studio_keys/);\n  assert.match(source, /ultron_openrouter_keys/);\n  assert.match(source, /ultron_groq_keys/);\n  assert.match(source, /callProductModelStreaming/);\n  assert.match(source, /no_eligible_free_model_across_connected_providers/);
   assert.match(source, /ultron_openrouter_keys/);
   assert.match(source, /ultron_groq_keys/);
   assert.match(source, /isFreeProviderModel/);

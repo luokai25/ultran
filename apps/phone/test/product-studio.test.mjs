@@ -58,6 +58,8 @@ test("Product Studio research obeys public crawl limits and streams safe preview
   assert.match(source, /robotsPathMatches/);
   assert.match(source, /isPublicResearchUrl/);
   assert.match(source, /readPublicTextLimited/);
+  assert.match(source, /projectStopStatus/);
+  assert.match(source, /product_project_stopped/);
   assert.match(source, /redirect: "manual"/);
   assert.match(source, /AbortSignal\.timeout/);
   assert.match(source, /draft\.block\.updated/);

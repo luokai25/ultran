@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const [main, cloudSync, html, quietUi] = await Promise.all([
+const [main, cloudSync, html, chatUi] = await Promise.all([
   readFile(path.join(root, "src/main.ts"), "utf8"),
   readFile(path.join(root, "src/cloud-sync.ts"), "utf8"),
   readFile(path.join(root, "index.html"), "utf8"),
-  readFile(path.join(root, "src/quiet-ui.css"), "utf8"),
+  readFile(path.join(root, "src/chatgpt-ui.css"), "utf8"),
 ]);
 
 test("Supabase owner session restores automatically and reconnects after network recovery", () => {
@@ -39,15 +39,16 @@ test("Supabase sessions persist and refresh without embedding service-role crede
 });
 
 
-test("the cinematic landing concept is integrated into the real app and wakes the composer", () => {
-  assert.match(html, /An intelligence that stays ready/);
-  assert.match(html, /WATCHING[\s\S]*REASONING[\s\S]*ACTING/);
-  assert.match(html, /It sees[\s\S]*It thinks[\s\S]*It acts/);
-  assert.match(html, /id="hero-wake"/);
+test("the clean ULTRON home state focuses the greeting and keeps the composer reachable", () => {
+  assert.match(html, /How can I help\?/);
+  assert.match(html, /id="composer"/);
+  assert.match(html, /id="chat-model-button"/);
+  assert.match(main, /greetingEl\.textContent = "How can I help\?"/);
   assert.match(main, /heroWakeButton\.addEventListener\("click"/);
   assert.match(main, /promptEl\.focus\(\{ preventScroll: true \}\)/);
-  assert.match(quietUi, /\.hero-manifesto/);
-  assert.match(quietUi, /\.hero-wake/);
+  assert.match(chatUi, /\.composer\s*\{/);
+  assert.match(chatUi, /#prompt\s*\{/);
+  assert.doesNotMatch(html, /avatar-orbit|WATCHING[\s\S]*REASONING[\s\S]*ACTING/);
 });
 
 
@@ -58,5 +59,6 @@ test("home status never claims Supabase is linked before an owner session is res
   assert.match(main, /OFFLINE · LOCAL AVAILABLE/);
   assert.match(main, /updateHeroCloudStatus\(\);/);
   assert.match(html, /id="core-status-label">CHECKING SUPABASE/);
-  assert.match(quietUi, /hero-status\[data-connection="local"\]/);
+  assert.match(chatUi, /\.hero-status[\s\S]*display:\s*none\s*!important/);
+  assert.match(main, /state === "error" \? "broken" : "local"/);
 });

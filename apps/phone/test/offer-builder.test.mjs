@@ -45,7 +45,10 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
       .map((line) => JSON.parse(line))
       .join(String.fromCharCode(10));
   };
-  assert.doesNotThrow(() => new Function(extractInjectedCode("summaryStep") + String.fromCharCode(10) + extractInjectedCode("manuscriptStep")));
+  const summaryCode = extractInjectedCode("summaryStep");
+  const manuscriptCode = extractInjectedCode("manuscriptStep");
+  assert.doesNotThrow(() => new Function(summaryCode), "summary step syntax");
+  assert.doesNotThrow(() => new Function(manuscriptCode), "manuscript step syntax");
   assert.match(backend, /functions\/v1\/ultron-brain/);
   assert.match(backend, /action: "chat"/);
   assert.match(backend, /offer_builder/);

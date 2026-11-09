@@ -219,7 +219,7 @@ function renderDetail(detail: ProductDetail): void {
   resume.textContent = project.status === "partial" ? "Continue research" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
-  warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "The requested research target was not reached. Review the actual source coverage before publication.") : project.status === "waiting_for_provider" ? "No eligible free Google AI Studio model is currently available. The project remains saved." : "");
+  warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "The requested research target was not reached. Review the actual source coverage before publication.") : project.status === "waiting_for_provider" ? "ULTRON is waiting for an eligible free model. Search-grounded research needs Google AI Studio; synthesis and drafting can use any eligible connected free provider. Your project remains saved." : "");
 }
 async function loadProject(id: string): Promise<void> {
   selectedProjectId = id;

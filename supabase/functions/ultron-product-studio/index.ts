@@ -535,6 +535,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   if (error) throw error;
   if (!project) throw new Error("product_project_not_found");
   if (project.status === "cancelled" || project.status === "paused") return { skipped: true, status: project.status };
+  const oldConfiguration = isObject(project.configuration) ? project.configuration : {};
   const target = Number(project.research_target) || 200;
   const request = clean(project.user_request, 4000) || "Find a practical, underserved problem people are willing to pay to solve. Choose a focused digital product opportunity.";
   const hasBrief = isObject(project.opportunity_brief) && Boolean(project.opportunity_brief.selected_topic);
@@ -573,10 +574,15 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
   const searched = await runWithProviderWait(ownerId, projectId, "research", () => callGemini(ownerId, [
-    { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid these previously researched domains: " + priorDomains.join(", ") + ". Return concise evidence. Do not invent URLs, statistics or sources." }] }
+    { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid these previously researched domains: " + priorDomains.join(", ") + ". Return a concise, search-grounded research brief with recurring findings, counter-evidence, disagreements and unanswered questions, followed by a short evidence summary. Keep the summary under 900 characters. Do not invent URLs, statistics or sources." }] }
   ], true));
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
   grounded.push(...searched.grounding);
+  const existingResearchNotes = Array.isArray(oldConfiguration.research_notes) ? oldConfiguration.research_notes.filter(note => isObject(note) && Number(note.round) !== researchRound + 1) : [];
+  const researchNotes = [...existingResearchNotes, {
+    round: researchRound + 1, query, summary: clean(searched.text, 1100),
+    sources: searched.grounding.slice(0, 24).map(item => ({ title: clean(item.title, 180), url: item.url })),
+  }].slice(-80);
   const grounding = grounded;
   const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
   const priorUrls = new Set((priorSources || []).map(row => {
@@ -681,7 +687,6 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   };
   const previousAnalyzed = Number((isObject(project.source_counts) ? project.source_counts : {}).analyzed || 0);
   const newSources = Math.max(0, counts.analyzed - previousAnalyzed);
-  const oldConfiguration = isObject(project.configuration) ? project.configuration : {};
   const stalledRounds = newSources > 0 ? 0 : Number(oldConfiguration.stalled_rounds || 0) + 1;
   const nextRound = researchRound + 1;
   const maxRounds = Math.min(80, Math.max(12, Math.ceil((Number(project.research_target) || 200) / 5)));
@@ -704,7 +709,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     const progress = Math.min(62, 25 + Math.floor((counts.analyzed / Math.max(1, Number(project.research_target) || 200)) * 37));
     await db.from("ultron_product_projects").update({
       status: "researching", active_stage: "research", progress, source_counts: counts,
-      configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds },
+      configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds, research_notes: researchNotes },
       source_job_id: nextJobId, updated_at: new Date().toISOString(),
     }).eq("id", projectId).eq("owner_id", ownerId);
     await addEvent(db, ownerId, projectId, "research", "batch.completed", { batch: researchRound + 1, new_sources: newSources, counts, target: project.research_target, next_batch_queued: true });
@@ -713,7 +718,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const coverageReason = counts.analyzed >= (Number(project.research_target) || 200) ? "requested_source_target_reached" : stalledRounds >= 3 ? "research_sources_stalled" : "research_batch_limit_reached";
   await db.from("ultron_product_projects").update({
     status: "synthesizing", active_stage: "synthesis", progress: 66, source_counts: counts,
-    configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds, research_stop_reason: coverageReason },
+    configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds, research_stop_reason: coverageReason, research_notes: researchNotes },
     updated_at: new Date().toISOString(),
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "research", "source.coverage", { ...counts, target: project.research_target, coverage_reason: coverageReason });
@@ -734,7 +739,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     return { title: source.title, url: source.canonical_url, text: clean(source.extraction_summary, index < 30 ? 1200 : 220) };
   }));
   const evidenceText = evidence.map((item, index) => "[" + (index + 1) + "] " + item.title + " (" + item.url + ")\n" + item.text).join("\n\n").slice(0, 160000);
-  const synthesisResult = await runWithProviderWait(ownerId, projectId, "synthesis", () => callGemini(ownerId, [{ role: "user", parts: [{ text: "Act as ULTRON's evidence synthesis lead. Review every numbered source entry, not just the first. Return valid JSON only with keys: executive_summary, recurring_themes (array with theme and supporting_source_numbers), customer_pain_points, evidence_supporting_opportunity, counter_evidence, contradictions, market_gap, willingness_to_pay_signals, target_audience, product_requirements, recommended_format, product_outline, confidence_by_claim. Cite source numbers exactly as [1] through [" + evidence.length + "]. Do not invent numbers, studies, demand or pricing. Clearly label inference and uncertainty. Opportunity brief: " + JSON.stringify(opportunity).slice(0, 5000) + "\n\nNumbered source evidence:\n" + evidenceText }] }], false));
+  const researchNotesText = researchNotes.slice(-50).map(note => "Research angle " + note.round + " (" + note.query + ")\n" + note.summary + "\nSources: " + note.sources.map(source => source.title + " — " + source.url).join("; ")).join("\n\n").slice(0, 50000);
+  const synthesisResult = await runWithProviderWait(ownerId, projectId, "synthesis", () => callGemini(ownerId, [{ role: "user", parts: [{ text: "Act as ULTRON's evidence synthesis lead. Review every numbered source entry, not just the first. Return valid JSON only with keys: executive_summary, recurring_themes (array with theme and supporting_source_numbers), customer_pain_points, evidence_supporting_opportunity, counter_evidence, contradictions, market_gap, willingness_to_pay_signals, target_audience, product_requirements, recommended_format, product_outline, confidence_by_claim. Cite source numbers exactly as [1] through [" + evidence.length + "]. Do not invent numbers, studies, demand or pricing. Clearly label inference and uncertainty. Opportunity brief: " + JSON.stringify(opportunity).slice(0, 5000) + "\n\nSearch-grounded research batch notes (use as synthesis hints; verify claims against numbered sources):\n" + researchNotesText + "\n\nNumbered source evidence:\n" + evidenceText }] }], false));
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
   const synthesis = parseJsonObject(synthesisResult.text);
   await db.from("ultron_product_projects").update({

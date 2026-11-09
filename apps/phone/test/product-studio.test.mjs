@@ -25,6 +25,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /product-studio-refresh-list/);
   assert.match(moduleSource, /product-studio-resume/);
   assert.match(moduleSource, /setInterval\(/);
+  assert.match(moduleSource, /opportunity_score/);
+  assert.match(moduleSource, /validation/);
   assert.match(css, /@media\(min-width:900px\)/);
   assert.match(css, /@media\(max-width:420px\)/);
   assert.ok(ledger.includes("product-studio-screen"), "screen coverage ledger must list Product Studio");
@@ -37,7 +39,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
-  assert.match(source, /callStudioStreaming/);\n  assert.match(source, /opportunity_score/);\n  assert.match(source, /validation/);
+  assert.match(source, /callStudioStreaming/);
   assert.match(source, /canonicalReferences/);
   assert.match(source, /product-v" \+ version/);
   assert.match(source, /version, source_counts/);
@@ -76,7 +78,8 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   const [jobs, worker, migration, backgroundWorker] = await Promise.all([
     read("supabase/functions/ultron-jobs/index.ts"),
     read("supabase/functions/ultron-product-studio/index.ts"),
-    read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),\n    read("supabase/migrations/20261109000300_ultron_product_studio_background_worker.sql"),
+    read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),
+    read("supabase/migrations/20261109000300_ultron_product_studio_background_worker.sql"),
   ]);
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);
@@ -94,4 +97,8 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   }
   assert.match(migration, /owner_id = \(select auth\.uid\(\)\)/);
   assert.match(migration, /alter publication supabase_realtime add table public\.ultron_product_events/);
+  assert.match(backgroundWorker, /product\.generate/);
+  assert.match(backgroundWorker, /ultron-cloud-job-worker/);
+  assert.match(backgroundWorker, /vault\.decrypted_secrets/);
+  assert.match(backgroundWorker, /ultron-jobs/);
 });

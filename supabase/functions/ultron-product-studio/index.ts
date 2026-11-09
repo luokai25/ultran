@@ -138,7 +138,7 @@ async function listStudioCandidates(ownerId: string, withSearch: boolean): Promi
     const { data, error } = await db.from(providerTable(provider))
       .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
       .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
-      .order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(30);
+      .order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true });
     if (error) throw error;
     return (data ?? []).flatMap((key: Record<string, unknown>) => {
       if (key.cooldown_until && Date.parse(String(key.cooldown_until)) > Date.now()) return [];
@@ -146,7 +146,7 @@ async function listStudioCandidates(ownerId: string, withSearch: boolean): Promi
       const eligible = models
         .filter((value) => isFreeProviderModel(provider, value) && (!withSearch || isFreeGoogleSearchModel(value)))
         .sort((a, b) => studioModelScore(b, withSearch) - studioModelScore(a, withSearch))
-        .slice(0, withSearch ? 2 : 3);
+        ;
       return eligible.map((model) => ({ provider, key, model } as StudioCandidate));
     });
   }));
@@ -180,22 +180,16 @@ function openAIContent(value: unknown): string {
   return "";
 }
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean, projectId?: string, searchStage = "research") {
-  const deadline = Date.now() + (withSearch ? 35_000 : 32_000);
+  const deadline = Date.now() + 105_000;
   const db = service();
   if (withSearch) {
     if (!projectId) throw new Error("google_search_project_required");
-    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
-    const { count, error } = await db.from("ultron_product_events").select("sequence", { count: "exact", head: true })
-      .eq("owner_id", ownerId).in("event_type", ["opportunity.search.requested", "research.search.requested"])
-      .gte("created_at", dayStart.toISOString());
-    if (error) throw error;
-    if ((count ?? 0) >= 25) throw new Error("free_google_search_daily_cap_reached");
-    await addEvent(db, ownerId, projectId, searchStage, searchStage === "identification" ? "opportunity.search.requested" : "research.search.requested", { message: "Using the free Google Search grounding budget." });
+    await addEvent(db, ownerId, projectId, searchStage, searchStage === "identification" ? "opportunity.search.requested" : "research.search.requested", { message: "Using connected Google Search grounding." });
   }
   const candidates = await listStudioCandidates(ownerId, withSearch);
   if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
   let lastError = "provider_unavailable";
-  for (const candidate of candidates.slice(0, withSearch ? 24 : 12)) {
+  for (const candidate of candidates) {
     let secret: string;
     try { secret = await readStudioSecret(db, candidate); } catch { continue; }
     const google = candidate.provider === "google_ai_studio";
@@ -212,7 +206,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
           ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(Math.max(1000, Math.min(withSearch ? 12_000 : 30_000, deadline - Date.now()))),
+        signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
       });
       const raw = await response.text();
       if (!response.ok) {
@@ -265,12 +259,12 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   throw new Error(lastError);
 }
 async function callStudioStreaming(ownerId: string, prompt: string, projectId: string, title: string): Promise<{ text: string; model: string }> {
-  const deadline = Date.now() + 55_000;
+  const deadline = Date.now() + 105_000;
   const db = service();
   const candidates = await listStudioCandidates(ownerId, false);
   if (!candidates.length) throw new Error("no_eligible_free_model_key");
   let lastError = "provider_unavailable";
-  for (const candidate of candidates.slice(0, 12)) {
+  for (const candidate of candidates) {
     try {
       const secret = await readStudioSecret(db, candidate);
       const google = candidate.provider === "google_ai_studio";

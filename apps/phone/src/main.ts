@@ -5048,6 +5048,33 @@ initConnectors({
   openExternal: async (url) => {
     await Browser.open({ url, presentationStyle: "popover" });
   },
+  prepareExternal: () => {
+    if (Capacitor.isNativePlatform()) {
+      return {
+        open: async (url: string) => { await Browser.open({ url, presentationStyle: "popover" }); },
+        cancel: () => {},
+      };
+    }
+    // Reserve a tab before the connector API request awaits. Otherwise mobile
+    // and desktop browsers treat the later redirect as an unsolicited popup.
+    let popup: Window | null = null;
+    try {
+      popup = window.open("about:blank", "_blank");
+      if (popup) {
+        popup.opener = null;
+        if (popup.document.body) popup.document.body.textContent = "Opening Google authorization…";
+      }
+    } catch {
+      popup = null;
+    }
+    return {
+      open: async (url: string) => {
+        if (popup && !popup.closed) popup.location.replace(url);
+        else window.location.assign(url);
+      },
+      cancel: () => { if (popup && !popup.closed) popup.close(); },
+    };
+  },
 });
 buildThemes();
 applyTheme(settings.theme);

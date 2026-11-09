@@ -26,3 +26,9 @@ test('the connector screen is branded as a unified gateway and explains approval
   assert.match(ui, /separate approval/);
   assert.match(ui, /Google authorization page/);
 });
+
+test("connector gateway links to Composio project setup and API key guidance",()=>{
+ assert.match(html,/dashboard\.composio\.dev/);
+ assert.match(html,/docs\.composio\.dev\/reference\/authenticating-to-composio/);
+ assert.match(html,/connected provider authorization and account access/);
+});

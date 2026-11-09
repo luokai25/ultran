@@ -333,10 +333,11 @@
         </section>
         <div id="composio-health" class="composio-health" data-state="loading" role="status" aria-live="polite">
           <span>CONNECTED PROVIDER ACCOUNTS</span><strong id="composio-health-label">Checking connection</strong>
-          <small id="composio-health-detail">Checking GitHub authorization and repository access.</small>
+          <small id="composio-health-detail">Checking connected provider authorization and account access.</small>
         </div>
         <section class="composio-key-setup" aria-label="Composio gateway key">
           <div><strong>OAuth gateway</strong><p>Connect ULTRON to the managed OAuth gateway. The project key is verified and stored in Supabase Vault, never in browser storage. You will authorize Google separately on Google’s own sign-in screen.</p></div>
+          <small><a href="https://dashboard.composio.dev" target="_blank" rel="noopener noreferrer">Create a free Composio project</a> · <a href="https://docs.composio.dev/reference/authenticating-to-composio" target="_blank" rel="noopener noreferrer">Find your Project API key</a></small>
           <label for="composio-api-key">Composio API key</label>
           <input id="composio-api-key" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste Composio API key" />
           <button id="composio-api-key-save" class="ghost" type="button">Verify and save securely</button>

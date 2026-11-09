@@ -59,6 +59,7 @@ function isFreeGoogleModel(model: string): boolean {
   return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
 }
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
+  const deadline = Date.now() + 12_000;
   const db = service();
   const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
     .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
@@ -123,6 +124,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   throw new Error(lastError);
 }
 async function callGeminiStreaming(ownerId: string, prompt: string, projectId: string, title: string): Promise<{ text: string; model: string }> {
+  const deadline = Date.now() + 62_000;
   const db = service();
   const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
     .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
@@ -151,7 +153,7 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
         const detail = (await response.text()).slice(0, 240);
         lastError = "google_ai_http_" + response.status;
         if (response.status === 429) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: "rate_limited", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
+          await db.from("ultron_google_ai_studio_keys").update({ status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
         } else if (response.status === 401 || response.status === 403) {
           await db.from("ultron_google_ai_studio_keys").update({ status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status, last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
         }

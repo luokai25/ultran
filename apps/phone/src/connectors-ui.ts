@@ -24,6 +24,11 @@ export type CatalogEntry = {
   description: string;
 };
 
+type PreparedExternal = {
+  open: (url: string) => Promise<void>;
+  cancel: () => void;
+};
+
 type Deps = {
   /** True when a brain endpoint is linked. */
   linked: () => Promise<boolean>;
@@ -31,6 +36,8 @@ type Deps = {
   api: (path: string, init?: RequestInit, timeoutMs?: number) => Promise<Response>;
   closeDrawer: () => void;
   openExternal: (url: string) => Promise<void>;
+  /** Reserve a browser tab synchronously in the click gesture, before network awaits. */
+  prepareExternal?: () => PreparedExternal;
 };
 
 const CATALOG = catalogJson as CatalogEntry[];
@@ -632,10 +639,16 @@ if (entry.auth === "oauth2") {
       act.disabled = true;
       note.dataset.tone = "";
       note.textContent = "Working…";
+      let preparedExternal: PreparedExternal | null = null;
       try {
         if (entry.auth === "oauth2") {
+          // Browsers block window.open after an awaited fetch. Reserve the tab
+          // synchronously inside this user gesture, then navigate it once the
+          // server has returned Google's managed OAuth URL.
+          preparedExternal = deps.prepareExternal?.() ?? null;
           const result = await startUltronConnectorConnection({ providerKey: entry.id.replace(/-/g, "_"), toolkitSlug: toolkit });
-          await deps.openExternal(result.redirectUrl);
+          if (preparedExternal) await preparedExternal.open(result.redirectUrl);
+          else await deps.openExternal(result.redirectUrl);
           note.dataset.tone = "";
           note.textContent = "Waiting for " + entry.name + " authorization. Finish sign-in in the browser; this screen will update automatically.";
           void (async () => {
@@ -700,6 +713,7 @@ if (entry.auth === "oauth2") {
         await refreshOAuthConnections();
         closeDetail();
       } catch (error) {
+        preparedExternal?.cancel();
         note.dataset.tone = "bad";
         note.textContent = `Could not complete that (${error instanceof Error ? error.message : "error"}).`;
         act.disabled = false;

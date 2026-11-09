@@ -2093,7 +2093,7 @@ function updateHeroCloudStatus(checking = false): void {
 function setLink(state: LinkState, label?: string): void {
   linkPill.dataset.state = state;
   linkPill.textContent = label ?? (state === "online" ? "linked" : state === "error" ? "unreachable" : "local");
-  app.dataset.health = state === "online" ? "ready" : state === "error" ? "broken" : "local";
+  app.dataset.health = state === "online" ? "ready" : "local";
 }
 
 function baseUrl(): string {

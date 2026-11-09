@@ -648,6 +648,8 @@ if (entry.auth === "oauth2") {
       let preparedExternal: PreparedExternal | null = null;
       try {
         if (entry.auth === "oauth2") {
+          cloudLinked = await deps.linked();
+          if (cloudLinked) await refreshOAuthConnections();
           if (!cloudLinked) {
             note.dataset.tone = "bad";
             note.textContent = "Sign in to your ULTRON owner account first. Opening private cloud settings…";

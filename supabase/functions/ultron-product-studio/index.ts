@@ -417,12 +417,18 @@ async function runWithProviderWait<T>(ownerId: string, projectId: string, stage:
     const message = error instanceof Error ? error.message : String(error);
     if (/no_free_google_search_model_available|no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|_http_429|HTTP 429/i.test(message)) {
       const db = service();
-      await db.from("ultron_product_projects").update({
-        status: "waiting_for_provider", active_stage: stage,
-        error_message: "No eligible free model is available right now. ULTRON will retry automatically when a connected provider becomes available.",
-        updated_at: new Date().toISOString(),
-      }).eq("id", projectId).eq("owner_id", ownerId);
-      await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: "Waiting for a free provider quota or connection to recover." });
+      const currentStatus = await projectStopStatus(ownerId, projectId);
+      if (!["cancelled","paused","missing"].includes(currentStatus)) {
+        const { data: waitingProject, error: waitingError } = await db.from("ultron_product_projects").update({
+          status: "waiting_for_provider", active_stage: stage,
+          error_message: "No eligible free model is available right now. ULTRON will retry automatically when a connected provider becomes available.",
+          updated_at: new Date().toISOString(),
+        }).eq("id", projectId).eq("owner_id", ownerId)
+          .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])
+          .select("id").maybeSingle();
+        if (waitingError) throw waitingError;
+        if (waitingProject) await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: "Waiting for a free provider quota or connection to recover." });
+      }
     }
     throw error;
   }
@@ -740,12 +746,19 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   }, { onConflict: "project_id,title,version" });
   if (htmlDocument.error) throw htmlDocument.error;
   const finalStatus = counts.analyzed >= target && validation.quality_checks_passed && (evidence.length === 0 || validation.citation_markers > 0) ? "completed" : "partial";
-  await db.from("ultron_product_projects").update({
+  const { data: finalizedProject, error: finalizeError } = await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,
     synthesis_summary: { ...synthesis, overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and all structural quality checks passed." : "A source-backed draft was created, but the research target or one or more quality checks were not reached. Review and improve it before publication.", research_stop_reason: coverageReason, validation },
     updated_at: new Date().toISOString(), completed_at: new Date().toISOString(),
-  }).eq("id", projectId).eq("owner_id", ownerId);
+  }).eq("id", projectId).eq("owner_id", ownerId).eq("status", "validating").select("id").maybeSingle();
+  if (finalizeError) throw finalizeError;
+  if (!finalizedProject) {
+    await bucket.remove([storagePath, htmlPath]);
+    await db.from("ultron_artifacts").delete().eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, version });
+    await db.from("ultron_product_documents").delete().eq("owner_id", ownerId).eq("project_id", projectId).eq("version", version);
+    return { project_id: projectId, status: "paused_or_cancelled", skipped: true };
+  }
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: artifact.id, title, format: "markdown", bytes: new TextEncoder().encode(markdown).byteLength });
   await addEvent(db, ownerId, projectId, "packaging", "job.completed", { status: finalStatus, analyzed_sources: counts.analyzed, target });
   const { data: signed } = await bucket.createSignedUrl(storagePath, 3600, { download: title + ".md" });

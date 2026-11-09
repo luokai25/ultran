@@ -18,12 +18,12 @@ test("Product Studio is registered in the canonical shared web and Android clien
   ]);
   assert.match(html, /id="drawer-product-studio"/);
   assert.match(html, /id="product-studio-screen"/);
-  assert.match(html, /id="product-studio-preview"[^>]*sandbox=""/);
+  assert.match(html, /id="product-studio-preview"[^>]*sandbox=""/);\n  assert.match(html, /id="product-studio-pause"/);
   assert.match(main, /initProductStudio\(/);
   assert.match(main, /openProductStudioScreen/);
   assert.match(moduleSource, /functions\.invoke\("ultron-product-studio"/);
   assert.match(moduleSource, /product-studio-refresh-list/);
-  assert.match(moduleSource, /product-studio-resume/);
+  assert.match(moduleSource, /product-studio-resume/);\n  assert.match(moduleSource, /invoke\("pause"/);
   assert.match(moduleSource, /setInterval\(/);
   assert.match(moduleSource, /opportunity_score/);
   assert.match(moduleSource, /validation/);

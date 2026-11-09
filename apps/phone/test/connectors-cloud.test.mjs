@@ -115,6 +115,8 @@ test("Google Connect stays clickable and opens owner sign-in when no cloud sessi
  assert.match(screen,/!cloudLinked \? "Sign in to connect"/);
  assert.match(screen,/Sign in to your ULTRON owner account first/);
  assert.match(screen,/deps\.openCloudSettings\?\.\(\)/);
+ assert.match(screen,/cloudLinked = await deps\.linked\(\)/);
+ assert.match(screen,/if \(cloudLinked\) await refreshOAuthConnections\(\)/);
  assert.match(main,/openCloudSettings: \(\) =>/);
  assert.match(main,/navSettingsButton\.click\(\)/);
  assert.match(main,/cloudEmailEl\.focus\(\{ preventScroll: true \}\)/);

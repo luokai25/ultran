@@ -521,6 +521,11 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   const offerActionMessage = "parent.postMessage({type:'ULTRON_OFFER_ACTION',id,action,payload:payload||{}},location.origin);";
   if (!html.includes(offerActionMessage)) throw new Error("Offer Builder message bridge source was not found.");
   html = html.replace(offerActionMessage, "parent.postMessage({type:'ULTRON_OFFER_ACTION',id,action,payload:payload||{}},'*');");
+  // Keep the supplied HTML source and layout intact, but let its API bridge wait
+  // for durable background jobs instead of rejecting them after two minutes.
+  const offerApiTimer = "const timer=setTimeout(()=>{apiPending.delete(id);reject(new Error('ULTRON backend timed out. Your saved project can be resumed.'))},120000);";
+  if (!html.includes(offerApiTimer)) throw new Error("Offer Builder API timeout adapter source was not found.");
+  html = html.replace(offerApiTimer, offerApiTimer.replace("120000", "2147483647"));
   const replaceBlock = (source: string, start: string, end: string, replacement: string) => {
     const from = source.indexOf(start);
     const to = source.indexOf(end, from + start.length);

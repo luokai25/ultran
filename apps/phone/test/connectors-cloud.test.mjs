@@ -80,3 +80,13 @@ test("connector tool discovery exposes read-only and owner-granted state",()=>{
  assert.match(ui,/Allow without asking/);
  assert.match(ui,/setUltronConnectorToolPermission/);
 });
+
+test("connector write permissions are owner-scoped, revocable and checked before enqueue",()=>{
+ assert.match(gateway,/body.action==="set_permission"/);
+ assert.match(gateway,/ultron_tool_permissions/);
+ assert.match(gateway,/read_only:readOnly,allowed/);
+ assert.match(gateway,/permission_required/);
+ assert.match(cloud,/setUltronConnectorToolPermission/);
+ assert.match(screen,/Allow without asking/);
+ assert.match(main,/Never call a write tool unless allowed is true/);
+});

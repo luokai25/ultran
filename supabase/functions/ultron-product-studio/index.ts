@@ -647,6 +647,27 @@ Deno.serve(async (req: Request) => {
       }));
       return json({ ok: true, project, events: events.data ?? [], sources: sources.data ?? [], documents: documentRows, download_url });
     }
+    if (body.action === "resume") {
+      const id = clean(body.project_id, 80);
+      const { data: existing, error: existingError } = await auth.db.from("ultron_product_projects").select("id,title,configuration,status").eq("owner_id", auth.id).eq("id", id).maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing || !["partial","failed","paused"].includes(existing.status)) return json({ error: "project_not_resumable" }, 409);
+      const configuration = isObject(existing.configuration) ? existing.configuration : {};
+      const resumeKey = "product:" + id + ":resume:" + crypto.randomUUID();
+      const { data: job, error: jobError } = await auth.db.from("ultron_jobs").insert({
+        owner_id: auth.id, job_type: "product.generate", title: "Continue " + clean(existing.title, 100),
+        payload: { project_id: id, research_round: 0 }, priority: 4, max_attempts: 20, idempotency_key: resumeKey,
+      }).select("id").single();
+      if (jobError) throw jobError;
+      const { data: updatedProject, error: updateError } = await auth.db.from("ultron_product_projects").update({
+        status: "queued", active_stage: "research", progress: 20, error_message: null, completed_at: null,
+        configuration: { ...configuration, research_round: 0, stalled_rounds: 0, research_stop_reason: null },
+        source_job_id: job.id, updated_at: new Date().toISOString(),
+      }).eq("owner_id", auth.id).eq("id", id).select("id,status,active_stage,progress").single();
+      if (updateError) throw updateError;
+      await auth.db.from("ultron_product_events").insert({ owner_id: auth.id, project_id: id, stage: "research", event_type: "research.resumed", payload: { message: "A new research pass has been queued." } });
+      return json({ ok: true, project: updatedProject });
+    }
     if (body.action === "cancel" || body.action === "pause") {
       const id = clean(body.project_id, 80);
       const status = body.action === "cancel" ? "cancelled" : "paused";

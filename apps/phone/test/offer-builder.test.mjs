@@ -36,8 +36,8 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /stage:'quality'/);
   assert.ok(host.includes("s.html=b.innerHTML;s.markdown=content;S.words+="));
   assert.match(host, /Resuming saved manuscript sections/);
-  assert.match(host, /else if \(!html\.includes\(newMarkdown\)\)/);
-  assert.match(host, /const finalizeStart = html\.indexOf\("try\{const saved=await ultronApi/);
+  assert.match(host, /const markdownMatch = \/const\\\\s\+markdown\\\\s\*=\/.exec\(html\)/);
+  assert.match(host, /const alreadyEnriched = currentMarkdown.includes\("S.summary\?\.about"\)/);
   assert.match(html, /Framework Glossary/);
   assert.match(main, /async function submitTurn\(raw: string\)/);
   assert.match(main, /async function submit\(raw: string\)/);

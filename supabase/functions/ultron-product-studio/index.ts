@@ -124,7 +124,84 @@ function parseJsonObject(text: string): Record<string, unknown> {
   if (start < 0 || end <= start) throw new Error("model_output_missing_json");
   return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
 }
-async function workerProcess(projectId: string, ownerId: string, jobId: string): Promise<Record<string, unknown>> {
+
+const robotsCache = new Map<string, Promise<Array<{ allow: boolean; path: string }>>>();
+function isPublicResearchUrl(value: URL): boolean {
+  if (!["http:", "https:"].includes(value.protocol) || value.username || value.password) return false;
+  if (value.port && !["80", "443"].includes(value.port)) return false;
+  const host = value.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  if (!host || host === "localhost" || /\\.(localhost|local|internal|test|invalid|example)$/.test(host)) return false;
+  if (host.includes(":")) return false;
+  if (/^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(host)) {
+    const octets = host.split(".").map(Number);
+    if (octets.some(value => value < 0 || value > 255)) return false;
+    const [a,b] = octets;
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && (b === 168 || b === 0 || b === 2)) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
+    if (a === 203 && b === 0) return false;
+  }
+  return true;
+}
+async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path: string }>> {
+  const cached = robotsCache.get(origin);
+  if (cached) return cached;
+  const task = (async () => {
+    try {
+      const response = await fetch(origin + "/robots.txt", { redirect: "manual", headers: { "User-Agent": "ULTRON-Research/1.0" }, signal: AbortSignal.timeout(3500) });
+      if (response.status === 404) return [];
+      if (!response.ok || response.status >= 300) return [{ allow: false, path: "/" }];
+      const body = (await response.text()).slice(0, 100_000);
+      const lines = body.split(/\\r?\\n/);
+      let inWildcardGroup = false, groupHasRules = false;
+      const rules: Array<{ allow: boolean; path: string }> = [];
+      for (const raw of lines) {
+        const line = raw.split("#", 1)[0]!.trim();
+        if (!line) continue;
+        const match = line.match(/^([^:]+):\\s*(.*)$/);
+        if (!match) continue;
+        const key = match[1]!.toLowerCase(), value = match[2]!.trim();
+        if (key === "user-agent") {
+          if (groupHasRules) { inWildcardGroup = false; groupHasRules = false; }
+          inWildcardGroup = value === "*" || /ultron-research/i.test(value);
+          continue;
+        }
+        if (inWildcardGroup && (key === "allow" || key === "disallow") && value) {
+          rules.push({ allow: key === "allow", path: value });
+          groupHasRules = true;
+        }
+      }
+      return rules;
+    } catch {
+      return [{ allow: false, path: "/" }];
+    }
+  })();
+  robotsCache.set(origin, task);
+  return task;
+}
+async function fetchPublicResearchPage(start: string): Promise<{ response: Response | null; blocked: boolean }> {
+  let current = new URL(start);
+  for (let hop = 0; hop < 4; hop++) {
+    if (!isPublicResearchUrl(current)) return { response: null, blocked: true };
+    const rules = await robotsRules(current.origin);
+    const path = current.pathname + current.search;
+    const matches = rules.filter(rule => path.startsWith(rule.path)).sort((a,b) => b.path.length - a.path.length);
+    if (matches[0] && !matches[0].allow) return { response: null, blocked: true };
+    const response = await fetch(current.toString(), { headers: { "User-Agent": "ULTRON-Research/1.0", "Accept": "text/html,text/plain" }, signal: AbortSignal.timeout(8000), redirect: "manual" });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) return { response, blocked: false };
+      current = new URL(location, current);
+      continue;
+    }
+    return { response, blocked: false };
+  }
+  return { response: null, blocked: true };
+}
+\nasync function workerProcess(projectId: string, ownerId: string, jobId: string): Promise<Record<string, unknown>> {
   const db = service();
   const { data: project, error } = await db.from("ultron_product_projects").select("*").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (error) throw error;
@@ -138,8 +215,21 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
   ], true);
   const opportunity = parseJsonObject(identify.text);
   const queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 4) : [];
-  const grounding = identify.grounding;
-  const urls = [...new Map(grounding.map((item) => [item.url, item])).values()].slice(0, 12);
+  const grounded = [...identify.grounding];
+  for (const query of queries.slice(0, 3)) {
+    try {
+      const searched = await callGemini(ownerId, [
+        { role: "user", parts: [{ text: "Use Google Search grounding to find diverse, credible public sources for this research question: " + query + ". Prefer official documentation, academic/government resources, reputable industry research and real practitioner discussions. Return a concise evidence summary. Do not invent URLs or sources." }] }
+      ], true);
+      grounded.push(...searched.grounding);
+    } catch (error) {
+      await addEvent(db, ownerId, projectId, "research", "search.query_limited", { query, reason: error instanceof Error ? error.message.slice(0, 140) : "search_unavailable" });
+    }
+  }
+  const grounding = grounded;
+  const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
+  const seenDomains = new Set<string>();
+  const urls = [...unique.filter(item => { try { const domain = new URL(item.url).hostname; if (seenDomains.has(domain)) return false; seenDomains.add(domain); return true; } catch { return false; } }), ...unique.filter(item => { try { return !seenDomains.has(new URL(item.url).hostname); } catch { return false; } })].slice(0, 24);
   await db.from("ultron_product_projects").update({
     title: clean(opportunity.title, 180) || "ULTRON digital product",
     selected_topic: clean(opportunity.selected_topic, 500) || request,
@@ -150,33 +240,46 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "identification", "opportunity.ranked", { title: clean(opportunity.title, 180), score: Number(opportunity.opportunity_score) || null, confidence: clean(opportunity.confidence, 20), queries });
   await addEvent(db, ownerId, projectId, "research", "stage.started", { message: "Opening accessible sources returned by grounded public-web research." });
-  let opened = 0, analyzed = 0, failed = 0;
+  let opened = 0, analyzed = 0, failed = 0, rejected = 0;
   const evidence: Array<{ title: string; url: string; text: string }> = [];
-  for (const item of urls.slice(0, 10)) {
+  const fetchResults = await Promise.all(urls.map(async (item) => {
     try {
-      const url = new URL(item.url);
-      if (!["http:", "https:"].includes(url.protocol)) continue;
-      const response = await fetch(url.toString(), { headers: { "User-Agent": "ULTRON-Research/1.0 (+respectful public research; contact: owner-configured)", "Accept": "text/html,text/plain,application/pdf;q=0.8" }, signal: AbortSignal.timeout(9000), redirect: "follow" });
-      if (!response.ok) { failed++; continue; }
+      const parsed = new URL(item.url);
+      const fetched = await fetchPublicResearchPage(parsed.toString());
+      if (fetched.blocked || !fetched.response) return { item, status: "rejected" as const, text: "" };
+      const response = fetched.response;
+      if (!response.ok) return { item, status: "failed" as const, text: "" };
       const type = response.headers.get("content-type") ?? "";
-      if (!/text\/html|text\/plain|application\/pdf/i.test(type)) { failed++; continue; }
-      const raw = await response.text();
-      const extracted = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 7000);
-      opened++;
-      if (extracted.length < 300) { failed++; continue; }
-      analyzed++;
-      const domain = url.hostname.replace(/^www\./, "");
-      const hashBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url.toString()));
-      const urlHash = Array.from(new Uint8Array(hashBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
-      await db.from("ultron_product_sources").upsert({
-        owner_id: ownerId, project_id: projectId, canonical_url: url.toString(), url_hash: urlHash,
-        title: item.title || domain, domain, fetch_status: "analyzed", extraction_summary: extracted.slice(0, 900),
-        metadata: { extraction_method: "public_html_text", content_type: type, grounding: "google_search" },
-      }, { onConflict: "project_id,url_hash" });
-      evidence.push({ title: item.title || domain, url: url.toString(), text: extracted.slice(0, 4500) });
-    } catch { failed++; }
+      if (!/text\\/html|text\\/plain/i.test(type)) return { item, status: "rejected" as const, text: "" };
+      const declaredSize = Number(response.headers.get("content-length") ?? 0);
+      if (declaredSize > 1_500_000) return { item, status: "rejected" as const, text: "" };
+      const raw = (await response.text()).slice(0, 1_500_000);
+      const extracted = raw.replace(/<script[\\s\\S]*?<\\/script>/gi, " ").replace(/<style[\\s\\S]*?<\\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\s+/g, " ").trim().slice(0, 4500);
+      if (extracted.length < 300) return { item, status: "failed" as const, text: "" };
+      return { item, status: "analyzed" as const, text: extracted, type, finalUrl: response.url || parsed.toString() };
+    } catch {
+      return { item, status: "failed" as const, text: "" };
+    }
+  }));
+  const evidence: Array<{ title: string; url: string; text: string }> = [];
+  for (const result of fetchResults) {
+    if (result.status === "rejected") { rejected++; continue; }
+    if (result.status === "failed") { failed++; continue; }
+    opened++;
+    analyzed++;
+    const finalUrl = result.finalUrl ?? result.item.url;
+    const url = new URL(finalUrl);
+    const domain = url.hostname.replace(/^www\\./, "");
+    const hashBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url.toString()));
+    const urlHash = Array.from(new Uint8Array(hashBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
+    await db.from("ultron_product_sources").upsert({
+      owner_id: ownerId, project_id: projectId, canonical_url: url.toString(), url_hash: urlHash,
+      title: result.item.title || domain, domain, fetch_status: "analyzed", extraction_summary: result.text.slice(0, 900),
+      metadata: { extraction_method: "public_html_text", content_type: result.type, grounding: "google_search" },
+    }, { onConflict: "project_id,url_hash" });
+    evidence.push({ title: result.item.title || domain, url: url.toString(), text: result.text });
   }
-  const counts = { discovered: urls.length, opened, analyzed, rejected: 0, failed };
+  const counts = { discovered: urls.length, opened, analyzed, rejected, failed };
   await db.from("ultron_product_projects").update({ source_counts: counts, progress: 48, status: "synthesizing", active_stage: "synthesis", updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "research", "source.coverage", counts);
   await addEvent(db, ownerId, projectId, "synthesis", "stage.started", { message: "Comparing the accessible source material and shaping the product around evidence." });
@@ -206,7 +309,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
     storage_path: storagePath, mime_type: "text/markdown", byte_size: new TextEncoder().encode(markdown).byteLength,
     checksum_sha256: checksum, validation_report: { minimum_length_passed: true, citations_included: /references/i.test(markdown), analyzed_sources: analyzed },
   });
-  const finalStatus = analyzed >= Math.min(10, Number(project.research_target) || 200) ? "completed" : "partial";
+  const finalStatus = analyzed >= Number(project.research_target || 200) ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,

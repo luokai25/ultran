@@ -11,7 +11,7 @@
  */
 
 import catalogJson from "./connectors.catalog.json";
-import { listUltronConnectors, listUltronConnectorTools, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector, saveUltronComposioApiKey } from "./connectors-cloud";
+import { listUltronConnectors, listUltronConnectorTools, setUltronConnectorToolPermission, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector, saveUltronComposioApiKey } from "./connectors-cloud";
 
 export type CatalogEntry = {
   id: string;
@@ -413,6 +413,27 @@ export function initConnectors(deps: Deps): void {
           details.append(el("strong", "conn-tool-name", tool.tool_slug));
           details.append(el("p", "conn-tool-description", tool.description || "No description supplied by provider."));
           row.append(details);
+          if (tool.read_only) {
+            row.append(el("span", "badge", "Read-only"));
+          } else {
+            const permissionButton = el("button", tool.allowed ? "ghost danger" : "ghost", tool.allowed ? "Disable write access" : "Allow without asking");
+            permissionButton.type = "button";
+            permissionButton.addEventListener("click", async () => {
+              const message = tool.allowed
+                ? "Disable future executions of " + tool.tool_slug + "?"
+                : "Allow ULTRON to run " + tool.tool_slug + " without asking each time? This is a persistent grant for this exact tool.";
+              if (!window.confirm(message)) return;
+              permissionButton.disabled = true;
+              try {
+                await setUltronConnectorToolPermission({ connectionId: tool.connection_id, toolSlug: tool.tool_slug, allow: !tool.allowed });
+                await refreshAvailableTools();
+              } catch (error) {
+                toolsStatus!.textContent = error instanceof Error ? error.message : "Could not update tool permission.";
+                permissionButton.disabled = false;
+              }
+            });
+            row.append(permissionButton);
+          }
           toolsList.append(row);
         }
       } catch (error) {

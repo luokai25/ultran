@@ -215,8 +215,8 @@ function renderDetail(detail: ProductDetail): void {
   const cancel = el<HTMLButtonElement>("product-studio-cancel");
   cancel.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const resume = el<HTMLButtonElement>("product-studio-resume");
-  resume.hidden = !["partial","failed","paused"].includes(project.status);
-  resume.textContent = project.status === "partial" ? "Continue research" : "Retry project";
+  resume.hidden = !["partial","failed","paused","waiting_for_provider"].includes(project.status);
+  resume.textContent = project.status === "partial" ? "Continue research" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
   warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "The requested research target was not reached. Review the actual source coverage before publication.") : project.status === "waiting_for_provider" ? "No eligible free Google AI Studio model is currently available. The project remains saved." : "");

@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from "npm:fflate@0.8.2";
-import { makeDocx, makePptx, makeXlsx } from "./formats.ts";
+import { extractCodeFiles, makeDocx, makePptx, makeXlsx } from "./formats.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -39,4 +39,25 @@ Deno.test("PPTX export contains editable slides and slide relationships", () => 
   const second = strFromU8(files["ppt/slides/slide2.xml"]);
   assert(first.includes("Market") && first.includes("Evidence"), "First slide content is missing");
   assert(second.includes("Solution") && second.includes("Workflow"), "Second slide content is missing");
+});
+
+Deno.test("Software code blocks become safe ZIP paths with language-aware extensions", () => {
+  const result = extractCodeFiles([
+    "~~~",
+    "```python filename=../../app.py",
+    "print('hello')",
+    "```",
+    "```ts src/main.ts",
+    "export const ready = true;",
+    "```",
+    "```bash",
+    "echo ready",
+    "```",
+  ].slice(1).join("\n"));
+  assert(result.count === 3, "All non-empty source blocks should be extracted");
+  assert(result.files["source-code/app.py"], "Traversal-style filenames must be reduced to a safe basename");
+  assert(result.files["source-code/main.ts"], "Language and explicit path should be preserved safely");
+  assert(result.files["source-code/example-03.sh"], "Unnamed code blocks should receive deterministic filenames");
+  assert(!Object.keys(result.files).some(path => path.includes("../")), "ZIP paths must not traverse outside source-code");
+  assert(result.languages.includes("python") && result.languages.includes("ts") && result.languages.includes("bash"), "Detected languages should be reported");
 });

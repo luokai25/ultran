@@ -37,7 +37,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
-  assert.match(source, /callStudioStreaming/);
+  assert.match(source, /callStudioStreaming/);\n  assert.match(source, /opportunity_score/);\n  assert.match(source, /validation/);
   assert.match(source, /canonicalReferences/);
   assert.match(source, /product-v" \+ version/);
   assert.match(source, /version, source_counts/);
@@ -73,10 +73,10 @@ test("Product Studio research obeys public crawl limits and streams safe preview
 });
 
 test("Product Studio worker requires a claimed lease and private owner-scoped tables", async () => {
-  const [jobs, worker, migration] = await Promise.all([
+  const [jobs, worker, migration, backgroundWorker] = await Promise.all([
     read("supabase/functions/ultron-jobs/index.ts"),
     read("supabase/functions/ultron-product-studio/index.ts"),
-    read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),
+    read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),\n    read("supabase/migrations/20261109000300_ultron_product_studio_background_worker.sql"),
   ]);
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);

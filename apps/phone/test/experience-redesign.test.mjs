@@ -285,6 +285,26 @@ test("Learning Review filter controls meet the minimum touch target", async () =
   assert.match(css, /\.learning-filters button \{[\s\S]*?min-width:48px;[\s\S]*?min-height:48px;/);
 });
 
+test("every secondary page uses the same quiet charcoal workspace primitives", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("src/chatgpt-ui.css")]);
+  for (const id of ["agent-identities-screen", "llm-api-keys-screen", "product-studio-screen", "vault-screen", "learning-screen", "capabilities-screen"]) {
+    assert.match(html, new RegExp(`id="${id}" class="feature-screen`), `${id} must use the shared page shell`);
+  }
+  for (const selector of [
+    ".feature-screen .feature-eyebrow",
+    ".feature-screen article",
+    ".feature-screen .llm-key-card",
+    ".feature-screen .learning-section",
+    "#connectors-panel .conn-card",
+    "#workspace-panel .workspace-task",
+    "#sheet-wrap .sheet",
+  ]) assert.ok(css.includes(selector), `missing shared secondary-page treatment: ${selector}`);
+  assert.match(css, /--bg:\s*#212121/);
+  assert.match(css, /--surface:\s*#2f2f2f/);
+  assert.match(css, /--accent:\s*#10a37f/);
+  assert.doesNotMatch(css, /#d5b779|#e8cb91|backdrop-filter:\s*blur/);
+});
+
 test("the replacement interface avoids ambient motion and decorative atmosphere", async () => {
   const [html, css] = await Promise.all([read("index.html"), read("src/chatgpt-ui.css")]);
   const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);

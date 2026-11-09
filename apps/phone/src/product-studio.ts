@@ -212,6 +212,7 @@ export function initProductStudio(value: StudioOptions): void {
     void startProject("");
   });
   el<HTMLButtonElement>("product-studio-refresh").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
+  el<HTMLButtonElement>("product-studio-refresh-list").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
   el<HTMLButtonElement>("product-studio-new").addEventListener("click", () => {
     selectedProjectId = "";
     if (pollTimer) clearInterval(pollTimer);

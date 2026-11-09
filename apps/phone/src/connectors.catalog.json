@@ -11,5 +11,20 @@
       "Create issues"
     ],
     "description": "Connect your GitHub account to inspect repositories, read project files, and create issues. Every write action is separately approval-gated."
+  },
+  {
+    "id": "googlesuper",
+    "name": "Google Workspace",
+    "category": "productivity",
+    "auth": "oauth2",
+    "tier": "free",
+    "actions": [
+      "Gmail: search, read, draft and send email",
+      "Calendar: read events, check availability and manage schedules",
+      "Drive: find, read, upload and organize files",
+      "Docs and Sheets: create, read and edit documents and spreadsheets",
+      "Contacts, Tasks and Meet: access supported workspace tools"
+    ],
+    "description": "Connect one Google account through Google's OAuth consent screen. Google Super unifies Gmail, Calendar, Drive, Docs, Sheets, Contacts, Tasks, Meet and other supported Google services in one connection. ULTRON never asks for your Google password; write actions remain approval-gated."
   }
 ]

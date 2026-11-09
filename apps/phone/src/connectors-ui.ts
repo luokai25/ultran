@@ -365,7 +365,7 @@ export function initConnectors(deps: Deps): void {
     const oauthOn = oauthConnected.has(toolkit);
 
     const titleRow = el("div", "github-detail-title");
-    const detailMark = el("span", "github-card-mark github-detail-mark", "GH");
+    const detailMark = el("span", "github-card-mark github-detail-mark", entry.name.slice(0, 2).toUpperCase());
     detailMark.setAttribute("aria-hidden", "true");
     titleRow.append(detailMark);
     const title = el("h2", undefined, entry.name);
@@ -389,7 +389,7 @@ export function initConnectors(deps: Deps): void {
       actions.append(row);
     }
     detailEl.append(actions);
-    detailEl.append(el("p", "github-approval-note", "Security model: repository data is read through the connected account. Any operation that changes GitHub requires a separate approval showing the exact repository and action."));
+    detailEl.append(el("p", "github-approval-note", entry.id === "googlesuper" ? "Security model: Google access is granted only through the Google authorization page. ULTRON never asks for your Google password. Read access is available after consent; sending, editing, sharing and deleting require a separate explicit permission and approval." : "Security model: connected account data is accessed only within the permissions you grant. Operations that change external data require a separate approval showing the exact action."));
 
     const note = el("small", "conn-note");
     const buttons = el("div", "sheet-actions");

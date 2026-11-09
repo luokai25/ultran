@@ -28,3 +28,16 @@ test("schema adds routing metadata only",()=>{assert.match(migration,/toolkit_sl
 test("Connectors screen loads live cloud tools after OAuth connection",()=>{assert.match(screen,/listUltronConnectorTools/);assert.match(screen,/refreshAvailableTools/);assert.match(screen,/CLOUD TOOLS/);assert.match(screen,/tool\.tool_slug/);});
 
 test("cloud connector and workflow jobs wake the durable Edge Function worker",()=>{assert.match(gateway,/kickDurableWorker\(url,auth,anon\)/);assert.match(runtime,/kickDurableWorker\(url,auth,key\)/);assert.match(gateway,/action:"process",limit:1/);assert.match(runtime,/action:"process",limit:1/);});
+
+test("Google Super is routed through the shared OAuth gateway without exposing Google credentials",()=>{
+ const catalog=JSON.parse(readFileSync(resolve(root,"apps/phone/src/connectors.catalog.json"),"utf8"));
+ const google=catalog.find((entry)=>entry.id==="googlesuper");
+ assert.ok(google);
+ assert.equal(google.auth,"oauth2");
+ assert.equal(google.id.replace(/-/g,"_"),"googlesuper");
+ assert.match(google.description,/Google OAuth consent screen/);
+ assert.match(gateway,/connected_accounts\/link/);
+ assert.match(gateway,/ultron_store_llm_secret/);
+ assert.match(gateway,/approval_required/);
+ assert.match(screen,/Google authorization page/);
+});

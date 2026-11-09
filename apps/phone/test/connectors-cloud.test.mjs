@@ -110,6 +110,12 @@ test("Google OAuth reserves a browser tab during the click before the async gate
  assert.match(main,/popup\.location\.replace\(url\)/);
  assert.match(main,/window\.location\.assign\(url\)/);
 });
+test("Google OAuth is blocked until the server-side Composio gateway key is configured",()=>{
+ assert.match(screen,/let composioConfigured = false/);
+ assert.match(screen,/composioConfigured = result\.configured === true/);
+ assert.match(screen,/Add the Composio Project API key in OAuth gateway above/);
+ assert.match(screen,/act\.disabled = !canAct \|\| \(entry\.auth === "oauth2" && !composioConfigured\)/);
+});
 test("OAuth connection waits for authorization and refreshes tools automatically",()=>{
  assert.match(screen,/Waiting for .* authorization/);
  assert.match(screen,/refreshUltronConnectorStatus\(result\.connection\.id\)/);

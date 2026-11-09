@@ -236,7 +236,7 @@ Source and live-browser review on 2026-11-09:
 1. **Design reset shipped to the canonical client.** `apps/phone/index.html` loads only `src/chatgpt-ui.css`; the previous nine-layer style stack is no longer linked. The web build is the same client used by the Android APK.
 2. **Orb and cinematic identity removed from the app shell.** The hero canvas, orbital DOM, SVG brand mark, favicon mark generation and Three.js/WebGL renderer were removed. ULTRON is text-first.
 3. **Conversation-first layout shipped.** The home state says “How can I help?”, the model selector sits above the bottom composer, desktop uses a persistent 260px sidebar, and mobile retains compact bottom navigation.
-4. **Secondary screens remain in the same app.** LLM API Keys, model management, Agents & Identities, Mind Map, Learning Review, Capabilities, Connectors, Workspace and Product Studio remain available. They still require a complete visual and interaction audit against the new shared primitives.
+4. **Secondary screens use the same shared design system.** LLM API Keys, model management, Agents & Identities, Mind Map, Learning Review, Capabilities, Connectors, Workspace, Product Studio and Settings now share the charcoal surfaces, neutral typography, green interaction accent, page headers and list/card primitives. Full state-by-state visual and interaction QA remains outstanding.
 5. **Backend contracts are retained.** Supabase owner sessions, RLS-backed cloud data, streaming, provider keys, native secure storage, connector permissions and approval gates must remain intact through the visual rebuild.
 6. **Regression cleanup is in progress.** Legacy tests that asserted the old orb and stacked stylesheet design are being replaced with tests for the new single-stylesheet shell. The Vite build has passed; the full CI test suite is being reconciled with the new design contract.
 ## Redesign execution order
@@ -247,7 +247,7 @@ Source and live-browser review on 2026-11-09:
 4. Mind Map and Learning Review.
 5. Capabilities, connectors, OAuth detail, approvals and Agent Workspace.
 6. Settings, nested sheets, dialogs, empty/loading/error/permission states.
-7. Align the Next.js surface to the same system and remove its pre-alpha visual mismatch without falsely presenting it as the canonical production client.
+7. Keep the legacy Next.js entry point routed to the canonical web/Android client; do not maintain a second divergent console.
 
 A phase is complete only after the page inventory, interaction states, responsive checks and relevant regression tests are updated.
 

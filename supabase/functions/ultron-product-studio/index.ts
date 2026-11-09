@@ -1035,7 +1035,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: zipArtifactResult.data.id, title: title + " package", format: "zip", bytes: zipBytes.byteLength });
   await addEvent(db, ownerId, projectId, "packaging", "job.completed", { status: finalStatus, analyzed_sources: counts.analyzed, target });
   const { data: signed } = await bucket.createSignedUrl(storagePath, 3600, { download: title + ".md" });
-  return { project_id: projectId, status: finalStatus, artifact_id: artifact.id, download_url: signed?.signedUrl ?? null, source_counts: counts, package_artifact_id: zipArtifactResult.data.id, model: draft.model };
+  return { project_id: projectId, status: finalStatus, artifact_id: artifact.id, download_url: signed?.signedUrl ?? null, source_counts: counts, package_artifact_id: zipArtifactResult.data.id, code_examples: { count: codeFiles.count, languages: codeFiles.languages }, model: draft.model };
 }
 
 Deno.serve(async (req: Request) => {

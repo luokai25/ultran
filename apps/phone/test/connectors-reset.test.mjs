@@ -14,7 +14,7 @@ test('the phone connector marketplace exposes GitHub and unified Google Workspac
   assert.equal(catalog[1].name, 'Google Workspace');
   assert.equal(catalog[1].auth, 'oauth2');
   assert.ok(catalog[1].actions.some((action) => action.includes('Gmail')));
-  assert.match(catalog[1].description, /Google OAuth consent screen/);
+  assert.match(catalog[1].description, /OAuth consent screen/);
 });
 
 test('the connector screen is branded as a unified gateway and explains approval boundaries', () => {

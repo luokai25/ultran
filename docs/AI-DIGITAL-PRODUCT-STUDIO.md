@@ -231,7 +231,9 @@ Integration requirements:
 
 Shipped first implementation slice:
 - Added owner-scoped project, source, event and document tables with RLS and Realtime publication.
-- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation, resume/retry and worker execution.\n- Research runs in durable batches with 12 distinct research angles, source-domain diversity prompts, private source-text checkpoints and retry-safe continuation jobs. A run stops when the target is reached, source discovery stalls for three batches, or the configured round ceiling is reached.\n- Draft generation streams into persisted Markdown and a sandboxed HTML preview while the model writes; package creation is idempotent across worker retries.
+- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation, resume/retry and worker execution.
+- Research runs in durable batches with 12 distinct research angles, source-domain diversity prompts, private source-text checkpoints and retry-safe continuation jobs. A run stops when the target is reached, source discovery stalls for three batches, or the configured round ceiling is reached.
+- Draft generation streams into persisted Markdown and a sandboxed HTML preview while the model writes; package creation is idempotent across worker retries.
 - Routed `product.generate` from the existing durable `ultron-jobs` worker to the Product Studio function.
 - Reused the existing Google AI Studio Vault registry and `ultron_read_llm_secret`; the first research adapter uses Gemini Google Search grounding and free-model eligibility.
 - Added the Product Studio drawer entry, canonical `apps/phone` workspace, source coverage counters, activity timeline, source list, sandboxed preview and Markdown artifact download.

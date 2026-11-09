@@ -118,11 +118,12 @@ test("Product Studio research obeys public crawl limits and streams safe preview
 });
 
 test("Product Studio worker requires a claimed lease and private owner-scoped tables", async () => {
-  const [jobs, worker, migration, backgroundWorker] = await Promise.all([
+  const [jobs, worker, migration, backgroundWorker, searchBudgetIndex] = await Promise.all([
     read("supabase/functions/ultron-jobs/index.ts"),
     read("supabase/functions/ultron-product-studio/index.ts"),
     read("supabase/migrations/20261109000100_ultron_ai_digital_product_studio.sql"),
     read("supabase/migrations/20261109000300_ultron_product_studio_background_worker.sql"),
+    read("supabase/migrations/20261109000400_ultron_product_search_budget_index.sql"),
   ]);
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);
@@ -145,4 +146,5 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   assert.match(backgroundWorker, /ultron-cloud-job-worker/);
   assert.match(backgroundWorker, /vault\.decrypted_secrets/);
   assert.match(backgroundWorker, /ultron-jobs/);
+  assert.match(searchBudgetIndex, /ultron_product_events_owner_type_created_at_idx/);
 });

@@ -201,7 +201,8 @@ async function fetchPublicResearchPage(start: string): Promise<{ response: Respo
   }
   return { response: null, blocked: true };
 }
-\nasync function workerProcess(projectId: string, ownerId: string, jobId: string): Promise<Record<string, unknown>> {
+
+async function workerProcess(projectId: string, ownerId: string, jobId: string): Promise<Record<string, unknown>> {
   const db = service();
   const { data: project, error } = await db.from("ultron_product_projects").select("*").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (error) throw error;

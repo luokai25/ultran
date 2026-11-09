@@ -44,7 +44,7 @@ function statusLabel(status: string): string {
   const labels: Record<string, string> = {
     queued: "Queued", identifying: "Identifying opportunity", researching: "Researching",
     synthesizing: "Synthesizing evidence", creating: "Creating product", validating: "Quality review",
-    packaging: "Packaging", completed: "Completed", partial: "Draft ready · research incomplete",
+    packaging: "Packaging", completed: "Completed", partial: "Draft ready · review needed",
     paused: "Paused", waiting_for_provider: "Waiting for a free model", failed: "Failed", cancelled: "Cancelled",
   };
   return labels[status] ?? status.replace(/_/g, " ");
@@ -252,10 +252,10 @@ function renderDetail(detail: ProductDetail): void {
   cancel.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const resume = el<HTMLButtonElement>("product-studio-resume");
   resume.hidden = !["partial","failed","paused","waiting_for_provider"].includes(project.status);
-  resume.textContent = project.status === "partial" ? "Continue research" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : "Retry project";
+  resume.textContent = project.status === "partial" ? "Improve draft / continue" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
-  warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "The requested research target was not reached. Review the actual source coverage before publication.") : project.status === "waiting_for_provider" ? "ULTRON is waiting for an eligible free model. Search-grounded research needs Google AI Studio; synthesis and drafting can use any eligible connected free provider. Your project remains saved." : "");
+  warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "Review the actual source coverage and quality checks before publication.") : project.status === "waiting_for_provider" ? "ULTRON is waiting for an eligible free model. Search-grounded research needs Google AI Studio; synthesis and drafting can use any eligible connected free provider. Your project remains saved." : "");
 }
 async function loadProject(id: string): Promise<void> {
   selectedProjectId = id;

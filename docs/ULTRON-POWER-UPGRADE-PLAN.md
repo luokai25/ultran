@@ -33,6 +33,7 @@ This is not a greenfield MCP project. The repository already contains:
 ## Current security implementation
 
 - **Committed to `main`:** FastAPI owner-session middleware, Supabase Auth verification, RLS-backed singleton-owner verification, production workspace pinning, and bearer propagation from the phone client.
+- **Committed to `main`:** third-party MCP endpoint preflight checks require an allow-listed public HTTPS/443 destination, reject non-public DNS answers, disable redirects and ignore ambient proxy settings. Full DNS-to-socket IP pinning remains a hardening task.
 - **Deployment prerequisite:** set `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in `infra/hetzner/.env` before restarting a production API. The publishable key is not a service-role secret. Never add a service-role key to the phone app.
 - **Verification:** latest CI passes the production-auth regression tests. The API must not be exposed publicly until the deployment environment is configured and the new build passes its health check.
 
@@ -116,11 +117,11 @@ Required MCP manager states:
 
 
 ### Phase 1 — durable MCP foundation
-1. **Implemented:** SQLite-backed native MCP server registry. Public server definitions persist across restarts; environment values and HTTP headers are encrypted with the existing Fernet credential key. Secret-bearing definitions fail closed when encryption is not configured. Environment-defined servers remain authoritative over persisted UI registrations.
-2. Persist and restore safe server definitions on restart; reject persistence of secret-bearing config when encryption is unavailable.
-3. Persist grant signing material safely so a restart does not silently invalidate every legitimate grant; keep expiry, revocation and single-use checks.
-4. Make tool-call audit history durable with bounded retention and secret redaction.
-5. Add tests for restart recovery, encryption-required behavior, tamper detection, grant expiry/revocation/single-use and audit redaction.
+1. **Implemented and tested:** SQLite-backed native MCP server registry. Public server definitions persist across restarts; environment values and HTTP headers are encrypted with the existing Fernet credential key. Secret-bearing registrations fail closed if encryption is not configured. Environment-defined servers remain authoritative over persisted UI registrations.
+2. **Implemented and tested:** persistent HMAC grant signing material and grant records, encrypted with the credential key when configured; expiry, revocation, single-use and pruning survive restart.
+3. **Implemented and tested:** durable MCP audit history in `mcp_audit.sqlite3`, bounded to 50,000 entries by default. Audit rows contain hashes and metadata, not raw tool arguments/results.
+4. **Implemented and tested:** restart recovery, encryption-required behavior, tamper detection, grant expiry/revocation/single-use and bounded audit retention.
+5. **Implemented:** public-endpoint preflight for third-party Streamable HTTP connections: explicit egress allow-list, HTTPS/443 requirement, DNS resolution checks rejecting non-public addresses, redirects disabled and ambient proxy settings disabled. This is a preflight guard, not a DNS-pinned transport; resolver pinning remains a hardening item.
 6. Preserve the existing MCP protocol, connector projection and permission pipeline.
 
 **Exit criteria:** local server definitions, encrypted credentials, persistent grants and bounded audit retention have regression tests. The latest full CI run passes. Remaining hardening: pin resolved DNS addresses to the actual HTTP connection and add a dedicated durable cloud registry in Phase 2.

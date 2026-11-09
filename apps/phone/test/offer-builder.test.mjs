@@ -33,8 +33,8 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /functions\.invoke\("ultron-offer-builder"/);
   assert.match(host, /event\.source !== frame\.contentWindow/);
   assert.match(host, /event\.origin !== "null"/);
-  assert.match(host, /parent\.postMessage\(\{type:'ULTRON_OFFER_ACTION'.*?'\\*'\);/);
-  assert.match(host, /frame\.contentWindow\?\.postMessage\([\\s\\S]*?"\\*"\)/);
+  assert.ok(host.includes("html.replace(offerActionMessage, \"parent.postMessage({type:'ULTRON_OFFER_ACTION',id,action,payload:payload||{}},'*');\")"));
+  assert.ok(host.includes('}, "*");'));
   assert.match(host, /stage:'summary'/);
   assert.match(host, /stage:'quality'/);
   assert.ok(host.includes("s.html=b.innerHTML;s.markdown=content;S.words+="));

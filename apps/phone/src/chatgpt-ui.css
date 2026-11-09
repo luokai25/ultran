@@ -333,3 +333,165 @@ progress { width:100%; accent-color:var(--accent); }
   .learning-toolbar > *, .mindmap-toolbar > * { flex: 1 1 100%; }
   .llm-key-header-actions { width: 100%; }
 }
+
+
+/* Secondary screens share the same quiet, conversation-first design system. */
+.feature-screen .feature-eyebrow,
+.feature-screen .section-eyebrow,
+#connectors-panel .github-mark,
+#capabilities-screen .capability-hero-mark { display:none !important; }
+
+.feature-screen,
+#connectors-panel,
+#workspace-panel {
+  color:var(--text);
+  scrollbar-color:#555 transparent;
+}
+.feature-screen > section,
+.feature-screen > div,
+#connectors-panel > div,
+#workspace-panel > div,
+#workspace-panel > section { margin-bottom:22px; }
+
+.feature-screen article {
+  padding:14px 0;
+  border:0;
+  border-bottom:1px solid var(--border);
+  border-radius:0;
+  background:transparent;
+}
+.feature-screen .learning-section,
+.feature-screen .capability-section {
+  padding-top:18px;
+  border-top:1px solid var(--border);
+}
+.feature-screen .llm-key-card,
+.feature-screen .product-studio-form,
+.feature-screen .product-studio-intro,
+.feature-screen .permission-overview,
+.feature-screen .composio-health,
+.feature-screen .mcp-manager,
+.feature-screen .composio-key-setup,
+.feature-screen .workspace-team-builder,
+.feature-screen .mindmap-detail,
+.feature-screen .mindmap-canvas-wrap {
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--surface);
+}
+.feature-screen .identity-card,
+.feature-screen .cloud-llm-key-row,
+.feature-screen .model-card,
+.feature-screen .learning-proposal,
+.feature-screen .capability-card,
+#connectors-panel .conn-card,
+#workspace-panel .workspace-task,
+#workspace-panel .workspace-artifact {
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface-soft);
+  box-shadow:none;
+}
+.feature-screen .identity-card:hover,
+.feature-screen .model-card:hover,
+#connectors-panel .conn-card:hover,
+#workspace-panel .workspace-task:hover,
+#workspace-panel .workspace-artifact:hover {
+  border-color:var(--border-strong);
+  background:var(--surface);
+}
+.feature-screen .capability-hero,
+.feature-screen .product-studio-notice,
+.feature-screen .learning-safety-note {
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface-soft);
+}
+.feature-screen .capability-stats,
+.feature-screen .learning-stats,
+#workspace-panel .workspace-stats {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.feature-screen .capability-stat,
+.feature-screen .learning-stat,
+#workspace-panel .workspace-stats > * {
+  min-width:0;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface-soft);
+}
+.feature-screen .capability-stat small,
+.feature-screen .learning-stat small { color:var(--muted); }
+.feature-screen .capability-stat strong,
+.feature-screen .learning-stat strong { color:var(--text); font-size:20px; font-weight:600; }
+.feature-screen .learning-toolbar,
+.feature-screen .mindmap-toolbar,
+.feature-screen .mindmap-footer,
+.feature-screen .capability-section-head,
+.feature-screen .learning-section-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+}
+#connectors-panel .github-intro {
+  padding:12px 0 18px;
+  border:0;
+  border-bottom:1px solid var(--border);
+  background:transparent;
+}
+#connectors-panel .composio-key-setup,
+#connectors-panel .permission-overview,
+#connectors-panel .composio-health,
+#connectors-panel .mcp-manager {
+  background:var(--surface-soft);
+  box-shadow:none;
+}
+#workspace-panel .workspace-section-head {
+  padding-top:16px;
+  border-top:1px solid var(--border);
+}
+#workspace-panel .workspace-team-open {
+  border:1px solid var(--border);
+  background:var(--surface-soft);
+  color:var(--text);
+}
+#sheet-wrap .sheet {
+  background:var(--bg);
+  border-left:1px solid var(--border);
+  box-shadow:none;
+}
+#sheet-wrap .sheet-head { background:var(--bg); }
+#sheet-wrap .field { padding:12px 0; border-bottom:1px solid var(--border); }
+#sheet-wrap .field .field { border:0; padding:0; }
+#product-studio-screen .product-studio-intro h2 {
+  margin:0 0 8px;
+  color:var(--text);
+  font-size:20px;
+  font-weight:600;
+  letter-spacing:-.02em;
+}
+#product-studio-screen .product-studio-form label {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:0 0 16px;
+  color:var(--text-secondary);
+}
+#product-studio-screen .product-studio-preview {
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface);
+}
+@media (max-width: 520px) {
+  .feature-screen .capability-stats,
+  .feature-screen .learning-stats,
+  #workspace-panel .workspace-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .feature-screen .learning-toolbar,
+  .feature-screen .mindmap-toolbar { align-items:stretch; }
+  .feature-screen .learning-filters { width:100%; }
+}

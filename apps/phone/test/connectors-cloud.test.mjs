@@ -68,3 +68,7 @@ test("common productivity and developer OAuth connectors are registered for ULTR
  for(const slug of ["googlesuper","notion","dropbox","slack","linear"]) assert.ok(catalog.some((entry)=>entry.id===slug&&entry.auth==="oauth2"),slug+" connector missing");
  assert.match(main,/notion\|dropbox\|slack\|linear/);
 });
+
+test("Composio auth-config listing stays within the v3.1 maximum page size",()=>{
+ assert.match(gateway,/auth_configs\?toolkit_slug=\"\+encodeURIComponent\(toolkit\)\+\"&limit=50/);
+});

@@ -91,7 +91,7 @@ Deno.serve(async(req:Request)=>{
    if(!/^[a-z][a-z0-9_.-]{1,63}$/.test(provider)||!/^[a-z][a-z0-9_-]{1,79}$/.test(toolkit)||!alias||!display)return reply({error:"invalid_connector_metadata"},400);
    if(!key)return reply({error:"composio_not_configured",required_secret:"COMPOSIO_API_KEY"},503);
    if(!authConfig){
-    const configs=await composio("/auth_configs?toolkit_slug="+encodeURIComponent(toolkit)+"&limit=100",key);
+    const configs=await composio("/auth_configs?toolkit_slug="+encodeURIComponent(toolkit)+"&limit=50",key);
     const items=obj(configs)&&Array.isArray(configs.items)?configs.items:[];
     const enabled=items.filter((item)=>obj(item)&&item.status==="ENABLED"&&obj(item.toolkit)&&item.toolkit.slug===toolkit&&item.auth_scheme==="OAUTH2");
     const preferred=enabled.find((item)=>obj(item)&&item.is_composio_managed===true)??enabled[0];

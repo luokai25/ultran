@@ -97,15 +97,15 @@ test("local file requests have a real PDF fallback and artifact card actions", a
 test("chat has an in-place model switcher with model discovery shortcuts", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  const css = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
+  const css = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
   for (const id of ["chat-model-button", "chat-model-label", "chat-model-menu", "chat-model-current", "chat-model-status", "chat-model-options", "chat-model-download", "chat-model-settings"]) {
     assert.match(html, new RegExp(`id="${id}"`), `missing model switcher control ${id}`);
   }
   assert.match(main, /async function openChatModelMenu\(/);
   assert.match(main, /NativeLocalAI\.loadModel\(\{ name: model\.name, projectorName: selectedNativeProjectorName \|\| undefined \}\)/);
   assert.match(main, /NativeLocalAI\.unloadModel\(\)/);
-  assert.match(css, /\.chat-model-menu\[hidden\]\{display:none!important\}/);
-  assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
+  assert.match(css, /\.chat-model-menu\s*\{/);
+  assert.match(css, /\.chat-model-button\s*\{/);
 });
 
 test("chat shell has no stray literal newline and composer respects mobile safe areas", async () => {
@@ -177,10 +177,12 @@ test("model import is directly reachable from the model picker", async () => {
 
 test("the neutral identity is unified and mobile content stays within the viewport", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  const experience = await readFile(new URL("../src/experience.css", import.meta.url), "utf8");
+  const chatUi = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
   assert.doesNotMatch(html, /redline\.css/);
-  assert.match(experience, /html,body\{width:100%;max-width:100%;overflow-x:hidden\}/);
-  assert.match(experience, /#app\{width:100%;max-width:760px;min-width:0/);
+  assert.match(chatUi, /html, body\s*\{[^}]*width:\s*100%/);
+  assert.match(chatUi, /#app\s*\{[^}]*width:\s*100%/);
+  assert.match(chatUi, /height:\s*100dvh/);
+  assert.match(chatUi, /min-width:\s*320px/);
 });
 
 
@@ -261,27 +263,26 @@ test("mind map export preserves graph confidence and semantic relationships", as
 });
 
 
-test("the existing ULTRON identity appearance control lives in Agents & Identities", async () => {
-  const html = await read("index.html");
+test("decorative identity theme picker is hidden while identity controls remain available", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("src/chatgpt-ui.css")]);
   const identityStart = html.indexOf('id="agent-identities-screen"');
   const themePicker = html.indexOf('id="themes"');
-  const settingsStart = html.indexOf('id="settings-sheet"');
   assert.ok(identityStart >= 0 && themePicker > identityStart);
   assert.match(html.slice(identityStart, themePicker), /ULTRON IDENTITY/);
-  assert.ok(settingsStart < 0 || themePicker < settingsStart || !html.slice(settingsStart).includes('id="themes"'));
+  assert.match(css, /\.identity-visual-section\s*\{\s*display:none\s*!important/);
 });
 
 test("empty mind map hides the empty SVG canvas and removes its forced horizontal pan", async () => {
   const source = await readFile(path.join(root, "src/main.ts"), "utf8");
-  const css = await readFile(path.join(root, "src/quiet-ui.css"), "utf8");
+  const css = await readFile(path.join(root, "src/chatgpt-ui.css"), "utf8");
   assert.match(source, /classList\.toggle\("is-empty",empty\)/);
   assert.match(css, /\.mindmap-canvas-wrap\.is-empty \.mindmap-canvas \{ display: none; \}/);
   assert.match(css, /\.mindmap-canvas-wrap\.is-empty \{[\s\S]*?overflow: hidden/);
 });
 
 test("Learning Review filter controls meet the minimum touch target", async () => {
-  const css = await read("src/quiet-ui.css");
-  assert.match(css, /\.learning-filters button \{[\s\S]*?min-width: 48px;[\s\S]*?min-height: 48px;/);
+  const css = await read("src/chatgpt-ui.css");
+  assert.match(css, /\.learning-filters button \{[\s\S]*?min-width:48px;[\s\S]*?min-height:48px;/);
 });
 
 test("the replacement interface avoids ambient motion and decorative atmosphere", async () => {

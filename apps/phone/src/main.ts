@@ -63,6 +63,7 @@ import {
   saveCloudModelProfile,
   registerCloudDevice,
   getCloudConversationId,
+  nativeSecureStorage,
 } from "./cloud-sync";
 import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
 
@@ -114,7 +115,6 @@ type NativeLocalAIPlugin = {
   addListener(eventName: "generationToken" | "providerGenerationToken", listener: (event: { token: string }) => void): Promise<{ remove(): Promise<void> }>;
 };
 const NativeLocalAI = registerPlugin<NativeLocalAIPlugin>("UltronLocalAI");
-const NativeSecureStorage = registerPlugin<{ get(options: { key: string }): Promise<{ value: string | null }>; set(options: { key: string; value: string }): Promise<{ stored: boolean }>; remove(options: { key: string }): Promise<{ removed: boolean }> }>("UltronSecureStorage");
 const NativeCompanion = registerPlugin<{ requestNotificationPermission(): Promise<{granted:boolean;requested?:boolean}>; notify(options:{title:string;body:string}):Promise<{posted:boolean}>;  openWhatsAppMessage(options:{number:string;body:string}):Promise<{opened?:boolean;approved?:boolean;sent?:boolean;requiresUserSend?:boolean}>; openApp(options:{app:string}):Promise<{opened:boolean;app?:string}>; composeTelegram(options:{body:string}):Promise<{opened:boolean;sent:boolean}>; startTaskMonitor(options:{endpoint:string;speakUpdates?:boolean}):Promise<{scheduled:boolean;minimumIntervalMinutes:number}>; stopTaskMonitor():Promise<{stopped:boolean}>; speakInBackground(options:{text:string}):Promise<{started:boolean}>; stopBackgroundSpeech():Promise<{stopped:boolean}>; openAppBatterySettings():Promise<{opened:boolean}>; getBackgroundAccessStatus():Promise<{notifications:boolean;manufacturer:string;model:string;sdk:number}> }>("UltronCompanion");
 const NativeRuntime = registerPlugin<{
   getStatus(): Promise<{ installed: boolean; runtimeReady: boolean; shell: string; gitAvailable: boolean; pythonAvailable: boolean; prootAvailable?: boolean; wgetAvailable?: boolean; sshAvailable?: boolean; aptAvailable?: boolean; packageManagerEnabled?: boolean; packageManagerNote?: string; availableCommands?: string[]; availableCommandCount?: number; commandInventoryTruncated?: boolean; prefix: string; architecture: string }>;
@@ -1787,8 +1787,7 @@ function renderLiveEvent(body: HTMLElement, event: Record<string, unknown>): voi
   }
   const type = String(event.type ?? "event");
   if (type === "completed" || type === "final") return;
-  if (type === "artifact_created" && event.artifact) { pushWorkspaceArtifact(event.artifact as ArtifactCard); app.dataset.health = "ready"; }
-  if (type === "tool_failed") app.dataset.health = "broken";
+  if (type === "artifact_created" && event.artifact) pushWorkspaceArtifact(event.artifact as ArtifactCard);
   const tool = String(event.tool ?? event.source ?? "");
   const action = String(event.action ?? "");
   const toolKey = `${tool}.${action}`;
@@ -2110,7 +2109,7 @@ function updateHeroCloudStatus(checking = false): void {
 function setLink(state: LinkState, label?: string): void {
   linkPill.dataset.state = state;
   linkPill.textContent = label ?? (state === "online" ? "linked" : state === "error" ? "unreachable" : "local");
-  app.dataset.health = state === "online" ? "ready" : "broken";
+  app.dataset.health = state === "online" ? "ready" : state === "error" ? "broken" : "local";
 }
 
 function baseUrl(): string {
@@ -4086,7 +4085,7 @@ async function loadSavedProviderKey(): Promise<void> {
   const metadata = readJson<Partial<ProviderMetadata>>(LLM_PROVIDER_META_KEY, {});
   try {
     if (Capacitor.getPlatform() === "android") {
-      const stored = await NativeSecureStorage.get({ key: LLM_PROVIDER_SECRET_KEY });
+      const stored = await nativeSecureStorage.get({ key: LLM_PROVIDER_SECRET_KEY });
       llmApiKey = stored.value ?? "";
     }
   } catch (error) { console.warn("[ULTRON secure API key storage]", error); llmApiKey = ""; }
@@ -4141,7 +4140,7 @@ async function verifyProviderKey(saveSecret: boolean): Promise<void> {
     selectedLlmModel = previousProviderId === detected.id && llmProviderModels.includes(previousModel)
       ? previousModel : llmProviderModels[0] ?? "";
     llmApiKey = key;
-    if (saveSecret && Capacitor.getPlatform() === "android") await NativeSecureStorage.set({ key: LLM_PROVIDER_SECRET_KEY, value: key });
+    if (saveSecret && Capacitor.getPlatform() === "android") await nativeSecureStorage.set({ key: LLM_PROVIDER_SECRET_KEY, value: key });
     await persistProviderMetadata();
     apiKeyInput.value = ""; llmProviderState = "connected";
     renderProviderKeyState("Connected · " + llmProviderModels.length + " chat models found"); syncChatModelLabel();
@@ -4151,7 +4150,7 @@ async function verifyProviderKey(saveSecret: boolean): Promise<void> {
   } finally { window.clearTimeout(timeout); apiKeySaveButton.disabled = false; }
 }
 async function removeProviderKey(): Promise<void> {
-  try { if (Capacitor.getPlatform() === "android") await NativeSecureStorage.remove({ key: LLM_PROVIDER_SECRET_KEY }); }
+  try { if (Capacitor.getPlatform() === "android") await nativeSecureStorage.remove({ key: LLM_PROVIDER_SECRET_KEY }); }
   catch (error) { apiKeyStatus.textContent = "Could not remove the encrypted key: " + (error instanceof Error ? error.message : "unknown error"); apiKeyStatus.dataset.state = "expired"; return; }
   llmApiKey = ""; llmProvider = detectProvider(""); llmProviderState = "missing"; llmProviderModels = []; selectedLlmModel = ""; apiKeyInput.value = "";
   writeJson(LLM_PROVIDER_META_KEY, {}); renderProviderKeyState(); syncChatModelLabel();

@@ -44,6 +44,7 @@ test("Product Studio is registered in the canonical shared web and Android clien
 
 test("Product Studio routes free inference across existing Vault-backed providers", async () => {
   const source = await read("supabase/functions/ultron-product-studio/index.ts");
+  const formats = await read("supabase/functions/ultron-product-studio/formats.ts");
   assert.match(source, /ultron_read_llm_secret/);
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
@@ -64,9 +65,9 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);
   assert.match(source, /zipSync/);
-  assert.match(source, /function makeDocx/);
-  assert.match(source, /function makeXlsx/);
-  assert.match(source, /function makePptx/);
+  assert.match(formats, /export function makeDocx/);
+  assert.match(formats, /export function makeXlsx/);
+  assert.match(formats, /export function makePptx/);
   assert.match(source, /persistStudioExport/);
   assert.match(source, /artifact_ids: \{ docx:/);
   assert.ok(source.includes('"product.html": htmlBytes,' + "\n" + '    "product.docx": docxBytes'));

@@ -1,4 +1,5 @@
 import { cloudClient, getCloudSession } from "./cloud-sync";
+import { OFFER_BUILDER_HTML_GZIP_BASE64 } from "./offer-builder-asset";
 
 type ProductProject = {
   id: string; title: string; user_request?: string; selected_topic?: string | null;
@@ -506,19 +507,119 @@ export function initProductStudio(value: StudioOptions): void {
     finally { button.disabled = false; }
   });
 }
+let offerBuilderHost: HTMLDivElement | null = null;
+let offerBuilderMessageHandler: ((event: MessageEvent) => void) | null = null;
+
+async function decodeOfferBuilderHtml(): Promise<string> {
+  const binary = atob(OFFER_BUILDER_HTML_GZIP_BASE64);
+  const compressed = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(stream).text();
+}
+
+function closeOfferBuilder(): void {
+  if (offerBuilderMessageHandler) window.removeEventListener("message", offerBuilderMessageHandler);
+  offerBuilderMessageHandler = null;
+  offerBuilderHost?.remove();
+  offerBuilderHost = null;
+  options?.closeScreen();
+}
+
+async function mountOfferBuilder(): Promise<void> {
+  if (offerBuilderHost) return;
+  const session = await getCloudSession();
+  const host = document.createElement("div");
+  offerBuilderHost = host;
+  host.id = "ultron-offer-builder-host";
+  Object.assign(host.style, {
+    position: "fixed", inset: "0", zIndex: "10000", display: "flex",
+    flexDirection: "column", background: "#090a0c", color: "#f2f4f7",
+  });
+  const toolbar = document.createElement("div");
+  Object.assign(toolbar.style, {
+    height: "48px", minHeight: "48px", display: "flex", alignItems: "center",
+    gap: "14px", padding: "0 14px", background: "#090a0c",
+    borderBottom: "1px solid rgba(201,206,214,.16)", font: "12px ui-monospace,monospace",
+  });
+  const back = document.createElement("button");
+  back.type = "button";
+  back.textContent = "‹ Back to ULTRON";
+  Object.assign(back.style, {
+    border: "1px solid rgba(201,206,214,.2)", borderRadius: "8px",
+    padding: "7px 11px", background: "#171a1f", color: "#e5e7eb", font: "inherit",
+  });
+  back.addEventListener("click", closeOfferBuilder);
+  const heading = document.createElement("strong");
+  heading.textContent = "ULTRON / OFFER BUILDER";
+  heading.style.letterSpacing = ".12em";
+  toolbar.append(back, heading);
+  host.append(toolbar);
+
+  if (!session) {
+    const message = document.createElement("div");
+    Object.assign(message.style, { margin: "auto", maxWidth: "420px", padding: "28px", textAlign: "center", font: "14px/1.6 system-ui,sans-serif" });
+    message.textContent = "Connect your ULTRON owner account to use the private AI Offer Builder.";
+    const connect = document.createElement("button");
+    connect.type = "button";
+    connect.textContent = "Open cloud settings";
+    connect.style.cssText = "display:block;margin:18px auto 0;padding:12px 18px;border:0;border-radius:10px;background:#e5e7eb;color:#111;font-weight:700";
+    connect.addEventListener("click", () => { closeOfferBuilder(); options?.openCloudSettings(); });
+    message.append(connect);
+    host.append(message);
+    document.body.append(host);
+    return;
+  }
+
+  const frame = document.createElement("iframe");
+  frame.title = "ULTRON AI Offer Builder";
+  frame.setAttribute("allow", "clipboard-read; clipboard-write");
+  Object.assign(frame.style, { width: "100%", height: "calc(100% - 48px)", flex: "1 1 auto", border: "0", background: "#07080a" });
+  host.append(frame);
+  document.body.append(host);
+
+  offerBuilderMessageHandler = async (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+    const message = event.data as { type?: string; id?: string; action?: string; payload?: Record<string, unknown> } | null;
+    if (!message || message.type !== "ULTRON_OFFER_ACTION" || !message.id || !message.action) return;
+    const allowed = new Set(["create", "get", "save", "generate", "finalize"]);
+    if (!allowed.has(message.action)) {
+      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, error: "Unsupported Offer Builder action." }, location.origin);
+      return;
+    }
+    try {
+      const { data, error } = await cloudClient.functions.invoke("ultron-offer-builder", {
+        body: { action: message.action, ...(message.payload ?? {}) },
+      });
+      if (error) throw error;
+      if (!data || typeof data !== "object" || (data as Record<string, unknown>).ok !== true) {
+        const detail = data && typeof data === "object" ? String((data as Record<string, unknown>).message ?? (data as Record<string, unknown>).error ?? "ULTRON did not confirm the operation.") : "ULTRON returned an invalid response.";
+        throw new Error(detail);
+      }
+      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: data }, location.origin);
+    } catch (error) {
+      frame.contentWindow?.postMessage({
+        type: "ULTRON_OFFER_RESULT", id: message.id,
+        error: error instanceof Error ? error.message : "Offer Builder request failed.",
+      }, location.origin);
+    }
+  };
+  window.addEventListener("message", offerBuilderMessageHandler);
+  try {
+    frame.srcdoc = await decodeOfferBuilderHtml();
+  } catch (error) {
+    const message = document.createElement("p");
+    message.textContent = error instanceof Error ? error.message : "Could not load the Offer Builder interface.";
+    host.append(message);
+  }
+}
+
 export async function openProductStudioScreen(): Promise<void> {
   options?.openScreen();
-  setNotice("Loading your private product projects…");
+  stopPolling();
+  stopLiveUpdates();
   try {
-    await loadProjects();
-    if (selectedProjectId) await loadProject(selectedProjectId);
-    else {
-      el<HTMLElement>("product-studio-start").hidden = false;
-      el<HTMLElement>("product-studio-workspace").hidden = true;
-      stopPolling();
-      stopLiveUpdates();
-    }
+    await mountOfferBuilder();
   } catch (error) {
-    setNotice(error instanceof Error ? error.message : "Connect ULTRON cloud to use Product Studio.", true);
+    setNotice(error instanceof Error ? error.message : "Could not open ULTRON Offer Builder.", true);
   }
 }

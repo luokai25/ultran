@@ -229,16 +229,21 @@ Integration requirements:
 
 ## 12. Implementation status (2026-11-09)
 
-Shipped first implementation slice:
+Implemented and deployed first production slice:
 - Added owner-scoped project, source, event and document tables with RLS and Realtime publication.
-- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation, resume/retry and worker execution.
-- Research runs in durable batches with 12 distinct research angles, source-domain diversity prompts, private source-text checkpoints and retry-safe continuation jobs. A run stops when the target is reached, source discovery stalls for three batches, or the configured round ceiling is reached.
-- Draft generation streams into persisted Markdown and a sandboxed HTML preview while the model writes; package creation is idempotent across worker retries.
-- Routed `product.generate` from the existing durable `ultron-jobs` worker to the Product Studio function.
-- Reused the existing Google AI Studio Vault registry and `ultron_read_llm_secret`; the first research adapter uses Gemini Google Search grounding and free-model eligibility.
-- Added the Product Studio drawer entry, canonical `apps/phone` workspace, source coverage counters, activity timeline, source list, sandboxed preview and Markdown artifact download.
+- Added the authenticated `ultron-product-studio` Edge Function for project creation/list/detail, event/source retrieval, signed private downloads, cancellation, pause/resume, retry and durable worker execution.
+- Added durable `product.generate` job routing, lease-token verification, bounded retries, provider-wait states, checkpoint recovery and cancellation checks.
+- Enabled server-side processing while the phone/web app is closed. The `ultron-cloud-job-worker` pg_cron job runs each minute through the existing Vault-backed internal worker secret; the existing brain supervisor also continues to wake the durable job worker.
+- Reused existing OpenRouter, Groq and Google AI Studio Vault-backed key tables for free-model synthesis and writing. Google AI Studio Search grounding is used for opportunity identification and source discovery. No credentials are copied into client code or project records.
+- Research runs in resumable batches across 12 research angles, stores private source extracts, deduplicates canonical URLs, applies domain-diversity prompts, respects robots rules and reports discovered/opened/analyzed/rejected/failed counts. Configurable targets are 50/100/200/500; early stopping is reported as partial rather than misrepresented as complete.
+- Added evidence synthesis for recurring themes, customer pain, counter-evidence, contradictions, market gaps, willingness-to-pay signals, product requirements and confidence.
+- Drafts stream into persisted Markdown and a sandboxed HTML preview. The workspace displays opportunity score, synthesis, source coverage, activity, source links, quality checks and versioned downloads.
+- Added quality gates for minimum length, a 700-word floor, contents/references structure and source-citation integrity.
+- Packaging creates versioned Markdown and HTML documents plus a private ZIP bundle containing the product, source register, evidence-synthesis JSON, validation report and manifest. Source page text is not redistributed.
+- Added the Product Studio drawer entry and responsive workflow to the canonical `apps/phone` client shared by web and Android.
 
-Known first-slice limits:
-- Research is incremental, not a promise of unlimited results: the target is 50/100/200/500 analyzed pages, but Google grounding, accessible page extraction, robots rules, free-tier quotas and source discovery can stop a run early. It marks the result `partial` when the target is not reached and exposes the real analyzed count. Each synthesis uses a domain-diverse subset of up to 30 stored source extracts.
-- Current exports are private Markdown and standalone HTML. Rich PDF/DOCX/XLSX/PPTX/ZIP exports, deeper structured findings, advanced QA and user-visible version history remain follow-on work.
-- A model/API key provides inference, not unlimited search capacity. Google grounding and free-tier quotas remain subject to provider availability and rate limits.
+Current limits:
+- Research depth depends on Google Search grounding availability, accessible pages, robots rules, free-tier quotas and the diversity of returned sources. A 200/500 target is a target, not a guarantee.
+- Exports currently include Markdown, standalone HTML and a ZIP bundle. PDF, DOCX, XLSX and PPTX renderers are not yet connected to this cloud workflow.
+- The Product Studio provider adapter reuses the existing provider tables, Vault RPC, free-model eligibility rules, cooldowns and usage accounting. Consolidating it with the brain's provider router remains a cleanup task to prevent future policy drift.
+- External publication, storefront listing and sales remain separate owner-approved actions; this feature only creates private files.

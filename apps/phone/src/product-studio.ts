@@ -525,7 +525,7 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   const summaryStep = [
     "async function s3(){",
     " const T=S.topic,p=S.pocket;",
-    " shell(\"<h2>Your eBook Structure</h2><div id='summary'>\"+loader('Generating your eBook summary…','Building the overview from your approved outline and transformation map')+\"</div>\");",
+    " shell(\"<h2>Your eBook Structure</h2><div id='summary'>\"+loader('Generating your eBook summary…','Building the overview from your approved outline and transformation map')+\"</div>\";",
     " try {",
     "  const r=await ultronApi('generate',{project_id:S.projectId,stage:'summary',context:{topic:T,audience:p.aud,pocket:p,outline:S.outline,transformation:{before_after:S.vtm,stages:S.map}}});",
     "  S.summary=r.result||{};S.title=S.summary.title||cap(T)+' for '+p.aud;S.sub=S.summary.subtitle||'A practical guide to '+p.outcome+', without '+p.avoid;",

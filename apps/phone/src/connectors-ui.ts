@@ -389,7 +389,7 @@ export function initConnectors(deps: Deps): void {
       actions.append(row);
     }
     detailEl.append(actions);
-    detailEl.append(el("p", "github-approval-note", entry.id === "googlesuper" ? "Security model: Google access is granted only through the Google authorization page. ULTRON never asks for your Google password. Read access is available after consent; sending, editing, sharing and deleting require a separate explicit permission and approval." : "Security model: connected account data is accessed only within the permissions you grant. Write actions are disabled by default. Enable each exact tool here and revoke it whenever you want."));
+    detailEl.append(el("p", "github-approval-note", entry.id === "googlesuper" ? "Security model: Google access is granted only through the Google authorization page. ULTRON never asks for your Google password. Read-only actions are available after consent. Write actions are disabled by default; enable each exact tool with Allow without asking to grant persistent access." : "Security model: connected account data is accessed only within the permissions you grant. Write actions are disabled by default. Enable each exact tool here and revoke it whenever you want."));
 
     const note = el("small", "conn-note");
     const buttons = el("div", "sheet-actions");
@@ -406,7 +406,7 @@ export function initConnectors(deps: Deps): void {
           toolsStatus.textContent = "No executable tools were returned for this connected provider.";
           return;
         }
-        toolsStatus.textContent = `${matching.length} cloud tools available to ULTRON's agent runtime. Showing the first ${Math.min(40, matching.length)} here; ULTRON can discover the full catalogue when needed.`;
+        toolsStatus.textContent = `${matching.length} cloud tools available. Read-only tools work within granted scopes; write tools are disabled until you enable each exact action below. Showing the first ${Math.min(40, matching.length)} here.`;
         for (const tool of matching.slice(0, 40)) {
           const row = el("article", "github-capability-row");
           const details = el("div", "conn-tool-details");

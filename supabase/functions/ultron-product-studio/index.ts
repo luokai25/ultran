@@ -43,17 +43,47 @@ async function addEvent(db: ReturnType<typeof service>, ownerId: string, project
 function htmlEscape(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+function inlineMarkdown(value: string): string {
+  let output = htmlEscape(value);
+  const tick = String.fromCharCode(96);
+  output = output.replace(new RegExp(tick + "([^" + tick + "]+)" + tick, "g"), "<code>$1</code>");
+  output = output.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  output = output.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  output = output.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_match, label, url) => "<a href=\"" + htmlEscape(url) + "\" rel=\"noopener noreferrer\">" + label + "</a>");
+  return output;
+}
 function markdownPreview(markdown: string, title: string): string {
-  const blocks = markdown.split(/\n{2,}/).map((block) => {
-    const value = block.trim();
-    if (!value) return "";
-    const heading = value.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) return "<h" + heading[1].length + ">" + htmlEscape(heading[2]) + "</h" + heading[1].length + ">";
-    if (/^[-*]\s/m.test(value)) return "<ul>" + value.split("\n").map(line => line.replace(/^[-*]\s+/, "").trim()).filter(Boolean).map(line => "<li>" + htmlEscape(line) + "</li>").join("") + "</ul>";
-    if (/^\d+\.\s/m.test(value)) return "<ol>" + value.split("\n").map(line => line.replace(/^\d+\.\s+/, "").trim()).filter(Boolean).map(line => "<li>" + htmlEscape(line) + "</li>").join("") + "</ol>";
-    return "<p>" + htmlEscape(value).replace(/\n/g, "<br>") + "</p>";
-  }).join("\n");
-  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:760px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks + "</main></body></html>";
+  const lines = markdown.replace(/\r/g, "").split("\n");
+  const blocks: string[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const trimmed = lines[index].trim();
+    if (!trimmed) { index++; continue; }
+    if (trimmed.startsWith("```")) {
+      const code: string[] = []; index++;
+      while (index < lines.length && !lines[index].trim().startsWith("```")) code.push(lines[index++]);
+      if (index < lines.length) index++;
+      blocks.push("<pre><code>" + htmlEscape(code.join("\n")) + "</code></pre>"); continue;
+    }
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) { const level = heading[1].length; blocks.push("<h" + level + ">" + inlineMarkdown(heading[2]) + "</h" + level + ">"); index++; continue; }
+    if (/^(---+|\*\*\*+|___+)$/.test(trimmed)) { blocks.push("<hr>"); index++; continue; }
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const rows: string[][] = [];
+      while (index < lines.length && lines[index].trim().startsWith("|") && lines[index].trim().endsWith("|")) rows.push(lines[index++].trim().slice(1, -1).split("|").map(cell => cell.trim()));
+      const separator = rows[1]?.every(cell => /^:?-{3,}:?$/.test(cell)) ?? false;
+      const header = rows[0] ?? []; const bodyRows = separator ? rows.slice(2) : rows.slice(1);
+      blocks.push("<table><thead><tr>" + header.map(cell => "<th>" + inlineMarkdown(cell) + "</th>").join("") + "</tr></thead><tbody>" + bodyRows.map(row => "<tr>" + row.map(cell => "<td>" + inlineMarkdown(cell) + "</td>").join("") + "</tr>").join("") + "</tbody></table>"); continue;
+    }
+    if (/^>\s?/.test(trimmed)) { const quote: string[] = []; while (index < lines.length && /^>\s?/.test(lines[index].trim())) quote.push(lines[index++].trim().replace(/^>\s?/, "")); blocks.push("<blockquote><p>" + inlineMarkdown(quote.join(" ")) + "</p></blockquote>"); continue; }
+    if (/^[-*+]\s+/.test(trimmed)) { const items: string[] = []; while (index < lines.length && /^[-*+]\s+/.test(lines[index].trim())) items.push(lines[index++].trim().replace(/^[-*+]\s+/, "")); blocks.push("<ul>" + items.map(item => "<li>" + inlineMarkdown(item) + "</li>").join("") + "</ul>"); continue; }
+    if (/^\d+[.)]\s+/.test(trimmed)) { const items: string[] = []; while (index < lines.length && /^\d+[.)]\s+/.test(lines[index].trim())) items.push(lines[index++].trim().replace(/^\d+[.)]\s+/, "")); blocks.push("<ol>" + items.map(item => "<li>" + inlineMarkdown(item) + "</li>").join("") + "</ol>"); continue; }
+    const paragraph: string[] = [];
+    while (index < lines.length && lines[index].trim() && !/^(#{1,6}\s|```|---+$|>\s?|[-*+]\s+|\d+[.)]\s+)/.test(lines[index].trim())) paragraph.push(lines[index++].trim());
+    if (!paragraph.length) paragraph.push(lines[index++].trim());
+    blocks.push("<p>" + inlineMarkdown(paragraph.join(" ")) + "</p>");
+  }
+  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3,h4,h5,h6{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{padding:9px 12px;border:1px solid #303743;text-align:left}th{background:#171b22}blockquote{margin:1em 0;padding:4px 16px;border-left:3px solid #777;color:#bbc3cf}pre{overflow:auto;padding:16px;border:1px solid #303743;border-radius:10px;background:#13171d;color:#e3e7ed}code{font-family:ui-monospace,monospace}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks.join("\n") + "</main></body></html>";
 }
 type StudioProvider = "openrouter" | "groq" | "google_ai_studio";
 type StudioCandidate = { provider: StudioProvider; key: Record<string, unknown>; model: string };

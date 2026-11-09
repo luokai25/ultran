@@ -165,7 +165,7 @@ function renderQuality(project: ProductProject): void {
     ["minimum_length_passed", "Minimum product length"],
     ["minimum_word_count_passed", "At least 700 words"],
     ["references_section", "References section"],
-    ["source_citations_match", "Citation numbers match the source register"],
+    ["source_citations_match", "At least five distinct grounded sources are cited"],
     ["body_external_links_match_sources", "External links match researched sources"],
     ["contents_section", "Contents section"],
     ["actionable_workflow", "Actionable workflow"],

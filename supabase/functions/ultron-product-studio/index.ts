@@ -515,7 +515,8 @@ function sanitizeProductCsv(markdown: string): { content: string; rows: number; 
   if (columns < 2 || rows.some(value => value.length !== columns)) return null;
   const safeRows = rows.map(value => value.map(raw => {
     const item = raw.trim();
-    return /^[=+@]/.test(item) || /^-\s*[A-Za-z(]/.test(item) ? "'" + item : item;
+    const formulaLike = /^[=+@]/.test(item) || (/^-/.test(item) && !/^-?\d+(?:\.\d+)?$/.test(item));
+    return formulaLike ? "'" + item : item;
   }));
   const content = safeRows.map(value => value.map(item => '"' + item.replace(/"/g, '""') + '"').join(",")).join("\n");
   return { content, rows: rows.length - 1, columns };
@@ -876,7 +877,11 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: csvArtifactResult.data.id, title: title + " (Spreadsheet data)", format: "csv", rows: productCsv.rows, columns: productCsv.columns });
   }
 
-  const csvCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+  const csvCell = (value: unknown) => {
+    const item = String(value ?? "").trim();
+    const safe = /^[=+@]/.test(item) || (/^-/.test(item) && !/^-?\d+(?:\.\d+)?$/.test(item)) ? "'" + item : item;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  };
   const sourceRegister = [
     ["source_number", "title", "domain", "url"].join(","),
     ...selectedSources.map((source, index) => [

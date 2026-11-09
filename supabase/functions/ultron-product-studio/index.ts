@@ -767,10 +767,11 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       if (!project) return json({ error: "project_not_found" }, 404);
       const [events, sources, documents] = await Promise.all([
-        auth.db.from("ultron_product_events").select("sequence,stage,event_type,payload,created_at").eq("owner_id", auth.id).eq("project_id", id).order("sequence", { ascending: true }).limit(200),
+        auth.db.from("ultron_product_events").select("sequence,stage,event_type,payload,created_at").eq("owner_id", auth.id).eq("project_id", id).order("sequence", { ascending: false }).limit(80),
         auth.db.from("ultron_product_sources").select("id,title,canonical_url,domain,fetch_status,relevance_score,extraction_summary,retrieved_at").eq("owner_id", auth.id).eq("project_id", id).order("relevance_score", { ascending: false }).limit(500),
         auth.db.from("ultron_product_documents").select("id,title,format,status,version,byte_size,storage_path,created_at").eq("owner_id", auth.id).eq("project_id", id).order("created_at", { ascending: false }),
       ]);
+      if (events.error || sources.error || documents.error) throw events.error ?? sources.error ?? documents.error;
       const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id,name").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
       let download_url: string | null = null;
       if (download.data?.storage_path) {

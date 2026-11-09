@@ -495,7 +495,7 @@ async function runWithProviderWait<T>(ownerId: string, projectId: string, stage:
           .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])
           .select("id").maybeSingle();
         if (waitingError) throw waitingError;
-        if (waitingProject) await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: message.includes("free_google_search_daily_cap_reached") ? "Waiting for the free daily Google Search grounding budget to reset." : "Waiting for a free provider quota or connection to recover." });
+        if (waitingProject) await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: "Waiting for a connected provider or key to recover." });
       }
     }
     throw error;

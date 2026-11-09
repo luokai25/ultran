@@ -102,6 +102,14 @@ test("Google and other connector tool catalogues are searchable without truncati
  assert.match(screen,/matching\.slice\(0, 40\)/);
 });
 
+test("Google OAuth reserves a browser tab during the click before the async gateway request",()=>{
+ assert.match(screen,/prepareExternal\?\.\(\)/);
+ assert.match(screen,/preparedExternal\.open\(result\.redirectUrl\)/);
+ assert.match(main,/prepareExternal: \(\) =>/);
+ assert.match(main,/window\.open\("about:blank", "_blank"\)/);
+ assert.match(main,/popup\.location\.replace\(url\)/);
+ assert.match(main,/window\.location\.assign\(url\)/);
+});
 test("OAuth connection waits for authorization and refreshes tools automatically",()=>{
  assert.match(screen,/Waiting for .* authorization/);
  assert.match(screen,/refreshUltronConnectorStatus\(result\.connection\.id\)/);

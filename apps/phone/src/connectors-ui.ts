@@ -87,6 +87,12 @@ export function initConnectors(deps: Deps): void {
   const composioKeyInput = need<HTMLInputElement>("#composio-api-key");
   const composioKeySave = need<HTMLButtonElement>("#composio-api-key-save");
   const composioKeyStatus = need<HTMLElement>("#composio-key-status");
+  const mcpServerName = need<HTMLInputElement>("#mcp-server-name");
+  const mcpServerUrl = need<HTMLInputElement>("#mcp-server-url");
+  const mcpServerToken = need<HTMLInputElement>("#mcp-server-token");
+  const mcpServerAdd = need<HTMLButtonElement>("#mcp-server-add");
+  const mcpServerStatus = need<HTMLElement>("#mcp-server-status");
+  const mcpServerList = need<HTMLElement>("#mcp-server-list");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
   const approvalPanel = need<HTMLElement>("#composio-approvals");
@@ -201,6 +207,101 @@ export function initConnectors(deps: Deps): void {
         reset();
       });
       tiersEl.append(b);
+    }
+  }
+
+  type McpServerRow = { id:string; name?:string; transport?:string; state?:string; ready?:boolean; trust_level?:string; manifest_hash?:string; tools?:number; last_error?:string; last_seen?:string };
+  async function refreshMcpServers(): Promise<void> {
+    if (!deps.backendLinked()) {
+      mcpServerStatus.textContent = "Link your ULTRON backend in Settings to manage remote MCP servers.";
+      mcpServerList.replaceChildren(el("p", "conn-empty", "MCP management becomes available after the backend is connected."));
+      return;
+    }
+    mcpServerStatus.textContent = "Loading your registered MCP servers…";
+    try {
+      const response = await deps.api("/v1/mcp/servers", {}, 12_000);
+      if (!response.ok) throw new Error("MCP registry returned " + response.status);
+      const payload = await response.json() as { servers?: McpServerRow[] };
+      const servers = Array.isArray(payload.servers) ? payload.servers : [];
+      mcpServerList.replaceChildren();
+      if (!servers.length) mcpServerList.append(el("p", "conn-empty", "No MCP servers yet. Add one above to connect its tools to ULTRON."));
+      for (const server of servers) {
+        const card = el("article", "mcp-server-card");
+        const heading = el("div", "mcp-server-card-head");
+        const title = el("strong", undefined, server.name || server.id);
+        const state = el("span", "badge", server.state || (server.ready ? "ready" : "registered"));
+        state.dataset.state = server.state || (server.ready ? "ready" : "unknown");
+        heading.append(title, state);
+        const meta = el("small", "conn-note", (server.transport || "http").toUpperCase() + " · " + String(server.tools ?? 0) + " tools · " + (server.trust_level || "third_party") + " trust");
+        card.append(heading, meta);
+        if (server.manifest_hash) card.append(el("small", "conn-note", "Manifest " + server.manifest_hash.slice(0, 16)));
+        if (server.last_error) card.append(el("p", "mcp-server-error", server.last_error));
+        const actions = el("div", "mcp-server-actions");
+        const inspect = el("button", "ghost", "Inspect tools");
+        inspect.type = "button";
+        inspect.addEventListener("click", async () => {
+          inspect.disabled = true;
+          try {
+            const response = await deps.api("/v1/mcp/tools?server_id=" + encodeURIComponent(server.id) + "&limit=100", {}, 15_000);
+            if (!response.ok) throw new Error("Tool index returned " + response.status);
+            const body = await response.json() as { tools?: Array<Record<string, unknown>> };
+            const tools = Array.isArray(body.tools) ? body.tools : [];
+            const details = el("details", "mcp-server-tools");
+            details.open = true;
+            details.append(el("summary", "", tools.length + " discovered tools"));
+            if (!tools.length) details.append(el("p", "conn-empty", "No tools were returned by this server."));
+            for (const tool of tools) {
+              const row = el("div", "mcp-server-tool");
+              const toolName = el("strong", undefined, String(tool.id || tool.name || "Unnamed tool"));
+              const description = el("small", undefined, String(tool.description || "No description supplied."));
+              const annotations = tool.annotations && typeof tool.annotations === "object" ? tool.annotations as Record<string, unknown> : {};
+              const caps = Array.isArray(annotations.capabilities) ? annotations.capabilities.map(String).join(", ") : "approval required by default";
+              const capability = el("small", "mcp-tool-capabilities", caps);
+              row.append(toolName, description, capability);
+              details.append(row);
+            }
+            card.querySelector(".mcp-server-tools")?.remove();
+            card.append(details);
+          } catch (error) {
+            mcpServerStatus.textContent = error instanceof Error ? error.message : "Could not inspect MCP tools.";
+          } finally { inspect.disabled = false; }
+        });
+        const probe = el("button", "ghost", "Probe");
+        probe.type = "button";
+        probe.addEventListener("click", async () => {
+          probe.disabled = true;
+          mcpServerStatus.textContent = "Reconnecting to " + (server.name || server.id) + " and refreshing its tool manifest…";
+          try {
+            const response = await deps.api("/v1/mcp/servers/" + encodeURIComponent(server.id) + "/probe", { method: "POST" }, 30_000);
+            if (!response.ok) throw new Error("Probe returned " + response.status);
+            await refreshMcpServers();
+            mcpServerStatus.textContent = "Probe finished. The server status and manifest are refreshed.";
+          } catch (error) {
+            mcpServerStatus.textContent = error instanceof Error ? error.message : "MCP probe failed.";
+          } finally { probe.disabled = false; }
+        });
+        const remove = el("button", "ghost danger", "Remove");
+        remove.type = "button";
+        remove.addEventListener("click", async () => {
+          if (!window.confirm("Remove MCP server " + (server.name || server.id) + "? Its tools will no longer be available.")) return;
+          remove.disabled = true;
+          try {
+            const response = await deps.api("/v1/mcp/servers/" + encodeURIComponent(server.id), { method: "DELETE" }, 15_000);
+            if (!response.ok && response.status !== 204) throw new Error("Remove returned " + response.status);
+            await refreshMcpServers();
+          } catch (error) {
+            mcpServerStatus.textContent = error instanceof Error ? error.message : "Could not remove MCP server.";
+            remove.disabled = false;
+          }
+        });
+        actions.append(inspect, probe, remove);
+        card.append(actions);
+        mcpServerList.append(card);
+      }
+      mcpServerStatus.textContent = servers.length + " remote MCP server" + (servers.length === 1 ? "" : "s") + " registered. Live state and tool counts are shown below.";
+    } catch (error) {
+      mcpServerStatus.textContent = error instanceof Error ? error.message : "Could not load MCP servers.";
+      mcpServerList.replaceChildren(el("p", "conn-empty", "The MCP registry could not be reached. Check your backend connection."));
     }
   }
 
@@ -639,7 +740,7 @@ if (entry.auth === "oauth2") {
     if (refreshInFlight?.generation === generation) return refreshInFlight.promise;
     refreshButton.disabled = true;
     refreshButton.textContent = "Checking…";
-    const promise = Promise.allSettled([refreshEnabled(), refreshOAuthConnections(), refreshApprovals()]).then(() => {
+    const promise = Promise.allSettled([refreshEnabled(), refreshOAuthConnections(), refreshApprovals(), refreshMcpServers()]).then(() => {
       if (panelOpen && generation === refreshGeneration) render();
     }).finally(() => {
       if (refreshInFlight?.promise !== promise) return;
@@ -669,6 +770,47 @@ if (entry.auth === "oauth2") {
     panel.hidden = true;
     delete document.body.dataset.panel;
   }
+
+  mcpServerAdd.addEventListener("click", async () => {
+    const name = mcpServerName.value.trim();
+    const endpoint = mcpServerUrl.value.trim();
+    const token = mcpServerToken.value;
+    let parsed: URL;
+    try { parsed = new URL(endpoint); } catch { mcpServerStatus.textContent = "Enter a valid HTTPS MCP endpoint."; return; }
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !parsed.hostname || parsed.hash) {
+      mcpServerStatus.textContent = "Use a public HTTPS endpoint without embedded credentials or URL fragments.";
+      return;
+    }
+    if (!name) { mcpServerStatus.textContent = "Give this MCP server a name first."; mcpServerName.focus(); return; }
+    const id = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").slice(0, 48);
+    if (!id) { mcpServerStatus.textContent = "Choose a name containing letters or numbers."; return; }
+    mcpServerAdd.disabled = true;
+    mcpServerStatus.textContent = "Registering " + name + " and performing the MCP handshake…";
+    const headers: Record<string,string> = token.trim() ? { Authorization: "Bearer " + token.trim() } : {};
+    mcpServerToken.value = "";
+    try {
+      const response = await deps.api("/v1/mcp/servers", {
+        method: "POST",
+        body: JSON.stringify({
+          id, name, transport: "http", url: parsed.toString(), headers,
+          trust_level: "third_party", enabled: true, connect: true,
+          timeout_s: 30, connect_timeout_s: 10,
+          egress: { allowed_hosts: [parsed.hostname], deny_private: true, byte_cap: 8388608, request_cap: 128 },
+          capabilities: [], description: "Owner-registered remote MCP server"
+        })
+      }, 35_000);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as Record<string,unknown>;
+        throw new Error(String(body.detail || body.message || "MCP registration failed (" + response.status + ")"));
+      }
+      mcpServerName.value = "";
+      mcpServerUrl.value = "";
+      mcpServerStatus.textContent = "MCP server registered. Checking its discovered tools…";
+      await refreshMcpServers();
+    } catch (error) {
+      mcpServerStatus.textContent = error instanceof Error ? error.message : "Could not register MCP server.";
+    } finally { mcpServerAdd.disabled = false; }
+  });
 
   composioKeySave.addEventListener("click", async () => {
     const value = composioKeyInput.value.trim();

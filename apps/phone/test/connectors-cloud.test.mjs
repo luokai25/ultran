@@ -114,3 +114,19 @@ test("connector catalogue search and category filters remain visible",()=>{
  assert.match(html,/id="connectors-search"/);
  assert.match(html,/id="connectors-chips"/);
 });
+
+test("remote MCP manager registers HTTPS endpoints, probes, inventories and removes servers",()=>{
+ assert.match(html,/id="mcp-server-url"/);
+ assert.match(html,/id="mcp-server-token"/);
+ assert.match(screen,/\/v1\/mcp\/servers/);
+ assert.match(screen,/\/probe/);
+ assert.match(screen,/\/v1\/mcp\/tools\?server_id=/);
+ assert.match(screen,/method: "DELETE"/);
+ assert.match(screen,/allowed_hosts: \[parsed\.hostname\]/);
+ assert.match(screen,/mcpServerToken\.value = ""/);
+});
+test("remote MCP manager refuses insecure endpoint URLs and keeps token input transient",()=>{
+ assert.match(screen,/parsed\.protocol !== "https:"/);
+ assert.match(screen,/headers: Record<string,string>/);
+ assert.match(screen,/Authorization: "Bearer " \+ token\.trim\(\)/);
+});

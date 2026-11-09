@@ -1665,3 +1665,26 @@ button {
 
 .conn-tool-search{width:100%;min-width:0;margin:8px 0;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface,rgba(255,255,255,.03));color:var(--text);font:inherit;font-size:13px;}
 .conn-tool-search:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px;}
+
+/* Simple remote MCP manager: clear form, visible health and tool inventory. */
+.mcp-manager{display:grid;gap:9px;margin:14px 0;padding:14px;border:1px solid var(--hairline);border-radius:16px;background:rgba(255,255,255,.025)}
+.mcp-manager-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.mcp-manager-head strong{font-size:14px}
+.mcp-manager-head p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.mcp-manager>label{font-size:11px;color:var(--ink-soft);font-weight:700}
+.mcp-manager>input{width:100%;min-width:0;padding:12px;border:1px solid var(--hairline);border-radius:11px;background:var(--surface-2);color:var(--ink);font:inherit}
+.mcp-manager>small{font-size:10px;color:var(--muted);line-height:1.5}
+.mcp-manager .muted-inline{color:var(--muted);font-weight:400}
+.mcp-server-list{display:grid;gap:9px}
+.mcp-server-card{display:grid;gap:8px;padding:12px;border:1px solid var(--hairline);border-radius:13px;background:rgba(255,255,255,.02)}
+.mcp-server-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mcp-server-card-head strong{min-width:0;overflow-wrap:anywhere}
+.mcp-server-card .conn-note{display:block}
+.mcp-server-error{margin:0;color:var(--danger);font-size:11px;overflow-wrap:anywhere}
+.mcp-server-actions{display:flex;gap:7px;flex-wrap:wrap}
+.mcp-server-tools{display:grid;gap:8px;padding:10px;border-radius:11px;background:rgba(255,255,255,.025)}
+.mcp-server-tools summary{font-size:12px;font-weight:700;cursor:pointer}
+.mcp-server-tool{display:grid;gap:4px;padding:8px 0;border-top:1px solid var(--hairline)}
+.mcp-server-tool strong{font-size:11px;overflow-wrap:anywhere}
+.mcp-server-tool small{font-size:10px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.mcp-tool-capabilities{color:var(--gold-bright)!important}

@@ -335,6 +335,19 @@
           <span>CONNECTED PROVIDER ACCOUNTS</span><strong id="composio-health-label">Checking connection</strong>
           <small id="composio-health-detail">Checking connected provider authorization and account access.</small>
         </div>
+        <section class="mcp-manager" aria-label="Remote MCP servers">
+          <div class="mcp-manager-head"><div><strong>Your MCP servers</strong><p>Add a remote MCP server with its HTTPS address. ULTRON will connect, inspect its tools and show the server's health.</p></div><span class="badge">MCP</span></div>
+          <label for="mcp-server-name">Server name</label>
+          <input id="mcp-server-name" type="text" maxlength="96" autocomplete="off" placeholder="Example: My Research Tools" />
+          <label for="mcp-server-url">Remote MCP HTTPS endpoint</label>
+          <input id="mcp-server-url" type="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/mcp" />
+          <label for="mcp-server-token">Bearer token <span class="muted-inline">optional</span></label>
+          <input id="mcp-server-token" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Only if your MCP server requires it" />
+          <small>Tokens are sent to your ULTRON backend and stored only in its encrypted MCP registry. They are never shown again or saved on this phone. HTTPS only; private and local network destinations remain blocked.</small>
+          <button id="mcp-server-add" class="solid" type="button">Connect and inspect tools</button>
+          <small id="mcp-server-status" role="status" aria-live="polite">No remote MCP servers loaded yet.</small>
+          <div id="mcp-server-list" class="mcp-server-list"><p class="conn-empty">Your connected MCP servers will appear here.</p></div>
+        </section>
         <section class="composio-key-setup" aria-label="Composio gateway key">
           <div><strong>OAuth gateway</strong><p>Connect ULTRON to the managed OAuth gateway. The project key is verified and stored in Supabase Vault, never in browser storage. You will authorize Google separately on Google’s own sign-in screen.</p></div>
           <small><a href="https://dashboard.composio.dev" target="_blank" rel="noopener noreferrer">Create a free Composio project</a> · <a href="https://docs.composio.dev/reference/authenticating-to-composio" target="_blank" rel="noopener noreferrer">Find your Project API key</a></small>

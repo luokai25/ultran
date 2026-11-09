@@ -151,7 +151,8 @@ function renderDetail(detail: ProductDetail): void {
   el<HTMLElement>("product-studio-stage").textContent = project.active_stage.replace(/_/g, " ");
   renderCounts(project.source_counts ?? {});
   renderEvents(detail.events ?? []);
-  renderSources(detail.sources ?? []);\n  renderDocuments(detail.documents ?? []);
+  renderSources(detail.sources ?? []);
+  renderDocuments(detail.documents ?? []);
   const preview = el<HTMLIFrameElement>("product-studio-preview");
   if (project.preview_html) {
     preview.srcdoc = project.preview_html;

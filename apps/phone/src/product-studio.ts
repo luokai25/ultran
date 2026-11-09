@@ -131,7 +131,7 @@ function renderDocuments(documents: ProductDetail["documents"]): void {
   for (const document of documents) {
     const row = node("div", "product-document-row");
     const copy = node("span", "product-document-copy");
-    copy.append(node("strong", "", document.title), node("small", "", document.format.toUpperCase() + " · " + Math.max(1, Math.round(document.byte_size / 1024)) + " KB"));
+    copy.append(node("strong", "", document.title), node("small", "", document.format.toUpperCase() + " · v" + document.version + " · " + Math.max(1, Math.round(document.byte_size / 1024)) + " KB"));
     row.append(copy);
     if (document.download_url) {
       const link = node("a", "product-document-download", "Download") as HTMLAnchorElement;

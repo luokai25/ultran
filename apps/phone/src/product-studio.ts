@@ -564,8 +564,19 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   html = html.replace("s.html=b.innerHTML;S.words+=", "s.html=b.innerHTML;s.markdown=content;S.words+=");
   const oldMarkdown = "const markdown='# '+S.title+'\\n\\n'+(S.sub||'')+'\\n\\n'+(S.outline?.promise||'')+'\\n\\n'+S.secs.map(s=>'## '+s.t+'\\n\\n'+(s.markdown||'')).join('\\n\\n');";
   const newMarkdown = "const markdown='# '+S.title+'\\n\\n'+(S.sub||'')+'\\n\\n'+(S.summary?.about||S.outline?.promise||'')+'\\n\\n## What You Will Learn\\n\\n'+(S.summary?.what_you_learn||[]).map(x=>'- '+x).join('\\n')+'\\n\\n## Transformation Map\\n\\n'+S.map.map(x=>'- **'+x[0]+'**: '+x[1]+' '+x[2]).join('\\n')+'\\n\\n## Framework Glossary\\n\\n'+(S.summary?.framework_glossary||[]).map(x=>'- **'+(x.name||'Framework')+'**: '+(x.definition||x.description||'')).join('\\n')+'\\n\\n'+S.secs.map(s=>'## '+s.t+'\\n\\n'+(s.markdown||'')).join('\\n\\n');";
-  if (!html.includes(oldMarkdown)) throw new Error("Offer Builder final manuscript patch point not found");
-  html = html.replace(oldMarkdown, newMarkdown);
+  if (html.includes(oldMarkdown)) {
+    html = html.replace(oldMarkdown, newMarkdown);
+  } else if (!html.includes(newMarkdown)) {
+    // The bundled asset may already contain the enhanced manuscript expression.
+    // If its formatting changed, replace only the export assignment, not the
+    // surrounding finalize/download flow.
+    const markdownStart = html.indexOf("const markdown=");
+    const finalizeStart = html.indexOf("try{const saved=await ultronApi('finalize'", markdownStart);
+    if (markdownStart < 0 || finalizeStart <= markdownStart) {
+      throw new Error("Offer Builder manuscript export block could not be located safely.");
+    }
+    html = html.slice(0, markdownStart) + newMarkdown + "\\n" + html.slice(finalizeStart);
+  }
   return html;
 }
 

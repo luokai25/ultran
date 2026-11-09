@@ -9,10 +9,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
 test("Offer Builder preserves its supplied HTML and routes generation through ULTRON", async () => {
-  const [asset, host, backend] = await Promise.all([
+  const [asset, host, backend, main, cloudLlm, brain] = await Promise.all([
     read("apps/phone/src/offer-builder-asset.ts"),
     read("apps/phone/src/product-studio.ts"),
     read("supabase/functions/ultron-offer-builder/index.ts"),
+    read("apps/phone/src/main.ts"),
+    read("apps/phone/src/cloud-llm.ts"),
+    read("supabase/functions/ultron-brain/index.ts"),
   ]);
   const match = asset.match(/OFFER_BUILDER_HTML_GZIP_BASE64 = "([A-Za-z0-9+/=]+)"/);
   assert.ok(match, "compressed Offer Builder asset exists");
@@ -33,6 +36,17 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /stage:'quality'/);
   assert.ok(host.includes("s.html=b.innerHTML;s.markdown=content;S.words+="));
   assert.match(host, /Resuming saved manuscript sections/);
+  assert.match(host, /else if \(!html\.includes\(newMarkdown\)\)/);
+  assert.match(host, /const finalizeStart = html\.indexOf\("try\{const saved=await ultronApi/);
+  assert.match(html, /Framework Glossary/);
+  assert.match(main, /async function submitTurn\(raw: string\)/);
+  assert.match(main, /async function submit\(raw: string\)/);
+  assert.match(main, /ULTRON hit an internal chat error/);
+  assert.match(cloudLlm, /setTimeout\(\(\) => controller\.abort\(\), 90_000\)/);
+  assert.match(cloudLlm, /invalid event from the cloud response stream/);
+  assert.match(brain, /select\("id,owner_id,label,vault_secret_id,key_fingerprint,status,enabled,priority,models,request_count,tokens_used,cooldown_until,last_used_at,last_checked_at,last_error,created_at"\)/);
+  assert.match(brain, /cross-provider fallback/);
+  assert.doesNotMatch(brain, /select\("\*"\)/);
   const extractInjectedCode = (name) => {
     const marker = "const " + name + " = [";
     const start = host.indexOf(marker);

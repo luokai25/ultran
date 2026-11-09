@@ -603,6 +603,33 @@ function closeOfferBuilder(): void {
   options?.closeScreen();
 }
 
+async function waitForOfferBuilderRun(runId: string, frame: HTMLIFrameElement): Promise<Record<string, unknown>> {
+  let delay = 1200;
+  while (offerBuilderHost && frame.isConnected) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    const { data, error } = await cloudClient.functions.invoke("ultron-offer-builder", {
+      body: { action: "job_status", run_id: runId },
+    });
+    if (error) throw error;
+    if (!data || typeof data !== "object" || (data as Record<string, unknown>).ok !== true) {
+      const detail = data && typeof data === "object"
+        ? String((data as Record<string, unknown>).message ?? (data as Record<string, unknown>).error ?? "Could not read Offer Builder job status.")
+        : "Offer Builder returned an invalid job status.";
+      throw new Error(detail);
+    }
+    const run = (data as Record<string, unknown>).run as Record<string, unknown> | undefined;
+    if (!run) throw new Error("Offer Builder job status is missing.");
+    if (run.status === "completed") {
+      return { ok: true, stage: run.requested_stage, result: run.result };
+    }
+    if (run.status === "failed" || run.status === "cancelled") {
+      throw new Error(String(run.error_message ?? (run.status === "cancelled" ? "Generation was cancelled." : "Offer Builder generation failed.")));
+    }
+    delay = run.status === "waiting_for_provider" ? 8000 : Math.min(4000, delay + 400);
+  }
+  throw new Error("The Offer Builder view was closed. Its background job continues and can be resumed when you reopen it.");
+}
+
 async function mountOfferBuilder(): Promise<void> {
   if (offerBuilderHost) return;
   const session = await getCloudSession();
@@ -673,7 +700,12 @@ async function mountOfferBuilder(): Promise<void> {
         const detail = data && typeof data === "object" ? String((data as Record<string, unknown>).message ?? (data as Record<string, unknown>).error ?? "ULTRON did not confirm the operation.") : "ULTRON returned an invalid response.";
         throw new Error(detail);
       }
-      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: data }, "*");
+      let responseData = data as Record<string, unknown>;
+      if (message.action === "generate" && responseData.queued === true && typeof responseData.run_id === "string") {
+        void cloudClient.functions.invoke("ultron-jobs", { body: { action: "process", limit: 1 } }).catch(() => undefined);
+        responseData = await waitForOfferBuilderRun(responseData.run_id, frame);
+      }
+      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: responseData }, "*");
     } catch (error) {
       frame.contentWindow?.postMessage({
         type: "ULTRON_OFFER_RESULT", id: message.id,

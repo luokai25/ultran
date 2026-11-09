@@ -333,7 +333,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 5) : [];
     if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
   }
-  const { data: priorSources } = await db.from("ultron_product_sources").select("domain").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
+  const { data: priorSources } = await db.from("ultron_product_sources").select("domain,canonical_url").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
   const priorDomains = [...new Set((priorSources || []).map(row => clean(row.domain, 120)).filter(Boolean))].slice(0, 100);
   const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
@@ -343,8 +343,20 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   grounded.push(...searched.grounding);
   const grounding = grounded;
   const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
+  const priorUrls = new Set((priorSources || []).map(row => {
+    try { const url = new URL(row.canonical_url); url.hash = ""; return url.toString(); } catch { return ""; }
+  }).filter(Boolean));
   const seenDomains = new Set<string>();
-  const urls = [...unique.filter(item => { try { const domain = new URL(item.url).hostname; if (seenDomains.has(domain)) return false; seenDomains.add(domain); return true; } catch { return false; } }), ...unique.filter(item => { try { return !seenDomains.has(new URL(item.url).hostname); } catch { return false; } })].slice(0, 24);
+  const urls = unique.filter(item => {
+    try {
+      const url = new URL(item.url); url.hash = "";
+      if (priorUrls.has(url.toString())) return false;
+      const domain = url.hostname;
+      if (seenDomains.has(domain)) return false;
+      seenDomains.add(domain);
+      return true;
+    } catch { return false; }
+  }).slice(0, 24);
   const discoveredRecords = await Promise.all(urls.map(async item => {
     const parsed = new URL(item.url);
     parsed.hash = "";

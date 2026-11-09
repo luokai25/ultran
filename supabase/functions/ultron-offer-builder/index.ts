@@ -112,7 +112,7 @@ function prompts(stage: string, context: Record<string, unknown>) {
   };
   if (stage === "outline") return {
     system: base + " You are a senior instructional designer. Generate one proposal at a time. Each proposal must be meaningfully different from the previous proposals and the approved outline becomes the canonical brief for every later stage.",
-    prompt: "Topic: " + topic + "\nSelected pocket: " + JSON.stringify(pocket) + "\nFormat: " + clean(context.format, 80) + "\nDepth: " + clean(context.depth, 80) + "\nFeedback: " + clean(context.feedback, 2000) + "\nOption key: " + clean(context.option_key, 1) + "\nPrevious proposals to avoid repeating: " + JSON.stringify(context.previous_outlines ?? []) + "\nCreate exactly ONE original product outline. Include key, name, promise, from_state, to_state, chapters (7-12 objects with title and learning_outcome), version (1). Return JSON {outline:{...}}.",
+    prompt: "Topic: " + topic + "\nSelected pocket: " + JSON.stringify(pocket) + "\nFormat: " + clean(context.format, 80) + "\nDepth: " + clean(context.depth, 80) + "\nFeedback: " + clean(context.feedback, 2000) + "\nOption key: " + clean(context.option_key, 1) + "\nPrevious proposals to avoid repeating: " + JSON.stringify(context.previous_outlines ?? []) + "\nCreate exactly ONE original product outline. Include key, name, promise, from_state, to_state, exactly 7 chapters with title and learning_outcome, version (1). Return JSON {outline:{...}}.",
   };
   if (stage === "transformation") return {
     system: base + " You are a behavior-change and instructional design specialist. Make the transformation concrete, measurable, and achievable. Use second-person language for guided mode and third-person language for creator mode.",
@@ -124,7 +124,7 @@ function prompts(stage: string, context: Record<string, unknown>) {
   };
   if (stage === "summary") return {
     system: base + " You are a senior nonfiction editor. Create a clear, specific summary from the approved canonical brief. Invent memorable named frameworks only when they can be used consistently in the book.",
-    prompt: "Topic: " + topic + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nTransformation map: " + JSON.stringify(context.transformation ?? {}) + "\nReturn JSON with title, subtitle, about, what_you_learn (4 bullets), predicted_word_count_range, reading_minutes, chapter_count, bonus_count, framework_glossary (3-6 named frameworks with one-sentence definitions), and bonus_materials (2).",
+    prompt: "Topic: " + topic + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nTransformation map: " + JSON.stringify(context.transformation ?? {}) + "\nReturn JSON with title, subtitle, about, what_you_learn (4 bullets), predicted_word_count_range (7,000-11,000 words), reading_minutes, chapter_count (7), bonus_count (2), framework_glossary (3-6 named frameworks with one-sentence definitions), and bonus_materials (2).",
   };
   if (stage === "quality") return {
     system: base + " You are a strict developmental editor and safety reviewer. Do not rewrite the whole book. Find concrete problems and propose precise fixes.",

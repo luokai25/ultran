@@ -455,6 +455,19 @@ Deno.serve(async (req: Request) => {
             if (running.error) throw running.error;
             if (failed.error) throw failed.error;
             result = { healthy: true, queue: { queued: queued.count ?? 0, running: running.count ?? 0, failed: failed.count ?? 0 }, checked_at: new Date().toISOString() };
+          } else if (job.job_type === "product.generate") {
+            const payload = isObject(job.payload) ? job.payload : {};
+            const response = await fetch(url + "/functions/v1/ultron-product-studio", {
+              method: "POST",
+              headers: internalWorker
+                ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
+                : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "worker_process", project_id: payload.project_id, job_id: job.id }),
+              signal: AbortSignal.timeout(115_000),
+            });
+            const data = await response.json() as Record<string, unknown>;
+            if (!response.ok || data.ok !== true) throw new Error(String(data.message ?? data.error ?? "product_generation_failed"));
+            result = isObject(data.result) ? data.result : data;
           } else if (job.job_type === "memory.consolidate") {
             result = await consolidateConversationMemory(db, owner_id, isObject(job.payload) ? job.payload : {}, serviceDb);
           } else {

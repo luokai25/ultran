@@ -7,39 +7,37 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-test("new mobile experience stylesheet is loaded after the base and workspace styles", async () => {
+test("the canonical shell loads one replacement stylesheet and removes orb markup", async () => {
   const html = await read("index.html");
-  const base = html.indexOf("./src/styles.css");
-  const workspace = html.indexOf("./src/workspace.css");
-  const experience = html.indexOf("./src/experience.css");
-  assert.ok(base >= 0 && workspace > base && experience > workspace);
-  for (const id of ["menu-btn", "new-btn", "thread", "hero", "avatar", "greeting", "suggestions", "messages", "composer", "prompt", "send-btn", "drawer", "history", "workspace-panel", "connectors-panel", "sheet-wrap"]) {
+  const css = await read("src/chatgpt-ui.css");
+  const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(links, ["./src/chatgpt-ui.css"]);
+  for (const id of ["menu-btn", "new-btn", "thread", "hero", "greeting", "suggestions", "messages", "composer", "prompt", "send-btn", "drawer", "history", "workspace-panel", "connectors-panel", "sheet-wrap"]) {
     assert.match(html, new RegExp(`id="${id}"`), `missing live UI node: ${id}`);
   }
+  assert.doesNotMatch(html, /avatar-orbit|id="avatar"|class="stage"/);
+  assert.match(css, /--bg:\s*#212121/);
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length, "the rebuilt shell must not introduce duplicate IDs");
 });
 
-test("redesigned UI preserves mobile layout, focus visibility, and reduced-motion support", async () => {
-  const css = await read("src/experience.css");
-  assert.ok(css.includes("@media(max-width:430px)"));
-  assert.ok(css.includes("@media(min-width:700px)"));
-  assert.match(css, /prefers-reduced-motion:reduce/);
+test("clean chat UI preserves responsive layout, focus visibility, and reduced motion", async () => {
+  const css = await read("src/chatgpt-ui.css");
+  assert.match(css, /@media \(max-width:\s*899px\)/);
+  assert.match(css, /@media \(min-width:\s*900px\)/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
-  for (const selector of [".hero-intro", ".quick-start", ".suggestions", ".composer", ".drawer", ".sheet", ".workspace-panel"]) {
+  for (const selector of [".hero-intro", ".quick-start", ".suggestions", ".composer", "#drawer", ".sheet", ".feature-screen"]) {
     assert.ok(css.includes(selector), `missing redesigned surface: ${selector}`);
   }
 });
 
-test("fixed navigation cannot sit above the drawer, connector panel, or settings sheet", async () => {
-  const [base, experience, workspace] = await Promise.all([
-    read("src/styles.css"), read("src/experience.css"), read("src/workspace.css"),
-  ]);
-  assert.match(experience, /\.bottom-nav\{position:fixed;z-index:15;/);
-  assert.match(base, /\.scrim\s*\{[\s\S]*?z-index:\s*20/);
-  assert.match(base, /\.drawer\s*\{[\s\S]*?z-index:\s*30/);
-  assert.match(experience, /\.sheet-wrap\{z-index:40;/);
-  assert.match(workspace, /\.workspace-panel\{position:fixed;z-index:60;/);
+test("desktop sidebar, feature screens, and transient sheets have a safe stacking order", async () => {
+  const css = await read("src/chatgpt-ui.css");
+  assert.match(css, /#drawer\s*\{[\s\S]*?z-index:\s*50/);
+  assert.match(css, /\.scrim\s*\{[\s\S]*?z-index:\s*45/);
+  assert.match(css, /\.feature-screen,\s*#connectors-panel[\s\S]*?z-index:\s*30/);
+  assert.match(css, /\.sheet-wrap\s*\{[\s\S]*?z-index:\s*80/);
 });
 
 test("monochrome orb identity stays aligned across web, Android generator, and adaptive icon", async () => {
@@ -110,12 +108,13 @@ test("chat has an in-place model switcher with model discovery shortcuts", async
   assert.match(css, /\.chat-model-button\[data-ready="true"\]/);
 });
 
-test("chat shell has no stray literal newline and composer stays above bottom navigation", async () => {
+test("chat shell has no stray literal newline and composer respects mobile safe areas", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  const css = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
   assert.doesNotMatch(html, /\\\\n<nav/);
-  assert.match(quiet, /#app\s*\{\s*padding-bottom:\s*calc\(62px \+ var\(--safe-bottom\)\)\s*!important;/);
-  assert.match(quiet, /\.dock\s*\{\s*flex:\s*0\s+0\s+auto;/);
+  assert.match(css, /\.dock\s*\{[\s\S]*?flex:\s*0\s+0\s+auto/);
+  assert.match(css, /\.bottom-nav\s*\{/);
+  assert.match(css, /--safe-bottom:\s*env\(safe-area-inset-bottom/);
 });
 
 test("empty home state never auto-scrolls the greeting out of view", async () => {
@@ -123,17 +122,18 @@ test("empty home state never auto-scrolls the greeting out of view", async () =>
   assert.match(main, /if \(has\) scrollToEnd\(false\);\s*else threadEl\.scrollTop = 0;/);
 });
 
-test("ULTRON core remains visible when WebGL cannot initialize", async () => {
+test("the conversation shell contains no orb renderer or orbital DOM", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
-  assert.match(main, /stage\.dataset\.coreFallback = "true"/);
-  assert.match(quiet, /\.stage\[data-core-fallback="true"\]::after/);
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(main, /initializeAvatar|import\(["']three["']\)|avatarSync|avatarTheme/);
+  assert.doesNotMatch(html, /avatar-orbit|id="avatar"|class="stage"/);
 });
 
-test("mobile empty state is compact enough to keep quick starts above the composer", async () => {
-  const quiet = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
-  assert.match(quiet, /@media \(max-width: 600px\)[\s\S]*?\.hero \{[\s\S]*?min-height: auto/);
-  assert.match(quiet, /\.quick-start \{ margin: 0; padding: 12px; \}/);
+test("mobile empty state keeps quick starts compact above the composer", async () => {
+  const css = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
+  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.hero \{[\s\S]*?padding: 24px 0/);
+  assert.match(css, /\.suggestions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(css, /\.dock\s*\{[\s\S]*?var\(--safe-bottom\)/);
 });
 
 test("model picker lives above the composer and request progress survives streamed tokens", async () => {
@@ -284,21 +284,21 @@ test("Learning Review filter controls meet the minimum touch target", async () =
   assert.match(css, /\.learning-filters button \{[\s\S]*?min-width: 48px;[\s\S]*?min-height: 48px;/);
 });
 
-test("cinematic motion layer gives ULTRON an atmospheric responsive shell", async () => {
-  const [html, css] = await Promise.all([read("index.html"), read("src/motion-experience.css")]);
-  assert.ok(html.indexOf("./src/motion-experience.css") > html.indexOf("./src/quiet-ui.css"));
-  for (const token of ["ultron-grid-drift", "ultron-nebula-turn", "ultron-core-float", "ultron-page-arrive", "ultron-surface-enter"]) assert.ok(css.includes(token));
-  assert.match(css, /@media \(min-width: 900px\)/);
-  assert.match(css, /flex-direction: column/);
-  assert.match(css, /prefers-reduced-motion: reduce/);
-  assert.match(css, /backdrop-filter: blur/);
+test("the replacement interface avoids ambient motion and decorative atmosphere", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("src/chatgpt-ui.css")]);
+  const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(links, ["./src/chatgpt-ui.css"]);
+  assert.doesNotMatch(css, /ultron-grid-drift|ultron-nebula-turn|ultron-core-float|backdrop-filter:\s*blur/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.match(css, /transition:\s*background \.15s/);
 });
 
 
 test("LLM API Keys exposes an explicit owner-session and provider-pool reconnect action", async () => {
-  const [html, main, css] = await Promise.all([read("index.html"), read("src/main.ts"), read("src/motion-experience.css")]);
+  const [html, main, css] = await Promise.all([read("index.html"), read("src/main.ts"), read("src/chatgpt-ui.css")]);
   assert.match(html, /id="cloud-llm-refresh"/);
   assert.match(main, /#cloud-llm-refresh/);
   assert.match(main, /Reconnecting…/);
-  assert.match(css, /\.llm-key-header-actions/);
+  assert.match(css, /\.llm-key-card/);
+  assert.match(css, /\.llm-key-actions/);
 });

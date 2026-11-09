@@ -26,6 +26,7 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /functions\.invoke\("ultron-product-studio"/);
   assert.match(moduleSource, /product-studio-refresh-list/);
   assert.match(moduleSource, /product-studio-resume/);
+  assert.match(moduleSource, /product-studio-pause/);
   assert.match(moduleSource, /invoke\("pause"/);
   assert.match(moduleSource, /setInterval\(/);
   assert.match(moduleSource, /opportunity_score/);
@@ -110,6 +111,7 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   assert.match(worker, /"resume"/);
   assert.match(worker, /"partial","failed","paused","waiting_for_provider"/);
   assert.match(worker, /"cancel"/);
+  assert.match(worker, /body.action === "cancel" \|\| body.action === "pause"/);
   for (const table of ["ultron_product_projects", "ultron_product_sources", "ultron_product_events", "ultron_product_documents"]) {
     assert.ok(migration.includes("create table if not exists public." + table), "missing table " + table);
     assert.ok(migration.includes("alter table public." + table + " enable row level security"), "RLS not enabled for " + table);

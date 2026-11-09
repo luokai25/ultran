@@ -12,12 +12,17 @@ Nothing above this file imports ``mcp``.
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import os
+import socket
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
-from .errors import McpProtocolError, McpUnavailable
+from .errors import EgressDenied, McpProtocolError, McpUnavailable
+from .egress import policy_from_config
 
 # --------------------------------------------------------------------------- #
 # SDK surface
@@ -286,6 +291,63 @@ class StdioTransport:
         return _open()
 
 
+def _validate_http_endpoint(spec: ServerSpec) -> None:
+    """Fail closed before a third-party MCP connection can reach the network.
+
+    Local-trust servers are intentionally allowed to use loopback/private
+    addresses for development. Every other trust level must use HTTPS on 443,
+    pass the configured hostname allow-list, and resolve only to globally
+    routable IP addresses. Redirects and ambient proxy settings are disabled
+    by the HTTP client below.
+    """
+    try:
+        parsed = urlsplit(spec.url)
+        host = parsed.hostname or ""
+        port = parsed.port or 443
+    except ValueError as exc:
+        raise McpUnavailable("MCP endpoint URL is malformed", details={"server": spec.id}) from exc
+
+    if not host or parsed.username or parsed.password or parsed.fragment:
+        raise McpUnavailable("MCP endpoint URL contains unsupported credentials or fragments", details={"server": spec.id})
+
+    if spec.trust_level == "local":
+        return
+
+    if parsed.scheme.lower() != "https" or port != 443 or parsed.query:
+        raise McpUnavailable(
+            "third-party MCP endpoints must use HTTPS on port 443 without query parameters",
+            details={"server": spec.id},
+        )
+
+    policy = policy_from_config(spec.egress)
+    try:
+        policy.require(spec.url)
+    except EgressDenied as exc:
+        raise McpUnavailable(
+            "MCP endpoint is outside the configured egress allow-list",
+            details={"server": spec.id},
+        ) from exc
+
+    try:
+        records = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise McpUnavailable("MCP endpoint DNS lookup failed", details={"server": spec.id}) from exc
+
+    addresses = set()
+    for record in records:
+        try:
+            address = ipaddress.ip_address(record[4][0].split("%", 1)[0])
+        except (ValueError, IndexError, TypeError) as exc:
+            raise McpUnavailable("MCP endpoint returned an invalid DNS address", details={"server": spec.id}) from exc
+        addresses.add(address)
+
+    if not addresses or any(not address.is_global for address in addresses):
+        raise McpUnavailable(
+            "MCP endpoint resolves to a private, reserved or non-public address",
+            details={"server": spec.id},
+        )
+
+
 class HttpTransport:
     """Streamable HTTP: one endpoint, POST for requests, SSE for streams."""
 
@@ -302,6 +364,7 @@ class HttpTransport:
         @asynccontextmanager
         async def _open():
             try:
+                await asyncio.to_thread(_validate_http_endpoint, self.spec)
                 async with _http_client(
                     self.spec.url, http_client=_http_client_with_headers(self.spec)
                 ) as streams:
@@ -328,8 +391,6 @@ def _http_client_with_headers(spec: ServerSpec) -> Any:
     custom headers go on a pre-configured client. Returning ``None`` when there
     are no headers lets the SDK use its own recommended timeouts.
     """
-    if not spec.headers:
-        return None
     try:
         import httpx2
     except ImportError:  # pragma: no cover - httpx2 ships with the SDK
@@ -338,6 +399,7 @@ def _http_client_with_headers(spec: ServerSpec) -> Any:
         headers=dict(spec.headers),
         timeout=httpx2.Timeout(spec.timeout_s, read=spec.timeout_s),
         follow_redirects=False,
+        trust_env=False,
     )
 
 

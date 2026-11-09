@@ -172,8 +172,6 @@ const heroEl = req<HTMLElement>("#hero");
 const heroWakeButton = req<HTMLButtonElement>("#hero-wake");
 const suggestionsEl = req<HTMLElement>("#suggestions");
 const greetingEl = req<HTMLElement>("#greeting");
-const canvas = req<HTMLCanvasElement>("#avatar");
-const haloEl = req<HTMLElement>(".halo");
 const composer = req<HTMLFormElement>("#composer");
 const promptEl = req<HTMLTextAreaElement>("#prompt");
 const sendBtn = req<HTMLButtonElement>("#send-btn");
@@ -3538,12 +3536,6 @@ async function submit(raw: string): Promise<void> {
  * Avatar (the hero) - rendered only while it is on screen
  * ------------------------------------------------------------------ */
 
-let speaking = false;
-let thinking = false;
-let avatarTheme: ((theme: Theme) => void) | null = null;
-let avatarResize: (() => void) | null = null;
-let avatarSync: (() => void) | null = null;
-let avatarInit: Promise<void> | null = null;
 
 function applyTheme(id: ThemeId): void {
   const theme = THEMES[id];
@@ -3553,194 +3545,18 @@ function applyTheme(id: ThemeId): void {
   css.setProperty("--accent-bright", theme.bright);
   css.setProperty("--accent-glow", `#${theme.accent.toString(16).padStart(6, "0")}55`);
   css.setProperty("--eye", theme.bright);
-  avatarTheme?.(theme);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#080609");
   for (const button of themesEl.querySelectorAll<HTMLButtonElement>(".theme")) {
     button.setAttribute("aria-pressed", String(button.dataset.theme === id));
   }
 }
 
-async function initializeAvatar(): Promise<void> {
-  if (avatarInit) return avatarInit;
-  avatarInit = (async () => {
-    try {
-      const context = canvas.getContext("webgl2", { antialias: true, alpha: true, powerPreference: "high-performance" });
-      if (!context) throw new Error("WebGL2 is unavailable in this WebView");
-      const THREE = await import("three");
-      const renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
-      const scene3d = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      camera.position.set(0, 0, 4.35);
-      const coreLight = new THREE.PointLight(0xff263b, 3.2, 5.5);
-      coreLight.position.set(0, 0, 0.35);
-      const rimLight = new THREE.DirectionalLight(0xff3448, 2.2);
-      rimLight.position.set(-3, 2, -2);
-      scene3d.add(coreLight, rimLight, new THREE.AmbientLight(0x28232a, 0.7));
-
-      const heart = new THREE.Group();
-      scene3d.add(heart);
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.67, 48, 36), new THREE.MeshPhysicalMaterial({ color: 0x8e071a, emissive: 0xd20d2b, emissiveIntensity: 1.45, roughness: 0.28, metalness: 0.18, clearcoat: 0.9 }));
-      heart.add(core);
-      const plasma = new THREE.Mesh(new THREE.IcosahedronGeometry(0.61, 3), new THREE.MeshBasicMaterial({ color: 0xff263b, wireframe: true, transparent: true, opacity: 0.28 }));
-      const plasmaInner = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 2), new THREE.MeshBasicMaterial({ color: 0xff6a72, wireframe: true, transparent: true, opacity: 0.2 }));
-      heart.add(plasma, plasmaInner);
-
-      const shell = new THREE.Group();
-      heart.add(shell);
-      const shardCount = 1050;
-      const shardGeometry = new THREE.BoxGeometry(0.052, 0.032, 0.018);
-      const rimGeometry = new THREE.BoxGeometry(0.061, 0.041, 0.012);
-      const shardMaterial = new THREE.MeshStandardMaterial({ color: 0x09090d, metalness: 0.96, roughness: 0.24, flatShading: true });
-      const rimMaterial = new THREE.MeshBasicMaterial({ color: 0xc80f2b, transparent: true, opacity: 0.88 });
-      const rims = new THREE.InstancedMesh(rimGeometry, rimMaterial, shardCount);
-      const shards = new THREE.InstancedMesh(shardGeometry, shardMaterial, shardCount);
-      const normal = new THREE.Vector3();
-      const position = new THREE.Vector3();
-      const scale = new THREE.Vector3();
-      const quaternion = new THREE.Quaternion();
-      const matrix = new THREE.Matrix4();
-      const outward = new THREE.Vector3(0, 0, 1);
-      for (let i = 0; i < shardCount; i += 1) {
-        const y = 1 - (i / (shardCount - 1)) * 2;
-        const ring = Math.sqrt(Math.max(0, 1 - y * y));
-        const theta = Math.PI * (3 - Math.sqrt(5)) * i;
-        normal.set(Math.cos(theta) * ring, y, Math.sin(theta) * ring).normalize();
-        quaternion.setFromUnitVectors(outward, normal);
-        quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(normal, (i % 13) * 0.41));
-        const size = 0.72 + ((i * 17) % 11) / 18;
-        position.copy(normal).multiplyScalar(0.99 + (i % 7) * 0.004);
-        scale.set(size, size, 1);
-        matrix.compose(position, quaternion, scale);
-        rims.setMatrixAt(i, matrix);
-        position.copy(normal).multiplyScalar(1.004 + (i % 7) * 0.004);
-        scale.set(size * 0.88, size * 0.84, 1);
-        matrix.compose(position, quaternion, scale);
-        shards.setMatrixAt(i, matrix);
-      }
-      rims.instanceMatrix.needsUpdate = true;
-      shards.instanceMatrix.needsUpdate = true;
-      shell.add(rims, shards);
-
-      const threads = new THREE.Group();
-      const threadMaterial = new THREE.LineBasicMaterial({ color: 0xf21d3b, transparent: true, opacity: 0.42 });
-      const addThread = (points: InstanceType<typeof THREE.Vector3>[]): void => {
-        threads.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), threadMaterial));
-      };
-      for (const latitude of [-0.95, -0.68, -0.32, 0, 0.32, 0.68, 0.95]) {
-        const radius = Math.sqrt(1 - latitude * latitude) * 1.035;
-        const points: InstanceType<typeof THREE.Vector3>[] = [];
-        for (let step = 0; step <= 96; step += 1) {
-          const angle = (step / 96) * Math.PI * 2;
-          points.push(new THREE.Vector3(Math.cos(angle) * radius, latitude * 1.035, Math.sin(angle) * radius));
-        }
-        addThread(points);
-      }
-      for (let meridian = 0; meridian < 10; meridian += 1) {
-        const angle = (meridian / 10) * Math.PI * 2;
-        const points: InstanceType<typeof THREE.Vector3>[] = [];
-        for (let step = 0; step <= 64; step += 1) {
-          const phi = (step / 64) * Math.PI;
-          points.push(new THREE.Vector3(Math.sin(phi) * Math.cos(angle) * 1.035, Math.cos(phi) * 1.035, Math.sin(phi) * Math.sin(angle) * 1.035));
-        }
-        addThread(points);
-      }
-      shell.add(threads);
-
-      const dustPositions = new Float32Array(720 * 3);
-      for (let i = 0; i < 720; i += 1) {
-        const radius = 1.12 + Math.random() * 0.34;
-        const y = Math.random() * 2 - 1;
-        const angle = Math.random() * Math.PI * 2;
-        const ring = Math.sqrt(1 - y * y);
-        dustPositions[i * 3] = Math.cos(angle) * ring * radius;
-        dustPositions[i * 3 + 1] = y * radius;
-        dustPositions[i * 3 + 2] = Math.sin(angle) * ring * radius;
-      }
-      const dustGeometry = new THREE.BufferGeometry();
-      dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
-      const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xff5362, size: 0.012, transparent: true, opacity: 0.72 }));
-      heart.add(dust);
-
-      let visible = true;
-      let looping = false;
-      const clock = new THREE.Clock();
-      const resizeAvatar = (): void => {
-        const rect = canvas.getBoundingClientRect();
-        const w = Math.max(1, Math.floor(rect.width));
-        const h = Math.max(1, Math.floor(rect.height));
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      };
-      const frame = (): void => {
-        if (!visible) { looping = false; return; }
-        const dt = Math.min(clock.getDelta(), 0.05);
-        const t = clock.elapsedTime;
-        const active = speaking || thinking;
-        heart.scale.setScalar(1 + Math.sin(t * 1.35) * 0.03);
-        heart.rotation.y = Math.sin(t * 0.22) * 0.1;
-        core.rotation.y = t * 0.12;
-        plasma.rotation.set(t * 0.11, -t * 0.18, t * 0.07);
-        plasmaInner.rotation.set(-t * 0.16, t * 0.21, -t * 0.1);
-        shell.rotation.y = t * (active ? 0.16 : 0.055);
-        shell.rotation.x = Math.sin(t * 0.17) * 0.045;
-        dust.rotation.y = -t * 0.025;
-        core.material.emissiveIntensity = 1.25 + Math.sin(t * (active ? 7 : 1.4)) * (active ? 0.5 : 0.16);
-        threadMaterial.opacity = 0.3 + (Math.sin(t * 1.8) + 1) * 0.08;
-        if (app.dataset.health === "broken") {
-          core.material.emissiveIntensity = 0.12;
-          rimMaterial.opacity = Math.sin(t * 17) > 0.35 ? 0.7 : 0.05;
-          threadMaterial.opacity = Math.sin(t * 17) > 0.35 ? 0.5 : 0.04;
-        } else {
-          rimMaterial.opacity = 0.82;
-        }
-        renderer.render(scene3d, camera);
-        requestAnimationFrame(frame);
-      };
-      avatarTheme = () => {
-        core.material.color.setHex(0x8e071a);
-        core.material.emissive.setHex(0xd20d2b);
-        plasma.material.color.setHex(0xff263b);
-        plasmaInner.material.color.setHex(0xff6a72);
-        rimMaterial.color.setHex(0xc80f2b);
-        threadMaterial.color.setHex(0xf21d3b);
-        rimLight.color.setHex(0xff3448);
-        coreLight.color.setHex(0xff263b);
-      };
-      avatarResize = resizeAvatar;
-      avatarSync = () => {
-        visible = app.dataset.chatting !== "true" && !document.hidden;
-        if (visible && !looping) { looping = true; clock.getDelta(); requestAnimationFrame(frame); }
-      };
-      new ResizeObserver(resizeAvatar).observe(canvas);
-      resizeAvatar();
-      avatarTheme(THEMES[settings.theme]);
-      avatarSync();
-    } catch (error) {
-      avatarInit = null;
-      console.warn("Ultron core could not be initialized; using the CSS core fallback", error);
-      const stage = canvas.closest<HTMLElement>(".stage");
-      if (stage) stage.dataset.coreFallback = "true";
-      canvas.hidden = true;
-    }
-  })();
-  return avatarInit;
-}
-
-function resize(): void {
-  avatarResize?.();
-}
-
-/** Load the 3D engine only when the hero is actually visible. */
 function syncRender(): void {
-  // ULTRON uses a text-first interface; no avatar, orb or ambient renderer.
-  haloEl.dataset.active = String(speaking || thinking);
+  // ULTRON is text-first. No avatar, orb, WebGL scene or ambient renderer.
 }
 
 function setThinking(next: boolean): void {
-  thinking = next;
-  haloEl.dataset.active = String(speaking || thinking);
+  app.dataset.thinking = String(next);
 }
 
 /* ------------------------------------------------------------------ *
@@ -3766,8 +3582,7 @@ function speak(text: string): void {
     ?? voices.find((v) => /^en/i.test(v.lang));
   if (voice) utterance.voice = voice;
   const set = (on: boolean): void => {
-    speaking = on;
-    haloEl.dataset.active = String(speaking || thinking);
+    app.dataset.speaking = String(on);
   };
   utterance.onstart = () => set(true);
   utterance.onend = () => set(false);
@@ -4656,8 +4471,7 @@ for (const [label, prompt] of SUGGESTIONS) {
   suggestionsEl.appendChild(card);
 }
 
-const hour = new Date().getHours();
-greetingEl.textContent = (hour < 5 ? "Still awake" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") + ".";
+greetingEl.textContent = "How can I help?";
 
 chatAttachButton.addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter" || (event as KeyboardEvent).key === " ") { event.preventDefault(); chatFileInput.click(); } });
 chatFileInput.addEventListener("change", async () => {
@@ -5156,7 +4970,6 @@ jumpBtn.addEventListener("click", () => scrollToEnd());
 
 // The hero avatar is tappable: it says a line, the fastest way to hear it work.
 const PRESETS = ["Ultron online. All systems nominal.", "Awaiting your objective.", "The brain may change. My standards do not.", ULTRON_MOTTO + "."];
-canvas.addEventListener("pointerdown", () => speak(PRESETS[Math.floor(Math.random() * PRESETS.length)] ?? PRESETS[0]!));
 
 type UltronRecognition = {
   lang: string;

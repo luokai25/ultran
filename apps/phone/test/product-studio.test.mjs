@@ -44,6 +44,9 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
+  assert.match(source, /isFreeGoogleSearchModel/);
+  assert.match(source, /free_google_search_daily_cap_reached/);
+  assert.ok(source.includes("count ?? 0) >= 200"));
   assert.match(source, /x-goog-api-key/);
   assert.ok(!source.includes("generateContent?key="));
   assert.match(source, /callStudioStreaming/);

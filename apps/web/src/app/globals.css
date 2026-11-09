@@ -13,7 +13,7 @@
 }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; margin: 0; background: var(--bg); color: var(--text); }
-body { font: 400 14px/1.55 inherit; -webkit-font-smoothing: antialiased; }
+body { font-family: inherit; font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); }
 button, input, textarea, select { font: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

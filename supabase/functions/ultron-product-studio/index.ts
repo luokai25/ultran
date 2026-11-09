@@ -302,6 +302,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   if (error) throw error;
   if (!project) throw new Error("product_project_not_found");
   if (project.status === "cancelled" || project.status === "paused") return { skipped: true, status: project.status };
+  const target = Number(project.research_target) || 200;
   const request = clean(project.user_request, 4000) || "Find a practical, underserved problem people are willing to pay to solve. Choose a focused digital product opportunity.";
   const hasBrief = isObject(project.opportunity_brief) && Boolean(project.opportunity_brief.selected_topic);
   let opportunity: Record<string, unknown>;

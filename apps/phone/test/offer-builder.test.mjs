@@ -37,15 +37,15 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
     const marker = "const " + name + " = [";
     const start = host.indexOf(marker);
     assert.notEqual(start, -1, name + " patch exists");
-    const end = host.indexOf('].join("\\n");', start);
+    const end = host.indexOf("].join(", start);
     assert.notEqual(end, -1, name + " patch closes");
-    return host.slice(start + marker.length, end).split("\\n")
+    return host.slice(start + marker.length, end).split(/\\r?\\n/)
       .map((line) => line.trim().replace(/,$/, ""))
       .filter(Boolean)
       .map((line) => JSON.parse(line))
-      .join("\\n");
+      .join(String.fromCharCode(10));
   };
-  assert.doesNotThrow(() => new Function(extractInjectedCode("summaryStep") + "\\n" + extractInjectedCode("manuscriptStep")));
+  assert.doesNotThrow(() => new Function(extractInjectedCode("summaryStep") + String.fromCharCode(10) + extractInjectedCode("manuscriptStep")));
   assert.match(backend, /functions\/v1\/ultron-brain/);
   assert.match(backend, /action: "chat"/);
   assert.match(backend, /offer_builder/);

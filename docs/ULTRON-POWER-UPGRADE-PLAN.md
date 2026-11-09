@@ -30,7 +30,7 @@ This is not a greenfield MCP project. The repository already contains:
 3. **Grant persistence is weaker than approval persistence.** Approval records can use SQLite persistence; the HMAC GrantStore itself is process-memory only and its signing key is generated at startup.
 4. **MCP audit history is process-local.** The gateway's recent audit entries are held in memory rather than a durable, owner-scoped event stream.
 5. **The canonical phone UI's cloud connector flow is Composio-oriented.** It can list/connect/disconnect Composio accounts and tools, but it does not yet provide a complete native MCP server manager with endpoint registration, transport selection, probe, trust/pin review, tool permissions and lifecycle.
-6. **The standalone Python control plane is local-first, not an internet-facing authenticated API.** Its workspace is selected by `X-Ultron-Workspace`; the repository documentation explicitly warns that this is not end-user authentication. It defaults to loopback, which is appropriate for local development. Do not expose its mutating MCP routes publicly until a real authentication and authorization boundary is added.
+6. **CRITICAL PRODUCTION SECURITY GAP: the Hetzner Caddy configuration reverse-proxies public HTTPS traffic to FastAPI, but the Python API currently has no end-user authentication middleware.** `X-Ultron-Workspace` is a workspace selector, not authentication. The `/v1/mcp` administration routes are therefore not safe to expose through the public Caddy proxy. Treat the Hetzner deployment as blocked until the API validates the Supabase owner session (or an equivalently strong per-device credential) on every non-health route, binds authorization to the single `ultron_instance.owner_id`, and has tests for unauthenticated, wrong-owner and expired-token requests. Do not deploy the MCP management UI or remote MCP invocation over this public API before that gate is closed.
 7. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
 
 ## Target architecture
@@ -113,7 +113,7 @@ Required MCP manager states:
 **Exit criteria:** the server-definition persistence and encryption tests are added. Full backend CI must pass before this step is considered verified. Remaining Phase 1 work: durable grant signing material, durable audit history, and restart/revocation/single-use regression tests.
 
 ### Phase 2 — authenticated cloud MCP bridge
-**Next implementation target.** Design the cloud registry and remote Streamable HTTP bridge with strict egress protections before enabling endpoint invocation.
+**Next implementation target.** First close the critical FastAPI production authentication gap described in the audit. Then design the cloud registry and remote Streamable HTTP bridge with strict egress protections before enabling endpoint invocation.
 1. Add owner-scoped Supabase schema for remote MCP server metadata and discovered tools.
 2. Add authenticated Edge Function operations for register, probe, list, enable/disable and invoke.
 3. Implement Streamable HTTP client with SSRF-safe egress and strict resource limits.

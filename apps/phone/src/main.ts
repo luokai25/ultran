@@ -40,7 +40,6 @@ import { captureExplicitKnowledge } from "./ultron-knowledge-capture";
 import { auditUltronIdentityOutput, buildUltronSelfModelPrompt, summarizeIdentityAudit } from "./ultron-self-model";
 import { buildUltronGoalPrompt, createUltronGoalGraph } from "./ultron-goals";
 import { createLearningLedger, validateLearningLedger, recordLearningEvent, proposeLearningImprovement, approveLearningProposal, transitionLearningProposal, buildLearningContext, selectIndependentLearningEvidence, type LearningLedger, type ImprovementProposal } from "./ultron-learning";
-import { markDataUrl, markSvg } from "./mark";
 import {
   cloudClient,
   getCloudSession,
@@ -287,13 +286,7 @@ const cloudFreeProviderCountEl = req<HTMLElement>("#cloud-free-provider-count");
 const cloudFreeProvidersRefreshButton = req<HTMLButtonElement>("#cloud-free-providers-refresh");
 const themesEl = req<HTMLElement>("#themes");
 
-req<HTMLElement>("#brand-mark").innerHTML = markSvg(22);
-req<HTMLElement>("#drawer-mark").innerHTML = markSvg(20);
-req<HTMLElement>(".identity-symbol").innerHTML = markSvg(38);
-const favicon = document.createElement("link");
-favicon.rel = "icon";
-favicon.href = markDataUrl();
-document.head.append(favicon);
+req<HTMLElement>("#identity-cards").querySelector(".identity-symbol")?.replaceChildren(document.createTextNode("ULTRON"));
 
 /* ------------------------------------------------------------------ *
  * Persistence (a WebView can refuse storage; never let that break the app)
@@ -1089,8 +1082,7 @@ function messageNode(message: Message): { root: HTMLElement; body: HTMLElement }
   if (message.role === "assistant") {
     const who = document.createElement("div");
     who.className = "who";
-    who.innerHTML = markSvg(14);
-    who.append(document.createTextNode("Ultron"));
+    who.textContent = "ULTRON";
     root.appendChild(who);
   }
   root.appendChild(body);

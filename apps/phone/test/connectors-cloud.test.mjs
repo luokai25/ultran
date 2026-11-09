@@ -109,7 +109,10 @@ test("Google OAuth reserves a browser tab during the click before the async gate
  assert.match(main,/window\.open\("about:blank", "_blank"\)/);
  assert.match(main,/popup\.location\.replace\(url\)/);
  assert.match(main,/window\.location\.assign\(url\)/);
- assert.ok(screen.indexOf("preparedExternal = deps.prepareExternal?.() ?? null;") < screen.indexOf("cloudLinked = await deps.linked();"), "the popup must be reserved before any awaited owner-session check");
+ const clickStart = screen.indexOf('act.addEventListener("click"');
+ const clickEnd = screen.indexOf("buttons.append(close)", clickStart);
+ const oauthClick = screen.slice(clickStart, clickEnd);
+ assert.ok(oauthClick.indexOf("preparedExternal = deps.prepareExternal?.() ?? null;") < oauthClick.indexOf("cloudLinked = await deps.linked();"), "the popup must be reserved before any awaited owner-session check");
 });
 test("Google Connect stays clickable and opens owner sign-in when no cloud session exists",()=>{
  assert.match(screen,/entry\.auth === "oauth2" \? true : deps\.backendLinked\(\)/);

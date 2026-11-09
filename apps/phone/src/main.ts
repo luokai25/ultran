@@ -4183,7 +4183,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     const goal = priorRun && typeof priorRun.goal === "string" ? priorRun.goal : task;
     const profile = profileTask(goal);
     const taskProfile = classifyUltronTask(goal, { continuation: Boolean(priorRun) });
-    const explicitWork = /\b(build|implement|debug|fix|research|search|run|execute|create|deploy|test|inspect|check|list|download|install|update|continue|resume|migrate|refactor)\b/i.test(goal)
+    const explicitWork = /\b(build|implement|debug|fix|research|search|run|execute|create|deploy|test|inspect|check|list|download|install|update|continue|resume|migrate|refactor|read|show|find|open|send|reply|draft|compose|upload|share|move|delete|archive|mark|label|write|comment|make|connect|use)\b/i.test(goal)
       && !/^(what|why|when|where|who|which|how|explain|describe|define)\b/i.test(goal.trim());
     const usePrometheus = Boolean(priorRun) || profile.tier === "deep" || profile.tier === "critical" || taskProfile.depth === "deep" || explicitWork;
     const cloudMaxTokens = profile.tier === "critical" || profile.tier === "deep" ? 4096 : profile.tier === "standard" ? 2048 : 1024;

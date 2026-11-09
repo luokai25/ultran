@@ -90,3 +90,8 @@ test("connector write permissions are owner-scoped, revocable and checked before
  assert.match(screen,/Allow without asking/);
  assert.match(main,/Never call a write tool unless allowed is true/);
 });
+
+test("simple Google and productivity actions enter the tool-capable agent path",()=>{
+ assert.match(main,/refactor\|read\|show\|find\|open\|send\|reply\|draft\|compose\|upload/);
+ assert.match(main,/const usePrometheus = .*explicitWork/);
+});

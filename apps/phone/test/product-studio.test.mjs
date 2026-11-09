@@ -52,6 +52,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /callStudioStreaming/);
   assert.match(source, /x-goog-api-key/);
   assert.match(source, /canonicalReferences/);
+  assert.match(source, /body_external_links_match_sources/);
   assert.match(source, /productFormatGuidance/);
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);
@@ -76,7 +77,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /body_external_links_match_sources/);
   assert.match(source, /bodyMarkdownLinks/);
   assert.match(source, /quality_checks_passed/);
-  assert.ok(source.includes("const deadline = Date.now() + 12_000"));
+  assert.ok(source.includes("withSearch ? 12_000 : 32_000"));
+  assert.ok(source.includes("Math.min(withSearch ? 10_000 : 30_000"));
   assert.ok(source.includes("const deadline = Date.now() + 55_000"));
   assert.match(source, /product_project_stopped/);
   assert.ok(source.includes('.eq("status", "validating")'));

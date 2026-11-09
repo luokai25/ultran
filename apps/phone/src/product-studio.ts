@@ -158,7 +158,11 @@ function renderDetail(detail: ProductDetail): void {
   renderDocuments(detail.documents ?? []);
   const preview = el<HTMLIFrameElement>("product-studio-preview");
   if (project.preview_html) {
-    preview.srcdoc = project.preview_html;
+    if (lastPreviewProjectId !== project.id || lastPreviewHtml !== project.preview_html) {
+      preview.srcdoc = project.preview_html;
+      lastPreviewProjectId = project.id;
+      lastPreviewHtml = project.preview_html;
+    }
     preview.hidden = false;
     el<HTMLElement>("product-studio-preview-empty").hidden = true;
   } else {

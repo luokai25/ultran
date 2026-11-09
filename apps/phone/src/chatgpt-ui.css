@@ -114,7 +114,7 @@ pre code { padding:0; background:transparent; }
 .history button { width:100%; min-height:38px; overflow:hidden; padding:7px 10px; border:0; border-radius:8px; background:transparent; color:var(--text-secondary); text-align:left; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 .history button:hover, .history button[aria-current="true"] { background:var(--surface-raised); color:var(--text); }
 .drawer-foot { display:flex; flex-direction:column; gap:2px; margin-top:auto; padding-top:12px; border-top:1px solid var(--border); }
-.scrim { position:fixed; z-index:45; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(2px); }
+.scrim { position:fixed; z-index:45; inset:0; background:rgba(0,0,0,.55);  }
 .bottom-nav { display:none; }
 .feature-screen, #connectors-panel, #workspace-panel, .panel { position:fixed; z-index:30; inset:54px 0 0; overflow:auto; padding:28px max(20px,calc((100% - 980px)/2)) calc(32px + var(--safe-bottom)); background:var(--bg); }
 .feature-head, .panel-head, .workspace-head { position:sticky; top:-28px; z-index:5; display:flex; align-items:flex-start; gap:14px; justify-content:space-between; margin:-28px 0 24px; padding:24px 0 16px; border-bottom:1px solid var(--border); background:var(--bg); }
@@ -271,6 +271,6 @@ progress { width:100%; accent-color:var(--accent); }
 
 .attachment-preview { max-height:88px; overflow-y:auto; }
 .attachment-thumb { width:56px; height:56px; object-fit:cover; }
-.attachment-chip { max-width:min(100%,320px); max-height:68px; overflow:hidden; }
+.attachment-chip { max-width:min(100%, 320px); max-height:68px; overflow:hidden; }
 .attachment-chip .attachment-snippet, .message-attachment .attachment-snippet { display:none; }
 .message-attachment { max-height:68px; overflow:hidden; }

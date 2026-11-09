@@ -41,7 +41,7 @@ async function invoke(action: string, payload: Record<string, unknown> = {}): Pr
   return result;
 }
 function statusLabel(status: string, errorMessage: string | null = ""): string {
-  if (status === "waiting_for_provider" && errorMessage.includes("daily free Google Search")) return "Waiting for daily free-search reset";
+  if (status === "waiting_for_provider" && errorMessage?.includes("daily free Google Search")) return "Waiting for daily free-search reset";
   const labels: Record<string, string> = {
     queued: "Queued", identifying: "Identifying opportunity", researching: "Researching",
     synthesizing: "Synthesizing evidence", creating: "Creating product", validating: "Quality review",

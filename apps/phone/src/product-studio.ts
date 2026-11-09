@@ -142,6 +142,38 @@ function renderDocuments(documents: ProductDetail["documents"]): void {
     list.append(row);
   }
 }
+function renderQuality(project: ProductProject): void {
+  const panel = el<HTMLElement>("product-studio-quality");
+  panel.replaceChildren();
+  const validation = isRecord(project.synthesis_summary?.validation) ? project.synthesis_summary.validation : null;
+  if (!validation) {
+    panel.append(node("p", "product-studio-empty", "Checks run after ULTRON finishes the first draft."));
+    return;
+  }
+  const checks: Array<[string, string]> = [
+    ["minimum_length_passed", "Minimum product length"],
+    ["minimum_word_count_passed", "At least 700 words"],
+    ["references_section", "References section"],
+    ["source_citations_match", "Citation numbers match the source register"],
+    ["contents_section", "Contents section"],
+    ["actionable_workflow", "Actionable workflow"],
+    ["reusable_asset", "Reusable template or checklist"],
+    ["limitations_and_next_steps", "Limitations and next steps"],
+    ["placeholder_free", "No unfinished placeholders"],
+  ];
+  const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed");
+  panel.append(summary);
+  for (const [key, label] of checks) {
+    const passed = validation[key] === true;
+    const row = node("div", "product-quality-row");
+    row.append(node("span", "product-quality-mark " + (passed ? "is-passed" : "is-pending"), passed ? "PASS" : "REVIEW"));
+    row.append(node("span", "product-quality-label", label));
+    panel.append(row);
+  }
+  if (validation.quality_checks_passed !== true) {
+    panel.append(node("p", "product-studio-quality-note", "This draft is saved, but it did not pass every quality gate. Improve it before publishing or selling."));
+  }
+}
 function renderOpportunity(project: ProductProject): void {
   const panel = el<HTMLElement>("product-studio-opportunity");
   panel.replaceChildren();
@@ -152,6 +184,12 @@ function renderOpportunity(project: ProductProject): void {
     const metric = node("div", "product-opportunity-score");
     metric.append(node("strong", "", String(Math.max(0, Math.min(100, Math.round(score)))) + " / 100"), node("span", "", "Opportunity score · " + String(brief.confidence ?? "unrated") + " confidence"));
     panel.append(metric);
+  }
+  const score = Number(brief.opportunity_score);
+  if (Number.isFinite(score) && score > 0) {
+    const item = node("div", "product-opportunity-item");
+    item.append(node("strong", "", "Opportunity score"), node("p", "", String(Math.round(score)) + " / 100 · " + String(brief.confidence ?? "unrated") + " confidence"));
+    panel.append(item);
   }
   const fields: Array<[string, unknown]> = [
     ["Topic", brief.selected_topic], ["Audience", brief.audience], ["Problem", brief.problem],
@@ -223,6 +261,7 @@ function renderDetail(detail: ProductDetail): void {
   el<HTMLElement>("product-studio-stage").textContent = project.active_stage.replace(/_/g, " ");
   el<HTMLElement>("product-studio-coverage").textContent = " · " + String(project.source_counts?.analyzed ?? 0) + " / " + String(project.research_target) + " analyzed";
   renderCounts(project.source_counts ?? {});
+  renderQuality(project);
   renderEvents(detail.events ?? []);
   renderSources(detail.sources ?? []);
   renderDocuments(detail.documents ?? []);

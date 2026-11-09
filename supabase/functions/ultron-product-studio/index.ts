@@ -787,11 +787,11 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const productBody = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
-  const citationIndexes = [...productBody.matchAll(/\\[(\\d+)\\]/g)].map(match => Number(match[1]));
+  const citationIndexes = [...productBody.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
   const sourceUrlSet = new Set(evidence.map(item => {
     try { const url = new URL(item.url); url.hash = ""; return url.toString(); } catch { return ""; }
   }));
-  const bodyMarkdownLinks = [...productBody.matchAll(/\\[[^\\]]+\\]\\((https?:\\/\\/[^)\\s]+)\\)/gi)].map(match => match[1].replace(/[.,;:!?]+$/, ""));
+  const bodyMarkdownLinks = [...productBody.matchAll(/\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/gi)].map(match => match[1].replace(/[.,;:!?]+$/, ""));
   const bodyExternalLinksMatchSources = bodyMarkdownLinks.every(value => {
     try { const url = new URL(value); url.hash = ""; return sourceUrlSet.has(url.toString()); } catch { return false; }
   });

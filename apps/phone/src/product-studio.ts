@@ -166,6 +166,7 @@ function renderQuality(project: ProductProject): void {
     ["minimum_word_count_passed", "At least 700 words"],
     ["references_section", "References section"],
     ["source_citations_match", "Citation numbers match the source register"],
+    ["body_external_links_match_sources", "External links match researched sources"],
     ["contents_section", "Contents section"],
     ["actionable_workflow", "Actionable workflow"],
     ["reusable_asset", "Reusable template or checklist"],

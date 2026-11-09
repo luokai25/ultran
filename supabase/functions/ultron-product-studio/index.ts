@@ -483,7 +483,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const markdown = draft.text.replace(/^\s*```(?:markdown|md)?/i, "").replace(/```\s*$/, "").trim();
   if (markdown.length < 1800) throw new Error("product_draft_too_short_for_quality_gate");
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
-  const validation = { minimum_length_passed: markdown.length >= 1800, references_section: /^#{1,3}\\s*(references|sources)\\s*$/im.test(markdown), citation_markers: [...markdown.matchAll(/\\[(\\d+)\\]/g)].length, analyzed_sources: counts.analyzed, requested_sources: target };
+  const validation = { minimum_length_passed: markdown.length >= 1800, references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown), citation_markers: [...markdown.matchAll(/\[(\d+)\]/g)].length, analyzed_sources: counts.analyzed, requested_sources: target };
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   const html = markdownPreview(markdown, title);
   const storagePath = ownerId + "/products/" + projectId + "/product-v1.md";

@@ -244,6 +244,12 @@ function isPublicResearchUrl(value: URL): boolean {
   }
   return true;
 }
+function robotsPathMatches(rulePath: string, path: string): boolean {
+  const exact = rulePath.endsWith("$");
+  const raw = exact ? rulePath.slice(0, -1) : rulePath;
+  const escaped = raw.split("*").map(part => part.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path: string }>> {")).join(".*");
+  return new RegExp("^" + escaped + (exact ? "$" : "")).test(path);
+}
 async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path: string }>> {
   const cached = robotsCache.get(origin);
   if (cached) return cached;
@@ -305,7 +311,7 @@ async function fetchPublicResearchPage(start: string): Promise<{ response: Respo
     if (!isPublicResearchUrl(current)) return { response: null, blocked: true };
     const rules = await robotsRules(current.origin);
     const path = current.pathname + current.search;
-    const matches = rules.filter(rule => path.startsWith(rule.path)).sort((a,b) => b.path.length - a.path.length);
+    const matches = rules.filter(rule => robotsPathMatches(rule.path, path)).sort((a,b) => b.path.length - a.path.length);
     if (matches[0] && !matches[0].allow) return { response: null, blocked: true };
     const response = await fetch(current.toString(), { headers: { "User-Agent": "ULTRON-Research/1.0", "Accept": "text/html,text/plain" }, signal: AbortSignal.timeout(8000), redirect: "manual" });
     if (response.status >= 300 && response.status < 400) {

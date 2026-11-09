@@ -31,12 +31,14 @@ async function authenticate(req: Request) {
   return { ownerId: data.user.id, db, authorization };
 }
 
-async function brain(authorization: string, system: string, prompt: string, maxTokens = 5000): Promise<string> {
+async function brain(authorization: string, system: string, prompt: string, maxTokens = 5000, internalWorker = false): Promise<string> {
   const response = await fetch(url + "/functions/v1/ultron-brain", {
     method: "POST",
-    headers: { Authorization: authorization, apikey: publishable, "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: internalWorker
+      ? { "x-ultron-cron-secret": authorization, "Content-Type": "application/json", Accept: "text/event-stream" }
+      : { Authorization: authorization, apikey: publishable, "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify({
-      action: "chat",
+      action: internalWorker ? "worker_chat" : "chat",
       messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
       max_tokens: maxTokens,
       temperature: 0.25,

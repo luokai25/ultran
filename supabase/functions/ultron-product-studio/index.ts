@@ -88,7 +88,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
       if (!response.ok) {
         lastError = "google_ai_http_" + response.status;
         if (response.status === 429) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: "rate_limited", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
+          await db.from("ultron_google_ai_studio_keys").update({ status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
         } else if (response.status === 401 || response.status === 403) {
           await db.from("ultron_google_ai_studio_keys").update({ status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status, last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
         }

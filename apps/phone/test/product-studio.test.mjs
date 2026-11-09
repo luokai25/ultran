@@ -123,6 +123,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
 test("Product Studio research obeys public crawl limits and streams safe previews", async () => {
   const source = await read("supabase/functions/ultron-product-studio/index.ts");
   assert.match(source, /robots\.txt/);
+  assert.equal(source.split('replace(/^www\\./, "")').length - 1, 3, "all source-domain normalization paths must strip www consistently");
   assert.match(source, /robotsPathMatches/);
   assert.match(source, /isPublicResearchUrl/);
   assert.match(source, /readPublicTextLimited/);

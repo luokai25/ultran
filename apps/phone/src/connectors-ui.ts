@@ -115,6 +115,7 @@ export function initConnectors(deps: Deps): void {
   let shown = PAGE;
   let enabled = new Set<string>();
   let oauthConnected = new Set<string>();
+  let composioConfigured = false;
   let remoteKnown = false;
   let detailReturnFocus: HTMLElement | null = null;
   let panelOpen = false;
@@ -394,9 +395,11 @@ export function initConnectors(deps: Deps): void {
   async function refreshOAuthConnections(): Promise<void> {
     const generation = refreshGeneration;
     oauthConnected = new Set();
+    composioConfigured = false;
     cloudLinked = await deps.linked();
     if (!cloudLinked) {
       composioHealth.dataset.state = "disconnected";
+      composioConfigured = false;
       composioHealthLabel.textContent = "Cloud account not connected";
       composioHealthDetail.textContent = "Sign in to the ULTRON owner account to manage provider connections.";
       return;
@@ -407,6 +410,7 @@ export function initConnectors(deps: Deps): void {
     try {
       const result = await listUltronConnectors();
       if (!panelOpen || generation !== refreshGeneration) return;
+      composioConfigured = result.configured === true;
       for (const connection of result.connections) {
         if (connection.toolkit_slug && connection.status === "connected") oauthConnected.add(connection.toolkit_slug);
       }
@@ -629,12 +633,14 @@ if (entry.auth === "oauth2") {
 
     const canAct = entry.auth === "oauth2" ? cloudLinked : deps.backendLinked();
     if (!canAct) {
-      note.textContent = "Link your Ultron backend in Settings to enable this connector.";
+      note.textContent = "Link your ULTRON cloud account in Settings to enable this connector.";
+    } else if (entry.auth === "oauth2" && !composioConfigured) {
+      note.textContent = "Add the Composio Project API key in OAuth gateway above before connecting Google.";
     }
 
     const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : entry.auth === "oauth2" ? (oauthOn ? "Reconnect account" : "Connect account") : on ? "Update key" : "Connect");
     act.type = "button";
-    act.disabled = !canAct;
+    act.disabled = !canAct || (entry.auth === "oauth2" && !composioConfigured);
     act.addEventListener("click", async () => {
       act.disabled = true;
       note.dataset.tone = "";

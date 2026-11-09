@@ -296,13 +296,15 @@ function renderDetail(detail: ProductDetail): void {
     download.href = detail.download_url;
     download.hidden = false;
   } else download.hidden = true;
+  const pause = el<HTMLButtonElement>("product-studio-pause");
+  pause.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging"].includes(project.status);
   const cancel = el<HTMLButtonElement>("product-studio-cancel");
   cancel.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const pause = el<HTMLButtonElement>("product-studio-pause");
   pause.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const resume = el<HTMLButtonElement>("product-studio-resume");
   resume.hidden = !["partial","failed","paused","waiting_for_provider"].includes(project.status);
-  resume.textContent = project.status === "partial" ? "Improve draft / continue" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : "Retry project";
+  resume.textContent = project.status === "partial" ? "Improve draft / continue" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : project.status === "paused" ? "Resume project" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
   warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "Review the actual source coverage and quality checks before publication.") : project.status === "waiting_for_provider" ? "ULTRON is waiting for an eligible free model. Search-grounded research needs Google AI Studio; synthesis and drafting can use any eligible connected free provider. Your project remains saved." : "");
@@ -404,6 +406,17 @@ export function initProductStudio(value: StudioOptions): void {
       await invoke("pause", { project_id: selectedProjectId });
       await loadProject(selectedProjectId);
       setNotice("Project paused at its next safe checkpoint. Its saved work is ready to resume.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not pause the project.", true); }
+    finally { button.disabled = false; }
+  });
+  el<HTMLButtonElement>("product-studio-pause").addEventListener("click", async () => {
+    if (!selectedProjectId) return;
+    const button = el<HTMLButtonElement>("product-studio-pause");
+    button.disabled = true;
+    try {
+      await invoke("pause", { project_id: selectedProjectId });
+      await loadProject(selectedProjectId);
+      setNotice("Project paused safely. Its saved research and draft are preserved.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not pause the project.", true); }
     finally { button.disabled = false; }
   });

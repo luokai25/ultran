@@ -641,7 +641,7 @@ Deno.serve(async (req: Request) => {
         throw jobError;
       }
       await auth.db.from("ultron_product_projects").update({ source_job_id: job.id }).eq("id", project.id);
-      await auth.db.from("ultron_product_events").insert({ owner_id: auth.id, project_id: project.id, stage: "identification", event_type: "job.queued", payload: { message: "Your product project is queued for ULTRON." } });
+      await addEvent(db, auth.id, project.id, "identification", "job.queued", { message: "Your product project is queued for ULTRON." });
       return json({ ok: true, project: { ...project, source_job_id: job.id } }, 201);
     }
     if (body.action === "list") {
@@ -696,7 +696,7 @@ Deno.serve(async (req: Request) => {
         source_job_id: job.id, updated_at: new Date().toISOString(),
       }).eq("owner_id", auth.id).eq("id", id).select("id,status,active_stage,progress").single();
       if (updateError) throw updateError;
-      await auth.db.from("ultron_product_events").insert({ owner_id: auth.id, project_id: id, stage: "research", event_type: "research.resumed", payload: { message: "A new research pass has been queued." } });
+      await addEvent(db, auth.id, id, "research", "research.resumed", { message: "A new research pass has been queued." });
       return json({ ok: true, project: updatedProject });
     }
     if (body.action === "cancel" || body.action === "pause") {
@@ -706,7 +706,7 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       if (!data) return json({ error: "project_not_active" }, 409);
       if (body.action === "cancel") await auth.db.from("ultron_jobs").update({ status: "cancelled", lock_token: null, lease_expires_at: null, completed_at: new Date().toISOString() }).eq("owner_id", auth.id).eq("id", (await auth.db.from("ultron_product_projects").select("source_job_id").eq("id", id).single()).data?.source_job_id).in("status", ["queued","retry_wait","running"]);
-      await auth.db.from("ultron_product_events").insert({ owner_id: auth.id, project_id: id, stage: "system", event_type: body.action === "cancel" ? "job.cancelled" : "job.paused", payload: {} });
+      await addEvent(db, auth.id, id, "system", body.action === "cancel" ? "job.cancelled" : "job.paused", {});
       return json({ ok: true, project: data });
     }
     return json({ error: "unknown_action" }, 400);

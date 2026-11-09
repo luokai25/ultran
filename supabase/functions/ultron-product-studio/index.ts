@@ -483,13 +483,13 @@ async function runWithProviderWait<T>(ownerId: string, projectId: string, stage:
   try { return await task(); }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/free_google_search_daily_cap_reached|no_free_google_search_model_available|no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|_http_429|HTTP 429/i.test(message)) {
+    if (/no_free_google_search_model_available|no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|_http_429|HTTP 429/i.test(message)) {
       const db = service();
       const currentStatus = await projectStopStatus(ownerId, projectId);
       if (!["cancelled","paused","missing"].includes(currentStatus)) {
         const { data: waitingProject, error: waitingError } = await db.from("ultron_product_projects").update({
           status: "waiting_for_provider", active_stage: stage,
-          error_message: message.includes("free_google_search_daily_cap_reached") ? "ULTRON reached its safe daily free Google Search grounding budget. It will retry after the daily quota resets. No paid search requests are sent." : "No eligible free model is available right now. ULTRON will retry automatically when a connected provider becomes available.",
+          error_message: "No eligible connected provider is available right now. ULTRON will retry automatically when a key or provider becomes available.",
           updated_at: new Date().toISOString(),
         }).eq("id", projectId).eq("owner_id", ownerId)
           .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])

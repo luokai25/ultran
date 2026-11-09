@@ -341,9 +341,11 @@
           <input id="mcp-server-name" type="text" maxlength="96" autocomplete="off" placeholder="Example: My Research Tools" />
           <label for="mcp-server-url">Remote MCP HTTPS endpoint</label>
           <input id="mcp-server-url" type="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/mcp" />
-          <label for="mcp-server-token">Bearer token <span class="muted-inline">optional</span></label>
-          <input id="mcp-server-token" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Only if your MCP server requires it" />
-          <small>Tokens are sent to your ULTRON backend and stored only in its encrypted MCP registry. They are never shown again or saved on this phone. HTTPS only; private and local network destinations remain blocked.</small>
+          <label for="mcp-server-header">Authentication header <span class="muted-inline">optional</span></label>
+          <input id="mcp-server-header" type="text" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" value="Authorization" placeholder="Authorization or X-API-Key" />
+          <label for="mcp-server-token">Header value <span class="muted-inline">optional</span></label>
+          <input id="mcp-server-token" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste token or API key only" />
+          <small>For Authorization, paste the token only and ULTRON adds “Bearer”. For custom API-key headers, the value is sent as entered. Credentials are stored only in the encrypted backend registry, never in browser storage. HTTPS only; private and local network destinations remain blocked.</small>
           <button id="mcp-server-add" class="solid" type="button">Connect and inspect tools</button>
           <small id="mcp-server-status" role="status" aria-live="polite">No remote MCP servers loaded yet.</small>
           <div id="mcp-server-list" class="mcp-server-list"><p class="conn-empty">Your connected MCP servers will appear here.</p></div>

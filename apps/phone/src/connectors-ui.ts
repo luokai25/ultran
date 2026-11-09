@@ -89,6 +89,7 @@ export function initConnectors(deps: Deps): void {
   const composioKeyStatus = need<HTMLElement>("#composio-key-status");
   const mcpServerName = need<HTMLInputElement>("#mcp-server-name");
   const mcpServerUrl = need<HTMLInputElement>("#mcp-server-url");
+  const mcpServerHeader = need<HTMLInputElement>("#mcp-server-header");
   const mcpServerToken = need<HTMLInputElement>("#mcp-server-token");
   const mcpServerAdd = need<HTMLButtonElement>("#mcp-server-add");
   const mcpServerStatus = need<HTMLElement>("#mcp-server-status");
@@ -813,19 +814,22 @@ if (entry.auth === "oauth2") {
   mcpServerAdd.addEventListener("click", async () => {
     const name = mcpServerName.value.trim();
     const endpoint = mcpServerUrl.value.trim();
-    const token = mcpServerToken.value;
+    const token = mcpServerToken.value.trim();
+    const headerName = mcpServerHeader.value.trim() || "Authorization";
     let parsed: URL;
     try { parsed = new URL(endpoint); } catch { mcpServerStatus.textContent = "Enter a valid HTTPS MCP endpoint."; return; }
     if (parsed.protocol !== "https:" || parsed.username || parsed.password || !parsed.hostname || parsed.hash || parsed.search || (parsed.port !== "" && parsed.port !== "443")) {
       mcpServerStatus.textContent = "Use a public HTTPS endpoint on port 443 without embedded credentials, query parameters or URL fragments. Put bearer tokens in the separate token field.";
       return;
     }
+    if (token && !/^[A-Za-z0-9-]{1,64}$/.test(headerName)) { mcpServerStatus.textContent = "Use a simple HTTP header name such as Authorization or X-API-Key."; mcpServerHeader.focus(); return; }
     if (!name) { mcpServerStatus.textContent = "Give this MCP server a name first."; mcpServerName.focus(); return; }
     const id = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").slice(0, 48);
     if (!id) { mcpServerStatus.textContent = "Choose a name containing letters or numbers."; return; }
     mcpServerAdd.disabled = true;
     mcpServerStatus.textContent = "Registering " + name + " and performing the MCP handshake…";
-    const headers: Record<string,string> = token.trim() ? { Authorization: "Bearer " + token.trim() } : {};
+    const headers: Record<string,string> = {};
+    if (token) headers[headerName] = headerName.toLowerCase() === "authorization" ? "Bearer " + token : token;
     mcpServerToken.value = "";
     try {
       const response = await deps.api("/v1/mcp/servers", {

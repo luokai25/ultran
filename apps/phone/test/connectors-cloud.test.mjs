@@ -148,3 +148,10 @@ test("MCP manager accepts only HTTPS port 443 endpoints",()=>{
  assert.match(screen,/parsed\.port !== "" && parsed\.port !== "443"/);
  assert.match(screen,/HTTPS endpoint on port 443/);
 });
+
+test("MCP manager supports bearer and custom API-key header authentication",()=>{
+ assert.match(html,/id="mcp-server-header"/);
+ assert.match(screen,/mcpServerHeader\.value\.trim\(\) \|\| "Authorization"/);
+ assert.match(screen,/headers\[headerName\] = headerName\.toLowerCase\(\) === "authorization" \? "Bearer " \+ token : token/);
+ assert.match(screen,/mcpServerToken\.value = ""/);
+});

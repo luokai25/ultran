@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { strToU8, zipSync } from "npm:fflate@0.8.2";
-import { makeDocx, makePptx, makeXlsx } from "./formats.ts";
+import { extractCodeFiles, makeDocx, makePptx, makeXlsx } from "./formats.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -813,6 +813,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const presentationRequired = /presentation|slide|pitch deck/i.test(String(opportunity.product_format ?? ""));
   const pptxBytes = presentationRequired ? makePptx(title, markdown) : null;
   const xlsxBytes = productCsv ? makeXlsx(productCsv.content) : null;
+  const softwareCodeRequired = /software|tool|app|code|automation/i.test(String(opportunity.product_format ?? ""));
+  const codeFiles = softwareCodeRequired ? extractCodeFiles(markdown) : { files: {} as Record<string, Uint8Array>, count: 0, languages: [] as string[] };
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const productBody = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
@@ -846,13 +848,16 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     spreadsheet_xlsx_valid: !spreadsheetCsvRequired || Boolean(xlsxBytes?.byteLength),
     presentation_pptx_valid: !presentationRequired || Boolean(pptxBytes?.byteLength),
     docx_export_ready: docxBytes.byteLength > 0,
+    software_code_files_ready: !softwareCodeRequired || codeFiles.count > 0,
+    code_examples_count: codeFiles.count,
+    code_languages: codeFiles.languages,
     analyzed_sources: counts.analyzed,
     requested_sources: target,
     quality_checks_passed: false,
   };
   validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
     validation.references_section && validation.source_citations_match && validation.body_external_links_match_sources && validation.contents_section &&
-    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid && validation.spreadsheet_xlsx_valid && validation.presentation_pptx_valid && validation.docx_export_ready);
+    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid && validation.spreadsheet_xlsx_valid && validation.presentation_pptx_valid && validation.docx_export_ready && validation.software_code_files_ready);
   await db.from("ultron_product_projects").update({ synthesis_summary: { ...synthesis, validation, source_count: counts.analyzed, research_target: target }, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
@@ -967,16 +972,19 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     product_title: title, version, generated_at: new Date().toISOString(),
     project_id: projectId, research_target: target, analyzed_sources: counts.analyzed,
     artifact_ids: { docx: docxArtifactId, pptx: pptxArtifactId, xlsx: xlsxArtifactId },
-    coverage_reason: coverageReason, formats: ["markdown", "html", "docx", ...(productCsv ? ["csv", "xlsx"] : []), ...(pptxBytes ? ["pptx"] : []), "zip"],
+    code_examples: { count: codeFiles.count, languages: codeFiles.languages },
+    coverage_reason: coverageReason, formats: ["markdown", "html", "docx", ...(productCsv ? ["csv", "xlsx"] : []), ...(pptxBytes ? ["pptx"] : []), ...(codeFiles.count ? ["source-code"] : []), "zip"],
     note: "Original product content with source metadata. Source page text is not redistributed.",
   };
   const packageFiles: Record<string, Uint8Array> = {
-    "README.txt": strToU8(title + "\nULTRON Digital Product Package · v" + version + "\n\nIncludes Markdown, standalone HTML, editable Word document" + (productCsv ? ", spreadsheet CSV and Excel workbook" : "") + (pptxBytes ? ", editable PowerPoint presentation" : "") + ", source register, evidence synthesis and quality report.\nResearch coverage: " + counts.analyzed + " analyzed pages out of " + target + " requested.\nReview every claim and citation before commercial publication.\n"),
+    "README.txt": strToU8(title + "\nULTRON Digital Product Package · v" + version + "\n\nIncludes Markdown, standalone HTML, editable Word document" + (productCsv ? ", spreadsheet CSV and Excel workbook" : "") + (pptxBytes ? ", editable PowerPoint presentation" : "") + (codeFiles.count ? ", " + codeFiles.count + " source-code files" : "") + ", source register, evidence synthesis and quality report.\nResearch coverage: " + counts.analyzed + " analyzed pages out of " + target + " requested.\nReview every claim and citation before commercial publication.\n"),
     "product.md": markdownBytes,
     "product.html": htmlBytes,
     "product.docx": docxBytes,
     ...(pptxBytes ? { "product.pptx": pptxBytes } : {}),
     ...(xlsxBytes ? { "product.xlsx": xlsxBytes } : {}),
+    ...codeFiles.files,
+    ...(codeFiles.count ? { "source-code/README.txt": strToU8("Extracted source examples from the original product draft.\nLanguages: " + codeFiles.languages.join(", ") + "\nExamples: " + codeFiles.count + "\nReview configuration and dependencies, then run the included tests before deployment. ULTRON has not executed this code unless explicitly stated in the validation report.\n") } : {}),
     ...(productCsv ? { "product-data.csv": strToU8(productCsv.content) } : {}),
     "research/source-register.csv": strToU8(sourceRegister),
     "research/evidence-synthesis.json": strToU8(JSON.stringify(synthesis, null, 2)),

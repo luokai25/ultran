@@ -485,7 +485,7 @@ Deno.serve(async (req: Request) => {
           outcomes.push({ id: job.id, job_type: job.job_type, status: "completed", duration_ms: Date.now() - started });
         } catch (error) {
           const message = error instanceof Error ? error.message : "job_execution_failed";
-          const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages|product_project_not_found|product_project_stopped/i.test(message);
+          const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages|product_project_not_found|product_project_stopped|google_ai_studio_http_404/i.test(message);
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
           const dailySearchCap = message.includes("free_google_search_daily_cap_reached");

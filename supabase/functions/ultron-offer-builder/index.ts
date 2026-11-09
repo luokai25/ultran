@@ -99,6 +99,123 @@ function parseJson(text: string): Record<string, unknown> {
   return value;
 }
 
+async function researchCreator(ownerId: string, projectId: string, context: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const handle = clean(context.creator_handle, 160) || clean(context.creator_url, 500);
+  if (!handle) return { status: "not_provided", missing_data: ["A public creator handle or profile URL"] };
+  const db = admin();
+  const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
+    .select("id,vault_secret_id,models,priority,cooldown_until")
+    .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
+    .order("priority", { ascending: false });
+  if (error) throw error;
+  const candidates = (keys ?? []).flatMap((key: Record<string, unknown>) => {
+    if (key.cooldown_until && Date.parse(String(key.cooldown_until)) > Date.now()) return [];
+    const models = Array.isArray(key.models) ? key.models.filter((model): model is string =>
+      typeof model === "string" && /^gemini-2\.5-(?:flash|flash-lite)(?:-|$)/i.test(model.replace(/^models\//i, ""))
+    ) : [];
+    models.sort((a, b) => Number(/flash-lite/i.test(b)) - Number(/flash-lite/i.test(a)));
+    return models.length ? [{ key, model: models[0].replace(/^models\//i, "") }] : [];
+  });
+  if (!candidates.length) return {
+    status: "search_provider_unavailable", handle,
+    missing_data: ["A connected Google AI Studio key with public-search grounding support"],
+  };
+
+  let lastError = "No connected Google Search key could complete public creator research.";
+  for (const candidate of candidates) {
+    const { key, model } = candidate;
+    const { data: secret, error: secretError } = await db.rpc("ultron_read_llm_secret", { p_secret_id: key.vault_secret_id });
+    if (secretError || typeof secret !== "string" || !secret) { lastError = "A connected search key could not be read from Vault."; continue; }
+    const prompt = [
+      "Research the public Instagram creator identified by this handle or profile URL: " + handle,
+      "Search the public web for the creator's official profile, public bio, public posts or reels, interviews, and other attributable public content.",
+      "Return strict JSON only with this schema: {access,profile_url,display_name,bio,verified_stats,content_themes,recent_public_content,audience_signals,positioning,monetisation_signals,sources,missing_data,limitations}.",
+      "access must be one of public, private, not_found, or unknown. Use private only when a reliable public source explicitly establishes that the account is private. If search cannot verify the account, use unknown or not_found.",
+      "verified_stats must contain only facts directly supported by cited public sources. Use null or an empty array for unavailable follower counts, engagement metrics, and demographics. Never estimate or invent them.",
+      "content_themes should describe only patterns supported by actual public posts or attributable reporting. recent_public_content should include a concise description and a source URL for each item. sources must contain title, url, and what_it_supports.",
+      "Do not treat search snippets as full content samples. Distinguish verified facts from reasonable inferences. Never infer private information or claim access to private posts. If the account is inaccessible, clearly say so and list what material the owner could provide.",
+    ].join("\n");
+    try {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": secret },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 6000 },
+        }),
+        signal: AbortSignal.timeout(7000),
+      });
+      const raw = await response.text();
+      if (!response.ok) {
+        lastError = "Google AI Studio public research returned HTTP " + response.status + ".";
+        if (response.status === 429) {
+          await db.from("ultron_google_ai_studio_keys").update({
+            cooldown_until: new Date(Date.now() + 60_000).toISOString(),
+            last_error: "HTTP 429 · provider cooldown", last_checked_at: new Date().toISOString(),
+          }).eq("id", key.id).eq("owner_id", ownerId);
+        } else if (response.status === 401 || response.status === 403) {
+          await db.from("ultron_google_ai_studio_keys").update({
+            status: response.status === 401 ? "invalid" : "expired",
+            last_error: "HTTP " + response.status, last_checked_at: new Date().toISOString(),
+          }).eq("id", key.id).eq("owner_id", ownerId);
+        }
+        continue;
+      }
+      const envelope = JSON.parse(raw) as Record<string, unknown>;
+      const rows = Array.isArray(envelope.candidates) ? envelope.candidates : [];
+      const first = isObject(rows[0]) ? rows[0] : {};
+      const content = isObject(first.content) ? first.content : {};
+      const parts = Array.isArray(content.parts) ? content.parts : [];
+      const text = parts.map((part) => isObject(part) && typeof part.text === "string" ? part.text : "").join("\n");
+      if (!text.trim()) { lastError = "Google Search returned no creator research text."; continue; }
+      const researched = parseJson(text);
+      const grounding = isObject(first.groundingMetadata) ? first.groundingMetadata : {};
+      const chunks = Array.isArray(grounding.groundingChunks) ? grounding.groundingChunks : [];
+      const groundedSources = chunks.flatMap((chunk) => {
+        if (!isObject(chunk) || !isObject(chunk.web)) return [];
+        const uri = clean(chunk.web.uri, 1200), title = clean(chunk.web.title, 300);
+        return /^https?:\/\//i.test(uri) ? [{ title: title || uri, url: uri, what_it_supports: "Google Search grounding source" }] : [];
+      });
+      const suppliedSources = Array.isArray(researched.sources) ? researched.sources.filter(isObject) : [];
+      const sourceMap = new Map<string, Record<string, unknown>>();
+      for (const source of [...suppliedSources, ...groundedSources]) {
+        const uri = clean(source.url, 1200);
+        if (/^https?:\/\//i.test(uri)) sourceMap.set(uri, { title: clean(source.title, 300) || uri, url: uri, what_it_supports: clean(source.what_it_supports, 500) });
+      }
+      const sources = [...sourceMap.values()];
+      for (const source of sources) {
+        const uri = String(source.url);
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(uri));
+        const urlHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+        let domain = "";
+        try { domain = new URL(uri).hostname; } catch { continue; }
+        await db.from("ultron_product_sources").upsert({
+          owner_id: ownerId, project_id: projectId, canonical_url: uri, url_hash: urlHash,
+          title: clean(source.title, 300) || uri, domain, source_type: "creator_social",
+          fetch_status: "analyzed", extraction_summary: clean(source.what_it_supports, 1000),
+          metadata: { creator_research: true, handle },
+        }, { onConflict: "project_id,url_hash" });
+      }
+      await db.from("ultron_google_ai_studio_keys").update({
+        last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(),
+        last_error: null, cooldown_until: null, status: "connected",
+      }).eq("id", key.id).eq("owner_id", ownerId);
+      await event(ownerId, projectId, "creator", "creator.public_research_completed", {
+        access: clean(researched.access, 40) || "unknown", sources: sources.length, model,
+      });
+      return { ...researched, status: "researched", handle, sources };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message.slice(0, 300) : "creator_public_research_failed";
+    }
+  }
+  return {
+    status: "research_unavailable", handle, error: lastError,
+    missing_data: ["Accessible public profile details", "Public posts or reels", "Creator-provided transcripts or content samples"],
+    limitations: ["ULTRON could not verify public creator material from the connected search providers. It will not invent profile facts."],
+  };
+}
+
 function prompts(stage: string, context: Record<string, unknown>) {
   const topic = clean(context.topic, 300);
   const audience = clean(context.audience, 300);
@@ -106,7 +223,7 @@ function prompts(stage: string, context: Record<string, unknown>) {
   const base = "Create original, useful digital products for the ULTRON owner. Be specific, realistic, and honest. Never invent research, citations, follower counts, market validation, or facts about a creator. Separate verified input from assumptions. Avoid generic filler. Return only the requested format.";
   if (stage === "creator") return {
     system: base + " You are a creator-content analyst. Analyze only the material supplied by the user. If only a handle or URL is supplied without transcripts or source text, explicitly mark profile metrics and content findings as unverified and request source material rather than pretending to have scraped it.",
-    prompt: "Creator profile: " + clean(context.creator_url, 500) + "\nCreator handle: " + clean(context.creator_handle, 160) + "\nContext: " + clean(context.context, 3000) + "\nSource material/transcripts: " + clean(context.source_text, 12000) + "\nReturn JSON with niche, transformation, content_themes (3 items with theme, monetisation_potential, rating), verdict, audience, voice, verified_stats, missing_data.",
+    prompt: "Creator profile: " + clean(context.creator_url, 500) + "\nCreator handle: " + clean(context.creator_handle, 160) + "\nContext: " + clean(context.context, 3000) + "\nPublic research and grounded source URLs: " + JSON.stringify(context.creator_research ?? {}) + "\nOwner-supplied source material/transcripts: " + clean(context.source_text, 12000) + "\nReturn JSON with niche, transformation, content_themes (3 items with theme, monetisation_potential, rating), verdict, audience, voice, verified_stats, research_sources, missing_data. Never fill missing public data with guesses.",
   };
   if (stage === "discovery") return {
     system: base + " You are a market-direction strategist. Produce diverse categories and avoid near-duplicates. Do not claim validation without evidence.",
@@ -241,7 +358,10 @@ async function processOfferBuilderJob(req: Request, body: Record<string, unknown
     const p = prompts("outline", { ...context, option_key: key, previous_outlines: previousOutlines });
     system = p.system; prompt = p.prompt; maxTokens = 3500;
   } else {
-    const p = prompts(stage, context);
+    const generationContext = step === "creator"
+      ? { ...context, creator_research: await researchCreator(ownerId, run.project_id, context) }
+      : context;
+    const p = prompts(stage, generationContext);
     system = p.system; prompt = p.prompt; maxTokens = stage === "section" ? 5000 : 6500;
   }
 

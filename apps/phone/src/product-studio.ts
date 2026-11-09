@@ -11,7 +11,7 @@ type ProductProject = {
 type ProductEvent = { sequence: number; stage: string; event_type: string; payload: Record<string, unknown>; created_at: string };
 type ProductSource = { id: string; title: string; canonical_url: string; domain: string; fetch_status: string; extraction_summary: string };
 type ProductDetail = { project: ProductProject; events: ProductEvent[]; sources: ProductSource[]; documents: Array<{ id: string; title: string; format: string; version: number; byte_size: number; download_url?: string | null }>; download_url?: string | null };
-type StudioOptions = { openScreen: () => void; closeScreen: () => void; wakeWorker: () => Promise<unknown> };
+type StudioOptions = { openScreen: () => void; closeScreen: () => void; openCloudSettings: () => void; wakeWorker: () => Promise<unknown> };
 let options: StudioOptions | null = null;
 let selectedProjectId = "";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -52,8 +52,18 @@ function statusLabel(status: string, errorMessage: string | null = ""): string {
 }
 function setNotice(message: string, error = false): void {
   const notice = el<HTMLElement>("product-studio-notice");
-  notice.textContent = message;
+  notice.replaceChildren();
   notice.dataset.state = error ? "error" : "info";
+  const needsOwnerAccount = /connect your ultron (owner )?account|owner account.*settings/i.test(message);
+  if (needsOwnerAccount && options?.openCloudSettings) {
+    notice.append(document.createTextNode("Connect your ULTRON owner account to enable private cloud products. "));
+    const connect = node("button", "product-studio-connect", "Open cloud settings");
+    connect.type = "button";
+    connect.addEventListener("click", () => options?.openCloudSettings());
+    notice.append(connect);
+    return;
+  }
+  notice.textContent = message;
 }
 function renderProjects(projects: ProductProject[]): void {
   const list = el<HTMLElement>("product-studio-projects");

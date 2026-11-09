@@ -296,31 +296,48 @@ async function fetchPublicResearchPage(start: string): Promise<{ response: Respo
   return { response: null, blocked: true };
 }
 
-async function workerProcess(projectId: string, ownerId: string, jobId: string): Promise<Record<string, unknown>> {
+async function workerProcess(projectId: string, ownerId: string, jobId: string, researchRound = 0): Promise<Record<string, unknown>> {
   const db = service();
   const { data: project, error } = await db.from("ultron_product_projects").select("*").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (error) throw error;
   if (!project) throw new Error("product_project_not_found");
   if (project.status === "cancelled" || project.status === "paused") return { skipped: true, status: project.status };
-  await db.from("ultron_product_projects").update({ status: "identifying", active_stage: "identification", progress: 8, source_job_id: jobId, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
-  await addEvent(db, ownerId, projectId, "identification", "stage.started", { message: "Identifying the audience, problem and strongest product opportunity." });
   const request = clean(project.user_request, 4000) || "Find a practical, underserved problem people are willing to pay to solve. Choose a focused digital product opportunity.";
-  const identify = await callGemini(ownerId, [
-    { role: "user", parts: [{ text: "You are ULTRON's product opportunity analyst. Treat this request as the owner's goal, not as permission to spend money or publish anything. Use Google Search grounding to investigate current public evidence. Do not copy source text. Return valid JSON only with keys: title, selected_topic, audience, problem, evidence, existing_alternatives, market_gap, product_format, promise, research_queries (3-5 strings), opportunity_score (0-100), confidence (low|medium|high), opportunity_summary. Request: " + request + ". If the request is broad or empty, identify a narrow opportunity with evidence. Keep all claims cautious and distinguish evidence from inference." }] }
-  ], true);
-  const opportunity = parseJsonObject(identify.text);
-  const queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 4) : [];
-  const grounded = [...identify.grounding];
-  for (const query of queries.slice(0, 1)) {
-    try {
-      const searched = await callGemini(ownerId, [
-        { role: "user", parts: [{ text: "Use Google Search grounding to find diverse, credible public sources for this research question: " + query + ". Prefer official documentation, academic/government resources, reputable industry research and real practitioner discussions. Return a concise evidence summary. Do not invent URLs or sources." }] }
-      ], true);
-      grounded.push(...searched.grounding);
-    } catch (error) {
-      await addEvent(db, ownerId, projectId, "research", "search.query_limited", { query, reason: error instanceof Error ? error.message.slice(0, 140) : "search_unavailable" });
-    }
+  const hasBrief = isObject(project.opportunity_brief) && Boolean(project.opportunity_brief.selected_topic);
+  let opportunity: Record<string, unknown>;
+  let queries: string[];
+  const grounded: Array<{ url: string; title: string }> = [];
+  if (!hasBrief) {
+    await db.from("ultron_product_projects").update({ status: "identifying", active_stage: "identification", progress: 8, source_job_id: jobId, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
+    await addEvent(db, ownerId, projectId, "identification", "stage.started", { message: "Identifying the audience, problem and strongest product opportunity." });
+    const identify = await callGemini(ownerId, [
+      { role: "user", parts: [{ text: "You are ULTRON's product opportunity analyst. Treat this request as the owner's goal, not as permission to spend money or publish anything. Use Google Search grounding to investigate current public evidence. Do not copy source text. Return valid JSON only with keys: title, selected_topic, audience, problem, evidence, existing_alternatives, market_gap, product_format, promise, research_queries (3-5 strings), opportunity_score (0-100), confidence (low|medium|high), opportunity_summary. Request: " + request + ". If the request is broad or empty, identify a narrow opportunity with evidence. Keep all claims cautious and distinguish evidence from inference." }] }
+    ], true);
+    opportunity = parseJsonObject(identify.text);
+    grounded.push(...identify.grounding);
+    queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 5) : [];
+    if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
+    opportunity.research_queries = queries;
+    await db.from("ultron_product_projects").update({
+      title: clean(opportunity.title, 180) || "ULTRON digital product",
+      selected_topic: clean(opportunity.selected_topic, 500) || request,
+      opportunity_brief: opportunity,
+      status: "researching", active_stage: "research", progress: 24,
+      configuration: { ...(isObject(project.configuration) ? project.configuration : {}), research_round: 0, stalled_rounds: 0 },
+      updated_at: new Date().toISOString(),
+    }).eq("id", projectId).eq("owner_id", ownerId);
+    await addEvent(db, ownerId, projectId, "identification", "opportunity.ranked", { title: clean(opportunity.title, 180), score: Number(opportunity.opportunity_score) || null, confidence: clean(opportunity.confidence, 20), queries });
+  } else {
+    opportunity = project.opportunity_brief as Record<string, unknown>;
+    queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 5) : [];
+    if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
   }
+  const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
+  const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
+  const searched = await callGemini(ownerId, [
+    { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid repeating the same domain within this batch. Return concise evidence. Do not invent URLs, statistics or sources." }] }
+  ], true);
+  grounded.push(...searched.grounding);
   const grounding = grounded;
   const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
   const seenDomains = new Set<string>();

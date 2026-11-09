@@ -342,59 +342,138 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
   const seenDomains = new Set<string>();
   const urls = [...unique.filter(item => { try { const domain = new URL(item.url).hostname; if (seenDomains.has(domain)) return false; seenDomains.add(domain); return true; } catch { return false; } }), ...unique.filter(item => { try { return !seenDomains.has(new URL(item.url).hostname); } catch { return false; } })].slice(0, 24);
+  const { data: priorSources } = await db.from("ultron_product_sources").select("domain").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
+  const priorDomains = [...new Set((priorSources || []).map(row => clean(row.domain, 120)).filter(Boolean))].slice(0, 100);
+  const discoveredRecords = await Promise.all(urls.map(async item => {
+    const parsed = new URL(item.url);
+    parsed.hash = "";
+    const canonical = parsed.toString();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    const urlHash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+    return { item, canonical, urlHash, domain: parsed.hostname.replace(/^www\./, "") };
+  }));
+  if (discoveredRecords.length) {
+    const { error: discoverError } = await db.from("ultron_product_sources").upsert(discoveredRecords.map(record => ({
+      owner_id: ownerId, project_id: projectId, canonical_url: record.canonical, url_hash: record.urlHash,
+      title: record.item.title || record.domain, domain: record.domain, fetch_status: "discovered",
+      metadata: { grounding: "google_search" },
+    })), { onConflict: "project_id,url_hash", ignoreDuplicates: true });
+    if (discoverError) throw discoverError;
+  }
   await db.from("ultron_product_projects").update({
     title: clean(opportunity.title, 180) || "ULTRON digital product",
     selected_topic: clean(opportunity.selected_topic, 500) || request,
     opportunity_brief: opportunity,
-    status: "researching", active_stage: "synthesis", progress: 28,
-    source_counts: { discovered: urls.length, opened: 0, analyzed: 0, rejected: 0, failed: 0 },
+    status: "researching", active_stage: "research", progress: Math.min(60, 24 + researchRound),
     updated_at: new Date().toISOString(),
   }).eq("id", projectId).eq("owner_id", ownerId);
-  await addEvent(db, ownerId, projectId, "identification", "opportunity.ranked", { title: clean(opportunity.title, 180), score: Number(opportunity.opportunity_score) || null, confidence: clean(opportunity.confidence, 20), queries });
-  await addEvent(db, ownerId, projectId, "research", "stage.started", { message: "Opening accessible sources returned by grounded public-web research." });
-  let opened = 0, analyzed = 0, failed = 0, rejected = 0;
-  const evidence: Array<{ title: string; url: string; text: string }> = [];
-  const fetchResults = await Promise.all(urls.map(async (item) => {
+  await addEvent(db, ownerId, projectId, "research", "batch.started", { batch: researchRound + 1, query, discovered: discoveredRecords.length, known_domains: priorDomains.length });
+  const fetchResults = await Promise.all(discoveredRecords.map(async (record) => {
     try {
-      const parsed = new URL(item.url);
-      const fetched = await fetchPublicResearchPage(parsed.toString());
-      if (fetched.blocked || !fetched.response) return { item, status: "rejected" as const, text: "" };
+      const fetched = await fetchPublicResearchPage(record.canonical);
+      if (fetched.blocked || !fetched.response) return { record, status: "rejected" as const, text: "", contentType: "" };
       const response = fetched.response;
-      if (!response.ok) return { item, status: "failed" as const, text: "" };
-      const type = response.headers.get("content-type") ?? "";
-      if (!/text\/html|text\/plain/i.test(type)) return { item, status: "rejected" as const, text: "" };
-      const declaredSize = Number(response.headers.get("content-length") ?? 0);
-      if (declaredSize > 1_500_000) return { item, status: "rejected" as const, text: "" };
+      if (!response.ok) return { record, status: "failed" as const, text: "", contentType: "" };
+      const contentType = response.headers.get("content-type") || "";
+      if (!/text\/html|text\/plain/i.test(contentType)) return { record, status: "rejected" as const, text: "", contentType };
+      const declaredSize = Number(response.headers.get("content-length") || 0);
+      if (declaredSize > 1_500_000) return { record, status: "rejected" as const, text: "", contentType };
       const raw = (await response.text()).slice(0, 1_500_000);
       const extracted = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 4500);
-      if (extracted.length < 300) return { item, status: "failed" as const, text: "" };
-      return { item, status: "analyzed" as const, text: extracted, type, finalUrl: response.url || parsed.toString() };
+      if (extracted.length < 300) return { record, status: "opened" as const, text: extracted, contentType };
+      return { record, status: "analyzed" as const, text: extracted, contentType, finalUrl: response.url || record.canonical };
     } catch {
-      return { item, status: "failed" as const, text: "" };
+      return { record, status: "failed" as const, text: "", contentType: "" };
     }
   }));
-  const evidence: Array<{ title: string; url: string; text: string }> = [];
+  const sourceBucket = db.storage.from("ultron-private");
   for (const result of fetchResults) {
-    if (result.status === "rejected") { rejected++; continue; }
-    if (result.status === "failed") { failed++; continue; }
-    opened++;
-    analyzed++;
-    const finalUrl = result.finalUrl ?? result.item.url;
-    const url = new URL(finalUrl);
-    const domain = url.hostname.replace(/^www\./, "");
-    const hashBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url.toString()));
-    const urlHash = Array.from(new Uint8Array(hashBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
-    await db.from("ultron_product_sources").upsert({
-      owner_id: ownerId, project_id: projectId, canonical_url: url.toString(), url_hash: urlHash,
-      title: result.item.title || domain, domain, fetch_status: "analyzed", extraction_summary: result.text.slice(0, 900),
-      metadata: { extraction_method: "public_html_text", content_type: result.type, grounding: "google_search" },
-    }, { onConflict: "project_id,url_hash" });
-    evidence.push({ title: result.item.title || domain, url: url.toString(), text: result.text });
+    const metadata: Record<string, unknown> = { grounding: "google_search", content_type: result.contentType };
+    let summary = "", contentHash: string | null = null;
+    if (result.status === "analyzed") {
+      const bytes = new TextEncoder().encode(result.text);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      contentHash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+      const contentPath = ownerId + "/products/" + projectId + "/sources/" + result.record.urlHash + ".txt";
+      const stored = await sourceBucket.upload(contentPath, bytes, { contentType: "text/plain; charset=utf-8", upsert: true });
+      if (stored.error) throw stored.error;
+      metadata.extraction_method = "public_html_text";
+      metadata.content_storage_path = contentPath;
+      metadata.final_url = result.finalUrl || result.record.canonical;
+      summary = result.text.slice(0, 900);
+    } else if (result.status === "opened") {
+      summary = "Page opened successfully, but it did not contain enough extractable text for analysis.";
+    }
+    const { error: updateSourceError } = await db.from("ultron_product_sources").update({
+      fetch_status: result.status, extraction_summary: summary, content_hash: contentHash, metadata,
+    }).eq("owner_id", ownerId).eq("project_id", projectId).eq("url_hash", result.record.urlHash);
+    if (updateSourceError) throw updateSourceError;
   }
-  const counts = { discovered: urls.length, opened, analyzed, rejected, failed };
-  await db.from("ultron_product_projects").update({ source_counts: counts, progress: 48, status: "synthesizing", active_stage: "synthesis", updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
-  await addEvent(db, ownerId, projectId, "research", "source.coverage", counts);
-  await addEvent(db, ownerId, projectId, "synthesis", "stage.started", { message: "Comparing the accessible source material and shaping the product around evidence." });
+  const { data: sourceRows, error: sourceRowsError } = await db.from("ultron_product_sources").select("fetch_status").eq("owner_id", ownerId).eq("project_id", projectId).limit(1000);
+  if (sourceRowsError) throw sourceRowsError;
+  const sourceStatuses = sourceRows || [];
+  const counts = {
+    discovered: sourceStatuses.length,
+    opened: sourceStatuses.filter(row => row.fetch_status === "opened" || row.fetch_status === "analyzed").length,
+    analyzed: sourceStatuses.filter(row => row.fetch_status === "analyzed").length,
+    rejected: sourceStatuses.filter(row => row.fetch_status === "rejected").length,
+    failed: sourceStatuses.filter(row => row.fetch_status === "failed").length,
+  };
+  const previousAnalyzed = Number((isObject(project.source_counts) ? project.source_counts : {}).analyzed || 0);
+  const newSources = Math.max(0, counts.analyzed - previousAnalyzed);
+  const oldConfiguration = isObject(project.configuration) ? project.configuration : {};
+  const stalledRounds = newSources >= 2 ? 0 : Number(oldConfiguration.stalled_rounds || 0) + 1;
+  const nextRound = researchRound + 1;
+  const maxRounds = Math.min(80, Math.max(12, Math.ceil((Number(project.research_target) || 200) / 5)));
+  const shouldContinue = counts.analyzed < (Number(project.research_target) || 200) && nextRound < maxRounds && stalledRounds < 3;
+  if (shouldContinue) {
+    const nextJobPayload = { project_id: projectId, research_round: nextRound };
+    const { data: nextJob, error: nextJobError } = await db.from("ultron_jobs").insert({
+      owner_id: ownerId, job_type: "product.generate", title: "Continue research · " + clean(opportunity.title, 100),
+      payload: nextJobPayload, priority: 4, max_attempts: 20,
+      idempotency_key: "product:" + projectId + ":research:" + nextRound,
+    }).select("id").single();
+    if (nextJobError) throw nextJobError;
+    const progress = Math.min(62, 25 + Math.floor((counts.analyzed / Math.max(1, Number(project.research_target) || 200)) * 37));
+    await db.from("ultron_product_projects").update({
+      status: "researching", active_stage: "research", progress, source_counts: counts,
+      configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds },
+      source_job_id: nextJob.id, updated_at: new Date().toISOString(),
+    }).eq("id", projectId).eq("owner_id", ownerId);
+    await addEvent(db, ownerId, projectId, "research", "batch.completed", { batch: researchRound + 1, new_sources: newSources, counts, target: project.research_target, next_batch_queued: true });
+    return { project_id: projectId, status: "researching", continuation_queued: true, source_counts: counts };
+  }
+  const coverageReason = counts.analyzed >= (Number(project.research_target) || 200) ? "requested_source_target_reached" : stalledRounds >= 3 ? "research_sources_stalled" : "research_batch_limit_reached";
+  await db.from("ultron_product_projects").update({
+    status: "synthesizing", active_stage: "synthesis", progress: 66, source_counts: counts,
+    configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds, research_stop_reason: coverageReason },
+    updated_at: new Date().toISOString(),
+  }).eq("id", projectId).eq("owner_id", ownerId);
+  await addEvent(db, ownerId, projectId, "research", "source.coverage", { ...counts, target: project.research_target, coverage_reason: coverageReason });
+  await addEvent(db, ownerId, projectId, "synthesis", "stage.started", { message: "Comparing the accumulated source set and shaping the product around evidence." });
+  const { data: allSources, error: allSourcesError } = await db.from("ultron_product_sources")
+    .select("title,canonical_url,domain,metadata,extraction_summary")
+    .eq("owner_id", ownerId).eq("project_id", projectId).eq("fetch_status", "analyzed")
+    .order("retrieved_at", { ascending: false }).limit(500);
+  if (allSourcesError) throw allSourcesError;
+  const selectedSources: typeof allSources = [];
+  const synthesisDomains = new Set<string>();
+  for (const source of allSources || []) {
+    const domain = clean(source.domain, 120);
+    if (domain && synthesisDomains.has(domain)) continue;
+    if (domain) synthesisDomains.add(domain);
+    selectedSources.push(source);
+    if (selectedSources.length >= 30) break;
+  }
+  const evidence = await Promise.all(selectedSources.map(async source => {
+    const metadata = isObject(source.metadata) ? source.metadata : {};
+    const path = clean(metadata.content_storage_path, 500);
+    if (path) {
+      const { data: file, error: fileError } = await sourceBucket.download(path);
+      if (!fileError && file) return { title: source.title, url: source.canonical_url, text: (await file.text()).slice(0, 1200) };
+    }
+    return { title: source.title, url: source.canonical_url, text: clean(source.extraction_summary, 1200) };
+  }));
   const evidenceText = evidence.map((item, index) => "[" + (index + 1) + "] " + item.title + " (" + item.url + ")\n" + item.text).join("\n\n").slice(0, 26000);
   const title = clean(opportunity.title, 180) || "ULTRON Digital Product";
   await db.from("ultron_product_projects").update({ status: "creating", active_stage: "creation", progress: 64, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);

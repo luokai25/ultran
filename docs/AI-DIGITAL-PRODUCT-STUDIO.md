@@ -238,7 +238,7 @@ Implemented and deployed first production slice:
 - Research runs in resumable batches across 12 research angles, stores private source extracts, deduplicates canonical URLs, applies domain-diversity prompts, respects robots rules and reports discovered/opened/analyzed/rejected/failed counts. Configurable targets are 50/100/200/500; early stopping is reported as partial rather than misrepresented as complete.
 - Added evidence synthesis for recurring themes, customer pain, counter-evidence, contradictions, market gaps, willingness-to-pay signals, product requirements and confidence.
 - Drafts stream into persisted Markdown and a sandboxed HTML preview with safe rendering for headings, tables, lists, code blocks, quotes and HTTP(S) links. Arabic output receives RTL layout. The workspace displays opportunity score, synthesis, source coverage and stopping reason, activity, source links, quality checks and versioned downloads. Pause, resume, cancel and provider-wait recovery are available.
-- Added quality gates for minimum length, a 700-word floor, contents/references structure and source-citation integrity.
+- Added quality gates for minimum length, a 700-word floor, contents/references structure, citation-index integrity and external Markdown links that must match the researched source register.
 - Packaging creates versioned Markdown and HTML documents plus a private ZIP bundle containing the product, source register, evidence-synthesis JSON, validation report and manifest. Spreadsheet-style products also receive a validated CSV export with formula-injection protection. Source page text is not redistributed.
 - Added the Product Studio drawer entry and responsive workflow to the canonical `apps/phone` client shared by web and Android.
 

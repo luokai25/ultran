@@ -45,17 +45,22 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Publish immutable web assets for the Cloudflare edge
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ultron-web-latest
-          name: ULTRON Web ${{ github.sha }}
-          prerelease: true
-          make_latest: false
-          fail_on_unmatched_files: true
-          overwrite_files: true
-          files: |
-            apps/phone/dist/index.html
-            apps/phone/dist/assets/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view ultron-web-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create ultron-web-latest \
+              --target "$GITHUB_SHA" \
+              --title "ULTRON Web" \
+              --notes "Mutable asset bundle consumed by the ULTRON Cloudflare edge worker." \
+              --prerelease \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release upload ultron-web-latest \
+            apps/phone/dist/index.html \
+            apps/phone/dist/assets/* \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
       - name: Smoke-test the live Cloudflare web app and its bundles
         run: |
           node --input-type=module <<'NODE'

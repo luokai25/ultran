@@ -128,7 +128,7 @@ test("remote MCP manager registers HTTPS endpoints, probes, inventories and remo
 test("remote MCP manager refuses insecure endpoint URLs and keeps token input transient",()=>{
  assert.match(screen,/parsed\.protocol !== "https:"/);
  assert.match(screen,/headers: Record<string,string>/);
- assert.match(screen,/Authorization: "Bearer " \+ token\.trim\(\)/);
+ assert.match(screen,/headers\[headerName\]/);
 });
 
 test("MCP endpoint URLs cannot carry credentials in query parameters",()=>{

@@ -47,7 +47,8 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(main, /async function submitTurn\(raw: string\)/);
   assert.match(main, /async function submit\(raw: string\)/);
   assert.match(main, /ULTRON hit an internal chat error/);
-  assert.match(cloudLlm, /setTimeout\(\(\) => controller\.abort\(\), 90_000\)/);
+  assert.doesNotMatch(cloudLlm, /setTimeout\(\(\) => controller\.abort\(\), 90_000\)/);
+  assert.match(cloudLlm, /signal\.addEventListener\("abort", abortFromCaller/);
   assert.match(cloudLlm, /invalid event from the cloud response stream/);
   assert.match(brain, /select\("id,owner_id,label,vault_secret_id,key_fingerprint,status,enabled,priority,models,request_count,tokens_used,cooldown_until,last_used_at,last_checked_at,last_error,created_at"\)/);
   assert.match(brain, /reserve capacity for cross-provider/);

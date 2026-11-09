@@ -462,7 +462,7 @@ Deno.serve(async (req: Request) => {
               headers: internalWorker
                 ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
                 : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "worker_process", project_id: payload.project_id, job_id: job.id, research_round: payload.research_round }),
+              body: JSON.stringify({ action: "worker_process", project_id: payload.project_id, job_id: job.id, lock_token: job.lock_token, research_round: payload.research_round }),
               signal: AbortSignal.timeout(115_000),
             });
             const data = await response.json() as Record<string, unknown>;

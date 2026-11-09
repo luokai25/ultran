@@ -82,6 +82,7 @@ class Container:
             wall_ms=settings.mcp_wall_ms,
             egress_bytes=settings.mcp_egress_bytes,
             require_grants=settings.mcp_require_grants,
+            audit_db_path=str(settings.data_dir / "mcp_audit.sqlite3"),
         )
         registry.attach_mcp(mcp_pool, mcp_gateway)
         for spec in mcp_server_store.list():

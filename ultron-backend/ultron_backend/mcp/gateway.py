@@ -25,6 +25,9 @@ the survivors, so a 200-tool index does not become a 200-tool prompt.
 from __future__ import annotations
 
 import logging
+import json
+import sqlite3
+import threading
 import re
 import time
 from collections.abc import Iterable, Mapping
@@ -126,6 +129,8 @@ class ToolGateway:
         wall_ms: int = DEFAULT_WALL_MS,
         egress_bytes: int = DEFAULT_EGRESS_BYTES,
         require_grants: bool = True,
+        audit_db_path: str | None = None,
+        audit_limit: int = 50_000,
     ) -> None:
         self.pool = pool
         self.grants = grants or GrantStore()
@@ -135,6 +140,48 @@ class ToolGateway:
         self.egress_bytes = egress_bytes
         self.require_grants = require_grants
         self.audit: list[GatewayAuditEntry] = []
+        self._audit_db_path = audit_db_path
+        self._audit_limit = max(100, int(audit_limit))
+        self._audit_lock = threading.RLock()
+        if self._audit_db_path:
+            from pathlib import Path
+            path = Path(self._audit_db_path)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._init_audit_store()
+            try:
+                path.chmod(0o600)
+            except OSError:
+                pass
+
+    def _audit_connect(self) -> sqlite3.Connection:
+        db = sqlite3.connect(self._audit_db_path, timeout=10)
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA busy_timeout=10000")
+        return db
+
+    def _init_audit_store(self) -> None:
+        with self._audit_connect() as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("""CREATE TABLE IF NOT EXISTS mcp_tool_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id TEXT NOT NULL, tool TEXT NOT NULL, server_id TEXT NOT NULL,
+                ok INTEGER NOT NULL, reason TEXT NOT NULL, latency_ms INTEGER NOT NULL,
+                tier TEXT NOT NULL, args_hash TEXT NOT NULL, result_hash TEXT NOT NULL,
+                sensitive INTEGER NOT NULL, capabilities_json TEXT NOT NULL,
+                grant_id TEXT NOT NULL, at TEXT NOT NULL
+            )""")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_mcp_tool_audit_workspace_at ON mcp_tool_audit(workspace_id, at DESC)")
+            rows = db.execute(
+                "SELECT workspace_id, tool, server_id, ok, reason, latency_ms, tier, args_hash, result_hash, sensitive, capabilities_json, grant_id, at FROM (SELECT * FROM mcp_tool_audit ORDER BY id DESC LIMIT ?) ORDER BY id",
+                (self._audit_limit,),
+            ).fetchall()
+        self.audit = [GatewayAuditEntry(
+            workspace_id=row["workspace_id"], tool=row["tool"], server_id=row["server_id"],
+            ok=bool(row["ok"]), reason=row["reason"], latency_ms=row["latency_ms"],
+            tier=row["tier"], args_hash=row["args_hash"], result_hash=row["result_hash"],
+            sensitive=bool(row["sensitive"]), capabilities=tuple(json.loads(row["capabilities_json"])),
+            grant_id=row["grant_id"], at=datetime.fromisoformat(row["at"]),
+        ) for row in rows]
 
     # ------------------------------------------------------------------ #
     # discovery
@@ -397,7 +444,23 @@ class ToolGateway:
         return {"checked": checked, "usage": policy.usage()} if checked else {}
 
     def _record(self, entry: GatewayAuditEntry) -> None:
-        self.audit.append(entry)
+        with self._audit_lock:
+            self.audit.append(entry)
+            if self._audit_db_path:
+                with self._audit_connect() as db:
+                    db.execute("""INSERT INTO mcp_tool_audit
+                        (workspace_id, tool, server_id, ok, reason, latency_ms, tier,
+                         args_hash, result_hash, sensitive, capabilities_json, grant_id, at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (entry.workspace_id, entry.tool, entry.server_id, int(entry.ok),
+                         entry.reason, entry.latency_ms, entry.tier, entry.args_hash,
+                         entry.result_hash, int(entry.sensitive),
+                         json.dumps(list(entry.capabilities)), entry.grant_id, entry.at.isoformat()))
+                    db.execute("""DELETE FROM mcp_tool_audit WHERE id NOT IN
+                        (SELECT id FROM mcp_tool_audit ORDER BY id DESC LIMIT ?)""",
+                        (self._audit_limit,))
+                if len(self.audit) > self._audit_limit:
+                    self.audit = self.audit[-self._audit_limit:]
 
     # ------------------------------------------------------------------ #
     def recent(self, limit: int = 50) -> list[dict[str, Any]]:

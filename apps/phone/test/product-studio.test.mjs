@@ -52,6 +52,10 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);
   assert.match(source, /zipSync/);
+  assert.match(source, /sanitizeProductCsv/);
+  assert.match(source, /spreadsheet_csv_valid/);
+  assert.match(source, /product-data\.csv/);
+  assert.match(source, /formula_injection_protection/);
   assert.match(source, /source-register\\.csv/);
   assert.match(source, /format: "zip"/);
   assert.match(source, /product-v" \+ version/);

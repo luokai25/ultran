@@ -485,10 +485,32 @@ Deno.serve(async (req: Request) => {
           outcomes.push({ id: job.id, job_type: job.job_type, status: "completed", duration_ms: Date.now() - started });
         } catch (error) {
           const message = error instanceof Error ? error.message : "job_execution_failed";
-          const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages/i.test(message);
+          const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages|product_project_not_found/i.test(message);
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
-          const delay = message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          const waitingForProvider = job.job_type === "product.generate" || message.startsWith("model_not_configured");
+          const delay = waitingForProvider ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          if (job.job_type === "product.generate") {
+            const payload = isObject(job.payload) ? job.payload : {};
+            const projectId = typeof payload.project_id === "string" ? payload.project_id : "";
+            if (projectId) {
+              const projectStatus = exhausted ? "failed" : "waiting_for_provider";
+              const { data: projectUpdate, error: projectUpdateError } = await db.from("ultron_product_projects")
+                .update({ status: projectStatus, error_message: message.slice(0, 500), updated_at: new Date().toISOString() })
+                .eq("owner_id", owner_id).eq("id", projectId)
+                .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])
+                .select("id").maybeSingle();
+              if (projectUpdateError) throw projectUpdateError;
+              if (projectUpdate) {
+                const { error: eventError } = await db.from("ultron_product_events").insert({
+                  owner_id: owner_id, project_id: projectId, stage: "system",
+                  event_type: exhausted ? "job.failed" : "provider.waiting",
+                  payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after checking the provider status." : "A free provider is temporarily unavailable. ULTRON will retry after its cooldown.", retry_after_seconds: delay },
+                });
+                if (eventError) throw eventError;
+              }
+            }
+          }
           const { error: failError } = await db.from("ultron_jobs").update({
             status: exhausted ? "failed" : "retry_wait",
             run_after: new Date(Date.now() + delay * 1000).toISOString(),

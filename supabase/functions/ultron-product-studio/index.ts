@@ -557,6 +557,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     }).eq("owner_id", ownerId).eq("project_id", projectId).eq("url_hash", result.record.urlHash);
     if (updateSourceError) throw updateSourceError;
   }
+  const afterSourceSave = await projectStopStatus(ownerId, projectId);
+  if (afterSourceSave === "cancelled" || afterSourceSave === "paused" || afterSourceSave === "missing") return { skipped: true, status: afterSourceSave };
   const { data: sourceRows, error: sourceRowsError } = await db.from("ultron_product_sources").select("fetch_status").eq("owner_id", ownerId).eq("project_id", projectId).limit(1000);
   if (sourceRowsError) throw sourceRowsError;
   const sourceStatuses = sourceRows || [];

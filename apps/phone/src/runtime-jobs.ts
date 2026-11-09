@@ -53,7 +53,7 @@ let workerBusy = false;
 let workerVisibilityHandler: (() => void) | null = null;
 let workerOnlineHandler: (() => void) | null = null;
 
-export async function processUltronJobs(limit = 3): Promise<number> {
+export async function processUltronJobs(limit = 1): Promise<number> {
   const result = await invokeUltronJobs("process", { limit });
   return Number(result.processed) || 0;
 }

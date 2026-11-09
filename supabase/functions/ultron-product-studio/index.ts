@@ -818,7 +818,11 @@ Deno.serve(async (req: Request) => {
       if (existing.source_job_id) {
         const { data: previousJob, error: previousJobError } = await auth.db.from("ultron_jobs").select("status").eq("owner_id", auth.id).eq("id", existing.source_job_id).maybeSingle();
         if (previousJobError) throw previousJobError;
-        if (previousJob && ["queued","retry_wait","running"].includes(previousJob.status)) return json({ error: "project_job_still_retrying" }, 409);
+        if (previousJob && ["queued","running"].includes(previousJob.status)) return json({ error: "project_job_still_retrying" }, 409);
+        if (previousJob?.status === "retry_wait") {
+          const { error: cancelRetryError } = await auth.db.from("ultron_jobs").update({ status: "cancelled", lock_token: null, lease_expires_at: null, completed_at: new Date().toISOString() }).eq("owner_id", auth.id).eq("id", existing.source_job_id).eq("status", "retry_wait");
+          if (cancelRetryError) throw cancelRetryError;
+        }
       }
       const configuration = isObject(existing.configuration) ? existing.configuration : {};
       const resumeKey = "product:" + id + ":resume:" + crypto.randomUUID();

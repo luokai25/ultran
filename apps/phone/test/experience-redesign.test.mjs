@@ -192,7 +192,7 @@ test("version 3 uses a neutral ULTRON identity and retains native capability ent
   ]);
   assert.match(pkg, /"version"\s*:\s*"3\.\d+\.\d+"/);
   assert.ok(main.includes('type ThemeId = "ultron"'));
-  assert.ok(main.includes("accent: 0x9ca3af"));
+  assert.ok(main.includes("accent: 0x10a37f"));
   assert.ok(main.includes("importNativeModel()"));
   assert.ok(main.includes("initConnectors("));
   assert.ok(main.includes("NativeRuntime"));

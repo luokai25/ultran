@@ -266,6 +266,7 @@ async function event(ownerId: string, projectId: string, stage: string, eventTyp
 }
 
 function offerBuilderSteps(stage: string): string[] {
+  if (stage === "creator") return ["creator_research", "creator_analysis"];
   if (stage === "discovery") return ["directions", "brainstorm", "score"];
   if (stage === "outline") return ["outline_A", "outline_B", "outline_C"];
   return [stage];
@@ -280,6 +281,10 @@ function offerBuilderResult(stage: string, values: Record<string, unknown>): unk
   if (stage === "outline") {
     const outlines = ["outline_A", "outline_B", "outline_C"].map((key) => values[key]).filter(isObject);
     return { outlines };
+  }
+  if (stage === "creator") {
+    const analysis = isObject(values.creator_analysis) ? values.creator_analysis : {};
+    return { ...analysis, public_research: values.creator_research ?? {} };
   }
   if (stage === "section") return { value: typeof values.section === "string" ? values.section : "" };
   return values[stage] ?? {};
@@ -339,7 +344,9 @@ async function processOfferBuilderJob(req: Request, body: Record<string, unknown
     .eq("id", runId).eq("owner_id", ownerId);
 
   let system = "", prompt = "", maxTokens = 6500;
-  if (step === "directions") {
+  if (step === "creator_research") {
+    system = ""; prompt = ""; maxTokens = 0;
+  } else if (step === "directions") {
     const p = prompts("discovery", context); system = p.system; prompt = p.prompt; maxTokens = 3500;
   } else if (step === "brainstorm") {
     const directions = isObject(previous.directions) && Array.isArray(previous.directions.directions) ? previous.directions.directions : [];
@@ -358,15 +365,16 @@ async function processOfferBuilderJob(req: Request, body: Record<string, unknown
     const p = prompts("outline", { ...context, option_key: key, previous_outlines: previousOutlines });
     system = p.system; prompt = p.prompt; maxTokens = 3500;
   } else {
-    const generationContext = step === "creator"
-      ? { ...context, creator_research: await researchCreator(ownerId, run.project_id, context) }
+    const generationContext = step === "creator_analysis"
+      ? { ...context, creator_research: previous.creator_research ?? {} }
       : context;
     const p = prompts(stage, generationContext);
     system = p.system; prompt = p.prompt; maxTokens = stage === "section" ? 5000 : 6500;
   }
 
-  const generated = await brain(secret, system, prompt, maxTokens, true);
-  const value: unknown = stage === "section" ? generated : parseJson(generated);
+  const value: unknown = step === "creator_research"
+    ? await researchCreator(ownerId, run.project_id, context)
+    : await brain(secret, system, prompt, maxTokens, true).then((generated) => stage === "section" ? generated : parseJson(generated));
   const nextValues = { ...previous, [step]: value };
   const nextIndex = stepIndex + 1;
   const now = new Date().toISOString();

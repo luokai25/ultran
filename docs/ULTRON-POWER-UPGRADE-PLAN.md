@@ -1,6 +1,6 @@
 # ULTRON Power Upgrade Plan
 
-**Status:** Phase 1 in progress; durable local MCP server registry implemented  
+**Status:** Phase 1 local MCP persistence complete; Phase 2 cloud bridge next  
 **Repository:** `luokai25/ultran`  
 **Integration rule:** work directly on `main`; preserve the existing local-first architecture  
 **Cost rule:** reuse the current Supabase, Vercel, Cloudflare and existing provider integrations; no new paid service or dependency without explicit approval.
@@ -113,6 +113,7 @@ Required MCP manager states:
 **Exit criteria:** the server-definition persistence and encryption tests are added. Full backend CI must pass before this step is considered verified. Remaining Phase 1 work: durable grant signing material, durable audit history, and restart/revocation/single-use regression tests.
 
 ### Phase 2 — authenticated cloud MCP bridge
+**Next implementation target.** Design the cloud registry and remote Streamable HTTP bridge with strict egress protections before enabling endpoint invocation.
 1. Add owner-scoped Supabase schema for remote MCP server metadata and discovered tools.
 2. Add authenticated Edge Function operations for register, probe, list, enable/disable and invoke.
 3. Implement Streamable HTTP client with SSRF-safe egress and strict resource limits.

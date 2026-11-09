@@ -116,7 +116,7 @@ function openAIContent(value: unknown): string {
   return "";
 }
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
-  const deadline = Date.now() + 18_000;
+  const deadline = Date.now() + 12_000;
   const db = service();
   const candidates = await listStudioCandidates(ownerId, withSearch);
   if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
@@ -138,7 +138,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
           ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(Math.max(1000, Math.min(15_000, deadline - Date.now()))),
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(10_000, deadline - Date.now()))),
       });
       const raw = await response.text();
       if (!response.ok) {
@@ -191,7 +191,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   throw new Error(lastError);
 }
 async function callStudioStreaming(ownerId: string, prompt: string, projectId: string, title: string): Promise<{ text: string; model: string }> {
-  const deadline = Date.now() + 62_000;
+  const deadline = Date.now() + 55_000;
   const db = service();
   const candidates = await listStudioCandidates(ownerId, false);
   if (!candidates.length) throw new Error("no_eligible_free_model_key");
@@ -634,14 +634,25 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const citationIndexes = [...markdown.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
-  const validation = {
-    minimum_length_passed: markdown.length >= 1800,
+  const wordCount = markdown.trim().split(/\s+/).filter(Boolean).length;
+  const validation: Record<string, unknown> = {
+    minimum_length_passed: markdown.length >= 4000,
+    minimum_word_count_passed: wordCount >= 700,
+    word_count: wordCount,
     references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown),
     citation_markers: citationIndexes.length,
     source_citations_match: citationIndexes.every(index => index >= 1 && index <= evidence.length),
+    contents_section: /table of contents|^#{1,3}\s*contents\s*$/im.test(markdown),
+    actionable_workflow: /workflow|step-by-step|implementation plan|process/i.test(markdown),
+    reusable_asset: /template|checklist|worksheet|prompt pack/i.test(markdown),
+    limitations_and_next_steps: /limitations|next steps|caveats/i.test(markdown),
+    placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(markdown),
     analyzed_sources: counts.analyzed,
     requested_sources: target,
   };
+  validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
+    validation.references_section && validation.source_citations_match && validation.contents_section &&
+    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free);
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   const html = markdownPreview(markdown, title);
   const { data: previousDocuments, error: versionError } = await db.from("ultron_product_documents")
@@ -699,11 +710,11 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   }, { onConflict: "project_id,title,version" });
   if (htmlDocument.error) throw htmlDocument.error;
-  const finalStatus = counts.analyzed >= target && validation.references_section && validation.source_citations_match && (evidence.length === 0 || validation.citation_markers > 0) ? "completed" : "partial";
+  const finalStatus = counts.analyzed >= target && validation.quality_checks_passed && (evidence.length === 0 || validation.citation_markers > 0) ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,
-    synthesis_summary: { ...synthesis, overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and references section check passed." : "A source-backed draft was created, but the research target or basic reference check was not reached. Review and expand it before publication.", research_stop_reason: coverageReason, validation },
+    synthesis_summary: { ...synthesis, overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and all structural quality checks passed." : "A source-backed draft was created, but the research target or one or more quality checks were not reached. Review and improve it before publication.", research_stop_reason: coverageReason, validation },
     updated_at: new Date().toISOString(), completed_at: new Date().toISOString(),
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: artifact.id, title, format: "markdown", bytes: new TextEncoder().encode(markdown).byteLength });

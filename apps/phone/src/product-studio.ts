@@ -514,7 +514,57 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   const binary = atob(OFFER_BUILDER_HTML_GZIP_BASE64);
   const compressed = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-  return await new Response(stream).text();
+  let html = await new Response(stream).text();
+  const replaceBlock = (source: string, start: string, end: string, replacement: string) => {
+    const from = source.indexOf(start);
+    const to = source.indexOf(end, from + start.length);
+    if (from < 0 || to < 0) throw new Error("Offer Builder enhancement point not found: " + start);
+    return source.slice(0, from) + replacement + "\n" + source.slice(to);
+  };
+
+  const summaryStep = [
+    "async function s3(){",
+    " const T=S.topic,p=S.pocket;",
+    " shell(\"<h2>Your eBook Structure</h2><div id='summary'>\"+loader('Generating your eBook summary…','Building the overview from your approved outline and transformation map')+\"</div>\");",
+    " try {",
+    "  const r=await ultronApi('generate',{project_id:S.projectId,stage:'summary',context:{topic:T,audience:p.aud,pocket:p,outline:S.outline,transformation:{before_after:S.vtm,stages:S.map}}});",
+    "  S.summary=r.result||{};S.title=S.summary.title||cap(T)+' for '+p.aud;S.sub=S.summary.subtitle||'A practical guide to '+p.outcome+', without '+p.avoid;",
+    "  await saveOfferState('ebook_summary');",
+    "  const learn=(S.summary.what_you_learn||S.map.slice(0,4).map(m=>m[1])).map(x=>'<li>'+esc(x)+'</li>').join('');",
+    "  const about=esc(S.summary.about||S.outline.promise||'');",
+    "  $('#summary').innerHTML=\"<div class='card'><small>EBOOK SUMMARY</small><h3>\"+esc(S.title)+\"</h3><p class='mu'>\"+esc(S.sub)+\"</p><div class='two'><div><b>About this eBook</b><p>\"+about+\"</p></div><div><b>What you’ll learn</b><ul>\"+learn+\"</ul></div></div><div class='meta'><span><b>\"+esc(String(S.summary.predicted_word_count_range||'7,000–11,000'))+ \"</b> words predicted</span><span><b>\"+esc(String(S.summary.reading_minutes||40))+\"</b> min reading time</span><span><b>\"+esc(String(S.summary.chapter_count||7))+\"</b> chapters</span><span><b>\"+esc(String(S.summary.bonus_count||2))+\"</b> bonus materials</span></div><div class='act'><button class='btn' id='cn'>Continue</button></div></div>\");",
+    "  $('#cn').onclick=async()=>{await saveOfferState('ebook_summary_approved');ms()};",
+    " } catch(e) { $('#summary').innerHTML='<p class=\\\"mu\\\">'+esc(e.message||'Summary generation failed')+'</p><button class=\\\"btn\\\" id=\\\"retry-summary\\\">Retry</button>';$('#retry-summary').onclick=s3; }",
+    "}",
+  ].join("\n");
+
+  const manuscriptStep = [
+    "async function ms(){",
+    " const names=['Introduction',...CHAP,'Conclusion','Bonus: Diagnostic Checklist','Bonus: One-Page Action Card'];",
+    " const old=Array.isArray(S.secs)?S.secs:[];",
+    " S.secs=names.map((name,i)=>{const prior=old.find(x=>x.t===name);return prior||{t:name,k:i===0?'in':i<8?'ch':'bn',html:'',markdown:''}});",
+    " S.secs.forEach(section=>{if(!section.markdown&&section.html){const box=document.createElement('div');box.innerHTML=section.html;section.markdown=box.textContent||''}});",
+    " S.words=S.secs.reduce((count,section)=>count+(section.markdown?section.markdown.split(/\\s+/).filter(Boolean).length:0),0);",
+    " S.pal=S.pal||PAL[hs(S.topic)%3];",
+    " shell(\"<h2>Your eBook Structure</h2><div class='card'><div class='pills' id='pl'><span>Chapter plan</span><span>Manuscript</span><span>Branding</span><span>Ready</span></div><div class='row'><span class='mu' id='st'></span><span id='wc' class='mu'>\"+S.words.toLocaleString()+\" words written</span></div><div class='bar'><i id='pb'></i></div><div class='ms'><div class='tocl' id='toc'></div><div class='rd' id='rd'></div></div></div>\");",
+    " pill(0);const pending=S.secs.filter(section=>!section.markdown).length;$('#st').textContent=pending<names.length?'Resuming saved manuscript sections…':'Planning your chapters…';$('#pb').style.width=Math.round((names.length-pending)/names.length*80)+'%';",
+    " $('#toc').innerHTML=names.map((name,i)=>\"<div id='t\"+i+\"'>\"+(S.secs[i].markdown?'✓':'○')+\" \"+esc(name)+\"</div>\").join('');",
+    " $('#rd').innerHTML=names.map((name,i)=>\"<article><small>SECTION \"+String(i+1).padStart(2,'0')+\"</small><h3>\"+esc(name)+\"</h3><div id='b\"+i+\"'>\"+(S.secs[i].html||'')+\"</div></article>\").join('');pill(1);",
+    " for(let wave=0;wave<4;wave++){const ids=[0,1,2].map(j=>wave*3+j).filter(i=>i<names.length&&!S.secs[i].markdown);if(!ids.length)continue;toast('Generating wave '+(wave+1)+'/4 ('+ids.length+' sections)');$('#st').textContent='Writing '+ids.length+' sections…';await Promise.all(ids.map(write));$('#pb').style.width=Math.round(S.secs.filter(section=>section.markdown).length/names.length*80+10)+'%'}",
+    " $('#st').textContent=names.length+' of '+names.length+' sections complete · quality review';await saveOfferState('manuscript_complete');",
+    " try{const review=await ultronApi('generate',{project_id:S.projectId,stage:'quality',context:{topic:S.topic,pocket:S.pocket,outline:S.outline,transformation:{before_after:S.vtm,stages:S.map},sections:S.secs.map(section=>({title:section.t,text:(section.markdown||'').slice(0,2200)}))}});S.quality=review.result||{};await saveOfferState('quality_review');if(S.quality.passed===false)toast('Quality review found items to inspect before publication.')}catch(e){S.quality={error:e.message||'Quality review unavailable'};try{await saveOfferState('quality_review_unavailable')}catch(_){}}",
+    " await sleep(350);brand();",
+    "}",
+  ].join("\n");
+
+  html = replaceBlock(html, "function s3(){", "const pill=", summaryStep);
+  html = replaceBlock(html, "async function ms(){", "async function write", manuscriptStep);
+  html = html.replace("s.html=b.innerHTML;S.words+=", "s.html=b.innerHTML;s.markdown=content;S.words+=");
+  const oldMarkdown = "const markdown='# '+S.title+'\\n\\n'+(S.sub||'')+'\\n\\n'+(S.outline?.promise||'')+'\\n\\n'+S.secs.map(s=>'## '+s.t+'\\n\\n'+(s.markdown||'')).join('\\n\\n');";
+  const newMarkdown = "const markdown='# '+S.title+'\\n\\n'+(S.sub||'')+'\\n\\n'+(S.summary?.about||S.outline?.promise||'')+'\\n\\n## What You Will Learn\\n\\n'+(S.summary?.what_you_learn||[]).map(x=>'- '+x).join('\\n')+'\\n\\n## Transformation Map\\n\\n'+S.map.map(x=>'- **'+x[0]+'**: '+x[1]+' '+x[2]).join('\\n')+'\\n\\n## Framework Glossary\\n\\n'+(S.summary?.framework_glossary||[]).map(x=>'- **'+(x.name||'Framework')+'**: '+(x.definition||x.description||'')).join('\\n')+'\\n\\n'+S.secs.map(s=>'## '+s.t+'\\n\\n'+(s.markdown||'')).join('\\n\\n');";
+  if (!html.includes(oldMarkdown)) throw new Error("Offer Builder final manuscript patch point not found");
+  html = html.replace(oldMarkdown, newMarkdown);
+  return html;
 }
 
 function closeOfferBuilder(): void {

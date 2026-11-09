@@ -53,6 +53,10 @@ function inlineMarkdown(value: string): string {
   return output;
 }
 function markdownPreview(markdown: string, title: string): string {
+  const arabicCount = (markdown.match(/[\u0600-\u06FF]/g) || []).length;
+  const latinCount = (markdown.match(/[A-Za-z]/g) || []).length;
+  const language = arabicCount > Math.max(20, latinCount * 0.2) ? "ar" : "en";
+  const direction = language === "ar" ? "rtl" : "ltr";
   const lines = markdown.replace(/\r/g, "").split("\n");
   const blocks: string[] = [];
   let index = 0;
@@ -83,7 +87,7 @@ function markdownPreview(markdown: string, title: string): string {
     if (!paragraph.length) paragraph.push(lines[index++].trim());
     blocks.push("<p>" + inlineMarkdown(paragraph.join(" ")) + "</p>");
   }
-  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3,h4,h5,h6{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{padding:9px 12px;border:1px solid #303743;text-align:left}th{background:#171b22}blockquote{margin:1em 0;padding:4px 16px;border-left:3px solid #777;color:#bbc3cf}pre{overflow:auto;padding:16px;border:1px solid #303743;border-radius:10px;background:#13171d;color:#e3e7ed}code{font-family:ui-monospace,monospace}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks.join("\n") + "</main></body></html>";
+  return "<!doctype html><html lang=\"" + language + "\" dir=\"" + direction + "\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3,h4,h5,h6{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}th,td{padding:9px 12px;border:1px solid #303743;text-align:left}th{background:#171b22}blockquote{margin:1em 0;padding:4px 16px;border-inline-start:3px solid #777;color:#bbc3cf}pre{overflow:auto;padding:16px;border:1px solid #303743;border-radius:10px;background:#13171d;color:#e3e7ed}code{font-family:ui-monospace,monospace}pre,code{direction:ltr;text-align:left;unicode-bidi:plaintext}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks.join("\n") + "</main></body></html>";
 }
 type StudioProvider = "openrouter" | "groq" | "google_ai_studio";
 type StudioCandidate = { provider: StudioProvider; key: Record<string, unknown>; model: string };

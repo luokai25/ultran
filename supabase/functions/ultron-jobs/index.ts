@@ -488,15 +488,18 @@ Deno.serve(async (req: Request) => {
           const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages|product_project_not_found/i.test(message);
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
-          const waitingForProvider = job.job_type === "product.generate" || message.startsWith("model_not_configured");
-          const delay = waitingForProvider ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          const waitingForProvider = job.job_type === "product.generate" &&
+            /no_eligible_free_model_key|no_free_google_search_model_available|_http_(429|5\\d\\d)|provider_unavailable|quota|rate.?limit|timed? ?out|fetch failed/i.test(message);
+          const delay = waitingForProvider || message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
           if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};
             const projectId = typeof payload.project_id === "string" ? payload.project_id : "";
             if (projectId) {
-              const projectStatus = exhausted ? "failed" : "waiting_for_provider";
+              const projectPatch: Record<string, unknown> = { error_message: message.slice(0, 500), updated_at: new Date().toISOString() };
+              if (exhausted) projectPatch.status = "failed";
+              else if (waitingForProvider) projectPatch.status = "waiting_for_provider";
               const { data: projectUpdate, error: projectUpdateError } = await db.from("ultron_product_projects")
-                .update({ status: projectStatus, error_message: message.slice(0, 500), updated_at: new Date().toISOString() })
+                .update(projectPatch)
                 .eq("owner_id", owner_id).eq("id", projectId)
                 .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])
                 .select("id").maybeSingle();
@@ -504,8 +507,8 @@ Deno.serve(async (req: Request) => {
               if (projectUpdate) {
                 const { error: eventError } = await db.from("ultron_product_events").insert({
                   owner_id: owner_id, project_id: projectId, stage: "system",
-                  event_type: exhausted ? "job.failed" : "provider.waiting",
-                  payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after checking the provider status." : "A free provider is temporarily unavailable. ULTRON will retry after its cooldown.", retry_after_seconds: delay },
+                  event_type: exhausted ? "job.failed" : waitingForProvider ? "provider.waiting" : "job.retrying",
+                  payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after reviewing the failure." : waitingForProvider ? "A free provider is temporarily unavailable. ULTRON will retry after its cooldown." : "A temporary worker error occurred. ULTRON will retry this checkpoint.", retry_after_seconds: delay },
                 });
                 if (eventError) throw eventError;
               }

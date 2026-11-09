@@ -521,7 +521,7 @@ function sanitizeProductCsv(markdown: string): { content: string; rows: number; 
   return { content, rows: rows.length - 1, columns };
 }
 function requiresSpreadsheetCsv(value: unknown): boolean {
-  return /spreadsheet|calculator|tracker|planner|budget|data/i.test(String(value ?? ""));
+  return /spreadsheet|calculator|tracker|planner|budget/i.test(String(value ?? ""));
 }
 
 async function workerProcess(projectId: string, ownerId: string, jobId: string, researchRound = 0): Promise<Record<string, unknown>> {

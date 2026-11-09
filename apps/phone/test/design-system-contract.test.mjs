@@ -41,7 +41,7 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.deepEqual(stylesheetLinks, ["./src/chatgpt-ui.css"]);
   assert.match(html, /<title>ULTRON<\/title>/);
   assert.match(html, /id="avatar"/); // retained only as a stable DOM contract, hidden by the new design
-  assert.match(css, /\.stage\s*,\s*\.hero-kicker,\s*\.hero-status/);
+  assert.match(css, /\.hero-kicker,\s*\.stage,\s*\.hero-status/);
   assert.match(css, /\.brand-mark,\s*#drawer-mark/);
   assert.match(css, /--bg:\s*#212121/);
   assert.match(css, /--surface:\s*#2f2f2f/);

@@ -467,7 +467,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
   }
   const { data: priorSources } = await db.from("ultron_product_sources").select("domain,canonical_url").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
-  const priorDomains = [...new Set((priorSources || []).map(row => clean(row.domain, 120)).filter(Boolean))].slice(0, 100);
+  const allPriorDomains = new Set((priorSources || []).map(row => clean(row.domain, 120).replace(/^www\\./, "")).filter(Boolean));
+  const priorDomains = [...allPriorDomains].slice(-100);
   const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
   const searched = await runWithProviderWait(ownerId, projectId, "research", () => callGemini(ownerId, [
@@ -480,17 +481,25 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const priorUrls = new Set((priorSources || []).map(row => {
     try { const url = new URL(row.canonical_url); url.hash = ""; return url.toString(); } catch { return ""; }
   }).filter(Boolean));
-  const seenDomains = new Set<string>();
-  const urls = unique.filter(item => {
+  const candidates = unique.flatMap(item => {
     try {
       const url = new URL(item.url); url.hash = "";
-      if (priorUrls.has(url.toString())) return false;
-      const domain = url.hostname;
-      if (seenDomains.has(domain)) return false;
-      seenDomains.add(domain);
-      return true;
-    } catch { return false; }
-  }).slice(0, 24);
+      if (priorUrls.has(url.toString())) return [];
+      return [{ item, canonical: url.toString(), domain: url.hostname.replace(/^www\\./, "") }];
+    } catch { return []; }
+  });
+  const seenDomains = new Set<string>();
+  const freshDomains = candidates.filter(record => {
+    if (allPriorDomains.has(record.domain) || seenDomains.has(record.domain)) return false;
+    seenDomains.add(record.domain);
+    return true;
+  });
+  const repeatDomains = candidates.filter(record => {
+    if (seenDomains.has(record.domain)) return false;
+    seenDomains.add(record.domain);
+    return true;
+  });
+  const urls = [...freshDomains, ...repeatDomains].slice(0, 24).map(record => record.item);
   const discoveredRecords = await Promise.all(urls.map(async item => {
     const parsed = new URL(item.url);
     parsed.hash = "";

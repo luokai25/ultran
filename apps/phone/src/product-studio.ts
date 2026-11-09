@@ -575,7 +575,7 @@ async function decodeOfferBuilderHtml(): Promise<string> {
     if (markdownStart < 0 || finalizeStart <= markdownStart) {
       throw new Error("Offer Builder manuscript export block could not be located safely.");
     }
-    html = html.slice(0, markdownStart) + newMarkdown + "\\n" + html.slice(finalizeStart);
+    html = html.slice(0, markdownStart) + newMarkdown + "\n" + html.slice(finalizeStart);
   }
   return html;
 }

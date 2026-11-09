@@ -272,7 +272,7 @@ function offerBuilderSteps(stage: string): string[] {
   return [stage];
 }
 
-function offerBuilderResult(stage: string, values: Record<string, unknown>): unknown {
+function offerBuilderResult(stage: string, values: Record<string, unknown>, context: Record<string, unknown> = {}): unknown {
   if (stage === "discovery") {
     const directions = isObject(values.directions) && Array.isArray(values.directions.directions) ? values.directions.directions : [];
     const scored: Array<Record<string, unknown>> = isObject(values.score) && Array.isArray(values.score.pockets) ? values.score.pockets.filter(isObject) : [];
@@ -286,7 +286,7 @@ function offerBuilderResult(stage: string, values: Record<string, unknown>): unk
     const analysis = isObject(values.creator_analysis) ? values.creator_analysis : {};
     return { ...analysis, public_research: values.creator_research ?? {} };
   }
-  if (stage === "section") return { value: typeof values.section === "string" ? values.section : "" };
+  if (stage === "section") return { value: typeof values.section === "string" ? values.section : "", title: clean(context.section_title, 240), index: Math.max(1, Number(context.section_index) || 1) };
   return values[stage] ?? {};
 }
 
@@ -405,7 +405,7 @@ async function processOfferBuilderJob(req: Request, body: Record<string, unknown
     return json({ ok: true, result: { queued: true, step, next_step: steps[nextIndex] } });
   }
 
-  const finalResult = offerBuilderResult(stage, nextValues);
+  const finalResult = offerBuilderResult(stage, nextValues, context);
   const { data: project, error: projectError } = await db.from("ultron_product_projects")
     .select("configuration,progress").eq("id", run.project_id).eq("owner_id", ownerId).maybeSingle();
   if (projectError) throw projectError;
@@ -477,7 +477,18 @@ Deno.serve(async (req: Request) => {
     if (!project) return json({ error: "project_not_found" }, 404);
     const configuration = isObject(project.configuration) ? project.configuration : {};
     const builder = isObject(configuration.offer_builder) ? configuration.offer_builder : {};
-    if (body.action === "get") return json({ ok: true, project, state: isObject(builder.state) ? builder.state : {} });
+    if (body.action === "get") {
+      const { data: activeRun, error: activeRunError } = await db.from("ultron_offer_builder_runs")
+        .select("id,requested_stage,status,progress,step_index,error_message,updated_at")
+        .eq("owner_id", auth.ownerId).eq("project_id", projectId)
+        .in("status", ["queued","running","retry_wait","waiting_for_provider"])
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      if (activeRunError) throw activeRunError;
+      return json({
+        ok: true, project, state: isObject(builder.state) ? builder.state : {},
+        generated: isObject(builder.generated) ? builder.generated : {}, active_run: activeRun ?? null,
+      });
+    }
     if (body.action === "save") {
       const nextState = isObject(body.state) ? body.state : {};
       const nextBuilder = { ...builder, state: nextState, updated_at: new Date().toISOString() };

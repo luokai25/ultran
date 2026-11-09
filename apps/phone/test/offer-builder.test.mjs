@@ -29,6 +29,10 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /OFFER_BUILDER_HTML_GZIP_BASE64/);
   assert.match(host, /functions\.invoke\("ultron-offer-builder"/);
   assert.match(host, /event\.source !== frame\.contentWindow/);
+  assert.match(host, /stage:'summary'/);
+  assert.match(host, /stage:'quality'/);
+  assert.match(host, /s\\.markdown=content/);
+  assert.match(host, /Resuming saved manuscript sections/);
   assert.match(backend, /functions\/v1\/ultron-brain/);
   assert.match(backend, /action: "chat"/);
   assert.match(backend, /offer_builder/);

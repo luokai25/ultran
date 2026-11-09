@@ -521,7 +521,7 @@ function sanitizeProductCsv(markdown: string): { content: string; rows: number; 
   return { content, rows: rows.length - 1, columns };
 }
 function requiresSpreadsheetCsv(value: unknown): boolean {
-  return /spreadsheet|calculator|tracker|planner|budget/i.test(String(value ?? ""));
+  return /spreadsheet|calculator|tracker|planner|budget|data/i.test(String(value ?? ""));
 }
 
 async function workerProcess(projectId: string, ownerId: string, jobId: string, researchRound = 0): Promise<Record<string, unknown>> {
@@ -788,7 +788,14 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     .select("version").eq("owner_id", ownerId).eq("project_id", projectId)
     .order("version", { ascending: false }).limit(1);
   if (versionError) throw versionError;
-  const version = Math.max(1, Number(previousDocuments?.[0]?.version ?? 0) + 1);
+  const { data: currentJobArtifacts, error: currentJobArtifactsError } = await db.from("ultron_artifacts")
+    .select("metadata").eq("owner_id", ownerId).eq("source_job_id", jobId);
+  if (currentJobArtifactsError) throw currentJobArtifactsError;
+  const retryVersion = (currentJobArtifacts ?? []).reduce((maximum: number, row: Record<string, unknown>) => {
+    const metadata = isObject(row.metadata) ? row.metadata : {};
+    return metadata.product_project_id === projectId ? Math.max(maximum, Number(metadata.version) || 0) : maximum;
+  }, 0);
+  const version = retryVersion || Math.max(1, Number(previousDocuments?.[0]?.version ?? 0) + 1);
   const storagePath = ownerId + "/products/" + projectId + "/product-v" + version + ".md";
   const bucket = db.storage.from("ultron-private");
   const markdownBytes = new TextEncoder().encode(markdown);
@@ -927,7 +934,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   }).eq("id", projectId).eq("owner_id", ownerId).eq("status", "validating").select("id").maybeSingle();
   if (finalizeError) throw finalizeError;
   if (!finalizedProject) {
-    await bucket.remove([storagePath, htmlPath, zipPath]);
+    await bucket.remove([storagePath, htmlPath, zipPath, ...(productCsv ? [csvPath] : [])]);
     await db.from("ultron_artifacts").delete().eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, version });
     await db.from("ultron_product_documents").delete().eq("owner_id", ownerId).eq("project_id", projectId).eq("version", version);
     return { project_id: projectId, status: "paused_or_cancelled", skipped: true };

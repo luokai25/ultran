@@ -7,54 +7,34 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-test("Ultron quiet UI stylesheet is loaded after all existing theme layers", async () => {
+test("the canonical client loads one replacement stylesheet instead of stacked theme layers", async () => {
   const html = await read("index.html");
-  const paths = [
-    "./src/styles.css",
-    "./src/workspace.css",
-    "./src/experience.css",
-    "./src/finish.css",
-    "./src/quiet-ui.css",
-  ];
-  const positions = paths.map((path) => html.indexOf(path));
-  assert.ok(positions.every((position) => position >= 0), "every required stylesheet must be loaded");
-  assert.deepEqual(positions, [...positions].sort((a, b) => a - b),
-    "quiet layer must load after base, workspace, experience and finishing styles");
+  const paths = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(paths, ["./src/chatgpt-ui.css"]);
 });
 
-test("quiet layer uses canonical ULTRON tokens and supports narrow devices and accessibility", async () => {
-  const css = await read("src/quiet-ui.css");
-  assert.match(css, /--u-bg:\s*#090a0c/i);
-  assert.match(css, /--u-accent:\s*#d5b779/i);
-  assert.match(css, /--accent:\s*var\(--u-accent\)/i);
-  assert.doesNotMatch(css, /#e52d41|#ff7180|#8d071d/i);
-  assert.match(css, /max-width:\s*390px/);
+test("new design tokens, responsive layouts and accessibility are present in the shipped stylesheet", async () => {
+  const css = await read("src/chatgpt-ui.css");
+  assert.match(css, /--bg:\s*#212121/i);
+  assert.match(css, /--surface:\s*#2f2f2f/i);
+  assert.match(css, /--accent:\s*#10a37f/i);
+  assert.match(css, /--accent-hover:\s*#0e9272/i);
+  assert.match(css, /max-width:\s*520px/);
+  assert.match(css, /max-width:\s*899px/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
-  assert.match(css, /active-identity-button \{ display: inline-flex/);
-  assert.match(css, /active-identity-button \{ display: inline-flex !important/);
   assert.match(css, /\[hidden\].*display: none !important/);
   assert.match(css, /overscroll-behavior/);
 });
 
 
-test("phone experience uses a restrained warm-metal accent rather than legacy decorative golds", async () => {
-  const css = await read("src/quiet-ui.css");
-  assert.match(css, /--u-accent:\s*#d5b779/i);
-  assert.match(css, /--u-accent-strong:\s*#e8cb91/i);
-  for (const legacyColor of [
-    "#fff5d8", "#f2ead8", "#f1d58e", "#a58f5b", "#e6cb83",
-    "#e6c77a", "#e6c878", "#8e7140", "#6d532c", "#f0d99a", "#c49b4d",
-    "rgba(217,185,108", "rgba(196,155,77", "rgba(220,196,131",
-    "#9d8a5e", "#82734e", "#a18b58", "#c49b42", "#a48b51", "#9c906f",
-    "#e5c77a", "#b88d37", "#e3c778", "#ebd18c", "#e8cf8b", "#ad9559",
-    "#e9cd82", "#bb913e", "#b8a36d", "#d4b763", "#d9a852", "#cdb165",
-    "#e8d39a", "#e7ca79", "#e9d18c", "#e6d39a", "#d7bb6c", "#e5d29a",
-    "#ead28c", "#d9c17e", "#c99b52", "#c4a95f",
-  ]) {
-    assert.equal(css.toLowerCase().includes(legacyColor.toLowerCase()), false,
-      "retired gold color " + legacyColor + " must not appear in the phone experience layer");
-  }
+test("the active accent is restrained green and the interface uses neutral charcoal surfaces", async () => {
+  const css = await read("src/chatgpt-ui.css");
+  assert.match(css, /--accent:\s*#10a37f/i);
+  assert.match(css, /--accent-hover:\s*#0e9272/i);
+  assert.match(css, /--bg:\s*#212121/i);
+  assert.match(css, /--surface:\s*#2f2f2f/i);
+  assert.doesNotMatch(css, /#d5b779|#e8cb91|#e34b58|#ff2a2a/i);
 });
 
 

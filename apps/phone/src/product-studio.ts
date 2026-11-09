@@ -165,7 +165,7 @@ function renderQuality(project: ProductProject): void {
     ["minimum_length_passed", "Minimum product length"],
     ["minimum_word_count_passed", "At least 700 words"],
     ["references_section", "References section"],
-    ["source_citations_match", "At least five distinct grounded sources are cited"],
+    ["source_citations_match", "Distinct citations match the source register"],
     ["body_external_links_match_sources", "External links match researched sources"],
     ["contents_section", "Contents section"],
     ["actionable_workflow", "Actionable workflow"],
@@ -177,7 +177,7 @@ function renderQuality(project: ProductProject): void {
     ["presentation_pptx_valid", "Editable PowerPoint deck (when required)"],
     ["docx_export_ready", "Editable Word edition"],
   ];
-  const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed");
+  const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed · " + String(validation.distinct_cited_sources ?? 0) + " cited");
   panel.append(summary);
   for (const [key, label] of checks) {
     const passed = validation[key] === true;

@@ -68,9 +68,9 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /persistStudioExport/);
   assert.match(source, /artifact_ids: \{ docx:/);
   assert.ok(source.includes('"product.html": htmlBytes,' + "\n" + '    "product.docx": docxBytes'));
-  assert.match(source, /product-v" \+ version \+ "\\.docx/);
-  assert.match(source, /product-v" \+ version \+ "\\.pptx/);
-  assert.match(source, /product-v" \+ version \+ "\\.xlsx/);
+  assert.ok(source.includes('product-v" + version + ".docx'));
+  assert.ok(source.includes('product-v" + version + ".pptx'));
+  assert.ok(source.includes('product-v" + version + ".xlsx'));
   assert.match(source, /spreadsheet_xlsx_valid/);
   assert.match(source, /presentation_pptx_valid/);
   assert.match(source, /"product.docx": docxBytes/);
@@ -85,7 +85,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /formula_injection_protection/);
   assert.ok(source.includes('"research/source-register.csv"'));
   assert.match(source, /format: "zip"/);
-  assert.match(source, /product-v" \+ version/);
+  assert.ok(source.includes('product-v" + version + ".xlsx'));
   assert.match(source, /version, source_counts/);
   assert.match(source, /runWithProviderWait/);
   assert.match(source, /researchNotesText/);

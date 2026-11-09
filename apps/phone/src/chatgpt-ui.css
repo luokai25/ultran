@@ -255,3 +255,7 @@ progress { width:100%; accent-color:var(--accent); }
   #drawer[data-open="false"] { visibility:hidden; }
   #drawer[data-open="true"] { visibility:visible; }
 }
+
+/* Keep the home state focused on one prompt and the composer. */
+.subgreeting, .identity-visual-section { display:none !important; }
+.identity-symbol { color:var(--text-secondary); font-size:11px; font-weight:650; letter-spacing:.02em; }

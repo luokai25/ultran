@@ -648,6 +648,15 @@ if (entry.auth === "oauth2") {
       let preparedExternal: PreparedExternal | null = null;
       try {
         if (entry.auth === "oauth2") {
+          if (!composioConfigured) {
+            composioHealth.scrollIntoView({ behavior: "smooth", block: "center" });
+            composioKeyInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            composioKeyInput.focus({ preventScroll: true });
+            note.dataset.tone = "bad";
+            note.textContent = "One-time setup required: add the Composio Project API key in OAuth gateway below. ULTRON will then open Google's authorization page directly.";
+            act.disabled = false;
+            return;
+          }
           // Browsers block window.open after an awaited fetch. Reserve the tab
           // synchronously inside this user gesture, then navigate it once the
           // server has returned Google's managed OAuth URL.

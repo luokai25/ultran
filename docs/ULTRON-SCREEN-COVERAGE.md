@@ -26,7 +26,7 @@ Do not mark a box from source inspection alone when it requires a browser, emula
 ## Canonical client: apps/phone
 
 ### Main conversation experience
-- [ ] App shell, top bar, ULTRON identity/core and global status
+- [ ] App shell, top bar, text-first ULTRON identity and global status
 - [ ] Chat/home empty state and suggested tasks
 - [ ] Conversation thread and message rendering
 - [ ] Streaming, stop, retry and empty-response states
@@ -165,3 +165,6 @@ Canonical feature screen: `#product-studio-screen`.
 - Workspace states: queued, active generation, live event timeline, source counters (discovered/opened/analyzed/rejected/failed), source detail links, sandboxed HTML preview, private Markdown download, partial completion, provider unavailable, cancellation and refresh/reconnect.
 - Data: owner-scoped Supabase Product Studio tables and durable `product.generate` jobs.
 - Verification still required: 360x800, 390x844, 768x1024, 1280x800, 1440x900; keyboard/focus; Android WebView; live signed download; free-model quota exhaustion; worker retry/recovery; large/long product previews.
+
+
+- 2026-11-09, full visual reset initiated: The canonical `apps/phone` shell now loads one replacement stylesheet, `src/chatgpt-ui.css`, instead of the previous nine-layer stylesheet stack. The new direction removes the orb/hero visuals and cinematic effects, uses a ChatGPT-like charcoal conversation workspace, and keeps the existing feature markup and DOM contracts in place. The production web and APK share this client. This is an implementation start, not a completion claim: visual QA across the full screen inventory, typecheck, lint, tests, build, Android WebView parity and live backend interactions remain to be run.

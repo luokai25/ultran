@@ -154,3 +154,12 @@ The secondary Next.js surface currently has one route at `apps/web/src/app/page.
 - 2026-11-06, live metadata check: Supabase reports 15/15 connected OpenRouter keys, 15/15 connected Groq keys and 15/15 connected Google AI Studio keys. `ultron-brain` Edge Function is ACTIVE at version 16. No secret values were read or displayed.
 - 2026-11-06, gstack environment: gstack `1.96.0.0` is registered as a global Codex skill. With Bun 1.4.4 selected from the user-local install, `gstack-doctor` reports 12 checks OK, one Codex-auth warning, artifact sync not configured, and zero failures. `gstack-design-md check DESIGN.md` passes. The project has a reusable `scripts/setup-gstack-codex.sh` installer and customized `DESIGN.md` motion contract.
 - 2026-11-06, local browser QA: 390×844 mobile and 1440×900 desktop previews showed no document horizontal overflow, browser exceptions or failed network responses across Chat, Models, Mind Map, Connectors, Settings, Identities, Learning Review, Capabilities and LLM API Keys. Desktop navigation is a persistent side rail; mobile retains the bottom bar. Authenticated live sign-in was not simulated in this browser run.
+
+
+## AI Digital Product Studio (added 2026-11-09)
+
+- Entry: three-line drawer item "AI Digital Products Generating" in canonical `apps/phone`.
+- Start states: disconnected cloud account, empty project list, request prompt, autonomous opportunity discovery, research-depth selector, queueing and queue errors.
+- Workspace states: queued, active generation, live event timeline, source counters (discovered/opened/analyzed/rejected/failed), source detail links, sandboxed HTML preview, private Markdown download, partial completion, provider unavailable, cancellation and refresh/reconnect.
+- Data: owner-scoped Supabase Product Studio tables and durable `product.generate` jobs.
+- Verification still required: 360x800, 390x844, 768x1024, 1280x800, 1440x900; keyboard/focus; Android WebView; live signed download; free-model quota exhaustion; worker retry/recovery; large/long product previews.

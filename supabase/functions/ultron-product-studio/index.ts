@@ -585,8 +585,16 @@ Deno.serve(async (req: Request) => {
         const auth = await ownerFromRequest(req);
         ownerId = auth.id;
       }
-      const projectId = clean(body.project_id, 80), jobId = clean(body.job_id, 80);
-      if (!projectId || !jobId || !ownerId) return json({ error: "project_and_job_required" }, 400);
+      const projectId = clean(body.project_id, 80), jobId = clean(body.job_id, 80), lockToken = clean(body.lock_token, 160);
+      if (!projectId || !jobId || !ownerId || !lockToken) return json({ error: "project_job_and_lease_required" }, 400);
+      const { data: claimedJob, error: claimedJobError } = await db.from("ultron_jobs")
+        .select("id,owner_id,job_type,status,lock_token,payload")
+        .eq("id", jobId).eq("owner_id", ownerId).maybeSingle();
+      if (claimedJobError) throw claimedJobError;
+      const claimedPayload = isObject(claimedJob?.payload) ? claimedJob.payload : {};
+      if (!claimedJob || claimedJob.job_type !== "product.generate" || claimedJob.status !== "running" || claimedJob.lock_token !== lockToken || claimedPayload.project_id !== projectId) {
+        return json({ error: "valid_claimed_product_job_required" }, 403);
+      }
       const result = await workerProcess(projectId, ownerId, jobId, Math.max(0, Math.floor(Number(body.research_round) || 0)));
       return json({ ok: true, result });
     }

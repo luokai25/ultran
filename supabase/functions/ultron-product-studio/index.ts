@@ -782,6 +782,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
     validation.references_section && validation.source_citations_match && validation.contents_section &&
     validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid);
+  await db.from("ultron_product_projects").update({ synthesis_summary: { ...synthesis, validation, source_count: counts.analyzed, research_target: target }, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
   const html = markdownPreview(markdown, title);

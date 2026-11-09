@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ULTRON · Personal AI Control Console",
-  description:
-    "A local-first personal AI system for model orchestration, private memory, approved tools, voice and real work.",
+  title: "ULTRON",
+  description: "The private ULTRON assistant. One consistent web and Android experience.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

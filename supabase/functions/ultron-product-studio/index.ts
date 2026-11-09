@@ -78,7 +78,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(48_000),
+        signal: AbortSignal.timeout(Math.min(12_000, deadline - Date.now())),
       });
       const raw = await response.text();
       if (!response.ok) {
@@ -141,7 +141,7 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
       const response = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(95_000),
+        signal: AbortSignal.timeout(Math.min(60_000, deadline - Date.now())),
       });
       if (!response.ok) {
         const detail = (await response.text()).slice(0, 240);
@@ -311,7 +311,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
   const opportunity = parseJsonObject(identify.text);
   const queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 4) : [];
   const grounded = [...identify.grounding];
-  for (const query of queries.slice(0, 3)) {
+  for (const query of queries.slice(0, 1)) {
     try {
       const searched = await callGemini(ownerId, [
         { role: "user", parts: [{ text: "Use Google Search grounding to find diverse, credible public sources for this research question: " + query + ". Prefer official documentation, academic/government resources, reputable industry research and real practitioner discussions. Return a concise evidence summary. Do not invent URLs or sources." }] }

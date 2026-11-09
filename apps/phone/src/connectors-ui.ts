@@ -816,8 +816,8 @@ if (entry.auth === "oauth2") {
     const token = mcpServerToken.value;
     let parsed: URL;
     try { parsed = new URL(endpoint); } catch { mcpServerStatus.textContent = "Enter a valid HTTPS MCP endpoint."; return; }
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !parsed.hostname || parsed.hash || parsed.search) {
-      mcpServerStatus.textContent = "Use a public HTTPS endpoint without embedded credentials, query parameters or URL fragments. Put bearer tokens in the separate token field.";
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !parsed.hostname || parsed.hash || parsed.search || (parsed.port !== "" && parsed.port !== "443")) {
+      mcpServerStatus.textContent = "Use a public HTTPS endpoint on port 443 without embedded credentials, query parameters or URL fragments. Put bearer tokens in the separate token field.";
       return;
     }
     if (!name) { mcpServerStatus.textContent = "Give this MCP server a name first."; mcpServerName.focus(); return; }

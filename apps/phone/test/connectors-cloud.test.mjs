@@ -143,3 +143,8 @@ test("MCP manager shows recent tool-call audit and refreshes it while open",()=>
  assert.match(screen,/clearInterval\(mcpAuditTimer\)/);
  assert.match(screen,/entry\.latency_ms/);
 });
+
+test("MCP manager accepts only HTTPS port 443 endpoints",()=>{
+ assert.match(screen,/parsed\.port !== "" && parsed\.port !== "443"/);
+ assert.match(screen,/HTTPS endpoint on port 443/);
+});

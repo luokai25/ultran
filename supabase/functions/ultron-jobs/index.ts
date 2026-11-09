@@ -51,7 +51,7 @@ function isFreeModel(provider: CloudProvider, model: string): boolean {
 }
 async function hasAvailableCloudModel(secretDb: ReturnType<typeof createClient>, ownerId: string): Promise<boolean> {
   for (const provider of CLOUD_PROVIDERS) {
-    const { data, error } = await secretDb.from(`ultron_${provider.id}_keys`).select("models").eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected").limit(20);
+    const { data, error } = await secretDb.from(`ultron_${provider.id}_keys`).select("models").eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected");
     if (error) throw error;
     if ((data ?? []).some((row) => Array.isArray(row.models) && row.models.some((model) => typeof model === "string" && isFreeModel(provider.id, model)))) return true;
   }
@@ -102,8 +102,8 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
 
   const attemptedModels = new Set<string>();
   let emptyProposal: { proposal: Record<string, unknown>; model: string } | null = null;
-  const deadline = Date.now() + 42_000;
-  for (const candidate of candidates.slice(0, 16)) {
+  const deadline = Date.now() + 105_000;
+  for (const candidate of candidates) {
     const remainingMs = deadline - Date.now();
     if (remainingMs < 1_000) break;
     const { provider, key, model } = candidate;
@@ -117,7 +117,7 @@ async function generateMemoryProposal(secretDb: ReturnType<typeof createClient>,
       ? { model, messages, temperature: 0.1, max_tokens: 2400 }
       : { model, messages, temperature: 0.1, max_tokens: 2400, response_format: { type: "json_object" } };
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(Math.min(12_000, Math.max(1_000, remainingMs))) });
+      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(Math.min(30_000, Math.max(1_000, remainingMs))) });
       const raw = await response.text();
       if (!response.ok) {
         const state = response.status === 401 ? "invalid" : response.status === 403 ? "expired" : response.status === 429 ? "rate_limited" : "unreachable";
@@ -510,13 +510,37 @@ Deno.serve(async (req: Request) => {
           const dailySearchCap = message.includes("free_google_search_daily_cap_reached");
           const waitingForProvider = (job.job_type === "product.generate" || job.job_type === "offer_builder.generate") && (dailySearchCap || /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_available_model_key|all_provider_keys_failed|_http_(429|5[0-9]{2})|provider_unavailable|quota|rate.?limit|timed.?out|timeout|network|fetch failed/i.test(message));
           const delay = dailySearchCap ? 180 : waitingForProvider ? 180 : message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          let productRetryJobId: string | null = null;
+          if (job.job_type === "product.generate" && exhausted && waitingForProvider) {
+            const retryPayload = isObject(job.payload) ? job.payload : {};
+            const retryProjectId = typeof retryPayload.project_id === "string" ? retryPayload.project_id : "";
+            if (retryProjectId) {
+              const cycle = Math.floor(attempts / Math.max(1, maxAttempts));
+              const retryKey = "product:" + retryProjectId + ":cycle:" + (cycle + 1);
+              const { data: retryJob, error: retryError } = await db.from("ultron_jobs").insert({
+                owner_id, job_type: "product.generate", title: "Resume digital product generation",
+                payload: { project_id: retryProjectId, research_round: Number(retryPayload.research_round) || 0 },
+                priority: 4, max_attempts: 20, idempotency_key: retryKey,
+                run_after: new Date(Date.now() + delay * 1000).toISOString(),
+              }).select("id").single();
+              if (retryError && retryError.code !== "23505") throw retryError;
+              productRetryJobId = retryJob?.id ?? null;
+              if (!productRetryJobId) {
+                const { data: existingRetry, error: existingRetryError } = await db.from("ultron_jobs").select("id")
+                  .eq("owner_id", owner_id).eq("idempotency_key", retryKey).maybeSingle();
+                if (existingRetryError) throw existingRetryError;
+                productRetryJobId = existingRetry?.id ?? null;
+              }
+            }
+          }
           if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};
             const projectId = typeof payload.project_id === "string" ? payload.project_id : "";
             if (projectId) {
               const projectPatch: Record<string, unknown> = { error_message: dailySearchCap ? "ULTRON reached its safe daily free Google Search grounding budget. It will retry after the daily quota resets. No paid search requests are sent." : message.slice(0, 500), updated_at: new Date().toISOString() };
-              if (exhausted) projectPatch.status = "failed";
+              if (exhausted && !productRetryJobId) projectPatch.status = "failed";
               else if (waitingForProvider) projectPatch.status = "waiting_for_provider";
+              if (productRetryJobId) projectPatch.source_job_id = productRetryJobId;
               const { data: projectUpdate, error: projectUpdateError } = await db.from("ultron_product_projects")
                 .update(projectPatch)
                 .eq("owner_id", owner_id).eq("id", projectId)

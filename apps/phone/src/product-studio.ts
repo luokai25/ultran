@@ -142,11 +142,45 @@ function renderDocuments(documents: ProductDetail["documents"]): void {
     list.append(row);
   }
 }
+function renderOpportunity(project: ProductProject): void {
+  const panel = el<HTMLElement>("product-studio-opportunity");
+  panel.replaceChildren();
+  const brief = project.opportunity_brief ?? {};
+  const synthesis = project.synthesis_summary ?? {};
+  const fields: Array<[string, unknown]> = [
+    ["Topic", brief.selected_topic], ["Audience", brief.audience], ["Problem", brief.problem],
+    ["Market gap", brief.market_gap], ["Product promise", brief.promise],
+    ["Evidence synthesis", synthesis.executive_summary],
+  ];
+  for (const [label, value] of fields) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const item = node("div", "product-opportunity-item");
+    item.append(node("strong", "", label), node("p", "", value));
+    panel.append(item);
+  }
+  const themes = Array.isArray(synthesis.recurring_themes) ? synthesis.recurring_themes : [];
+  if (themes.length) {
+    const item = node("div", "product-opportunity-item");
+    item.append(node("strong", "", "Recurring themes"));
+    const list = node("ul", "product-opportunity-themes");
+    for (const theme of themes.slice(0, 8)) {
+      const label = typeof theme === "string" ? theme : isRecord(theme) ? String(theme.theme ?? theme.name ?? "") : "";
+      if (label) list.append(node("li", "", label));
+    }
+    item.append(list);
+    panel.append(item);
+  }
+  if (!panel.childElementCount) panel.append(node("p", "product-studio-empty", "ULTRON is still building the opportunity brief and comparing source evidence."));
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 function renderDetail(detail: ProductDetail): void {
   const project = detail.project;
   el<HTMLElement>("product-studio-start").hidden = true;
   el<HTMLElement>("product-studio-workspace").hidden = false;
   el<HTMLElement>("product-studio-title").textContent = project.title;
+  renderOpportunity(project);
   el<HTMLElement>("product-studio-status").textContent = statusLabel(project.status);
   const progress = el<HTMLProgressElement>("product-studio-progress");
   progress.value = Math.max(0, Math.min(100, Number(project.progress) || 0));

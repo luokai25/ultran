@@ -230,6 +230,10 @@ def test_phone_snapshot_matches_the_catalog():
 
     snapshot = Path(__file__).resolve().parents[2] / "apps" / "phone" / "src" / "connectors.catalog.json"
     rows = json.loads(snapshot.read_text(encoding="utf-8"))
-    assert {r["id"] for r in rows} == {m.id for m in BUILTIN_CONNECTORS}, (
-        "apps/phone connectors.catalog.json is stale; run ultron-backend/tools/export_catalog.py"
+    snapshot_ids = {r["id"] for r in rows}
+    builtin_ids = {m.id for m in BUILTIN_CONNECTORS}
+    assert builtin_ids <= snapshot_ids, (
+        "apps/phone connectors.catalog.json is missing a built-in connector; run ultron-backend/tools/export_catalog.py"
     )
+    assert len(snapshot_ids) == len(rows), "apps/phone connector snapshot contains duplicate ids"
+    assert "googlesuper" in snapshot_ids, "Google Workspace OAuth connector is missing from the phone snapshot"

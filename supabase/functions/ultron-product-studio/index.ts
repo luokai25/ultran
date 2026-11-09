@@ -203,7 +203,7 @@ async function callStudioStreaming(ownerId: string, prompt: string, projectId: s
       const endpoint = studioModelUrl(candidate, true, secret);
       const payload = google
         ? { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }
-        : { model: candidate.model, messages: [{ role: "user", content: prompt }], temperature: 0.35, max_tokens: 8192, stream: true };
+        : { model: candidate.model, messages: [{ role: "user", content: prompt }], temperature: 0.35, max_tokens: 8192, stream: true, stream_options: { include_usage: true } };
       const response = await fetch(endpoint, {
         method: "POST",
         headers: google ? { "Content-Type": "application/json" } : {

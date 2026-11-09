@@ -191,7 +191,7 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
       };
       while (true) {
         const chunk = await reader.read();
-        if (chunk.done) break;
+        const lines = buffer.split(/\r?\n/);
         buffer += decoder.decode(chunk.value, { stream: true });
         const lines = buffer.split(/\\r?\\n/);
         buffer = lines.pop() ?? "";
@@ -249,7 +249,7 @@ function isPublicResearchUrl(value: URL): boolean {
 function robotsPathMatches(rulePath: string, path: string): boolean {
   const exact = rulePath.endsWith("$");
   const raw = exact ? rulePath.slice(0, -1) : rulePath;
-  const escaped = raw.split("*").map(part => part.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path: string }>> {")).join(".*");
+  const escaped = raw.split("*").map(part => part.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&")).join(".*");
   return new RegExp("^" + escaped + (exact ? "$" : "")).test(path);
 }
 async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path: string }>> {
@@ -261,7 +261,7 @@ async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path
       if (response.status === 404) return [];
       if (!response.ok || response.status >= 300) return [{ allow: false, path: "/" }];
       const body = (await response.text()).slice(0, 100_000);
-      const lines = body.split(/\\r?\\n/);
+      const lines = body.split(/\r?\n/);
       let inWildcardGroup = false, groupHasRules = false;
       const rules: Array<{ allow: boolean; path: string }> = [];
       for (const raw of lines) {

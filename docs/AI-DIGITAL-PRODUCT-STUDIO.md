@@ -1,7 +1,7 @@
 # ULTRON AI Digital Product Studio
 ## Product and engineering plan
 
-Status: approved design direction; implementation not started.
+Status: first implementation slice shipped to main and deployed to Supabase; iterative research expansion and multi-format packaging remain in progress.
 Target surfaces: canonical `apps/phone` client (production web + Capacitor Android APK).
 Repository: `luokai25/ultran`.
 Branch policy: `main` only.
@@ -225,3 +225,18 @@ Integration requirements:
 - Track request/token usage and provider errors using the existing accounting fields. Apply per-project request/token budgets and avoid uncontrolled retry loops.
 - The existing LLM API keys power opportunity analysis, synthesis, writing, coding and QA. They do not automatically provide a general-purpose web search/crawling entitlement. Research discovery/fetch must use a separate adapter (or a supported provider-native search capability) with honest source counts and no assumed paid search API. Do not confuse model calls with unique web sources read.
 - Do not rotate, delete, replace or modify existing credentials as part of this feature. The user confirmed they want these existing credentials reused.
+
+
+## 12. Implementation status (2026-11-09)
+
+Shipped first implementation slice:
+- Added owner-scoped project, source, event and document tables with RLS and Realtime publication.
+- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation and worker execution.
+- Routed `product.generate` from the existing durable `ultron-jobs` worker to the Product Studio function.
+- Reused the existing Google AI Studio Vault registry and `ultron_read_llm_secret`; the first research adapter uses Gemini Google Search grounding and free-model eligibility.
+- Added the Product Studio drawer entry, canonical `apps/phone` workspace, source coverage counters, activity timeline, source list, sandboxed preview and Markdown artifact download.
+
+Known first-slice limits:
+- The current worker performs one grounded opportunity pass and opens up to ten returned public HTML/text pages. It does not yet fulfill a 50/100/200/500-source target in one run. It marks the result `partial` when the target is not reached and exposes the real analyzed count.
+- The first export is Markdown. Rich multi-format exports, resumable multi-batch research, source-domain diversity scoring, detailed finding records, advanced QA and versioned iterative drafts are the next implementation phases.
+- A model/API key provides inference, not unlimited search capacity. Google grounding and free-tier quotas remain subject to provider availability and rate limits.

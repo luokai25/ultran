@@ -60,6 +60,14 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);
   assert.match(source, /zipSync/);
+  assert.match(source, /function makeDocx/);
+  assert.match(source, /function makeXlsx/);
+  assert.match(source, /function makePptx/);
+  assert.match(source, /spreadsheet_xlsx_valid/);
+  assert.match(source, /presentation_pptx_valid/);
+  assert.match(source, /"product.docx": docxBytes/);
+  assert.match(source, /"product.pptx": pptxBytes/);
+  assert.match(source, /"product.xlsx": xlsxBytes/);
   assert.match(source, /sanitizeProductCsv/);
   assert.match(source, /formulaLike/);
   assert.match(source, /const csvCell =/);

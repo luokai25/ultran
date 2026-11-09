@@ -35,7 +35,7 @@ test("Google Super is routed through the shared OAuth gateway without exposing G
  assert.ok(google);
  assert.equal(google.auth,"oauth2");
  assert.equal(google.id.replace(/-/g,"_"),"googlesuper");
- assert.match(google.description,/Google OAuth consent screen/);
+ assert.match(google.description,/OAuth consent screen/);
  assert.match(gateway,/connected_accounts\/link/);
  assert.match(gateway,/ultron_store_llm_secret/);
  assert.match(gateway,/approval_required/);

@@ -72,3 +72,11 @@ test("common productivity and developer OAuth connectors are registered for ULTR
 test("Composio auth-config listing stays within the v3.1 maximum page size",()=>{
  assert.match(gateway,/auth_configs\?toolkit_slug=\"\+encodeURIComponent\(toolkit\)\+\"&limit=50/);
 });
+
+test("connector tool discovery exposes read-only and owner-granted state",()=>{
+ assert.match(gateway,/read_only:readOnly,allowed/);
+ assert.match(gateway,/permission_required/);
+ assert.match(main,/Never call a write tool unless allowed is true/);
+ assert.match(ui,/Allow without asking/);
+ assert.match(ui,/setUltronConnectorToolPermission/);
+});

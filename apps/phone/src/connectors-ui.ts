@@ -389,7 +389,7 @@ export function initConnectors(deps: Deps): void {
       actions.append(row);
     }
     detailEl.append(actions);
-    detailEl.append(el("p", "github-approval-note", entry.id === "googlesuper" ? "Security model: Google access is granted only through the Google authorization page. ULTRON never asks for your Google password. Read access is available after consent; sending, editing, sharing and deleting require a separate explicit permission and approval." : "Security model: connected account data is accessed only within the permissions you grant. Operations that change external data require a separate approval showing the exact action."));
+    detailEl.append(el("p", "github-approval-note", entry.id === "googlesuper" ? "Security model: Google access is granted only through the Google authorization page. ULTRON never asks for your Google password. Read access is available after consent; sending, editing, sharing and deleting require a separate explicit permission and approval." : "Security model: connected account data is accessed only within the permissions you grant. Write actions are disabled by default. Enable each exact tool here and revoke it whenever you want."));
 
     const note = el("small", "conn-note");
     const buttons = el("div", "sheet-actions");

@@ -1587,10 +1587,7 @@ button {
   display: none;
 }
 
-/* Focused first connector: GitHub. The marketplace stays intentionally small. */
-#connectors-panel .github-panel-tools > #connectors-search,
-#connectors-panel .github-panel-tools > #connectors-tiers,
-#connectors-panel .github-panel-tools > #connectors-chips { display: none !important; }
+/* Keep catalogue search and filters visible so every connector is discoverable. */
 .connector-brand-heading { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .connector-brand-heading h2 { margin:0; }
 .connector-brand-heading small { color:var(--muted); font-size:10px; letter-spacing:.14em; font-weight:800; }

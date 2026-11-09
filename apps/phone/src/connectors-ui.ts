@@ -232,7 +232,7 @@ export function initConnectors(deps: Deps): void {
       statusEl.textContent = `${enabled.size} connected or enabled across your ULTRON gateway.`;
       statusEl.dataset.tone = "ok";
       const capabilityCount = CATALOG.filter((entry) => enabled.has(entry.id)).reduce((sum, entry) => sum + entry.actions.length, 0);
-      setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} catalog actions are available across ${enabled.size} connectors. Write-capable actions still require approval.` : "No connector permissions are active. Connect only the services you need.");
+      setPermissionOverview(enabled.size > 0 ? "ready" : "empty", capabilityCount, enabled.size > 0 ? `${capabilityCount} catalog actions are available across ${enabled.size} connectors. Write actions remain disabled until you enable each exact tool.` : "No connector permissions are active. Connect only the services you need.");
     } catch {
       if (!panelOpen || generation !== refreshGeneration) return;
       // Never present a stale "On" badge as current backend state after a failed
@@ -498,8 +498,45 @@ if (entry.auth === "oauth2") {
         if (entry.auth === "oauth2") {
           const result = await startUltronConnectorConnection({ providerKey: entry.id.replace(/-/g, "_"), toolkitSlug: toolkit });
           await deps.openExternal(result.redirectUrl);
-          note.textContent = "Complete provider authorization in your browser, then return here to refresh the connection.";
-          act.disabled = false;
+          note.dataset.tone = "";
+          note.textContent = "Waiting for " + entry.name + " authorization. Finish sign-in in the browser; this screen will update automatically.";
+          void (async () => {
+            const deadline = Date.now() + 120_000;
+            let checks = 0;
+            while (Date.now() < deadline && checks < 48 && panelOpen && !detailWrap.hidden) {
+              await new Promise<void>((resolve) => window.setTimeout(resolve, 2500));
+              if (document.visibilityState === "hidden" || !panelOpen || detailWrap.hidden) continue;
+              checks++;
+              try {
+                const current = await refreshUltronConnectorStatus(result.connection.id);
+                if (current.status === "connected") {
+                  await refreshOAuthConnections();
+                  await refreshEnabled();
+                  await refreshAvailableTools();
+                  note.dataset.tone = "ok";
+                  note.textContent = entry.name + " connected. Its available tools are now loaded below.";
+                  act.textContent = "Connected";
+                  act.disabled = true;
+                  return;
+                }
+                if (current.status === "error" || current.status === "refresh_required" || current.status === "revoked") {
+                  note.dataset.tone = "bad";
+                  note.textContent = current.last_error || "Authorization did not complete. Reconnect to try again.";
+                  act.disabled = false;
+                  return;
+                }
+                note.textContent = "Waiting for " + entry.name + " authorization… " + Math.min(checks * 2.5, 120) + "s";
+              } catch (error) {
+                note.textContent = "Still waiting for authorization. " + (error instanceof Error ? error.message : "Connection status will retry.");
+              }
+            }
+            if (panelOpen && !detailWrap.hidden) {
+              note.dataset.tone = "";
+              note.textContent = "Authorization is still pending. Finish sign-in, then tap Refresh status if the account has not appeared.";
+              act.disabled = false;
+            }
+          })();
+          act.disabled = true;
           return;
         } else if (entry.auth === "none") {
           const res = await deps.api(`/v1/connectors/${encodeURIComponent(entry.id)}/${on ? "disable" : "enable"}`, { method: "POST" }, 15_000);

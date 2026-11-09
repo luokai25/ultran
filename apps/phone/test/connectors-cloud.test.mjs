@@ -101,3 +101,16 @@ test("Google and other connector tool catalogues are searchable without truncati
  assert.match(screen,/cachedTools\.filter/);
  assert.match(screen,/matching\.slice\(0, 40\)/);
 });
+
+test("OAuth connection waits for authorization and refreshes tools automatically",()=>{
+ assert.match(screen,/Waiting for .* authorization/);
+ assert.match(screen,/refreshUltronConnectorStatus\(result\.connection\.id\)/);
+ assert.match(screen,/current\.status === "connected"/);
+ assert.match(screen,/await refreshAvailableTools\(\)/);
+});
+
+test("connector catalogue search and category filters remain visible",()=>{
+ assert.doesNotMatch(readFileSync(resolve(root,"apps/phone/src/styles.css"),"utf8"),/#connectors-panel \.github-panel-tools > #connectors-search,[\s\S]*?display: none !important/);
+ assert.match(html,/id="connectors-search"/);
+ assert.match(html,/id="connectors-chips"/);
+});

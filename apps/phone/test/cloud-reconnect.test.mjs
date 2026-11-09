@@ -60,5 +60,5 @@ test("home status never claims Supabase is linked before an owner session is res
   assert.match(main, /updateHeroCloudStatus\(\);/);
   assert.match(html, /id="core-status-label">CHECKING SUPABASE/);
   assert.match(chatUi, /\.hero-status[\s\S]*display:\s*none\s*!important/);
-  assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : "local"/);
+  assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : state === "connecting" \? "checking" : "local"/);
 });

@@ -302,6 +302,7 @@ test("every secondary page uses the same quiet charcoal workspace primitives", a
   assert.match(css, /--bg:\s*#212121/);
   assert.match(css, /--surface:\s*#2f2f2f/);
   assert.match(css, /--accent:\s*#10a37f/);
+  assert.match(css, /\.feature-screen a,[\s\S]*?#connectors-panel a,[\s\S]*?#workspace-panel a \{ color:var\(--accent\); \}/);
   assert.doesNotMatch(css, /#d5b779|#e8cb91|backdrop-filter:\s*blur/);
 });
 

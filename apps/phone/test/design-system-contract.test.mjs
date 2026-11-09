@@ -32,10 +32,11 @@ test("ULTRON design workflow and complete screen inventory remain installed", as
 });
 
 test("canonical phone client uses one clean stylesheet and keeps the existing backend client", async () => {
-  const [html, css, main] = await Promise.all([
+  const [html, css, main, cloudSync] = await Promise.all([
     read("apps/phone/index.html"),
     read("apps/phone/src/chatgpt-ui.css"),
     read("apps/phone/src/main.ts"),
+    read("apps/phone/src/cloud-sync.ts"),
   ]);
   const stylesheetLinks = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(stylesheetLinks, ["./src/chatgpt-ui.css"]);
@@ -54,7 +55,11 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.match(main, /streamUltronSupabaseChat/);
   assert.match(main, /getCloudSession/);
   assert.match(main, /addUltronCloudKey/);
-  assert.doesNotMatch(main, /if \(shouldShow\) void initializeAvatar\(\)/);
+  assert.doesNotMatch(main, /initializeAvatar|import\(["']three["']\)|markSvg|markDataUrl/);
+  assert.match(main, /nativeSecureStorage/);
+  assert.doesNotMatch(main, /registerPlugin[^;]+UltronSecureStorage/);
+  assert.equal((cloudSync.match(/registerPlugin<UltronSecureStoragePlugin>\(['"]UltronSecureStorage['"]\)/g) ?? []).length, 1);
+  assert.match(main, /state === "error" \? "broken" : "local"/);
 });
 
 test("responsive requirements and every full-screen destination remain covered", async () => {

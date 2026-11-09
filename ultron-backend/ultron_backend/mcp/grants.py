@@ -24,6 +24,7 @@ threat when a model can call tools that write files.
 from __future__ import annotations
 
 import hashlib
+import json
 import hmac
 import secrets
 import sqlite3
@@ -113,12 +114,84 @@ class GrantStore:
         key: bytes | None = None,
         default_ttl_s: int = DEFAULT_TTL_S,
         clock: Callable[[], datetime] | None = None,
+        db_path: str | None = None,
+        encryption_key: str | None = None,
     ) -> None:
-        self._key = key or secrets.token_bytes(32)
         self.default_ttl_s = max(1, min(int(default_ttl_s), MAX_TTL_S))
         self._grants: dict[str, Grant] = {}
+        self._lock = threading.RLock()
+        self._db_path = db_path
+        self._fernet: Any = None
+        if encryption_key:
+            try:
+                from cryptography.fernet import Fernet
+                self._fernet = Fernet(encryption_key.encode("ascii"))
+            except Exception as exc:
+                raise ValueError("grant-store encryption key is invalid") from exc
+        self._key = key or secrets.token_bytes(32)
         # Injectable so expiry can be tested without sleeping.
         self._clock: Callable[[], datetime] = clock or utcnow
+        if self._db_path:
+            from pathlib import Path
+            path = Path(self._db_path)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._init_store(key)
+            try:
+                path.chmod(0o600)
+            except OSError:
+                pass
+
+    def _connect(self) -> sqlite3.Connection:
+        db = sqlite3.connect(self._db_path, timeout=10)
+        db.execute("PRAGMA busy_timeout=10000")
+        return db
+
+    def _init_store(self, supplied_key: bytes | None) -> None:
+        with self._connect() as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("CREATE TABLE IF NOT EXISTS grant_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
+            db.execute("""CREATE TABLE IF NOT EXISTS grants (
+                id TEXT PRIMARY KEY, payload TEXT NOT NULL, used INTEGER NOT NULL,
+                revoked_at TEXT, signature TEXT NOT NULL
+            )""")
+            row = db.execute("SELECT value FROM grant_meta WHERE key='signing_key'").fetchone()
+            if row:
+                stored = bytes(row[0])
+                if self._fernet:
+                    try:
+                        stored = self._fernet.decrypt(stored)
+                    except Exception as exc:
+                        raise RuntimeError("grant signing key cannot be decrypted; check ULTRON_CREDENTIAL_ENCRYPTION_KEY") from exc
+                if supplied_key is not None and not secrets.compare_digest(supplied_key, stored):
+                    raise ValueError("supplied grant signing key does not match the persistent store")
+                self._key = stored
+            else:
+                stored = self._fernet.encrypt(self._key) if self._fernet else self._key
+                db.execute("INSERT INTO grant_meta(key, value) VALUES ('signing_key', ?)", (stored,))
+            rows = db.execute("SELECT id, payload, used, revoked_at, signature FROM grants").fetchall()
+        for grant_id, payload, used, revoked_at, signature in rows:
+            data = json.loads(payload)
+            self._grants[grant_id] = Grant(
+                id=data["id"], workspace_id=data["workspace_id"], tool_id=data["tool_id"],
+                capabilities=frozenset(data["capabilities"]),
+                issued_at=datetime.fromisoformat(data["issued_at"]),
+                expires_at=datetime.fromisoformat(data["expires_at"]) if data["expires_at"] else None,
+                single_use=bool(data["single_use"]), used=int(used),
+                revoked_at=datetime.fromisoformat(revoked_at) if revoked_at else None,
+                signature=signature, issued_by=data["issued_by"],
+            )
+
+    def _save(self, grant: Grant) -> None:
+        if not self._db_path:
+            return
+        payload = json.dumps(grant.payload(), sort_keys=True, separators=(",", ":"))
+        with self._connect() as db:
+            db.execute("""INSERT INTO grants(id, payload, used, revoked_at, signature)
+                VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+                payload=excluded.payload, used=excluded.used,
+                revoked_at=excluded.revoked_at, signature=excluded.signature""",
+                (grant.id, payload, grant.used,
+                 grant.revoked_at.isoformat() if grant.revoked_at else None, grant.signature))
 
     # ------------------------------------------------------------------ #
     def issue(
@@ -163,14 +236,17 @@ class GrantStore:
             issued_by=issued_by,
         )
         grant.signature = _sign(self._key, grant.payload())
-        self._grants[grant.id] = grant
+        with self._lock:
+            self._grants[grant.id] = grant
+            self._save(grant)
         return grant
 
     def get(self, grant_id: str) -> Grant:
-        try:
-            return self._grants[grant_id]
-        except KeyError:
-            raise NotFound("grant not found", details={"grant_id": grant_id}) from None
+        with self._lock:
+            try:
+                return self._grants[grant_id]
+            except KeyError:
+                raise NotFound("grant not found", details={"grant_id": grant_id}) from None
 
     def verify(self, grant: Grant | str | None, *, workspace_id: str, tool_id: str, required: Iterable[str]) -> Grant:
         """Return the grant if it authorises this call, else raise."""
@@ -213,31 +289,42 @@ class GrantStore:
         return resolved
 
     def consume(self, grant: Grant) -> None:
-        grant.used += 1
+        with self._lock:
+            current = self.get(grant.id)
+            current.used += 1
+            grant.used = current.used
+            self._save(current)
 
     def revoke(self, grant_id: str) -> Grant:
-        grant = self.get(grant_id)
-        grant.revoked_at = self._clock()
-        return grant
+        with self._lock:
+            grant = self.get(grant_id)
+            grant.revoked_at = self._clock()
+            self._save(grant)
+            return grant
 
     def list(self, workspace_id: str | None = None, *, live_only: bool = False) -> list[Grant]:
         now = self._clock()
-        rows = [
-            g
-            for g in self._grants.values()
-            if (workspace_id is None or g.workspace_id == workspace_id)
-            and (not live_only or g.is_live(now))
-        ]
+        with self._lock:
+            rows = [
+                g
+                for g in self._grants.values()
+                if (workspace_id is None or g.workspace_id == workspace_id)
+                and (not live_only or g.is_live(now))
+            ]
         rows.sort(key=lambda g: g.issued_at, reverse=True)
         return rows
 
     def prune(self) -> int:
         """Drop grants that can never be used again. Returns how many went."""
         now = self._clock()
-        dead = [gid for gid, g in self._grants.items() if not g.is_live(now)]
-        for gid in dead:
-            del self._grants[gid]
-        return len(dead)
+        with self._lock:
+            dead = [gid for gid, g in self._grants.items() if not g.is_live(now)]
+            for gid in dead:
+                del self._grants[gid]
+            if self._db_path and dead:
+                with self._connect() as db:
+                    db.executemany("DELETE FROM grants WHERE id = ?", [(gid,) for gid in dead])
+            return len(dead)
 
 
 # --------------------------------------------------------------------------- #

@@ -31,7 +31,7 @@ test("Offer Builder preserves its supplied HTML and routes generation through UL
   assert.match(host, /event\.source !== frame\.contentWindow/);
   assert.match(host, /stage:'summary'/);
   assert.match(host, /stage:'quality'/);
-  assert.match(host, /s\\.markdown=content/);
+  assert.ok(host.includes("s.html=b.innerHTML;s.markdown=content;S.words+="));
   assert.match(host, /Resuming saved manuscript sections/);
   const extractInjectedCode = (name) => {
     const marker = "const " + name + " = [";

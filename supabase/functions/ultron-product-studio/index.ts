@@ -98,6 +98,9 @@ function isFreeProviderModel(provider: StudioProvider, model: string): boolean {
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
   return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
 }
+function isFreeGoogleSearchModel(model: string): boolean {
+  return /^gemini-2\.5-(?:flash|flash-lite)$/.test(model.toLowerCase().replace(/^models\//, ""));
+}
 function studioModelScore(model: string): number {
   const id = model.toLowerCase();
   if (/gpt-oss-120b|llama-3\.3-70b|llama-4-scout/.test(id)) return 100;
@@ -117,7 +120,7 @@ async function listStudioCandidates(ownerId: string, withSearch: boolean): Promi
     return (data ?? []).flatMap((key: Record<string, unknown>) => {
       if (key.cooldown_until && Date.parse(String(key.cooldown_until)) > Date.now()) return [];
       const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-      const model = models.filter((value) => isFreeProviderModel(provider, value)).sort((a, b) => studioModelScore(b) - studioModelScore(a))[0];
+      const model = models.filter((value) => isFreeProviderModel(provider, value) && (!withSearch || isFreeGoogleSearchModel(value))).sort((a, b) => studioModelScore(b) - studioModelScore(a))[0];
       return model ? [{ provider, key, model } as StudioCandidate] : [];
     });
   }));
@@ -150,9 +153,19 @@ function openAIContent(value: unknown): string {
   if (Array.isArray(value)) return value.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
   return "";
 }
-async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
+async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean, projectId?: string, searchStage = "research") {
   const deadline = Date.now() + 12_000;
   const db = service();
+  if (withSearch) {
+    if (!projectId) throw new Error("google_search_project_required");
+    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+    const { count, error } = await db.from("ultron_product_events").select("sequence", { count: "exact", head: true })
+      .eq("owner_id", ownerId).in("event_type", ["opportunity.search.requested", "research.search.requested"])
+      .gte("created_at", dayStart.toISOString());
+    if (error) throw error;
+    if ((count ?? 0) >= 200) throw new Error("free_google_search_daily_cap_reached");
+    await addEvent(db, ownerId, projectId, searchStage, searchStage === "identification" ? "opportunity.search.requested" : "research.search.requested", { message: "Using the free Google Search grounding budget." });
+  }
   const candidates = await listStudioCandidates(ownerId, withSearch);
   if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
   let lastError = "provider_unavailable";
@@ -450,19 +463,19 @@ async function runWithProviderWait<T>(ownerId: string, projectId: string, stage:
   try { return await task(); }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/no_free_google_search_model_available|no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|_http_429|HTTP 429/i.test(message)) {
+    if (/free_google_search_daily_cap_reached|no_free_google_search_model_available|no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|_http_429|HTTP 429/i.test(message)) {
       const db = service();
       const currentStatus = await projectStopStatus(ownerId, projectId);
       if (!["cancelled","paused","missing"].includes(currentStatus)) {
         const { data: waitingProject, error: waitingError } = await db.from("ultron_product_projects").update({
           status: "waiting_for_provider", active_stage: stage,
-          error_message: "No eligible free model is available right now. ULTRON will retry automatically when a connected provider becomes available.",
+          error_message: message.includes("free_google_search_daily_cap_reached") ? "ULTRON reached its safe daily free Google Search grounding budget. It will retry after the daily quota resets. No paid search requests are sent." : "No eligible free model is available right now. ULTRON will retry automatically when a connected provider becomes available.",
           updated_at: new Date().toISOString(),
         }).eq("id", projectId).eq("owner_id", ownerId)
           .in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"])
           .select("id").maybeSingle();
         if (waitingError) throw waitingError;
-        if (waitingProject) await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: "Waiting for a free provider quota or connection to recover." });
+        if (waitingProject) await addEvent(db, ownerId, projectId, stage, "provider.waiting", { message: message.includes("free_google_search_daily_cap_reached") ? "Waiting for the free daily Google Search grounding budget to reset." : "Waiting for a free provider quota or connection to recover." });
       }
     }
     throw error;
@@ -547,7 +560,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     await addEvent(db, ownerId, projectId, "identification", "stage.started", { message: "Identifying the audience, problem and strongest product opportunity." });
     const identify = await runWithProviderWait(ownerId, projectId, "identification", () => callGemini(ownerId, [
       { role: "user", parts: [{ text: "You are ULTRON's product opportunity analyst. Treat this request as the owner's goal, not as permission to spend money or publish anything. Use Google Search grounding to investigate current public evidence. Do not copy source text. Return valid JSON only with keys: title, selected_topic, audience, problem, evidence, existing_alternatives, market_gap, product_format (choose one of guide, workbook, template_pack, spreadsheet, presentation, software_tool, research_report), promise, research_queries (3-5 strings), opportunity_score (0-100), confidence (low|medium|high), opportunity_summary. Request: " + request + ". If the request is broad or empty, identify a narrow opportunity with evidence. Keep all claims cautious and distinguish evidence from inference." }] }
-    ], true));
+    ], true, projectId, "identification"));
     if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
     opportunity = parseJsonObject(identify.text);
     grounded.push(...identify.grounding);
@@ -575,7 +588,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
   const searched = await runWithProviderWait(ownerId, projectId, "research", () => callGemini(ownerId, [
     { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid these previously researched domains: " + priorDomains.join(", ") + ". Return a concise, search-grounded research brief with recurring findings, counter-evidence, disagreements and unanswered questions, followed by a short evidence summary. Keep the summary under 900 characters. Do not invent URLs, statistics or sources." }] }
-  ], true));
+  ], true, projectId, "research"));
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
   grounded.push(...searched.grounding);
   const existingResearchNotes = Array.isArray(oldConfiguration.research_notes) ? oldConfiguration.research_notes.filter(note => isObject(note) && Number(note.round) !== researchRound + 1 && typeof note.query === "string" && typeof note.summary === "string" && Array.isArray(note.sources)) : [];

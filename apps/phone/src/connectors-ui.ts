@@ -406,8 +406,8 @@ export function initConnectors(deps: Deps): void {
           toolsStatus.textContent = "No executable tools were returned for this connected provider.";
           return;
         }
-        toolsStatus.textContent = `${matching.length} cloud tools available to ULTRON's agent runtime.`;
-        for (const tool of matching) {
+        toolsStatus.textContent = `${matching.length} cloud tools available to ULTRON's agent runtime. Showing the first ${Math.min(40, matching.length)} here; ULTRON can discover the full catalogue when needed.`;
+        for (const tool of matching.slice(0, 40)) {
           const row = el("article", "github-capability-row");
           const details = el("div", "conn-tool-details");
           details.append(el("strong", "conn-tool-name", tool.tool_slug));

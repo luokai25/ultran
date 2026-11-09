@@ -40,6 +40,7 @@ test("Google Super is routed through the shared OAuth gateway without exposing G
  assert.match(gateway,/connected_accounts\/link/);
  assert.match(gateway,/ultron_store_llm_secret/);
  assert.match(gateway,/approval_required/);
+ assert.match(gateway,/toolkit_versions=latest&limit=1000/);
  assert.match(screen,/Google authorization page/);
 });
 

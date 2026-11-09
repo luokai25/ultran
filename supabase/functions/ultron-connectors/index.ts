@@ -115,7 +115,7 @@ Deno.serve(async(req:Request)=>{
    const available:Record<string,unknown>[]=[];
    for(const connection of connections??[]){
     if(!connection.toolkit_slug||!connection.external_account_id)continue;
-    const remote=await composio("/tools?toolkit_slug="+encodeURIComponent(connection.toolkit_slug)+"&toolkit_versions=latest&limit=100",key);
+    const remote=await composio("/tools?toolkit_slug="+encodeURIComponent(connection.toolkit_slug)+"&toolkit_versions=latest&limit=1000",key);
     const candidates=obj(remote)&&Array.isArray(remote.items)?remote.items:obj(remote)&&Array.isArray(remote.tools)?remote.tools:obj(remote)&&Array.isArray(remote.data)?remote.data:[];
     for(const item of candidates){
      if(!obj(item))continue;

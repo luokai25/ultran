@@ -934,6 +934,10 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const productCsv = sanitizeProductCsv(markdown);
   const spreadsheetCsvRequired = requiresSpreadsheetCsv(opportunity.product_format);
   markdown += "\n\n## References\n" + (canonicalReferences.length ? canonicalReferences.join("\n") : "No public source pages were accessible for analysis; treat this draft as an unvalidated starting point.");
+  const docxBytes = makeDocx(title, markdown);
+  const presentationRequired = /presentation|slide|pitch deck/i.test(String(opportunity.product_format ?? ""));
+  const pptxBytes = presentationRequired ? makePptx(title, markdown) : null;
+  const xlsxBytes = productCsv ? makeXlsx(productCsv.content) : null;
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const productBody = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
@@ -960,13 +964,16 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     limitations_and_next_steps: /limitations|next steps|caveats/i.test(productBody),
     placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(productBody),
     spreadsheet_csv_valid: !spreadsheetCsvRequired || Boolean(productCsv),
+    spreadsheet_xlsx_valid: !spreadsheetCsvRequired || Boolean(xlsxBytes?.byteLength),
+    presentation_pptx_valid: !presentationRequired || Boolean(pptxBytes?.byteLength),
+    docx_export_ready: docxBytes.byteLength > 0,
     analyzed_sources: counts.analyzed,
     requested_sources: target,
     quality_checks_passed: false,
   };
   validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
     validation.references_section && validation.source_citations_match && validation.body_external_links_match_sources && validation.contents_section &&
-    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid);
+    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid && validation.spreadsheet_xlsx_valid && validation.presentation_pptx_valid && validation.docx_export_ready);
   await db.from("ultron_product_projects").update({ synthesis_summary: { ...synthesis, validation, source_count: counts.analyzed, research_target: target }, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
@@ -1068,10 +1075,6 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     const safe = /^[=+@]/.test(item) || (/^-/.test(item) && !/^-?\d+(?:\.\d+)?$/.test(item)) ? "'" + item : item;
     return '"' + safe.replace(/"/g, '""') + '"';
   };
-  const docxBytes = makeDocx(title, markdown);
-  const presentationRequired = /presentation|slide|pitch deck/i.test(String(opportunity.product_format ?? ""));
-  const pptxBytes = presentationRequired ? makePptx(title, markdown) : null;
-  const xlsxBytes = productCsv ? makeXlsx(productCsv.content) : null;
   const docxArtifactId = await persistStudioExport(db, ownerId, projectId, jobId, title, version, "docx", docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "document", "Editable Word edition of the original digital product.", { rtl_supported: /[\u0600-\u06FF]/.test(markdown), heading_styles: true });
   const pptxArtifactId = pptxBytes ? await persistStudioExport(db, ownerId, projectId, jobId, title, version, "pptx", pptxBytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "document", "Editable PowerPoint edition of the presentation product.", { slides: Math.min(30, markdown.split(/^# /m).length - 1 || 1) }) : null;
   const xlsxArtifactId = xlsxBytes ? await persistStudioExport(db, ownerId, projectId, jobId, title, version, "xlsx", xlsxBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "document", "Editable Excel workbook generated from the validated spreadsheet data.", { rows: productCsv?.rows ?? 0, columns: productCsv?.columns ?? 0, formula_injection_protection: true }) : null;
@@ -1084,6 +1087,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const manifest = {
     product_title: title, version, generated_at: new Date().toISOString(),
     project_id: projectId, research_target: target, analyzed_sources: counts.analyzed,
+    artifact_ids: { docx: docxArtifactId, pptx: pptxArtifactId, xlsx: xlsxArtifactId },
     coverage_reason: coverageReason, formats: ["markdown", "html", "docx", ...(productCsv ? ["csv", "xlsx"] : []), ...(pptxBytes ? ["pptx"] : []), "zip"],
     note: "Original product content with source metadata. Source page text is not redistributed.",
   };
@@ -1132,7 +1136,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   }).eq("id", projectId).eq("owner_id", ownerId).eq("status", "validating").select("id").maybeSingle();
   if (finalizeError) throw finalizeError;
   if (!finalizedProject) {
-    await bucket.remove([storagePath, htmlPath, zipPath, ...(productCsv ? [csvPath] : [])]);
+    await bucket.remove([storagePath, htmlPath, zipPath, ownerId + "/products/" + projectId + "/product-v" + version + ".docx", ...(pptxBytes ? [ownerId + "/products/" + projectId + "/product-v" + version + ".pptx"] : []), ...(xlsxBytes ? [ownerId + "/products/" + projectId + "/product-v" + version + ".xlsx"] : []), ...(productCsv ? [csvPath] : [])]);
     await db.from("ultron_artifacts").delete().eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, version });
     await db.from("ultron_product_documents").delete().eq("owner_id", ownerId).eq("project_id", projectId).eq("version", version);
     return { project_id: projectId, status: "paused_or_cancelled", skipped: true };

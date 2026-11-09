@@ -47,6 +47,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /x-goog-api-key/);
   assert.ok(!source.includes("generateContent?key="));
   assert.match(source, /callStudioStreaming/);
+  assert.match(source, /x-goog-api-key/);
   assert.match(source, /canonicalReferences/);
   assert.match(source, /productFormatGuidance/);
   assert.match(source, /spreadsheet-ready product/);

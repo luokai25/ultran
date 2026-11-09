@@ -1,6 +1,6 @@
 # ULTRON Power Upgrade Plan
 
-**Status:** Architecture audit completed; Phase 1 implementation is next  
+**Status:** Phase 1 in progress; durable local MCP server registry implemented  
 **Repository:** `luokai25/ultran`  
 **Integration rule:** work directly on `main`; preserve the existing local-first architecture  
 **Cost rule:** reuse the current Supabase, Vercel, Cloudflare and existing provider integrations; no new paid service or dependency without explicit approval.
@@ -103,14 +103,14 @@ Required MCP manager states:
 ## Delivery phases and acceptance criteria
 
 ### Phase 1 — durable MCP foundation
-1. Add a versioned, encrypted native MCP server registry for the local runtime.
+1. **Implemented:** SQLite-backed native MCP server registry. Public server definitions persist across restarts; environment values and HTTP headers are encrypted with the existing Fernet credential key. Secret-bearing definitions fail closed when encryption is not configured. Environment-defined servers remain authoritative over persisted UI registrations.
 2. Persist and restore safe server definitions on restart; reject persistence of secret-bearing config when encryption is unavailable.
 3. Persist grant signing material safely so a restart does not silently invalidate every legitimate grant; keep expiry, revocation and single-use checks.
 4. Make tool-call audit history durable with bounded retention and secret redaction.
 5. Add tests for restart recovery, encryption-required behavior, tamper detection, grant expiry/revocation/single-use and audit redaction.
 6. Preserve the existing MCP protocol, connector projection and permission pipeline.
 
-**Exit criteria:** a registered server survives backend restart; secrets are never written in plaintext; invalid/tampered grants remain denied; audit history survives restart; existing stdio/HTTP protocol tests still pass.
+**Exit criteria:** the server-definition persistence and encryption tests are added. Full backend CI must pass before this step is considered verified. Remaining Phase 1 work: durable grant signing material, durable audit history, and restart/revocation/single-use regression tests.
 
 ### Phase 2 — authenticated cloud MCP bridge
 1. Add owner-scoped Supabase schema for remote MCP server metadata and discovered tools.
@@ -181,7 +181,7 @@ An external ChatGPT connector is not automatically an ULTRON connector. ULTRON m
 - Active cron jobs observed: brain supervisor every minute, cloud job worker every minute and maintenance queue every five minutes.
 - Security advisor currently reports leaked-password protection disabled; enable it in Supabase Auth settings.
 - Performance advisor currently reports unused indexes. Do not remove them just because the project is young; re-check after real query volume.
-- The latest observed Android release workflow run #1070 completed successfully, but the signed release asset must be checked separately before telling the owner an APK is available.
+- Android release workflow run #1070 completed successfully and published a signed APK asset: https://github.com/luokai25/ultran/releases/download/android-v3.0.4-b1070/ultron-3.0.4.apk. This release was built from commit 1af9e62, before the current MCP registry commits.
 
 ## Working rule
 

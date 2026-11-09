@@ -172,7 +172,7 @@ export async function streamUltronSupabaseChat(
     let buffer = "";
     let content = "";
     const consume = (block: string): void => {
-      const data = block.split(/\\r?\\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\\n");
+      const data = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
       if (!data || data === "[DONE]") return;
       let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }>; error?: string | { message?: string }; message?: string };
       try { event = JSON.parse(data) as typeof event; }
@@ -186,12 +186,12 @@ export async function streamUltronSupabaseChat(
       if (controller.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       const chunk = await reader.read();
       buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-      let boundary = buffer.search(/\\r?\\n\\r?\\n/);
+      let boundary = buffer.search(/\r?\n\r?\n/);
       while (boundary >= 0) {
-        const match = buffer.slice(boundary).match(/^\\r?\\n\\r?\\n/);
+        const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
         consume(buffer.slice(0, boundary));
         buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
-        boundary = buffer.search(/\\r?\\n\\r?\\n/);
+        boundary = buffer.search(/\r?\n\r?\n/);
       }
       if (chunk.done) break;
     }

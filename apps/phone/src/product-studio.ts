@@ -147,26 +147,62 @@ function renderOpportunity(project: ProductProject): void {
   panel.replaceChildren();
   const brief = project.opportunity_brief ?? {};
   const synthesis = project.synthesis_summary ?? {};
+  const score = Number(brief.opportunity_score);
+  if (Number.isFinite(score)) {
+    const metric = node("div", "product-opportunity-score");
+    metric.append(node("strong", "", String(Math.max(0, Math.min(100, Math.round(score)))) + " / 100"), node("span", "", "Opportunity score · " + String(brief.confidence ?? "unrated") + " confidence"));
+    panel.append(metric);
+  }
   const fields: Array<[string, unknown]> = [
     ["Topic", brief.selected_topic], ["Audience", brief.audience], ["Problem", brief.problem],
     ["Market gap", brief.market_gap], ["Product promise", brief.promise],
-    ["Evidence synthesis", synthesis.executive_summary],
+    ["Evidence from the market", brief.evidence], ["Existing alternatives", brief.existing_alternatives],
+    ["Willingness-to-pay signals", synthesis.willingness_to_pay_signals],
+    ["Counter-evidence", synthesis.counter_evidence], ["Contradictions", synthesis.contradictions],
+    ["Recommended format", synthesis.recommended_format ?? brief.product_format],
+    ["Evidence synthesis", synthesis.executive_summary ?? synthesis.overview],
   ];
   for (const [label, value] of fields) {
-    if (typeof value !== "string" || !value.trim()) continue;
+    const values = Array.isArray(value) ? value.map(item => typeof item === "string" ? item : isRecord(item) ? String(item.signal ?? item.text ?? item.theme ?? item.description ?? "") : "").filter(Boolean) : [];
+    const textValue = typeof value === "string" ? value.trim() : "";
+    if (!textValue && !values.length) continue;
     const item = node("div", "product-opportunity-item");
-    item.append(node("strong", "", label), node("p", "", value));
+    item.append(node("strong", "", label));
+    if (textValue) item.append(node("p", "", textValue));
+    if (values.length) {
+      const list = node("ul", "product-opportunity-themes");
+      for (const entry of values.slice(0, 8)) list.append(node("li", "", entry));
+      item.append(list);
+    }
     panel.append(item);
   }
   const themes = Array.isArray(synthesis.recurring_themes) ? synthesis.recurring_themes : [];
   if (themes.length) {
     const item = node("div", "product-opportunity-item");
-    item.append(node("strong", "", "Recurring themes"));
+    item.append(node("strong", "", "Recurring themes across sources"));
     const list = node("ul", "product-opportunity-themes");
     for (const theme of themes.slice(0, 8)) {
       const label = typeof theme === "string" ? theme : isRecord(theme) ? String(theme.theme ?? theme.name ?? "") : "";
-      if (label) list.append(node("li", "", label));
+      if (label) {
+        const supporting = isRecord(theme) && Array.isArray(theme.supporting_source_numbers) ? " · sources " + theme.supporting_source_numbers.join(", ") : "";
+        list.append(node("li", "", label + supporting));
+      }
     }
+    item.append(list);
+    panel.append(item);
+  }
+  const validation = isRecord(synthesis.validation) ? synthesis.validation : {};
+  if (Object.keys(validation).length) {
+    const item = node("div", "product-opportunity-item product-opportunity-quality");
+    item.append(node("strong", "", "Quality checks"));
+    const checks: Array<[string, unknown]> = [
+      ["Minimum length", validation.minimum_length_passed],
+      ["References section", validation.references_section],
+      ["Source citations", validation.source_citations_match],
+    ];
+    const list = node("ul", "product-opportunity-themes");
+    for (const [label, value] of checks) list.append(node("li", "", label + ": " + (value === true ? "passed" : value === false ? "needs review" : "not checked")));
+    list.append(node("li", "", "Analyzed sources: " + String(validation.analyzed_sources ?? 0) + " / " + String(validation.requested_sources ?? project.research_target)));
     item.append(list);
     panel.append(item);
   }

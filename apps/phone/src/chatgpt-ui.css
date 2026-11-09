@@ -268,3 +268,9 @@ progress { width:100%; accent-color:var(--accent); }
 .learning-filters { display:flex; flex-wrap:wrap; gap:8px; }
 .learning-filters button { min-width:48px; min-height:48px; padding:8px 12px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--text-secondary); }
 .learning-filters button[aria-pressed="true"] { background:var(--surface-raised); border-color:var(--border-strong); color:var(--text); }
+
+.attachment-preview { max-height:88px; overflow-y:auto; }
+.attachment-thumb { width:56px; height:56px; object-fit:cover; }
+.attachment-chip { max-width:min(100%,320px); max-height:68px; overflow:hidden; }
+.attachment-chip .attachment-snippet, .message-attachment .attachment-snippet { display:none; }
+.message-attachment { max-height:68px; overflow:hidden; }

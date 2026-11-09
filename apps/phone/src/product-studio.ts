@@ -171,6 +171,9 @@ function renderDetail(detail: ProductDetail): void {
   } else download.hidden = true;
   const cancel = el<HTMLButtonElement>("product-studio-cancel");
   cancel.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
+  const resume = el<HTMLButtonElement>("product-studio-resume");
+  resume.hidden = !["partial","failed","paused"].includes(project.status);
+  resume.textContent = project.status === "partial" ? "Continue research" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
   warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "The requested research target was not reached. Review the actual source coverage before publication.") : project.status === "waiting_for_provider" ? "No eligible free Google AI Studio model is currently available. The project remains saved." : "");
@@ -243,6 +246,18 @@ export function initProductStudio(value: StudioOptions): void {
     el<HTMLElement>("product-studio-workspace").hidden = true;
     el<HTMLElement>("product-studio-start").hidden = false;
     setNotice("Ready to create a new product.");
+  });
+  el<HTMLButtonElement>("product-studio-resume").addEventListener("click", async () => {
+    if (!selectedProjectId) return;
+    const button = el<HTMLButtonElement>("product-studio-resume");
+    button.disabled = true;
+    try {
+      await invoke("resume", { project_id: selectedProjectId });
+      await loadProject(selectedProjectId);
+      setNotice("A new durable research run has been queued.");
+      void options?.wakeWorker().catch(() => setNotice("Project saved. ULTRON will resume when the cloud worker is online."));
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not resume the project.", true); }
+    finally { button.disabled = false; }
   });
   el<HTMLButtonElement>("product-studio-cancel").addEventListener("click", async () => {
     if (!selectedProjectId) return;

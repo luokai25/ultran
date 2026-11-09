@@ -321,7 +321,7 @@ function isPublicResearchUrl(value: URL): boolean {
 function robotsPathMatches(rulePath: string, path: string): boolean {
   const exact = rulePath.endsWith("$");
   const raw = exact ? rulePath.slice(0, -1) : rulePath;
-  const special = ".*+?^$()|[]{}\\\\";
+  const special = ".*+?^$()|[]{}\\";
   const escaped = raw.split("*").map(part => [...part].map(ch => special.includes(ch) ? "\\" + ch : ch).join("")).join(".*");
   return new RegExp("^" + escaped + (exact ? "$" : "")).test(path);
 }

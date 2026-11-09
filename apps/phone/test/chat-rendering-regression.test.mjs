@@ -17,6 +17,11 @@ test("optional Supabase memory and skill enrichment cannot indefinitely block mo
   assert.doesNotMatch(submit, /await invokeUltronRuntime\("(search_memory|list_skills)"/);
 });
 
+test("cloud chat visibly reports connection attempts before a response arrives", () => {
+  assert.match(main, /type LinkState = "offline" \| "connecting" \| "online" \| "error"/);
+  assert.match(main, /setLink\("connecting", "Connecting to ULTRON/);
+});
+
 test("every completed model turn has visible output even when a provider returns an empty string", () => {
   assert.match(main, /else if \(!result\.content \|\| !result\.content\.trim\(\)\) result = \{ \.\.\.result, content:/);
   assert.match(main, /reply\.body\.replaceChildren\(\)/);

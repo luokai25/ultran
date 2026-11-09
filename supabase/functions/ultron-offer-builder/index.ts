@@ -148,6 +148,147 @@ async function event(ownerId: string, projectId: string, stage: string, eventTyp
   if (error) throw error;
 }
 
+function offerBuilderSteps(stage: string): string[] {
+  if (stage === "discovery") return ["directions", "brainstorm", "score"];
+  if (stage === "outline") return ["outline_A", "outline_B", "outline_C"];
+  return [stage];
+}
+
+function offerBuilderResult(stage: string, values: Record<string, unknown>): unknown {
+  if (stage === "discovery") {
+    const directions = isObject(values.directions) && Array.isArray(values.directions.directions) ? values.directions.directions : [];
+    const scored = isObject(values.score) && Array.isArray(values.score.pockets) ? values.score.pockets : [];
+    return { directions, pockets: scored.sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.overall) - Number(a.overall)) };
+  }
+  if (stage === "outline") {
+    const outlines = ["outline_A", "outline_B", "outline_C"].map((key) => values[key]).filter(isObject);
+    return { outlines };
+  }
+  if (stage === "section") return { value: typeof values.section === "string" ? values.section : "" };
+  return values[stage] ?? {};
+}
+
+async function offerBuilderWorkerAuth(req: Request): Promise<{ ownerId: string; secret: string; db: ReturnType<typeof admin> }> {
+  const secret = req.headers.get("x-ultron-cron-secret") ?? "";
+  const db = admin();
+  const { data: expected, error: secretError } = await db.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+  if (secretError || typeof expected !== "string" || !expected || secret !== expected) throw new Response("unauthorized_worker", { status: 401 });
+  const { data: instance, error: ownerError } = await db.from("ultron_instance").select("owner_id").eq("id", true).maybeSingle();
+  if (ownerError || !instance?.owner_id) throw new Response("owner_instance_required", { status: 503 });
+  return { ownerId: String(instance.owner_id), secret, db };
+}
+
+async function processOfferBuilderJob(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const { ownerId, secret, db } = await offerBuilderWorkerAuth(req);
+  const runId = clean(body.run_id, 80), jobId = clean(body.job_id, 80), lockToken = clean(body.lock_token, 80);
+  if (!runId || !jobId || !lockToken) return json({ error: "run_job_and_lock_required" }, 400);
+  const { data: job, error: jobError } = await db.from("ultron_jobs")
+    .select("id,owner_id,job_type,status,lock_token,payload")
+    .eq("id", jobId).eq("owner_id", ownerId).maybeSingle();
+  if (jobError) throw jobError;
+  const payload = isObject(job?.payload) ? job.payload : {};
+  if (!job || job.job_type !== "offer_builder.generate" || job.status !== "running" ||
+      job.lock_token !== lockToken || payload.run_id !== runId) return json({ error: "valid_claimed_offer_builder_job_required" }, 403);
+
+  const { data: run, error: runError } = await db.from("ultron_offer_builder_runs")
+    .select("id,owner_id,project_id,requested_stage,context,steps,step_index,step_results,status,result")
+    .eq("id", runId).eq("owner_id", ownerId).maybeSingle();
+  if (runError) throw runError;
+  if (!run) return json({ error: "offer_builder_run_not_found" }, 404);
+  if (run.status === "completed") return json({ ok: true, result: { completed: true, result: run.result } });
+  if (run.status === "cancelled") throw new Error("offer_builder_run_cancelled");
+
+  const stage = clean(run.requested_stage, 40);
+  const context = isObject(run.context) ? run.context : {};
+  const steps = Array.isArray(run.steps) ? run.steps.filter((step): step is string => typeof step === "string") : offerBuilderSteps(stage);
+  const stepIndex = Math.max(0, Number(run.step_index) || 0);
+  const step = steps[stepIndex];
+  if (!step) throw new Error("offer_builder_step_missing");
+  const previous = isObject(run.step_results) ? run.step_results : {};
+  await db.from("ultron_offer_builder_runs").update({ status: "running", error_message: null, updated_at: new Date().toISOString() })
+    .eq("id", runId).eq("owner_id", ownerId);
+
+  let system = "", prompt = "", maxTokens = 6500;
+  if (step === "directions") {
+    const p = prompts("discovery", context); system = p.system; prompt = p.prompt; maxTokens = 3500;
+  } else if (step === "brainstorm") {
+    const directions = isObject(previous.directions) && Array.isArray(previous.directions.directions) ? previous.directions.directions : [];
+    if (!directions.length) throw new Error("offer_builder_directions_checkpoint_missing");
+    system = "You are a digital-product opportunity brainstormer. For every supplied direction, create one or two distinct specific profitable pockets. Do not score them yet. Do not claim real-world market validation without evidence.";
+    prompt = "Topic: " + clean(context.topic, 300) + "\nDirections: " + JSON.stringify(directions) + "\nCreate 1-2 pockets for every direction. Each pocket must include direction_title, aud, outcome, avoid, industry, niche, know, prob, and statement using: I help [audience] [outcome] without [bad alternative]. Return JSON {pockets:[...]} with 18-24 pockets and no near-duplicates.";
+  } else if (step === "score") {
+    const brainstorm = isObject(previous.brainstorm) ? previous.brainstorm : {};
+    const pockets = Array.isArray(brainstorm.pockets) ? brainstorm.pockets : [];
+    if (!pockets.length) throw new Error("offer_builder_brainstorm_checkpoint_missing");
+    system = "You are a rigorous product opportunity evaluator. Score each pocket using pain (30%), worsening (25%), purchasing power (30%), and speed to outcome (15%). Use numeric 1-10 scores and concise rationales. Do not inflate scores. Do not claim validation without evidence.";
+    prompt = "Score every pocket below without changing its core statement. Return JSON {pockets:[...]} with each original pocket plus s:{pain,worsening,pp,speed}, score_rationales:{pain,worsening,purchasing_power,speed}, and numeric overall rounded to one decimal. All sub-scores are numeric from 1 to 10. Calculate overall = 0.30*pain + 0.25*worsening + 0.30*purchasing_power + 0.15*speed. Pockets: " + JSON.stringify(pockets);
+  } else if (step.startsWith("outline_")) {
+    const key = step.slice("outline_".length);
+    const previousOutlines = ["outline_A", "outline_B", "outline_C"].map((name) => previous[name]).filter(isObject);
+    const p = prompts("outline", { ...context, option_key: key, previous_outlines: previousOutlines });
+    system = p.system; prompt = p.prompt; maxTokens = 3500;
+  } else {
+    const p = prompts(stage, context);
+    system = p.system; prompt = p.prompt; maxTokens = stage === "section" ? 5000 : 6500;
+  }
+
+  const generated = await brain(secret, system, prompt, maxTokens, true);
+  const value: unknown = stage === "section" ? generated : parseJson(generated);
+  const nextValues = { ...previous, [step]: value };
+  const nextIndex = stepIndex + 1;
+  const now = new Date().toISOString();
+  await event(ownerId, run.project_id, stage, "offer.generation_step_completed", { step, step_index: stepIndex + 1, step_count: steps.length });
+
+  if (nextIndex < steps.length) {
+    const nextKey = "offer-builder:" + runId + ":step:" + nextIndex + ":cycle:0";
+    const { data: nextJob, error: nextJobError } = await db.from("ultron_jobs").insert({
+      owner_id: ownerId, job_type: "offer_builder.generate", title: "Continue Offer Builder " + stage,
+      payload: { run_id: runId }, priority: 5, max_attempts: 20, idempotency_key: nextKey,
+    }).select("id").single();
+    if (nextJobError && nextJobError.code !== "23505") throw nextJobError;
+    let nextJobId = nextJob?.id;
+    if (!nextJobId) {
+      const { data: existing, error: existingError } = await db.from("ultron_jobs").select("id").eq("owner_id", ownerId).eq("idempotency_key", nextKey).maybeSingle();
+      if (existingError) throw existingError;
+      nextJobId = existing?.id;
+    }
+    await db.from("ultron_offer_builder_runs").update({
+      step_results: nextValues, step_index: nextIndex, progress: Math.min(95, Math.round(nextIndex / steps.length * 95)),
+      status: "queued", current_job_id: nextJobId ?? null, updated_at: now,
+    }).eq("id", runId).eq("owner_id", ownerId);
+    await db.from("ultron_product_projects").update({
+      active_stage: "offer_" + stage, progress: Math.min(90, Math.max(Number((await db.from("ultron_product_projects").select("progress").eq("id", run.project_id).eq("owner_id", ownerId).maybeSingle()).data?.progress) || 0, Math.round(nextIndex / steps.length * 80))),
+      updated_at: now,
+    }).eq("id", run.project_id).eq("owner_id", ownerId);
+    return json({ ok: true, result: { queued: true, step, next_step: steps[nextIndex] } });
+  }
+
+  const finalResult = offerBuilderResult(stage, nextValues);
+  const { data: project, error: projectError } = await db.from("ultron_product_projects")
+    .select("configuration,progress").eq("id", run.project_id).eq("owner_id", ownerId).maybeSingle();
+  if (projectError) throw projectError;
+  if (!project) throw new Error("offer_builder_project_missing");
+  const configuration = isObject(project.configuration) ? project.configuration : {};
+  const builder = isObject(configuration.offer_builder) ? configuration.offer_builder : {};
+  const generatedMap = isObject(builder.generated) ? builder.generated : {};
+  const nextBuilder = { ...builder, generated: { ...generatedMap, [stage]: finalResult }, updated_at: now };
+  const stageProgress: Record<string, number> = { creator: 12, discovery: 20, outline: 35, transformation: 48, summary: 55, section: 78, quality: 86, brand: 90, store: 92 };
+  const { error: saveError } = await db.from("ultron_product_projects").update({
+    configuration: { ...configuration, builder: "offer_builder", offer_builder: nextBuilder },
+    active_stage: "offer_" + stage, progress: Math.max(Number(project.progress) || 0, stageProgress[stage] ?? 85),
+    updated_at: now,
+  }).eq("id", run.project_id).eq("owner_id", ownerId);
+  if (saveError) throw saveError;
+  const storedResult = stage === "section" ? { value: typeof (finalResult as Record<string, unknown>)?.value === "string" ? (finalResult as Record<string, unknown>).value : "" } : finalResult;
+  const { error: completeRunError } = await db.from("ultron_offer_builder_runs").update({
+    step_results: nextValues, step_index: nextIndex, progress: 100, status: "completed",
+    result: isObject(storedResult) ? storedResult : {}, error_message: null, completed_at: now, updated_at: now,
+  }).eq("id", runId).eq("owner_id", ownerId);
+  if (completeRunError) throw completeRunError;
+  await event(ownerId, run.project_id, stage, "offer.generation_completed", { stage });
+  return json({ ok: true, result: finalResult });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -155,6 +296,7 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json();
     if (!isObject(body) || typeof body.action !== "string") return json({ error: "invalid_request" }, 400);
+    if (body.action === "worker_process") return await processOfferBuilderJob(req, body);
     const auth = await authenticate(req);
     const db = admin();
     if (body.action === "create") {
@@ -172,6 +314,17 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       await event(auth.ownerId, data.id, "offer_discovery", "offer.created", { title: data.title });
       return json({ ok: true, project: data }, 201);
+    }
+    if (body.action === "job_status") {
+      const runId = clean(body.run_id, 80);
+      if (!runId) return json({ error: "run_id_required" }, 400);
+      const { data: run, error: runError } = await db.from("ultron_offer_builder_runs")
+        .select("id,requested_stage,status,progress,step_index,steps,result,error_message,updated_at,completed_at")
+        .eq("id", runId).eq("owner_id", auth.ownerId).maybeSingle();
+      if (runError) throw runError;
+      if (!run) return json({ error: "offer_builder_run_not_found" }, 404);
+      const value = run.requested_stage === "section" && isObject(run.result) ? run.result.value : run.result;
+      return json({ ok: true, run: { ...run, result: value } });
     }
     const projectId = clean(body.project_id, 80);
     if (!projectId) return json({ error: "project_id_required" }, 400);
@@ -196,53 +349,29 @@ Deno.serve(async (req: Request) => {
     }
     if (body.action === "generate") {
       const stage = clean(body.stage, 40);
+      const allowedStages = new Set(["creator","discovery","outline","transformation","summary","section","quality","brand","store"]);
+      if (!allowedStages.has(stage)) return json({ error: "unsupported_generation_stage" }, 400);
       const context = isObject(body.context) ? body.context : {};
-      await event(auth.ownerId, projectId, stage, "offer.generation_started", { stage });
-      let result: unknown;
-      if (stage === "discovery") {
-        const directionPrompt = prompts("discovery", context);
-        const directionData = parseJson(await brain(auth.authorization, directionPrompt.system, directionPrompt.prompt, 3500));
-        const directions = Array.isArray(directionData.directions) ? directionData.directions.slice(0, 12) : [];
-        if (!directions.length) throw new Error("no_market_directions_returned");
-        await event(auth.ownerId, projectId, stage, "offer.directions_completed", { count: directions.length });
-        const brainstormSystem = "You are a digital-product opportunity brainstormer. For every supplied direction, create one or two distinct specific profitable pockets. Do not score them yet. Do not claim real-world market validation without evidence.";
-        const brainstormPrompt = "Topic: " + clean(context.topic, 300) + "\nDirections: " + JSON.stringify(directions) + "\nCreate 1-2 pockets for every direction. Each pocket must include direction_title, aud, outcome, avoid, industry, niche, know, prob, and statement using: I help [audience] [outcome] without [bad alternative]. Return JSON {pockets:[...]} with 18-24 pockets and no near-duplicates.";
-        const brainstormData = parseJson(await brain(auth.authorization, brainstormSystem, brainstormPrompt, 6500));
-        const rawPockets = Array.isArray(brainstormData.pockets) ? brainstormData.pockets.slice(0, 24) : [];
-        if (!rawPockets.length) throw new Error("no_profitable_pockets_returned");
-        await event(auth.ownerId, projectId, stage, "offer.brainstorm_completed", { count: rawPockets.length });
-        const scoreSystem = "You are a rigorous product opportunity evaluator. Score each pocket using pain (30%), worsening (25%), purchasing power (30%), and speed to outcome (15%). Use numeric 1-10 scores and concise rationales. Do not inflate scores. Do not claim validation without evidence.";
-        const scorePrompt = "Score every pocket below without changing its core statement. Return JSON {pockets:[...]} with each original pocket plus s:{pain,worsening,pp,speed}, score_rationales:{pain,worsening,purchasing_power,speed}, and numeric overall rounded to one decimal. All sub-scores are numeric from 1 to 10. Calculate overall = 0.30*pain + 0.25*worsening + 0.30*purchasing_power + 0.15*speed. Pockets: " + JSON.stringify(rawPockets);
-        const scoredData = parseJson(await brain(auth.authorization, scoreSystem, scorePrompt, 6500));
-        const pockets = Array.isArray(scoredData.pockets) ? scoredData.pockets : [];
-        result = { directions, pockets: pockets.sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.overall) - Number(a.overall)) };
-      } else if (stage === "outline") {
-        const outlines: Record<string, unknown>[] = [];
-        for (const key of ["A", "B", "C"]) {
-          const onePrompt = prompts("outline", { ...context, option_key: key, previous_outlines: outlines });
-          const oneData = parseJson(await brain(auth.authorization, onePrompt.system, onePrompt.prompt, 3500));
-          const outline = isObject(oneData.outline) ? oneData.outline : oneData;
-          outlines.push({ ...outline, key, version: 1 });
-          await event(auth.ownerId, projectId, stage, "offer.outline_option_completed", { key });
-        }
-        result = { outlines };
-      } else {
-        const prompt = prompts(stage, context);
-        const generated = await brain(auth.authorization, prompt.system, prompt.prompt, stage === "section" ? 5000 : 6500);
-        result = stage === "section" ? generated : parseJson(generated);
+      const runId = crypto.randomUUID();
+      const steps = offerBuilderSteps(stage);
+      const idempotencyKey = "offer-builder:" + runId;
+      const { data: run, error: runError } = await db.from("ultron_offer_builder_runs").insert({
+        owner_id: auth.ownerId, project_id: projectId, requested_stage: stage, context, steps,
+        step_index: 0, step_results: {}, status: "queued", progress: 0, idempotency_key: idempotencyKey,
+      }).select("id").single();
+      if (runError) throw runError;
+      const { data: job, error: jobError } = await db.from("ultron_jobs").insert({
+        owner_id: auth.ownerId, job_type: "offer_builder.generate", title: "Generate Offer Builder " + stage,
+        payload: { run_id: run.id }, priority: 5, max_attempts: 20,
+        idempotency_key: "offer-builder:" + run.id + ":step:0:cycle:0",
+      }).select("id").single();
+      if (jobError) {
+        await db.from("ultron_offer_builder_runs").update({ status: "failed", error_message: "Could not queue the generation run.", completed_at: new Date().toISOString() }).eq("id", run.id);
+        throw jobError;
       }
-      const generatedMap = isObject(builder.generated) ? builder.generated : {};
-      const nextBuilder = { ...builder, generated: { ...generatedMap, [stage]: result }, updated_at: new Date().toISOString() };
-      const nextConfiguration = { ...configuration, builder: "offer_builder", offer_builder: nextBuilder };
-      const { error } = await auth.db.from("ultron_product_projects").update({
-        configuration: nextConfiguration,
-        active_stage: "offer_" + stage,
-        progress: Math.min(90, Math.max(Number(project.progress) || 0, stage === "discovery" ? 15 : stage === "outline" ? 30 : stage === "transformation" ? 45 : stage === "summary" ? 52 : stage === "section" ? 75 : stage === "quality" ? 82 : 85)),
-        updated_at: new Date().toISOString(),
-      }).eq("id", projectId).eq("owner_id", auth.ownerId);
-      if (error) throw error;
-      await event(auth.ownerId, projectId, stage, "offer.generation_completed", { stage });
-      return json({ ok: true, stage, result });
+      await db.from("ultron_offer_builder_runs").update({ current_job_id: job.id, updated_at: new Date().toISOString() }).eq("id", run.id);
+      await event(auth.ownerId, projectId, stage, "offer.generation_started", { stage, run_id: run.id });
+      return json({ ok: true, queued: true, run_id: run.id, stage });
     }
     if (body.action === "finalize") {
       const markdown = clean(body.markdown, 500000);

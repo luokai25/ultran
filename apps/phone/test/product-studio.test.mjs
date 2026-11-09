@@ -32,6 +32,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /opportunity_score/);
   assert.match(moduleSource, /validation/);
   assert.match(moduleSource, /function renderQuality/);
+  assert.match(moduleSource, /Editable Excel workbook/);
+  assert.match(moduleSource, /Editable PowerPoint deck/);
   assert.match(css, /@media\(min-width:900px\)/);
   assert.match(css, /@media\(max-width:420px\)/);
   assert.match(css, /--u-accent:#cbd5e1/);
@@ -63,6 +65,12 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /function makeDocx/);
   assert.match(source, /function makeXlsx/);
   assert.match(source, /function makePptx/);
+  assert.match(source, /persistStudioExport/);
+  assert.match(source, /artifact_ids: \{ docx:/);
+  assert.match(source, /"product\\.html": htmlBytes,\\n\\s+"product\\.docx": docxBytes/);
+  assert.match(source, /product-v" \+ version \+ "\\.docx/);
+  assert.match(source, /product-v" \+ version \+ "\\.pptx/);
+  assert.match(source, /product-v" \+ version \+ "\\.xlsx/);
   assert.match(source, /spreadsheet_xlsx_valid/);
   assert.match(source, /presentation_pptx_valid/);
   assert.match(source, /"product.docx": docxBytes/);

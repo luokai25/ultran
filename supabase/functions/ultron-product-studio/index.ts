@@ -504,33 +504,46 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   if (htmlUpload.error) throw htmlUpload.error;
   const checksumBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(markdown));
   const checksum = Array.from(new Uint8Array(checksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
-  const { data: artifact, error: artifactError } = await db.from("ultron_artifacts").insert({
+  const markdownArtifactPayload = {
     owner_id: ownerId, name: title + ".md", description: "Original research-backed digital product draft created by ULTRON.",
     artifact_type: "file", mime_type: "text/markdown", bucket_id: "ultron-private", storage_path: storagePath,
-    byte_size: new TextEncoder().encode(markdown).byteLength, checksum_sha256: checksum, source_job_id: jobId,
+    byte_size: markdownBytes.byteLength, checksum_sha256: checksum, source_job_id: jobId,
     metadata: { product_project_id: projectId, format: "markdown", source_counts: counts, private: true },
-  }).select("id").single();
-  if (artifactError) throw artifactError;
-  await db.from("ultron_product_documents").insert({
+  };
+  const { data: existingMarkdownArtifact, error: existingMarkdownError } = await db.from("ultron_artifacts").select("id").eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, format: "markdown" }).maybeSingle();
+  if (existingMarkdownError) throw existingMarkdownError;
+  const markdownArtifactResult = existingMarkdownArtifact
+    ? await db.from("ultron_artifacts").update(markdownArtifactPayload).eq("owner_id", ownerId).eq("id", existingMarkdownArtifact.id).select("id").single()
+    : await db.from("ultron_artifacts").insert(markdownArtifactPayload).select("id").single();
+  if (markdownArtifactResult.error) throw markdownArtifactResult.error;
+  const artifact = markdownArtifactResult.data;
+  const markdownDocument = await db.from("ultron_product_documents").upsert({
     owner_id: ownerId, project_id: projectId, title, format: "markdown", status: "final", version: 1,
-    storage_path: storagePath, mime_type: "text/markdown", byte_size: new TextEncoder().encode(markdown).byteLength,
-    checksum_sha256: checksum, validation_report: { minimum_length_passed: true, citations_included: /references/i.test(markdown), analyzed_sources: counts.analyzed },
-  });
+    storage_path: storagePath, mime_type: "text/markdown", byte_size: markdownBytes.byteLength,
+    checksum_sha256: checksum, validation_report: validation,
+  }, { onConflict: "project_id,title,version" });
+  if (markdownDocument.error) throw markdownDocument.error;
   const htmlBytes = new TextEncoder().encode(html);
   const htmlChecksumBytes = await crypto.subtle.digest("SHA-256", htmlBytes);
   const htmlChecksum = Array.from(new Uint8Array(htmlChecksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
-  const { data: htmlArtifact, error: htmlArtifactError } = await db.from("ultron_artifacts").insert({
+  const htmlArtifactPayload = {
     owner_id: ownerId, name: title + ".html", description: "Standalone HTML edition of the ULTRON digital product.",
     artifact_type: "file", mime_type: "text/html", bucket_id: "ultron-private", storage_path: htmlPath,
     byte_size: htmlBytes.byteLength, checksum_sha256: htmlChecksum, source_job_id: jobId,
     metadata: { product_project_id: projectId, format: "html", private: true },
-  }).select("id").single();
-  if (htmlArtifactError) throw htmlArtifactError;
-  await db.from("ultron_product_documents").insert({
+  };
+  const { data: existingHtmlArtifact, error: existingHtmlError } = await db.from("ultron_artifacts").select("id").eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, format: "html" }).maybeSingle();
+  if (existingHtmlError) throw existingHtmlError;
+  const htmlArtifactResult = existingHtmlArtifact
+    ? await db.from("ultron_artifacts").update(htmlArtifactPayload).eq("owner_id", ownerId).eq("id", existingHtmlArtifact.id).select("id").single()
+    : await db.from("ultron_artifacts").insert(htmlArtifactPayload).select("id").single();
+  if (htmlArtifactResult.error) throw htmlArtifactResult.error;
+  const htmlDocument = await db.from("ultron_product_documents").upsert({
     owner_id: ownerId, project_id: projectId, title: title + " (HTML)", format: "html", status: "final", version: 1,
     storage_path: htmlPath, mime_type: "text/html", byte_size: htmlBytes.byteLength,
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
-  });
+  }, { onConflict: "project_id,title,version" });
+  if (htmlDocument.error) throw htmlDocument.error;
   const finalStatus = counts.analyzed >= target && validation.references_section && (evidence.length === 0 || (validation.citation_markers > 0 && validation.source_citations_match)) ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,

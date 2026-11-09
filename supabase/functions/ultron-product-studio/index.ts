@@ -742,16 +742,17 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     .order("retrieved_at", { ascending: false }).limit(500);
   if (allSourcesError) throw allSourcesError;
   const selectedSources = (allSources || []).slice(0, Math.min(500, target));
+  const evidenceCharLimit = Math.max(180, Math.min(900, Math.floor(160000 / Math.max(1, selectedSources.length))));
   const evidence = await Promise.all(selectedSources.map(async (source, index) => {
     const metadata = isObject(source.metadata) ? source.metadata : {};
     const path = clean(metadata.content_storage_path, 500);
     if (index < 30 && path) {
       const { data: file, error: fileError } = await sourceBucket.download(path);
-      if (!fileError && file) return { title: source.title, url: source.canonical_url, text: (await file.text()).slice(0, 1200) };
+      if (!fileError && file) return { title: source.title, url: source.canonical_url, text: (await file.text()).slice(0, evidenceCharLimit) };
     }
-    return { title: source.title, url: source.canonical_url, text: clean(source.extraction_summary, index < 30 ? 1200 : 220) };
+    return { title: source.title, url: source.canonical_url, text: clean(source.extraction_summary, evidenceCharLimit) };
   }));
-  const evidenceText = evidence.map((item, index) => "[" + (index + 1) + "] " + item.title + " (" + item.url + ")\n" + item.text).join("\n\n").slice(0, 160000);
+  const evidenceText = evidence.map((item, index) => "[" + (index + 1) + "] " + item.title + " (" + item.url + ")\n" + item.text).join("\n\n").slice(0, 240000);
   const researchNotesText = researchNotes.slice(-50).map(note => {
     const sources = Array.isArray(note.sources) ? note.sources.filter(isObject).map(source => clean(source.title, 180) + " — " + clean(source.url, 500)) : [];
     return "Research angle " + note.round + " (" + clean(note.query, 400) + ")\n" + clean(note.summary, 1100) + "\nSources: " + sources.join("; ");

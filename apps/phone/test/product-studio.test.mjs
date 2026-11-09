@@ -65,6 +65,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /product-v" \+ version/);
   assert.match(source, /version, source_counts/);
   assert.match(source, /runWithProviderWait/);
+  assert.match(source, /researchNotesText/);
+  assert.match(source, /research_notes: researchNotes/);
   assert.match(source, /provider\.waiting/);
   assert.match(source, /minimum_word_count_passed/);
   assert.match(source, /quality_checks_passed/);

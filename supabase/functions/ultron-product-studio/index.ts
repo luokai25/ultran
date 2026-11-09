@@ -575,16 +575,11 @@ Deno.serve(async (req: Request) => {
     const db = service();
     if (body.action === "worker_process") {
       const cron = req.headers.get("x-ultron-cron-secret") ?? "";
-      let ownerId = "";
-      if (cron) {
-        const { data: expected } = await db.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
-        if (typeof expected !== "string" || expected !== cron) return json({ error: "unauthorized_worker" }, 401);
-        const { data: instance } = await db.from("ultron_instance").select("owner_id").eq("id", true).maybeSingle();
-        ownerId = clean(instance?.owner_id, 80);
-      } else {
-        const auth = await ownerFromRequest(req);
-        ownerId = auth.id;
-      }
+      if (!cron) return json({ error: "unauthorized_worker" }, 401);
+      const { data: expected } = await db.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+      if (typeof expected !== "string" || expected !== cron) return json({ error: "unauthorized_worker" }, 401);
+      const { data: instance } = await db.from("ultron_instance").select("owner_id").eq("id", true).maybeSingle();
+      const ownerId = clean(instance?.owner_id, 80);
       const projectId = clean(body.project_id, 80), jobId = clean(body.job_id, 80), lockToken = clean(body.lock_token, 160);
       if (!projectId || !jobId || !ownerId || !lockToken) return json({ error: "project_job_and_lease_required" }, 400);
       const { data: claimedJob, error: claimedJobError } = await db.from("ultron_jobs")

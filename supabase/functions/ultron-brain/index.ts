@@ -295,15 +295,17 @@ function cohereMessageStream(response: Response, db: ReturnType<typeof service>,
           }
           if (done) break;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+        if (controller.desiredSize !== null) {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        }
       } catch (error) {
-        controller.error(error);
+        try { if (controller.desiredSize !== null) controller.error(error); } catch { /* The client may have cancelled the stream. */ }
       } finally {
         await recordKeyUse(db, ownerId, provider, key, tokenCount).catch(() => undefined);
       }
     },
-    cancel(reason) { void reader.cancel(reason); },
+    cancel(reason) { void reader.cancel(reason).catch(() => undefined); },
   });
   return new Response(stream, { status: 200, headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" } });
 }
@@ -335,11 +337,12 @@ function openAIMessageStream(response: Response, db: ReturnType<typeof service>,
           }
           if (done) break;
         }
-        controller.close();
-      } catch (error) { controller.error(error); }
-      finally { await recordKeyUse(db, ownerId, provider, key, tokenCount).catch(() => undefined); }
+        if (controller.desiredSize !== null) controller.close();
+      } catch (error) {
+        try { if (controller.desiredSize !== null) controller.error(error); } catch { /* The client may have cancelled the stream. */ }
+      } finally { await recordKeyUse(db, ownerId, provider, key, tokenCount).catch(() => undefined); }
     },
-    cancel(reason) { void reader.cancel(reason); },
+    cancel(reason) { void reader.cancel(reason).catch(() => undefined); },
   });
   return new Response(stream, { status: 200, headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" } });
 }

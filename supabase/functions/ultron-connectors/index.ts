@@ -97,7 +97,7 @@ Deno.serve(async(req:Request)=>{
     const preferred=enabled.find((item)=>obj(item)&&item.is_composio_managed===true)??enabled[0];
     if(obj(preferred))authConfig=str(preferred.id,120);
     if(!authConfig){
-     const created=await composio("/auth_configs",key,"POST",{toolkit,options:{type:"use_composio_managed_auth",name:"ULTRON "+display}});
+     const created=await composio("/auth_configs",key,"POST",{toolkit:{slug:toolkit},auth_config:{type:"use_composio_managed_auth",credentials:{},restrict_to_following_tools:[]}});
      if(obj(created))authConfig=str(created.id??(obj(created.auth_config)?created.auth_config.id:""),120);
     }
    }

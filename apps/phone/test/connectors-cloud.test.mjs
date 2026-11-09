@@ -57,3 +57,8 @@ test("ULTRON agent can discover and invoke Google Workspace tools from natural r
  assert.match(main,/google workspace|google calendar|google drive|google sheets|google docs/);
  assert.match(main,/emails|inbox|mail/);
 });
+
+test("Composio auth config creation uses the current v3.1 request schema",()=>{
+ assert.match(gateway,/toolkit:\{slug:toolkit\},auth_config:\{type:"use_composio_managed_auth",credentials:\{\},restrict_to_following_tools:\[\]\}/);
+ assert.doesNotMatch(gateway,/options:\{type:"use_composio_managed_auth"/);
+});

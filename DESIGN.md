@@ -193,7 +193,7 @@ All current screens are in scope. Do not treat the home/chat screen as the whole
 | Learning Review | `#learning-screen` | Evidence-based learning queue, before/after context, approve/reject/undo states |
 | ULTRON Capabilities | `#capabilities-screen` | Capability inventory, permission level, enabled state, tool/skill/run groupings |
 | Connectors | `#connectors-panel`, `#connector-detail-wrap`, `#connector-detail` | Searchable connector catalog, connection state, OAuth actions, scopes, disconnect and error states |
-| Agent Workspace | `#workspace-panel`, `#workspace-team-builder` | Objective, agents, tasks, artifacts, progress and approval controls |
+| Agent Workspace | `#workspace-panel`, `#workspace-team-builder` | Objective, agents, tasks, artifacts, progress and approval controls |\n| AI Digital Product Studio | `#product-studio-screen` | Problem/opportunity input, research depth, durable project list, real source coverage, event timeline, private artifact download and sandboxed live preview |
 | Settings | `#sheet-wrap` and settings sections | Grouped settings, clear persistence feedback, safe destructive actions |
 | Approval surfaces | `#composio-approvals`, `#approval-panel` | Exact action, requested scope, consequences, approve/deny controls |
 | Drawer / Navigation | `#drawer`, bottom navigation | Consistent labels, active state, keyboard and touch behavior |

@@ -5069,7 +5069,6 @@ setLink("offline", settings.endpoint ? "ready" : "local");
 renderConversation();
 void refreshNativeModels();
 autosize();
-resize();
 
 declare global {
   interface Window {

@@ -12,9 +12,9 @@ test("optional Supabase memory and skill enrichment cannot indefinitely block mo
   assert.match(main, /async function loadOptionalCloudTurnContext\(/);
   assert.match(main, /Promise\.allSettled\(\[memoryTask, skillsTask\]\)/);
   assert.match(main, /setTimeout\(resolve, 500\)/);
-  const submit = main.slice(main.indexOf("async function submit(raw: string)"), main.indexOf("\n/* ------------------------------------------------------------------ *\n * Avatar", main.indexOf("async function submit(raw: string)")));
-  assert.match(submit, /await loadOptionalCloudTurnContext\(text, turnController\)/);
-  assert.doesNotMatch(submit, /await invokeUltronRuntime\("(search_memory|list_skills)"/);
+  const submitTurn = main.slice(main.indexOf("async function submitTurn(raw: string)"), main.indexOf("\nasync function submit(raw: string)", main.indexOf("async function submitTurn(raw: string)")));
+  assert.match(submitTurn, /await loadOptionalCloudTurnContext\(text, turnController\)/);
+  assert.doesNotMatch(submitTurn, /await invokeUltronRuntime\("(search_memory|list_skills)"/);
 });
 
 test("cloud chat visibly reports connection attempts before a response arrives", () => {

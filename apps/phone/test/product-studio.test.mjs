@@ -70,6 +70,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /research_notes: researchNotes/);
   assert.match(source, /provider\.waiting/);
   assert.match(source, /minimum_word_count_passed/);
+  assert.match(source, /body_external_links_match_sources/);
+  assert.match(source, /bodyMarkdownLinks/);
   assert.match(source, /quality_checks_passed/);
   assert.ok(source.includes("const deadline = Date.now() + 12_000"));
   assert.ok(source.includes("const deadline = Date.now() + 55_000"));

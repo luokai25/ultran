@@ -18,6 +18,7 @@ type UltronSecureStoragePlugin = {
 };
 
 const NativeSecureStorage = registerPlugin<UltronSecureStoragePlugin>('UltronSecureStorage');
+export const nativeSecureStorage = NativeSecureStorage;
 
 const secureSessionStorage = {
   async getItem(key: string): Promise<string | null> {

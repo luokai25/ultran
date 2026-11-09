@@ -37,7 +37,10 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /providerTable\(provider\)/);
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
-  assert.match(source, /callStudioStreaming/);\n  assert.match(source, /runWithProviderWait/);\n  assert.match(source, /provider\.waiting/);\n  assert.match(source, /waiting_for_provider/);
+  assert.match(source, /callStudioStreaming/);
+  assert.match(source, /canonicalReferences/);
+  assert.match(source, /product-v" \+ version/);
+  assert.match(source, /version, source_counts/);\n  assert.match(source, /runWithProviderWait/);\n  assert.match(source, /provider\.waiting/);\n  assert.match(source, /waiting_for_provider/);
   assert.match(source, /no_free_google_search_model_available/);
   assert.match(source, /google_search/);
   assert.match(source, /cooldown_until/);
@@ -73,6 +76,7 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);
   assert.match(jobs, /lock_token: job\.lock_token/);
+  assert.match(jobs, /waitingForProvider \? 180/);
   assert.match(worker, /valid_claimed_product_job_required/);
   assert.match(worker, /x-ultron-cron-secret/);
   assert.match(worker, /createSignedUrl/);

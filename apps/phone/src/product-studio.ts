@@ -11,7 +11,7 @@ type ProductProject = {
 type ProductEvent = { sequence: number; stage: string; event_type: string; payload: Record<string, unknown>; created_at: string };
 type ProductSource = { id: string; title: string; canonical_url: string; domain: string; fetch_status: string; extraction_summary: string };
 type ProductDetail = { project: ProductProject; events: ProductEvent[]; sources: ProductSource[]; documents: Array<{ id: string; title: string; format: string; byte_size: number }>; download_url?: string | null };
-type StudioOptions = { openScreen: () => void; wakeWorker: () => Promise<unknown> };
+type StudioOptions = { openScreen: () => void; closeScreen: () => void; wakeWorker: () => Promise<unknown> };
 let options: StudioOptions | null = null;
 let selectedProjectId = "";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -211,7 +211,7 @@ export function initProductStudio(value: StudioOptions): void {
     el<HTMLTextAreaElement>("product-studio-request").value = "";
     void startProject("");
   });
-  el<HTMLButtonElement>("product-studio-refresh").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
+  el<HTMLButtonElement>("product-studio-refresh").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));\n  el<HTMLButtonElement>("product-studio-back").addEventListener("click", () => options?.closeScreen());
   el<HTMLButtonElement>("product-studio-refresh-list").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
   el<HTMLButtonElement>("product-studio-new").addEventListener("click", () => {
     selectedProjectId = "";

@@ -47,7 +47,13 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /product-v" \+ version/);
   assert.match(source, /version, source_counts/);
   assert.match(source, /runWithProviderWait/);
-  assert.match(source, /provider\.waiting/);\n  assert.match(source, /minimum_word_count_passed/);\n  assert.match(source, /quality_checks_passed/);\n  assert.match(source, /const deadline = Date\\.now\\(\\) \\+ 12_000/);\n  assert.match(source, /const deadline = Date\\.now\\(\\) \\+ 55_000/);\n  assert.match(source, /product_project_stopped/);\n  assert.match(source, /eq\\("status", "validating"\\)/);
+  assert.match(source, /provider\.waiting/);
+  assert.match(source, /minimum_word_count_passed/);
+  assert.match(source, /quality_checks_passed/);
+  assert.ok(source.includes("const deadline = Date.now() + 12_000"));
+  assert.ok(source.includes("const deadline = Date.now() + 55_000"));
+  assert.match(source, /product_project_stopped/);
+  assert.ok(source.includes('.eq("status", "validating")'));
   assert.match(source, /waiting_for_provider/);
   assert.match(source, /no_free_google_search_model_available/);
   assert.match(source, /google_search/);

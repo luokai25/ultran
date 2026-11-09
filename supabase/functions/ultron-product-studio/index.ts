@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       const { data: job, error: jobError } = await auth.db.from("ultron_jobs").insert({
         owner_id: auth.id, job_type: "product.generate", title: "Create " + (request.slice(0, 100) || "a digital product"),
-        payload: { project_id: project.id }, priority: 4, max_attempts: 4, idempotency_key: "product:" + project.id,
+        payload: { project_id: project.id }, priority: 4, max_attempts: 20, idempotency_key: "product:" + project.id,
       }).select("id").single();
       if (jobError) {
         await auth.db.from("ultron_product_projects").update({ status: "failed", error_message: "Could not queue product generation." }).eq("id", project.id);
@@ -290,7 +290,7 @@ Deno.serve(async (req: Request) => {
       const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
       let download_url: string | null = null;
       if (download.data?.storage_path) {
-        const { data: signed } = await auth.db.storage.from(download.data.bucket_id).createSignedUrl(download.data.storage_path, 3600);
+        const { data: signed } = await db.storage.from(download.data.bucket_id).createSignedUrl(download.data.storage_path, 3600);
         download_url = signed?.signedUrl ?? null;
       }
       return json({ ok: true, project, events: events.data ?? [], sources: sources.data ?? [], documents: documents.data ?? [], download_url });

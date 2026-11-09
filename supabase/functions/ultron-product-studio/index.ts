@@ -54,6 +54,10 @@ function markdownPreview(markdown: string, title: string): string {
   }).join("\n");
   return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:760px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks + "</main></body></html>";
 }
+function isFreeGoogleModel(model: string): boolean {
+  const id = model.toLowerCase().replace(/^models\//, "");
+  return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
+}
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
   const db = service();
   const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
@@ -64,7 +68,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   const candidates = (keys ?? []).flatMap((key) => {
     if (key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) return [];
     const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-    const model = models.find((value) => /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/i.test(value));
+    const model = models.find(isFreeGoogleModel);
     return model ? [{ key, model }] : [];
   });
   if (!candidates.length) throw new Error("no_eligible_free_google_model");
@@ -128,7 +132,7 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
   const candidates = (keys ?? []).flatMap((key) => {
     if (key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) return [];
     const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-    const model = models.find((value) => /^gemini-(?:2\\.5-(?:flash|flash-lite)|3(?:\\.[678])?-flash|3\\.5-flash(?:-lite)?|3-flash-preview|3\\.1-flash-lite)/i.test(value));
+    const model = models.find(isFreeGoogleModel);
     return model ? [{ key, model }] : [];
   });
   if (!candidates.length) throw new Error("no_eligible_free_google_model");

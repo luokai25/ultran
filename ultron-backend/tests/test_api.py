@@ -623,3 +623,51 @@ def test_production_workspace_ignores_a_caller_selected_workspace():
 
     request = SimpleNamespace(state=SimpleNamespace(owner_id="owner-uuid"))
     assert get_workspace(request, "attacker-selected-workspace") == "local"
+
+
+def test_production_accepts_a_valid_registered_owner_session_and_ignores_workspace_header(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    import ultron_backend.app as app_module
+    from ultron_backend.app import create_app
+    from ultron_backend.config import Settings
+
+    owner_id = "2fbbd8f2-2cb0-4ec9-8b3a-16e61f09a7bd"
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.status_code = 200
+            self._payload = payload
+        def json(self):
+            return self._payload
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def get(self, url, **kwargs):
+            if url.endswith("/auth/v1/user"):
+                assert kwargs["headers"]["Authorization"] == "Bearer valid-owner-session"
+                return FakeResponse({"id": owner_id})
+            assert url.endswith("/rest/v1/ultron_instance")
+            assert kwargs["params"] == {"select": "owner_id", "id": "eq.true"}
+            return FakeResponse([{"owner_id": owner_id}])
+
+    monkeypatch.setattr(app_module.httpx, "AsyncClient", FakeClient)
+    settings = Settings(
+        environment="production", data_dir=tmp_path / "owner-data",
+        credential_encryption_key="present-for-test",
+        supabase_url="https://project.supabase.co",
+        supabase_publishable_key="sb_publishable_test",
+    )
+    with TestClient(create_app(settings)) as production:
+        response = production.get(
+            "/v1/capabilities",
+            headers={"Authorization": "Bearer valid-owner-session", "X-Ultron-Workspace": "not-the-owner"},
+        )
+        assert response.status_code == 200
+        assert response.json()["workspace_id"] == "local"

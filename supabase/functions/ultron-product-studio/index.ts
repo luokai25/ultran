@@ -433,7 +433,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: artifact.id, title, format: "markdown", bytes: new TextEncoder().encode(markdown).byteLength });
   await addEvent(db, ownerId, projectId, "packaging", "job.completed", { status: finalStatus, analyzed_sources: analyzed, target: project.research_target });
-  const { data: signed } = await bucket.createSignedUrl(storagePath, 3600);
+  const { data: signed } = await bucket.createSignedUrl(storagePath, 3600, { download: title + ".md" });
   return { project_id: projectId, status: finalStatus, artifact_id: artifact.id, download_url: signed?.signedUrl ?? null, source_counts: counts, model: draft.model };
 }
 
@@ -513,7 +513,7 @@ Deno.serve(async (req: Request) => {
       }
       const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {
         if (!document.storage_path) return { ...document, download_url: null };
-        const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600);
+        const filename = document.format === "html" ? title + ".html" : title + ".md";\n        const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600, { download: filename });
         return { ...document, download_url: signedDocument?.signedUrl ?? null };
       }));
       return json({ ok: true, project, events: events.data ?? [], sources: sources.data ?? [], documents: documentRows, download_url });

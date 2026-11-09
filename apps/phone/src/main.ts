@@ -5045,6 +5045,11 @@ initConnectors({
   backendLinked: () => baseUrl() !== "",
   api,
   closeDrawer,
+  openCloudSettings: () => {
+    closeDrawer();
+    navSettingsButton.click();
+    window.setTimeout(() => cloudEmailEl.focus({ preventScroll: true }), 120);
+  },
   openExternal: async (url) => {
     await Browser.open({ url, presentationStyle: "popover" });
   },

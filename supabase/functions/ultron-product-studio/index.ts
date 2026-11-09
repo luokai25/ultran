@@ -691,7 +691,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,
-    synthesis_summary: { overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and references section check passed." : "A source-backed draft was created, but the research target or basic reference check was not reached. Review and expand it before publication.", research_stop_reason: coverageReason, validation },
+    synthesis_summary: { ...synthesis, overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and references section check passed." : "A source-backed draft was created, but the research target or basic reference check was not reached. Review and expand it before publication.", research_stop_reason: coverageReason, validation },
     updated_at: new Date().toISOString(), completed_at: new Date().toISOString(),
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: artifact.id, title, format: "markdown", bytes: new TextEncoder().encode(markdown).byteLength });

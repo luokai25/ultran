@@ -231,12 +231,12 @@ Integration requirements:
 
 Shipped first implementation slice:
 - Added owner-scoped project, source, event and document tables with RLS and Realtime publication.
-- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation and worker execution.
+- Added `ultron-product-studio` Edge Function for authenticated project creation/list/detail, event/source retrieval, signed private downloads, cancellation, resume/retry and worker execution.\n- Research runs in durable batches with 12 distinct research angles, source-domain diversity prompts, private source-text checkpoints and retry-safe continuation jobs. A run stops when the target is reached, source discovery stalls for three batches, or the configured round ceiling is reached.\n- Draft generation streams into persisted Markdown and a sandboxed HTML preview while the model writes; package creation is idempotent across worker retries.
 - Routed `product.generate` from the existing durable `ultron-jobs` worker to the Product Studio function.
 - Reused the existing Google AI Studio Vault registry and `ultron_read_llm_secret`; the first research adapter uses Gemini Google Search grounding and free-model eligibility.
 - Added the Product Studio drawer entry, canonical `apps/phone` workspace, source coverage counters, activity timeline, source list, sandboxed preview and Markdown artifact download.
 
 Known first-slice limits:
-- The current worker performs one grounded opportunity pass and opens up to ten returned public HTML/text pages. It does not yet fulfill a 50/100/200/500-source target in one run. It marks the result `partial` when the target is not reached and exposes the real analyzed count.
-- The first export is Markdown. Rich multi-format exports, resumable multi-batch research, source-domain diversity scoring, detailed finding records, advanced QA and versioned iterative drafts are the next implementation phases.
+- Research is incremental, not a promise of unlimited results: the target is 50/100/200/500 analyzed pages, but Google grounding, accessible page extraction, robots rules, free-tier quotas and source discovery can stop a run early. It marks the result `partial` when the target is not reached and exposes the real analyzed count. Each synthesis uses a domain-diverse subset of up to 30 stored source extracts.
+- Current exports are private Markdown and standalone HTML. Rich PDF/DOCX/XLSX/PPTX/ZIP exports, deeper structured findings, advanced QA and user-visible version history remain follow-on work.
 - A model/API key provides inference, not unlimited search capacity. Google grounding and free-tier quotas remain subject to provider availability and rate limits.

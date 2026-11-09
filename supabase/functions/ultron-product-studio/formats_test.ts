@@ -18,7 +18,7 @@ Deno.test("DOCX export is a valid editable Open XML package and preserves RTL te
 });
 
 Deno.test("XLSX export contains a formatted worksheet and stores formula-like text safely", () => {
-  const files = unzipSync(makeXlsx('Name,Amount\n"=HYPERLINK(\"https://example.com\")",12\nWidget,4.5'));
+  const files = unzipSync(makeXlsx('Name,Amount\n"=HYPERLINK(""https://example.com"")",12\nWidget,4.5'));
   assert(files["xl/workbook.xml"], "XLSX workbook is missing");
   assert(files["xl/worksheets/sheet1.xml"], "XLSX worksheet is missing");
   assert(files["xl/styles.xml"], "XLSX styles are missing");

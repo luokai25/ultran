@@ -315,6 +315,8 @@ async function loadProject(id: string): Promise<void> {
   showLoadingRows("product-studio-opportunity", 3);
   showLoadingRows("product-source-counts", 5);
   el<HTMLElement>("product-studio-preview-empty").textContent = "Loading your saved product preview…";
+  el<HTMLElement>("product-studio-preview-empty").hidden = false;
+  el<HTMLElement>("product-studio-preview").hidden = true;
   try {
     const result = await invoke("get", { project_id: id }) as unknown as ProductDetail & Record<string, unknown>;
     renderDetail(result);

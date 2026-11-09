@@ -19,6 +19,7 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(html, /id="drawer-product-studio"/);
   assert.match(html, /id="product-studio-screen"/);
   assert.match(html, /id="product-studio-preview"[^>]*sandbox=""/);
+  assert.match(html, /id="product-studio-quality"/);
   assert.match(html, /id="product-studio-pause"/);
   assert.match(main, /initProductStudio\(/);
   assert.match(main, /openProductStudioScreen/);
@@ -29,6 +30,7 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /setInterval\(/);
   assert.match(moduleSource, /opportunity_score/);
   assert.match(moduleSource, /validation/);
+  assert.match(moduleSource, /function renderQuality/);
   assert.match(css, /@media\(min-width:900px\)/);
   assert.match(css, /@media\(max-width:420px\)/);
   assert.ok(ledger.includes("product-studio-screen"), "screen coverage ledger must list Product Studio");

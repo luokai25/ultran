@@ -50,6 +50,11 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.match(css, /\.composer\s*\{/);
   assert.match(css, /#prompt\s*\{/);
   assert.match(css, /#drawer\s*\{/);
+  for (const selector of [".identity-cards", ".llm-key-card", ".product-studio-form", ".learning-stats", ".capability-stats", ".conn-list", ".workspace-stats", ".mindmap-toolbar"]) {
+    assert.ok(css.includes(selector), `missing shared secondary-page treatment: ${selector}`);
+  }
+  assert.match(css, /\.identity-visual-section, \.capability-hero-mark, \.github-mark/);
+  assert.match(css, /\.feature-screen > :not\(\.feature-head\)/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(html, /src\/(?:styles|workspace|experience|finish|learning|design-system|quiet-ui|motion-experience|product-studio)\.css/);
   assert.match(main, /streamUltronSupabaseChat/);
@@ -59,7 +64,7 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.match(main, /nativeSecureStorage/);
   assert.doesNotMatch(main, /registerPlugin[^;]+UltronSecureStorage/);
   assert.equal((cloudSync.match(/registerPlugin<UltronSecureStoragePlugin>\(['"]UltronSecureStorage['"]\)/g) ?? []).length, 1);
-  assert.match(main, /state === "error" \? "broken" : "local"/);
+  assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : "local"/);
 });
 
 test("responsive requirements and every full-screen destination remain covered", async () => {

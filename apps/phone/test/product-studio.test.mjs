@@ -139,6 +139,10 @@ test("Product Studio research obeys public crawl limits and streams safe preview
   assert.match(source, /AbortSignal\.timeout/);
   assert.match(source, /draft\.block\.updated/);
   assert.match(source, /inlineMarkdown/);
+  assert.match(source, /product-cover/);
+  assert.match(source, /@page\{size:A4/);
+  assert.match(source, /@media print/);
+  assert.match(source, /page-break-after:always/);
   assert.match(source, /noopener noreferrer/);
   assert.match(source, /<table>/);
   assert.match(source, /sandbox/);

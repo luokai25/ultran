@@ -1665,3 +1665,6 @@ button {
 .composio-key-setup small{font-size:11px;line-height:1.45;color:var(--muted)}
 .composio-key-setup small[data-tone="ok"]{color:var(--ok)}
 .composio-key-setup small[data-tone="bad"]{color:var(--danger,#e58c8c)}
+
+.conn-tool-search{width:100%;min-width:0;margin:8px 0;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface,rgba(255,255,255,.03));color:var(--text);font:inherit;font-size:13px;}
+.conn-tool-search:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px;}

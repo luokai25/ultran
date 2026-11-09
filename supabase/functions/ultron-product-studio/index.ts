@@ -482,7 +482,9 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const draft = await callGeminiStreaming(ownerId, draftPrompt, projectId, title);
   const markdown = draft.text.replace(/^\s*```(?:markdown|md)?/i, "").replace(/```\s*$/, "").trim();
   if (markdown.length < 1800) throw new Error("product_draft_too_short_for_quality_gate");
-  const title = clean(opportunity.title, 180) || "ULTRON Digital Product";
+  await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
+  const validation = { minimum_length_passed: markdown.length >= 1800, references_section: /^#{1,3}\\s*(references|sources)\\s*$/im.test(markdown), citation_markers: [...markdown.matchAll(/\\[(\\d+)\\]/g)].length, analyzed_sources: counts.analyzed, requested_sources: target };
+  await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   const html = markdownPreview(markdown, title);
   const storagePath = ownerId + "/products/" + projectId + "/product-v1.md";
   const bucket = db.storage.from("ultron-private");
@@ -503,7 +505,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   await db.from("ultron_product_documents").insert({
     owner_id: ownerId, project_id: projectId, title, format: "markdown", status: "final", version: 1,
     storage_path: storagePath, mime_type: "text/markdown", byte_size: new TextEncoder().encode(markdown).byteLength,
-    checksum_sha256: checksum, validation_report: { minimum_length_passed: true, citations_included: /references/i.test(markdown), analyzed_sources: analyzed },
+    checksum_sha256: checksum, validation_report: { minimum_length_passed: true, citations_included: /references/i.test(markdown), analyzed_sources: counts.analyzed },
   });
   const htmlBytes = new TextEncoder().encode(html);
   const htmlChecksumBytes = await crypto.subtle.digest("SHA-256", htmlBytes);
@@ -520,15 +522,15 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     storage_path: htmlPath, mime_type: "text/html", byte_size: htmlBytes.byteLength,
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   });
-  const finalStatus = analyzed >= Number(project.research_target || 200) ? "completed" : "partial";
+  const finalStatus = counts.analyzed >= target && validation.references_section ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,
-    synthesis_summary: { overview: clean(opportunity.opportunity_summary, 3000), source_count: analyzed, research_target: project.research_target, coverage_note: analyzed < Number(project.research_target) ? "This first run created a source-backed draft but did not reach the requested source target. Continue research before treating it as publication-ready." : "Research target reached." },
+    synthesis_summary: { overview: clean(opportunity.opportunity_summary, 3000), source_count: counts.analyzed, research_target: target, coverage_note: finalStatus === "completed" ? "Research target reached and references section check passed." : "A source-backed draft was created, but the research target or basic reference check was not reached. Review and expand it before publication.", research_stop_reason: coverageReason, validation },
     updated_at: new Date().toISOString(), completed_at: new Date().toISOString(),
   }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: artifact.id, title, format: "markdown", bytes: new TextEncoder().encode(markdown).byteLength });
-  await addEvent(db, ownerId, projectId, "packaging", "job.completed", { status: finalStatus, analyzed_sources: analyzed, target: project.research_target });
+  await addEvent(db, ownerId, projectId, "packaging", "job.completed", { status: finalStatus, analyzed_sources: counts.analyzed, target });
   const { data: signed } = await bucket.createSignedUrl(storagePath, 3600, { download: title + ".md" });
   return { project_id: projectId, status: finalStatus, artifact_id: artifact.id, download_url: signed?.signedUrl ?? null, source_counts: counts, model: draft.model };
 }
@@ -555,7 +557,7 @@ Deno.serve(async (req: Request) => {
       }
       const projectId = clean(body.project_id, 80), jobId = clean(body.job_id, 80);
       if (!projectId || !jobId || !ownerId) return json({ error: "project_and_job_required" }, 400);
-      const result = await workerProcess(projectId, ownerId, jobId);
+      const result = await workerProcess(projectId, ownerId, jobId, Math.max(0, Math.floor(Number(body.research_round) || 0)));
       return json({ ok: true, result });
     }
     const auth = await ownerFromRequest(req);
@@ -576,7 +578,7 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       const { data: job, error: jobError } = await auth.db.from("ultron_jobs").insert({
         owner_id: auth.id, job_type: "product.generate", title: "Create " + (request.slice(0, 100) || "a digital product"),
-        payload: { project_id: project.id }, priority: 4, max_attempts: 20, idempotency_key: "product:" + project.id,
+        payload: { project_id: project.id, research_round: 0 }, priority: 4, max_attempts: 20, idempotency_key: "product:" + project.id,
       }).select("id").single();
       if (jobError) {
         await auth.db.from("ultron_product_projects").update({ status: "failed", error_message: "Could not queue product generation." }).eq("id", project.id);

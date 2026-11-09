@@ -347,6 +347,11 @@
           <button id="mcp-server-add" class="solid" type="button">Connect and inspect tools</button>
           <small id="mcp-server-status" role="status" aria-live="polite">No remote MCP servers loaded yet.</small>
           <div id="mcp-server-list" class="mcp-server-list"><p class="conn-empty">Your connected MCP servers will appear here.</p></div>
+          <section class="mcp-audit" aria-label="Recent MCP activity">
+            <div class="mcp-audit-head"><div><strong>Recent MCP activity</strong><small>Updates every 5 seconds while this screen is open. The current backend keeps this recent audit in memory.</small></div><button id="mcp-audit-refresh" class="ghost" type="button">Refresh</button></div>
+            <small id="mcp-audit-status" role="status" aria-live="polite">Waiting for audit history…</small>
+            <div id="mcp-audit-list" class="mcp-audit-list"><p class="conn-empty">No MCP calls loaded.</p></div>
+          </section>
         </section>
         <section class="composio-key-setup" aria-label="Composio gateway key">
           <div><strong>OAuth gateway</strong><p>Connect ULTRON to the managed OAuth gateway. The project key is verified and stored in Supabase Vault, never in browser storage. You will authorize Google separately on Google’s own sign-in screen.</p></div>

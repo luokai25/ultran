@@ -1688,3 +1688,18 @@ button {
 .mcp-server-tool strong{font-size:11px;overflow-wrap:anywhere}
 .mcp-server-tool small{font-size:10px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
 .mcp-tool-capabilities{color:var(--gold-bright)!important}
+
+.mcp-audit{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)}
+.mcp-audit-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mcp-audit-head>div{display:grid;gap:4px}
+.mcp-audit-head strong{font-size:13px}
+.mcp-audit-head small,.mcp-audit-status{font-size:10px;color:var(--muted);line-height:1.45}
+.mcp-audit-list{display:grid;gap:7px}
+.mcp-audit-row{display:grid;gap:4px;padding:10px;border:1px solid var(--hairline);border-radius:11px;background:rgba(255,255,255,.02)}
+.mcp-audit-row-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mcp-audit-row-top strong{font-size:11px;overflow-wrap:anywhere}
+.mcp-audit-row>small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.mcp-audit-meta{opacity:.8}
+.mcp-audit-ok,.mcp-audit-failed{font-size:9px;font-weight:800;white-space:nowrap}
+.mcp-audit-ok{color:var(--ok)}
+.mcp-audit-failed{color:var(--danger)}

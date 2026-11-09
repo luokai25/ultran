@@ -135,3 +135,11 @@ test("MCP endpoint URLs cannot carry credentials in query parameters",()=>{
  assert.match(screen,/parsed\.search/);
  assert.match(screen,/Put bearer tokens in the separate token field/);
 });
+
+test("MCP manager shows recent tool-call audit and refreshes it while open",()=>{
+ assert.match(html,/id="mcp-audit-list"/);
+ assert.match(screen,/\/v1\/mcp\/audit\?limit=30/);
+ assert.match(screen,/setInterval\(\(\) => \{ if \(panelOpen && !document\.hidden\) void refreshMcpAudit\(\); \}, 5000\)/);
+ assert.match(screen,/clearInterval\(mcpAuditTimer\)/);
+ assert.match(screen,/entry\.latency_ms/);
+});

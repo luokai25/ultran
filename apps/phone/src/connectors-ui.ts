@@ -93,6 +93,9 @@ export function initConnectors(deps: Deps): void {
   const mcpServerAdd = need<HTMLButtonElement>("#mcp-server-add");
   const mcpServerStatus = need<HTMLElement>("#mcp-server-status");
   const mcpServerList = need<HTMLElement>("#mcp-server-list");
+  const mcpAuditRefresh = need<HTMLButtonElement>("#mcp-audit-refresh");
+  const mcpAuditStatus = need<HTMLElement>("#mcp-audit-status");
+  const mcpAuditList = need<HTMLElement>("#mcp-audit-list");
   const detailWrap = need<HTMLElement>("#connector-detail-wrap");
   const detailEl = need<HTMLElement>("#connector-detail");
   const approvalPanel = need<HTMLElement>("#composio-approvals");
@@ -207,6 +210,39 @@ export function initConnectors(deps: Deps): void {
         reset();
       });
       tiersEl.append(b);
+    }
+  }
+
+  let mcpAuditTimer: number | null = null;
+  async function refreshMcpAudit(): Promise<void> {
+    if (!deps.backendLinked()) {
+      mcpAuditStatus.textContent = "Link the ULTRON backend to inspect MCP activity.";
+      mcpAuditList.replaceChildren(el("p", "conn-empty", "No backend activity source is connected."));
+      return;
+    }
+    mcpAuditStatus.textContent = "Loading recent MCP calls…";
+    try {
+      const response = await deps.api("/v1/mcp/audit?limit=30", {}, 12_000);
+      if (!response.ok) throw new Error("MCP audit returned " + response.status);
+      const payload = await response.json() as { entries?: Array<Record<string,unknown>>; summary?: Record<string,unknown> };
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      const summary = payload.summary ?? {};
+      mcpAuditList.replaceChildren();
+      if (!entries.length) mcpAuditList.append(el("p", "conn-empty", "No MCP tool calls recorded in this backend session yet."));
+      for (const entry of entries) {
+        const row = el("article", "mcp-audit-row");
+        const top = el("div", "mcp-audit-row-top");
+        top.append(el("strong", undefined, String(entry.tool || "MCP tool")));
+        top.append(el("span", entry.ok === true ? "mcp-audit-ok" : "mcp-audit-failed", entry.ok === true ? "Completed" : "Blocked / failed"));
+        const reason = String(entry.reason || "No additional details");
+        const caps = Array.isArray(entry.capabilities) ? entry.capabilities.map(String).join(", ") : "unspecified";
+        const when = typeof entry.at === "string" ? new Date(entry.at).toLocaleTimeString() : "Time unavailable";
+        row.append(top, el("small", undefined, reason.slice(0, 240)), el("small", "mcp-audit-meta", when + " · " + String(entry.latency_ms ?? 0) + " ms · " + caps));
+        mcpAuditList.append(row);
+      }
+      mcpAuditStatus.textContent = String(summary.total ?? entries.length) + " calls in this backend session · " + String(summary.ok ?? 0) + " successful · " + String(summary.denied ?? 0) + " denied · last 30 shown.";
+    } catch (error) {
+      mcpAuditStatus.textContent = error instanceof Error ? error.message : "Could not load MCP activity.";
     }
   }
 
@@ -740,7 +776,7 @@ if (entry.auth === "oauth2") {
     if (refreshInFlight?.generation === generation) return refreshInFlight.promise;
     refreshButton.disabled = true;
     refreshButton.textContent = "Checking…";
-    const promise = Promise.allSettled([refreshEnabled(), refreshOAuthConnections(), refreshApprovals(), refreshMcpServers()]).then(() => {
+    const promise = Promise.allSettled([refreshEnabled(), refreshOAuthConnections(), refreshApprovals(), refreshMcpServers(), refreshMcpAudit()]).then(() => {
       if (panelOpen && generation === refreshGeneration) render();
     }).finally(() => {
       if (refreshInFlight?.promise !== promise) return;
@@ -759,6 +795,8 @@ if (entry.auth === "oauth2") {
     panelOpen = true;
     refreshGeneration++;
     panel.hidden = false;
+    if (mcpAuditTimer !== null) window.clearInterval(mcpAuditTimer);
+    mcpAuditTimer = window.setInterval(() => { if (panelOpen && !document.hidden) void refreshMcpAudit(); }, 5000);
     document.body.dataset.panel = "connectors";
     void refreshAll();
   }
@@ -766,6 +804,7 @@ if (entry.auth === "oauth2") {
   function close(): void {
     panelOpen = false;
     refreshGeneration++;
+    if (mcpAuditTimer !== null) { window.clearInterval(mcpAuditTimer); mcpAuditTimer = null; }
     closeDetail();
     panel.hidden = true;
     delete document.body.dataset.panel;
@@ -837,6 +876,7 @@ if (entry.auth === "oauth2") {
     }
   });
     refreshButton.addEventListener("click", () => void refreshAll());
+  mcpAuditRefresh.addEventListener("click", () => void refreshMcpAudit());
   need<HTMLButtonElement>("#connectors-btn").addEventListener("click", open);
   need<HTMLButtonElement>("#connectors-back").addEventListener("click", close);
   detailWrap.addEventListener("click", (event) => {

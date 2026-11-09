@@ -78,7 +78,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(Math.min(12_000, deadline - Date.now())),
+        signal: AbortSignal.timeout(Math.min(8_000, deadline - Date.now())),
       });
       const raw = await response.text();
       if (!response.ok) {
@@ -429,17 +429,24 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const shouldContinue = counts.analyzed < (Number(project.research_target) || 200) && nextRound < maxRounds && stalledRounds < 3;
   if (shouldContinue) {
     const nextJobPayload = { project_id: projectId, research_round: nextRound };
+    const nextIdempotencyKey = "product:" + projectId + ":research:" + nextRound;
+    let nextJobId = "";
     const { data: nextJob, error: nextJobError } = await db.from("ultron_jobs").insert({
       owner_id: ownerId, job_type: "product.generate", title: "Continue research · " + clean(opportunity.title, 100),
       payload: nextJobPayload, priority: 4, max_attempts: 20,
-      idempotency_key: "product:" + projectId + ":research:" + nextRound,
+      idempotency_key: nextIdempotencyKey,
     }).select("id").single();
-    if (nextJobError) throw nextJobError;
+    if (nextJobError?.code === "23505") {
+      const { data: existingNextJob, error: existingNextError } = await db.from("ultron_jobs").select("id").eq("owner_id", ownerId).eq("idempotency_key", nextIdempotencyKey).maybeSingle();
+      if (existingNextError || !existingNextJob) throw nextJobError;
+      nextJobId = existingNextJob.id;
+    } else if (nextJobError) throw nextJobError;
+    else nextJobId = nextJob.id;
     const progress = Math.min(62, 25 + Math.floor((counts.analyzed / Math.max(1, Number(project.research_target) || 200)) * 37));
     await db.from("ultron_product_projects").update({
       status: "researching", active_stage: "research", progress, source_counts: counts,
       configuration: { ...oldConfiguration, research_round: nextRound, stalled_rounds: stalledRounds },
-      source_job_id: nextJob.id, updated_at: new Date().toISOString(),
+      source_job_id: nextJobId, updated_at: new Date().toISOString(),
     }).eq("id", projectId).eq("owner_id", ownerId);
     await addEvent(db, ownerId, projectId, "research", "batch.completed", { batch: researchRound + 1, new_sources: newSources, counts, target: project.research_target, next_batch_queued: true });
     return { project_id: projectId, status: "researching", continuation_queued: true, source_counts: counts };
@@ -626,10 +633,10 @@ Deno.serve(async (req: Request) => {
         auth.db.from("ultron_product_sources").select("id,title,canonical_url,domain,fetch_status,relevance_score,extraction_summary,retrieved_at").eq("owner_id", auth.id).eq("project_id", id).order("relevance_score", { ascending: false }).limit(200),
         auth.db.from("ultron_product_documents").select("id,title,format,status,version,byte_size,storage_path,created_at").eq("owner_id", auth.id).eq("project_id", id).order("created_at", { ascending: false }),
       ]);
-      const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
+      const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id,name").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
       let download_url: string | null = null;
       if (download.data?.storage_path) {
-        const { data: signed } = await db.storage.from(download.data.bucket_id).createSignedUrl(download.data.storage_path, 3600);
+        const { data: signed } = await db.storage.from(download.data.bucket_id).createSignedUrl(download.data.storage_path, 3600, { download: download.data.name });
         download_url = signed?.signedUrl ?? null;
       }
       const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {

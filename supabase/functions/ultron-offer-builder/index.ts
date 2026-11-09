@@ -157,8 +157,8 @@ function offerBuilderSteps(stage: string): string[] {
 function offerBuilderResult(stage: string, values: Record<string, unknown>): unknown {
   if (stage === "discovery") {
     const directions = isObject(values.directions) && Array.isArray(values.directions.directions) ? values.directions.directions : [];
-    const scored = isObject(values.score) && Array.isArray(values.score.pockets) ? values.score.pockets : [];
-    return { directions, pockets: scored.sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.overall) - Number(a.overall)) };
+    const scored: Array<Record<string, unknown>> = isObject(values.score) && Array.isArray(values.score.pockets) ? values.score.pockets.filter(isObject) : [];
+    return { directions, pockets: scored.sort((a, b) => Number(b.overall) - Number(a.overall)) };
   }
   if (stage === "outline") {
     const outlines = ["outline_A", "outline_B", "outline_C"].map((key) => values[key]).filter(isObject);

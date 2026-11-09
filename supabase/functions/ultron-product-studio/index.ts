@@ -333,18 +333,18 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     queries = Array.isArray(opportunity.research_queries) ? opportunity.research_queries.filter((q): q is string => typeof q === "string").slice(0, 5) : [];
     if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
   }
+  const { data: priorSources } = await db.from("ultron_product_sources").select("domain").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
+  const priorDomains = [...new Set((priorSources || []).map(row => clean(row.domain, 120)).filter(Boolean))].slice(0, 100);
   const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
   const searched = await callGemini(ownerId, [
-    { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid repeating the same domain within this batch. Return concise evidence. Do not invent URLs, statistics or sources." }] }
+    { role: "user", parts: [{ text: "Use Google Search grounding for this research angle: " + query + ". Topic: " + clean(opportunity.selected_topic, 500) + ". Find new, diverse, credible sources. Prefer official, academic, government, reputable industry and practitioner sources. Avoid these previously researched domains: " + priorDomains.join(", ") + ". Return concise evidence. Do not invent URLs, statistics or sources." }] }
   ], true);
   grounded.push(...searched.grounding);
   const grounding = grounded;
   const unique = [...new Map(grounding.map((item) => [item.url, item])).values()];
   const seenDomains = new Set<string>();
   const urls = [...unique.filter(item => { try { const domain = new URL(item.url).hostname; if (seenDomains.has(domain)) return false; seenDomains.add(domain); return true; } catch { return false; } }), ...unique.filter(item => { try { return !seenDomains.has(new URL(item.url).hostname); } catch { return false; } })].slice(0, 24);
-  const { data: priorSources } = await db.from("ultron_product_sources").select("domain").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
-  const priorDomains = [...new Set((priorSources || []).map(row => clean(row.domain, 120)).filter(Boolean))].slice(0, 100);
   const discoveredRecords = await Promise.all(urls.map(async item => {
     const parsed = new URL(item.url);
     parsed.hash = "";
@@ -484,7 +484,15 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const markdown = draft.text.replace(/^\s*```(?:markdown|md)?/i, "").replace(/```\s*$/, "").trim();
   if (markdown.length < 1800) throw new Error("product_draft_too_short_for_quality_gate");
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
-  const validation = { minimum_length_passed: markdown.length >= 1800, references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown), citation_markers: [...markdown.matchAll(/\[(\d+)\]/g)].length, analyzed_sources: counts.analyzed, requested_sources: target };
+  const citationIndexes = [...markdown.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
+  const validation = {
+    minimum_length_passed: markdown.length >= 1800,
+    references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown),
+    citation_markers: citationIndexes.length,
+    source_citations_match: citationIndexes.every(index => index >= 1 && index <= evidence.length),
+    analyzed_sources: counts.analyzed,
+    requested_sources: target,
+  };
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   const html = markdownPreview(markdown, title);
   const storagePath = ownerId + "/products/" + projectId + "/product-v1.md";
@@ -523,7 +531,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     storage_path: htmlPath, mime_type: "text/html", byte_size: htmlBytes.byteLength,
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   });
-  const finalStatus = counts.analyzed >= target && validation.references_section ? "completed" : "partial";
+  const finalStatus = counts.analyzed >= target && validation.references_section && (evidence.length === 0 || (validation.citation_markers > 0 && validation.source_citations_match)) ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
     preview_html: html, artifact_id: artifact.id, source_counts: counts,

@@ -40,6 +40,8 @@ test("Product Studio backend uses Vault keys, grounded research and bounded publ
   assert.match(source, /google_search/);
   assert.match(source, /robots\.txt/);
   assert.match(source, /isPublicResearchUrl/);
+  assert.match(source, /robotsPathMatches/);
+  assert.match(source, /readPublicTextLimited/);
   assert.match(source, /redirect: "manual"/);
   assert.match(source, /AbortSignal\.timeout/);
   assert.match(source, /streamGenerateContent/);
@@ -65,6 +67,7 @@ test("Product Studio research batches are carried by the existing durable job wo
   ]);
   assert.match(jobs, /job\.job_type === "product\.generate"/);
   assert.match(jobs, /research_round: payload\.research_round/);
+  assert.match(jobs, /lock_token: job\.lock_token/);
   for (const table of ["ultron_product_projects", "ultron_product_sources", "ultron_product_events", "ultron_product_documents"]) {
     assert.ok(migration.includes("create table if not exists public." + table), "missing table " + table);
     assert.ok(migration.includes("alter table public." + table + " enable row level security"), "RLS not enabled for " + table);

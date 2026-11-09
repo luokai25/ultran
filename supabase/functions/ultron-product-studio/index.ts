@@ -82,7 +82,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(Math.min(8_000, deadline - Date.now())),
+        signal: AbortSignal.timeout(Math.min(7_000, deadline - Date.now())),
       });
       const raw = await response.text();
       if (!response.ok) {
@@ -145,7 +145,7 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
       const response = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(Math.min(60_000, deadline - Date.now())),
+        signal: AbortSignal.timeout(Math.min(55_000, deadline - Date.now())),
       });
       if (!response.ok) {
         const detail = (await response.text()).slice(0, 240);
@@ -516,6 +516,18 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     return { title: source.title, url: source.canonical_url, text: clean(source.extraction_summary, index < 30 ? 1200 : 220) };
   }));
   const evidenceText = evidence.map((item, index) => "[" + (index + 1) + "] " + item.title + " (" + item.url + ")\n" + item.text).join("\n\n").slice(0, 160000);
+  const synthesisResult = await callGemini(ownerId, [
+    { role: "user", parts: [{ text: "Act as ULTRON's evidence synthesis lead. Review every numbered source entry, not just the first. Return valid JSON only with keys: executive_summary, recurring_themes (array with theme and supporting_source_numbers), customer_pain_points, evidence_supporting_opportunity, counter_evidence, contradictions, market_gap, willingness_to_pay_signals, target_audience, product_requirements, recommended_format, product_outline, confidence_by_claim. Cite source numbers exactly as [1] through [" + evidence.length + "]. Do not invent numbers, studies, demand or pricing. Clearly label inference and uncertainty. Opportunity brief: " + JSON.stringify(opportunity).slice(0, 5000) + "\n\nNumbered source evidence:\n" + evidenceText }] }
+  ], false);
+  const synthesis = parseJsonObject(synthesisResult.text);
+  await db.from("ultron_product_projects").update({
+    synthesis_summary: { ...synthesis, source_count: counts.analyzed, research_target: target, synthesis_model: synthesisResult.model },
+    status: "synthesizing", active_stage: "synthesis", progress: 68, updated_at: new Date().toISOString(),
+  }).eq("id", projectId).eq("owner_id", ownerId);
+  await addEvent(db, ownerId, projectId, "synthesis", "synthesis.completed", {
+    source_count: counts.analyzed, theme_count: Array.isArray(synthesis.recurring_themes) ? synthesis.recurring_themes.length : 0,
+    summary: clean(synthesis.executive_summary, 500),
+  });
   const title = clean(opportunity.title, 180) || "ULTRON Digital Product";
   await db.from("ultron_product_projects").update({ status: "creating", active_stage: "creation", progress: 64, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   await addEvent(db, ownerId, projectId, "creation", "stage.started", { message: "Writing the original product. The preview updates as draft sections are saved." });

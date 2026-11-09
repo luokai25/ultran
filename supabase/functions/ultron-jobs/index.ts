@@ -457,11 +457,15 @@ Deno.serve(async (req: Request) => {
             result = { healthy: true, queue: { queued: queued.count ?? 0, running: running.count ?? 0, failed: failed.count ?? 0 }, checked_at: new Date().toISOString() };
           } else if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};
+            let productWorkerSecret = cronSecret;
+            if (!internalWorker) {
+              const { data: expectedProductSecret, error: productSecretError } = await serviceDb.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+              if (productSecretError || typeof expectedProductSecret !== "string" || !expectedProductSecret) throw new Error("product_worker_secret_unavailable");
+              productWorkerSecret = expectedProductSecret;
+            }
             const response = await fetch(url + "/functions/v1/ultron-product-studio", {
               method: "POST",
-              headers: internalWorker
-                ? { "x-ultron-cron-secret": cronSecret, "Content-Type": "application/json" }
-                : { "Authorization": authorization, "apikey": key, "Content-Type": "application/json" },
+              headers: { "x-ultron-cron-secret": productWorkerSecret, "Content-Type": "application/json" },
               body: JSON.stringify({ action: "worker_process", project_id: payload.project_id, job_id: job.id, lock_token: job.lock_token, research_round: payload.research_round }),
               signal: AbortSignal.timeout(115_000),
             });

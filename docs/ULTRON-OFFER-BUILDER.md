@@ -32,7 +32,7 @@ Project state and events use `ultron_product_projects` and `ultron_product_event
 - Branding: palette, typography direction, cover concept, and product copy.
 - Store: product-page copy, benefits, FAQ, and suggested price.
 
-The backend also exposes summary and quality-review stages for future UI wiring.
+The UI also generates a product summary and runs a manuscript quality review before branding.
 
 ## Current boundaries
 
@@ -40,7 +40,7 @@ The backend also exposes summary and quality-review stages for future UI wiring.
 - The current cover is a styled HTML cover concept; image-file generation is not yet connected.
 - The store page is generated and saved to the ULTRON project. It is not automatically published to Shopify.
 - The final export currently saved by this flow is Markdown. PDF/DOCX export can be added through the existing artifact/document pipeline.
-- Generation is server-backed and checkpoints are persisted, but the Offer Builder is not yet a durable background job queue. Generated sections are saved in the project record; automatic section-level resume in the UI still needs a follow-up fix.
+- Generation is server-backed and checkpoints are persisted, but the Offer Builder is not yet a durable background job queue. Generated sections are saved in the project record and the UI resumes only the unfinished sections after reopening a saved project. This is checkpointed client-orchestrated work, not a durable background job queue.
 
 ## Security
 

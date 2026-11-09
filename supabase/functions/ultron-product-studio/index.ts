@@ -992,7 +992,7 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await auth.db.from("ultron_product_projects").update({ status, updated_at: new Date().toISOString() }).eq("owner_id", auth.id).eq("id", id).in("status", ["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"]).select("id,status").maybeSingle();
       if (error) throw error;
       if (!data) return json({ error: "project_not_active" }, 409);
-      if (body.action === "cancel") await auth.db.from("ultron_jobs").update({ status: "cancelled", lock_token: null, lease_expires_at: null, completed_at: new Date().toISOString() }).eq("owner_id", auth.id).eq("id", (await auth.db.from("ultron_product_projects").select("source_job_id").eq("id", id).single()).data?.source_job_id).in("status", ["queued","retry_wait","running"]);
+      if (body.action === "cancel" || body.action === "pause") await auth.db.from("ultron_jobs").update({ status: "cancelled", lock_token: null, lease_expires_at: null, completed_at: new Date().toISOString() }).eq("owner_id", auth.id).eq("id", (await auth.db.from("ultron_product_projects").select("source_job_id").eq("id", id).single()).data?.source_job_id).in("status", ["queued","retry_wait","running"]);
       await addEvent(db, auth.id, id, "system", body.action === "cancel" ? "job.cancelled" : "job.paused", {});
       return json({ ok: true, project: data });
     }

@@ -25,6 +25,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(main, /openProductStudioScreen/);
   assert.match(main, /openCloudSettings:.*navSettingsButton\.click/s);
   assert.match(main, /cloud-sync-heading.*scrollIntoView/s);
+  assert.match(main, /for \(const latitude of \[-0\.95, -0\.68, -0\.32, 0, 0\.32, 0\.68, 0\.95\]\)/);
+  assert.doesNotMatch(main, /for \(const latitude of \[-1\.05,.*1\.05\]\)/);
   assert.match(moduleSource, /functions\.invoke\("ultron-product-studio"/);
   assert.match(moduleSource, /product-studio-refresh-list/);
   assert.match(moduleSource, /product-studio-resume/);

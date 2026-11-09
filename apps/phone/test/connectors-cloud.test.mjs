@@ -110,11 +110,13 @@ test("Google OAuth reserves a browser tab during the click before the async gate
  assert.match(main,/popup\.location\.replace\(url\)/);
  assert.match(main,/window\.location\.assign\(url\)/);
 });
-test("Google OAuth is blocked until the server-side Composio gateway key is configured",()=>{
+test("Google OAuth explains the one-time gateway prerequisite before attempting a redirect",()=>{
  assert.match(screen,/let composioConfigured = false/);
  assert.match(screen,/composioConfigured = result\.configured === true/);
- assert.match(screen,/Add the Composio Project API key in OAuth gateway above/);
- assert.match(screen,/act\.disabled = !canAct \|\| \(entry\.auth === "oauth2" && !composioConfigured\)/);
+ assert.match(screen,/if \(!composioConfigured\)/);
+ assert.match(screen,/One-time setup required: add the Composio Project API key in OAuth gateway below/);
+ assert.match(screen,/composioKeyInput\.focus\(\{ preventScroll: true \}\)/);
+ assert.match(screen,/preparedExternal = deps\.prepareExternal\?\.\(\) \?\? null/);
 });
 test("OAuth connection waits for authorization and refreshes tools automatically",()=>{
  assert.match(screen,/Waiting for .* authorization/);

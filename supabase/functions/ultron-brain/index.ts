@@ -136,7 +136,7 @@ async function getKeySecret(db: ReturnType<typeof service>, secretId: string): P
   return data;
 }
 async function listProviderKeys(db: ReturnType<typeof service>, ownerId: string, provider: Provider): Promise<KeyRow[]> {
-  const { data, error } = await db.from(tableFor(provider)).select("*").eq("owner_id", ownerId).order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true });
+  const { data, error } = await db.from(tableFor(provider)).select("id,owner_id,label,vault_secret_id,key_fingerprint,status,enabled,priority,models,request_count,tokens_used,cooldown_until,last_used_at,last_checked_at,last_error,created_at").eq("owner_id", ownerId).order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true });
   if (error) throw error;
   return (data ?? []) as KeyRow[];
 }
@@ -366,15 +366,31 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   const allRows = await keyRows(db, ownerId);
   const now = Date.now();
   const complexity = taskComplexity(messages);
-  const candidates = allRows.flatMap(({ provider, key }) => {
-    if (!key.enabled || key.status !== "connected" || (requestedProvider && provider !== requestedProvider) || (key.cooldown_until && Date.parse(key.cooldown_until) > now)) return [];
-    const chosenModel = requestedModel
-      ? ((key.models ?? []).includes(requestedModel) && isFreeModel(provider, requestedModel) ? requestedModel : "")
-      : bestFreeModel(provider, key.models ?? [], complexity);
+  const compareCandidates = (a: { provider: Provider; key: KeyRow; chosenModel: string; modelScore: number }, b: { provider: Provider; key: KeyRow; chosenModel: string; modelScore: number }) =>
+    b.modelScore - a.modelScore || b.key.priority - a.key.priority || Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01");
+  const eligibleRows = allRows.filter(({ key }) =>
+    key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)
+  );
+  const automaticCandidates = eligibleRows.flatMap(({ provider, key }) => {
+    const chosenModel = bestFreeModel(provider, key.models ?? [], complexity);
     if (!chosenModel) return [];
     return [{ provider, key, chosenModel, modelScore: modelCapabilityScore(chosenModel, complexity) }];
-  }).sort((a, b) => b.modelScore - a.modelScore || b.key.priority - a.key.priority || Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01"));
-  if (!candidates.length) return json({ error: "no_available_model_key", message: requestedModel ? "No connected key currently supports this free-tier model." : "No connected key currently has an available free-tier chat model. Add another key or wait for a provider quota to reset." }, 503);
+  }).sort(compareCandidates);
+  const preferredCandidates = requestedModel ? eligibleRows.flatMap(({ provider, key }) => {
+    if (requestedProvider && provider !== requestedProvider) return [];
+    if (!(key.models ?? []).includes(requestedModel) || !isFreeModel(provider, requestedModel)) return [];
+    return [{ provider, key, chosenModel: requestedModel, modelScore: modelCapabilityScore(requestedModel, complexity) + 10000 }];
+  }).sort(compareCandidates) : [];
+  // Honor the selected model first, but reserve capacity for cross-provider
+  // fallback. A stale model, rate limit or retired provider model must not
+  // make the whole chat unusable while other free Vault keys are healthy.
+  const preferredSlice = preferredCandidates.slice(0, requestedModel ? 2 : 0);
+  const preferredIds = new Set(preferredSlice.map((item) => item.provider + ":" + item.key.id));
+  const fallbackSlice = automaticCandidates.filter((item) => !preferredIds.has(item.provider + ":" + item.key.id)).slice(0, Math.max(0, 8 - preferredSlice.length));
+  const candidates = [...preferredSlice, ...fallbackSlice];
+  if (!candidates.length) return json({ error: "no_available_model_key", message: requestedModel
+    ? "The selected model is no longer available. No connected free model key is currently usable; check the LLM API Keys screen or switch to ULTRON Automatic."
+    : "No connected key currently has an available free-tier chat model. Add another key or wait for a provider quota to reset." }, 503);
   let lastError = "No provider key could complete the request.";
   for (const candidate of candidates.slice(0, 8)) {
     const { provider, key, chosenModel } = candidate;
@@ -400,7 +416,6 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
       const cooldown = upstream.status === 429 ? new Date(Date.now() + retryAfterMs(upstream.headers.get("retry-after"))).toISOString() : null;
       await updateKey(db, ownerId, provider, key.id, { status: state, last_checked_at: new Date().toISOString(), last_error: `HTTP ${upstream.status}: ${detail}`, cooldown_until: cooldown });
       lastError = `${config.label} returned HTTP ${upstream.status}.`;
-      if (requestedModel && (upstream.status === 400 || upstream.status === 404)) break;
       continue;
     }
     if (!upstream.body) { lastError = `${config.label} returned no response stream.`; continue; }

@@ -62,3 +62,9 @@ test("Composio auth config creation uses the current v3.1 request schema",()=>{
  assert.match(gateway,/toolkit:\{slug:toolkit\},auth_config:\{type:"use_composio_managed_auth",credentials:\{\},restrict_to_following_tools:\[\]\}/);
  assert.doesNotMatch(gateway,/options:\{type:"use_composio_managed_auth"/);
 });
+
+test("common productivity and developer OAuth connectors are registered for ULTRON",()=>{
+ const catalog=JSON.parse(readFileSync(resolve(root,"apps/phone/src/connectors.catalog.json"),"utf8"));
+ for(const slug of ["googlesuper","notion","dropbox","slack","linear"]) assert.ok(catalog.some((entry)=>entry.id===slug&&entry.auth==="oauth2"),slug+" connector missing");
+ assert.match(main,/notion\|dropbox\|slack\|linear/);
+});

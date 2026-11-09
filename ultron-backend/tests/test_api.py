@@ -600,13 +600,14 @@ def test_read_endpoints_are_fast_and_stable(client, path):
 
 def test_production_operational_routes_require_a_supabase_owner_session(tmp_path):
     from fastapi.testclient import TestClient
+    from cryptography.fernet import Fernet
     from ultron_backend.app import create_app
     from ultron_backend.config import Settings
 
     settings = Settings(
         environment="production",
         data_dir=tmp_path / "production-data",
-        credential_encryption_key="present-for-test",
+        credential_encryption_key=Fernet.generate_key().decode("ascii"),
         supabase_url="https://project.supabase.co",
         supabase_publishable_key="sb_publishable_test",
     )
@@ -627,6 +628,7 @@ def test_production_workspace_ignores_a_caller_selected_workspace():
 
 def test_production_accepts_a_valid_registered_owner_session_and_ignores_workspace_header(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
+    from cryptography.fernet import Fernet
     import ultron_backend.app as app_module
     from ultron_backend.app import create_app
     from ultron_backend.config import Settings
@@ -660,7 +662,7 @@ def test_production_accepts_a_valid_registered_owner_session_and_ignores_workspa
     monkeypatch.setattr(app_module.httpx, "AsyncClient", FakeClient)
     settings = Settings(
         environment="production", data_dir=tmp_path / "owner-data",
-        credential_encryption_key="present-for-test",
+        credential_encryption_key=Fernet.generate_key().decode("ascii"),
         supabase_url="https://project.supabase.co",
         supabase_publishable_key="sb_publishable_test",
     )

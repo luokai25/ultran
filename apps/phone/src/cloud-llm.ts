@@ -158,9 +158,10 @@ export async function streamUltronSupabaseChat(
     }
     // Supabase occasionally fails before it can establish the streaming response.
     // Retry only its generic Edge Runtime failure, never a provider's own error.
-    if (response.status === 502 && !controller.signal.aborted) {
+    if ([502, 503, 504].includes(response.status) && !controller.signal.aborted) {
       const gatewayBody = await response.clone().text().catch(() => "");
-      if (/EDGE_FUNCTION_ERROR|edge function.*failed|gateway error/i.test(gatewayBody)) {
+      const gatewayCode = response.headers.get("sb-error-code") ?? response.headers.get("x-sb-error-code") ?? "";
+      if (gatewayCode === "EDGE_FUNCTION_ERROR" || /EDGE_FUNCTION_ERROR|edge function.*failed|gateway error/i.test(gatewayBody)) {
         response = await send(session.access_token);
       }
     }

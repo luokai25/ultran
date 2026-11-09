@@ -12,6 +12,7 @@
 
 import catalogJson from "./connectors.catalog.json";
 import { listUltronConnectors, listUltronConnectorTools, setUltronConnectorToolPermission, startUltronConnectorConnection, refreshUltronConnectorStatus, disconnectUltronConnector, saveUltronComposioApiKey } from "./connectors-cloud";
+import type { UltronConnectorTool } from "./connectors-cloud";
 
 export type CatalogEntry = {
   id: string;
@@ -396,6 +397,7 @@ export function initConnectors(deps: Deps): void {
     let toolsStatus: HTMLElement | null = null;
     let toolsList: HTMLElement | null = null;
     let cachedTools: UltronConnectorTool[] = [];
+let refreshAvailableTools: () => Promise<void> = async () => {};
 let toolsSearch: HTMLInputElement | null = null;
 const renderAvailableTools = (): void => {
   if (!toolsStatus || !toolsList) return;
@@ -437,7 +439,7 @@ const renderAvailableTools = (): void => {
     toolsList.append(row);
   }
 };
-const refreshAvailableTools = async (): Promise<void> => {
+refreshAvailableTools = async (): Promise<void> => {
   if (!toolsStatus || !toolsList) return;
   toolsStatus.textContent = "Loading tools from the ULTRON gateway…";
   toolsList.replaceChildren();

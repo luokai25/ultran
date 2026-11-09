@@ -183,8 +183,10 @@ export async function streamUltronSupabaseChat(
     const consume = (block: string): void => {
       const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith("data:"));
       const data = dataLines.map((line) => line.slice(5).trim()).join("\n");
-      if (!data && !block.trim()) return;
-      if (data === "[DONE]") return;
+      const rawPayload = data || block.trim();
+      if (!rawPayload || rawPayload === "[DONE]") return;
+      // Ignore SSE metadata and heartbeat/comment frames until a data payload arrives.
+      if (!data && !rawPayload.startsWith("{") && !rawPayload.startsWith("[")) return;
       // Most providers send SSE, but some OpenAI-compatible gateways ignore
       // stream=true and return one JSON completion body. Accept both formats.
       let event: {
@@ -199,7 +201,7 @@ export async function streamUltronSupabaseChat(
         error?: string | { message?: string };
         message?: string;
       };
-      try { event = JSON.parse(data || block.trim()) as typeof event; }
+      try { event = JSON.parse(rawPayload) as typeof event; }
       catch { throw new Error("ULTRON received an invalid event from the cloud response stream."); }
       if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
       const choice = event.choices?.[0];

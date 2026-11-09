@@ -16,6 +16,8 @@ let options: StudioOptions | null = null;
 let selectedProjectId = "";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let busy = false;
+let lastPreviewProjectId = "";
+let lastPreviewHtml = "";
 
 const el = <T extends HTMLElement>(id: string) => {
   const node = document.getElementById(id);
@@ -149,6 +151,7 @@ function renderDetail(detail: ProductDetail): void {
   const progress = el<HTMLProgressElement>("product-studio-progress");
   progress.value = Math.max(0, Math.min(100, Number(project.progress) || 0));
   el<HTMLElement>("product-studio-stage").textContent = project.active_stage.replace(/_/g, " ");
+  el<HTMLElement>("product-studio-coverage").textContent = " · " + String(project.source_counts?.analyzed ?? 0) + " / " + String(project.research_target) + " analyzed";
   renderCounts(project.source_counts ?? {});
   renderEvents(detail.events ?? []);
   renderSources(detail.sources ?? []);
@@ -160,6 +163,8 @@ function renderDetail(detail: ProductDetail): void {
     el<HTMLElement>("product-studio-preview-empty").hidden = true;
   } else {
     preview.removeAttribute("srcdoc");
+    lastPreviewProjectId = project.id;
+    lastPreviewHtml = "";
     preview.hidden = true;
     el<HTMLElement>("product-studio-preview-empty").hidden = false;
     el<HTMLElement>("product-studio-preview-empty").textContent = "The live preview will appear when ULTRON commits the first complete draft.";

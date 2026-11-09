@@ -176,6 +176,7 @@ function renderQuality(project: ProductProject): void {
     ["spreadsheet_xlsx_valid", "Editable Excel workbook (when required)"],
     ["presentation_pptx_valid", "Editable PowerPoint deck (when required)"],
     ["docx_export_ready", "Editable Word edition"],
+    ["software_code_files_ready", "Source-code examples packaged (when required)"],
   ];
   const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed · " + String(validation.distinct_cited_sources ?? 0) + " cited");
   panel.append(summary);

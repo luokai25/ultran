@@ -173,6 +173,9 @@ function renderQuality(project: ProductProject): void {
     ["limitations_and_next_steps", "Limitations and next steps"],
     ["placeholder_free", "No unfinished placeholders"],
     ["spreadsheet_csv_valid", "Spreadsheet CSV export (when required)"],
+    ["spreadsheet_xlsx_valid", "Editable Excel workbook (when required)"],
+    ["presentation_pptx_valid", "Editable PowerPoint deck (when required)"],
+    ["docx_export_ready", "Editable Word edition"],
   ];
   const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed");
   panel.append(summary);

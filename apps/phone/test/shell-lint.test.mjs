@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
-const css = readFileSync(resolve(root, "src/design-system.css"), "utf8");
+const css = readFileSync(resolve(root, "src/chatgpt-ui.css"), "utf8");
 const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
 
 function element(id) {

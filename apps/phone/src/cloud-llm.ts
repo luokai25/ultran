@@ -181,13 +181,30 @@ export async function streamUltronSupabaseChat(
     let buffer = "";
     let content = "";
     const consume = (block: string): void => {
-      const data = block.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
-      if (!data || data === "[DONE]") return;
-      let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }>; error?: string | { message?: string }; message?: string };
-      try { event = JSON.parse(data) as typeof event; }
+      const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith("data:"));
+      const data = dataLines.map((line) => line.slice(5).trim()).join("\n");
+      if (!data && !block.trim()) return;
+      if (data === "[DONE]") return;
+      // Most providers send SSE, but some OpenAI-compatible gateways ignore
+      // stream=true and return one JSON completion body. Accept both formats.
+      let event: {
+        choices?: Array<{
+          delta?: { content?: string | Array<{ text?: string }> };
+          message?: { content?: string | Array<{ text?: string }> };
+          text?: string;
+        }>;
+        output_text?: string;
+        response?: string;
+        content?: string | Array<{ text?: string }>;
+        error?: string | { message?: string };
+        message?: string;
+      };
+      try { event = JSON.parse(data || block.trim()) as typeof event; }
       catch { throw new Error("ULTRON received an invalid event from the cloud response stream."); }
       if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
-      const delta = event.choices?.[0]?.delta?.content;
+      const choice = event.choices?.[0];
+      const delta = choice?.delta?.content ?? choice?.message?.content ?? choice?.text
+        ?? event.output_text ?? event.response ?? event.content;
       const token = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
       if (token) { content += token; onToken(token); }
     };

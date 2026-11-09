@@ -10,7 +10,7 @@ type ProductProject = {
 };
 type ProductEvent = { sequence: number; stage: string; event_type: string; payload: Record<string, unknown>; created_at: string };
 type ProductSource = { id: string; title: string; canonical_url: string; domain: string; fetch_status: string; extraction_summary: string };
-type ProductDetail = { project: ProductProject; events: ProductEvent[]; sources: ProductSource[]; documents: Array<{ id: string; title: string; format: string; byte_size: number }>; download_url?: string | null };
+type ProductDetail = { project: ProductProject; events: ProductEvent[]; sources: ProductSource[]; documents: Array<{ id: string; title: string; format: string; byte_size: number; download_url?: string | null }>; download_url?: string | null };
 type StudioOptions = { openScreen: () => void; closeScreen: () => void; wakeWorker: () => Promise<unknown> };
 let options: StudioOptions | null = null;
 let selectedProjectId = "";
@@ -119,6 +119,27 @@ function renderSources(sources: ProductSource[]): void {
     list.append(row);
   }
 }
+function renderDocuments(documents: ProductDetail["documents"]): void {
+  const list = el<HTMLElement>("product-studio-documents");
+  list.replaceChildren();
+  if (!documents.length) {
+    list.append(node("p", "product-studio-empty", "Exports will appear here when packaging finishes."));
+    return;
+  }
+  for (const document of documents) {
+    const row = node("div", "product-document-row");
+    const copy = node("span", "product-document-copy");
+    copy.append(node("strong", "", document.title), node("small", "", document.format.toUpperCase() + " · " + Math.max(1, Math.round(document.byte_size / 1024)) + " KB"));
+    row.append(copy);
+    if (document.download_url) {
+      const link = node("a", "product-document-download", "Download") as HTMLAnchorElement;
+      link.href = document.download_url;
+      link.download = "";
+      row.append(link);
+    }
+    list.append(row);
+  }
+}
 function renderDetail(detail: ProductDetail): void {
   const project = detail.project;
   el<HTMLElement>("product-studio-start").hidden = true;
@@ -130,7 +151,7 @@ function renderDetail(detail: ProductDetail): void {
   el<HTMLElement>("product-studio-stage").textContent = project.active_stage.replace(/_/g, " ");
   renderCounts(project.source_counts ?? {});
   renderEvents(detail.events ?? []);
-  renderSources(detail.sources ?? []);
+  renderSources(detail.sources ?? []);\n  renderDocuments(detail.documents ?? []);
   const preview = el<HTMLIFrameElement>("product-studio-preview");
   if (project.preview_html) {
     preview.srcdoc = project.preview_html;

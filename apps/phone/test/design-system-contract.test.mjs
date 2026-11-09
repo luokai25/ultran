@@ -64,7 +64,7 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.match(main, /nativeSecureStorage/);
   assert.doesNotMatch(main, /registerPlugin[^;]+UltronSecureStorage/);
   assert.equal((cloudSync.match(/registerPlugin<UltronSecureStoragePlugin>\(['"]UltronSecureStorage['"]\)/g) ?? []).length, 1);
-  assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : "local"/);
+  assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : state === "connecting" \? "checking" : "local"/);
 });
 
 test("responsive requirements and every full-screen destination remain covered", async () => {

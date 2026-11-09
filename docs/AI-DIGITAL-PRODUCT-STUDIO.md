@@ -204,3 +204,24 @@ Events must be sequenced, bounded, idempotent and safe to replay. The UI must no
 - RLS prevents another user from reading or changing any project data or artifacts.
 - External publication and purchases never occur automatically.
 - Web and APK feature parity is verified from the canonical `apps/phone` build.
+
+
+## 11. Reuse the existing ULTRON model-key registry (user-confirmed)
+
+The user explicitly requests reuse of the already configured free-tier provider keys in the existing Supabase project. Do not ask the user to re-enter these keys and do not create duplicate credentials or a second key-management UI.
+
+Verified live Supabase state (metadata only; no credential values were read):
+- `ultron_openrouter_keys`: 15 enabled, connected, Vault-backed keys.
+- `ultron_groq_keys`: 15 enabled, connected, Vault-backed keys.
+- `ultron_google_ai_studio_keys`: 15 enabled, connected, Vault-backed keys.
+- The existing ULTRON brain already uses `ultron_read_llm_secret` to resolve credentials server-side and has a free-model filter and key rotation/usage accounting.
+
+Integration requirements:
+- Reuse the existing provider key tables, Vault secret IDs, model catalog, free-model eligibility logic, cooldowns, priorities, usage accounting and health/status tracking.
+- Prefer a shared server-side provider-routing module or a narrowly scoped internal brain inference action so product jobs use the same provider selection behavior as ULTRON chat. Do not duplicate a divergent hard-coded provider list or create new API-key tables.
+- Use only models already marked eligible by the existing free-model policy by default. Never route to a paid model merely because it is stronger. If free quotas are exhausted or a provider rejects a request, fall back to another eligible configured key/model and report when no eligible route remains.
+- Resolve all credentials only in trusted server-side code through the existing Vault RPC. Never return key material, Vault IDs, raw key input columns or authorization headers to the browser, Android client, event payloads, logs, project metadata or generated artifacts.
+- Select explicit non-secret columns from provider key tables; do not use `select("*")` in new code. Existing `api_key_input` compatibility columns must never be read by the product pipeline.
+- Track request/token usage and provider errors using the existing accounting fields. Apply per-project request/token budgets and avoid uncontrolled retry loops.
+- The existing LLM API keys power opportunity analysis, synthesis, writing, coding and QA. They do not automatically provide a general-purpose web search/crawling entitlement. Research discovery/fetch must use a separate adapter (or a supported provider-native search capability) with honest source counts and no assumed paid search API. Do not confuse model calls with unique web sources read.
+- Do not rotate, delete, replace or modify existing credentials as part of this feature. The user confirmed they want these existing credentials reused.

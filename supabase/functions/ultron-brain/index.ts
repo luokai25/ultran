@@ -583,18 +583,28 @@ async function handleWorker(db: ReturnType<typeof service>, ownerId: string, lim
   const connected = refreshedRows.filter(({ provider, key }) => key.enabled && key.status === "connected" && (key.models ?? []).some((model) => isFreeModel(provider, model))).length;
   const total = refreshedRows.filter(({ key }) => key.enabled).length;
   let jobWorker: Json = { ok: false, processed: 0, reason: "not_started" };
-  try {
-    const { data: cronSecret, error: cronSecretError } = await db.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
-    if (cronSecretError || typeof cronSecret !== "string" || !cronSecret) throw new Error("internal_worker_secret_unavailable");
-    const jobResponse = await fetch(`${PROJECT_URL}/functions/v1/ultron-jobs`, {
-      method: "POST", headers: { "Content-Type": "application/json", "x-ultron-cron-secret": cronSecret },
-      body: JSON.stringify({ action: "process", limit: 1 }), signal: AbortSignal.timeout(55000),
-    });
-    const jobPayload = await jobResponse.json().catch(() => ({})) as Json;
-    if (!jobResponse.ok || jobPayload.ok !== true) throw new Error(clean(jobPayload.message ?? jobPayload.error, 300) || `job_worker_http_${jobResponse.status}`);
-    jobWorker = jobPayload;
-  } catch (error) {
-    jobWorker = { ok: false, processed: 0, error: error instanceof Error ? error.message.slice(0, 300) : "job_worker_failed" };
+  const runJobWorker = async (): Promise<Json> => {
+    try {
+      const { data: cronSecret, error: cronSecretError } = await db.rpc("ultron_get_system_secret", { p_name: "ultron_brain_cron_secret" });
+      if (cronSecretError || typeof cronSecret !== "string" || !cronSecret) throw new Error("internal_worker_secret_unavailable");
+      const jobResponse = await fetch(PROJECT_URL + "/functions/v1/ultron-jobs", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-ultron-cron-secret": cronSecret },
+        body: JSON.stringify({ action: "process", limit: 1 }), signal: AbortSignal.timeout(125000),
+      });
+      const jobPayload = await jobResponse.json().catch(() => ({})) as Json;
+      if (!jobResponse.ok || jobPayload.ok !== true) throw new Error(clean(jobPayload.message ?? jobPayload.error, 300) || "job_worker_http_" + jobResponse.status);
+      return jobPayload;
+    } catch (error) {
+      return { ok: false, processed: 0, error: error instanceof Error ? error.message.slice(0, 300) : "job_worker_failed" };
+    }
+  };
+  const jobPromise = runJobWorker();
+  const edgeRuntime = (globalThis as unknown as { EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+  if (edgeRuntime && typeof edgeRuntime.waitUntil === "function") {
+    edgeRuntime.waitUntil(jobPromise);
+    jobWorker = { ok: true, scheduled: true, processed: 0 };
+  } else {
+    jobWorker = await jobPromise;
   }
   const state = connected > 0 ? "active" : total > 0 ? "degraded" : "waiting_for_keys";
   const status = { state, owner_id: ownerId, connected_keys: connected, valid_keys: valid, enabled_keys: total, providers: PROVIDER_IDS.length, worker_interval_seconds: 60, last_worker_at: new Date().toISOString(), registry_providers: Array.isArray(registry?.providers) ? registry.providers.length : 0, registry_synced_at: registry?.synced_at ?? null, job_worker: jobWorker, recovered_from_crash: recovered, recovery: recoveryResult, duration_ms: Date.now() - started };

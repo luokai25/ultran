@@ -490,7 +490,6 @@ Deno.serve(async (req: Request) => {
           const exhausted = terminal || attempts >= maxAttempts;
           const dailySearchCap = message.includes("free_google_search_daily_cap_reached");
           const waitingForProvider = job.job_type === "product.generate" && (dailySearchCap || /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5[0-9]{2})|provider_unavailable|quota|rate.?limit/i.test(message));
-            /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5\d\d)|provider_unavailable|quota|rate.?limit/i.test(message);
           const nextUtcReset = new Date();
           nextUtcReset.setUTCHours(24, 0, 0, 0);
           const secondsUntilUtcReset = Math.max(60, Math.ceil((nextUtcReset.getTime() - Date.now()) / 1000) + 30);

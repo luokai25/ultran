@@ -73,7 +73,17 @@ function renderProjects(projects: ProductProject[]): void {
     list.append(button);
   }
 }
+function showLoadingRows(id: string, count: number): void {
+  const target = el<HTMLElement>(id);
+  target.replaceChildren();
+  for (let index = 0; index < count; index++) {
+    const row = node("div", "product-studio-skeleton");
+    row.setAttribute("aria-hidden", "true");
+    target.append(row);
+  }
+}
 async function loadProjects(): Promise<void> {
+  showLoadingRows("product-studio-projects", 3);
   const result = await invoke("list");
   renderProjects(Array.isArray(result.projects) ? result.projects as ProductProject[] : []);
 }
@@ -299,6 +309,12 @@ function renderDetail(detail: ProductDetail): void {
 }
 async function loadProject(id: string): Promise<void> {
   selectedProjectId = id;
+  showLoadingRows("product-studio-events", 4);
+  showLoadingRows("product-studio-sources", 5);
+  showLoadingRows("product-studio-documents", 2);
+  showLoadingRows("product-studio-opportunity", 3);
+  showLoadingRows("product-source-counts", 5);
+  el<HTMLElement>("product-studio-preview-empty").textContent = "Loading your saved product preview…";
   try {
     const result = await invoke("get", { project_id: id }) as unknown as ProductDetail & Record<string, unknown>;
     renderDetail(result);

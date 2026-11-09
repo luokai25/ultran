@@ -130,3 +130,8 @@ test("remote MCP manager refuses insecure endpoint URLs and keeps token input tr
  assert.match(screen,/headers: Record<string,string>/);
  assert.match(screen,/Authorization: "Bearer " \+ token\.trim\(\)/);
 });
+
+test("MCP endpoint URLs cannot carry credentials in query parameters",()=>{
+ assert.match(screen,/parsed\.search/);
+ assert.match(screen,/Put bearer tokens in the separate token field/);
+});

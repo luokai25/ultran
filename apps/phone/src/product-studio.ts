@@ -570,7 +570,8 @@ async function decodeOfferBuilderHtml(): Promise<string> {
     // Asset revisions can change quoting and whitespace. Locate the complete
     // markdown assignment by its statement terminator, then replace only that
     // expression. An already-enriched assignment is accepted as-is.
-    const markdownStart = html.indexOf("const markdown=");
+    const markdownMatch = /const\\s+markdown\\s*=/.exec(html);
+    const markdownStart = markdownMatch?.index ?? -1;
     const markdownEnd = markdownStart >= 0 ? html.indexOf(";", markdownStart) : -1;
     if (markdownStart < 0 || markdownEnd < 0) {
       throw new Error("Offer Builder manuscript export block is missing");

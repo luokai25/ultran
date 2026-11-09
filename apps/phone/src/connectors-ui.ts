@@ -631,14 +631,14 @@ if (entry.auth === "oauth2") {
       detailEl.append(field);
     }
 
-    const canAct = entry.auth === "oauth2" ? cloudLinked : deps.backendLinked();
+    const canAct = entry.auth === "oauth2" ? true : deps.backendLinked();
     if (!canAct) {
       note.textContent = "Link your ULTRON cloud account in Settings to enable this connector.";
     } else if (entry.auth === "oauth2" && !composioConfigured) {
       note.textContent = "Add the Composio Project API key in OAuth gateway above before connecting Google.";
     }
 
-    const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : entry.auth === "oauth2" ? (oauthOn ? "Reconnect account" : "Connect account") : on ? "Update key" : "Connect");
+    const act = el("button", "solid", entry.auth === "none" ? (on ? "Disable" : "Enable") : entry.auth === "oauth2" ? (!cloudLinked ? "Sign in to connect" : oauthOn ? "Reconnect account" : "Connect account") : on ? "Update key" : "Connect");
     act.type = "button";
     act.disabled = !canAct || (entry.auth === "oauth2" && !composioConfigured);
     act.addEventListener("click", async () => {
@@ -648,6 +648,13 @@ if (entry.auth === "oauth2") {
       let preparedExternal: PreparedExternal | null = null;
       try {
         if (entry.auth === "oauth2") {
+          if (!cloudLinked) {
+            note.dataset.tone = "bad";
+            note.textContent = "Sign in to your ULTRON owner account first. Opening private cloud settings…";
+            deps.openCloudSettings?.();
+            act.disabled = false;
+            return;
+          }
           if (!composioConfigured) {
             composioHealth.scrollIntoView({ behavior: "smooth", block: "center" });
             composioKeyInput.scrollIntoView({ behavior: "smooth", block: "center" });

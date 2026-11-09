@@ -81,6 +81,9 @@ test("Product Studio research obeys public crawl limits and streams safe preview
   assert.match(source, /redirect: "manual"/);
   assert.match(source, /AbortSignal\.timeout/);
   assert.match(source, /draft\.block\.updated/);
+  assert.match(source, /inlineMarkdown/);
+  assert.match(source, /noopener noreferrer/);
+  assert.match(source, /<table>/);
   assert.match(source, /sandbox/);
   assert.match(source, /ultron-private/);
   assert.match(source, /content_storage_path/);

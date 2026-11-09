@@ -178,6 +178,19 @@ async function offerBuilderWorkerAuth(req: Request): Promise<{ ownerId: string; 
   return { ownerId: String(instance.owner_id), secret, db };
 }
 
+function wakeNextOfferBuilderStep(secret: string): void {
+  const run = fetch(url + "/functions/v1/ultron-jobs", {
+    method: "POST",
+    headers: { "x-ultron-cron-secret": secret, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "process", limit: 1 }),
+    signal: AbortSignal.timeout(115_000),
+  }).catch((error) => {
+    console.warn("[ULTRON Offer Builder worker wake]", error instanceof Error ? error.message : "worker_wake_failed");
+  });
+  const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+  if (runtime && typeof runtime.waitUntil === "function") runtime.waitUntil(run);
+}
+
 async function processOfferBuilderJob(req: Request, body: Record<string, unknown>): Promise<Response> {
   const { ownerId, secret, db } = await offerBuilderWorkerAuth(req);
   const runId = clean(body.run_id, 80), jobId = clean(body.job_id, 80), lockToken = clean(body.lock_token, 80);
@@ -256,6 +269,7 @@ async function processOfferBuilderJob(req: Request, body: Record<string, unknown
       step_results: nextValues, step_index: nextIndex, progress: Math.min(95, Math.round(nextIndex / steps.length * 95)),
       status: "queued", current_job_id: nextJobId ?? null, updated_at: now,
     }).eq("id", runId).eq("owner_id", ownerId);
+    wakeNextOfferBuilderStep(secret);
     await db.from("ultron_product_projects").update({
       active_stage: "offer_" + stage, progress: Math.min(90, Math.max(Number((await db.from("ultron_product_projects").select("progress").eq("id", run.project_id).eq("owner_id", ownerId).maybeSingle()).data?.progress) || 0, Math.round(nextIndex / steps.length * 80))),
       updated_at: now,

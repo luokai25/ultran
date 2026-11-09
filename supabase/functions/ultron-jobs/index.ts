@@ -488,9 +488,10 @@ Deno.serve(async (req: Request) => {
           const terminal = /approval_required|unsupported_job_type|conversation_not_found|no_complete_messages|product_project_not_found|product_project_stopped/i.test(message);
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
-          const waitingForProvider = job.job_type === "product.generate" &&
+          const dailySearchCap = message.includes("free_google_search_daily_cap_reached");
+          const waitingForProvider = job.job_type === "product.generate" && (dailySearchCap || /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5[0-9]{2})|provider_unavailable|quota|rate.?limit/i.test(message));
             /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5\d\d)|provider_unavailable|quota|rate.?limit/i.test(message);
-          const delay = waitingForProvider ? 180 : message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
+          const delay = dailySearchCap ? 86_400 : waitingForProvider ? 180 : message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
           if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};
             const projectId = typeof payload.project_id === "string" ? payload.project_id : "";

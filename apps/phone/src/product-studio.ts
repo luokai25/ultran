@@ -296,8 +296,6 @@ function renderDetail(detail: ProductDetail): void {
     download.href = detail.download_url;
     download.hidden = false;
   } else download.hidden = true;
-  const pause = el<HTMLButtonElement>("product-studio-pause");
-  pause.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging"].includes(project.status);
   const cancel = el<HTMLButtonElement>("product-studio-cancel");
   cancel.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const pause = el<HTMLButtonElement>("product-studio-pause");
@@ -406,17 +404,6 @@ export function initProductStudio(value: StudioOptions): void {
       await invoke("pause", { project_id: selectedProjectId });
       await loadProject(selectedProjectId);
       setNotice("Project paused at its next safe checkpoint. Its saved work is ready to resume.");
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not pause the project.", true); }
-    finally { button.disabled = false; }
-  });
-  el<HTMLButtonElement>("product-studio-pause").addEventListener("click", async () => {
-    if (!selectedProjectId) return;
-    const button = el<HTMLButtonElement>("product-studio-pause");
-    button.disabled = true;
-    try {
-      await invoke("pause", { project_id: selectedProjectId });
-      await loadProject(selectedProjectId);
-      setNotice("Project paused safely. Its saved research and draft are preserved.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not pause the project.", true); }
     finally { button.disabled = false; }
   });

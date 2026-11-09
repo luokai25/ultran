@@ -84,6 +84,7 @@ test("Product Studio worker requires a claimed lease and private owner-scoped ta
   assert.match(worker, /x-ultron-cron-secret/);
   assert.match(worker, /createSignedUrl/);
   assert.match(worker, /"resume"/);
+  assert.match(worker, /"partial","failed","paused","waiting_for_provider"/);
   assert.match(worker, /"cancel"/);
   for (const table of ["ultron_product_projects", "ultron_product_sources", "ultron_product_events", "ultron_product_documents"]) {
     assert.ok(migration.includes("create table if not exists public." + table), "missing table " + table);

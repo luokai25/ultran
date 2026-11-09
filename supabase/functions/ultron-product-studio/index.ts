@@ -588,7 +588,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const previousAnalyzed = Number((isObject(project.source_counts) ? project.source_counts : {}).analyzed || 0);
   const newSources = Math.max(0, counts.analyzed - previousAnalyzed);
   const oldConfiguration = isObject(project.configuration) ? project.configuration : {};
-  const stalledRounds = newSources >= 2 ? 0 : Number(oldConfiguration.stalled_rounds || 0) + 1;
+  const stalledRounds = newSources > 0 ? 0 : Number(oldConfiguration.stalled_rounds || 0) + 1;
   const nextRound = researchRound + 1;
   const maxRounds = Math.min(80, Math.max(12, Math.ceil((Number(project.research_target) || 200) / 5)));
   const shouldContinue = counts.analyzed < (Number(project.research_target) || 200) && nextRound < maxRounds && stalledRounds < 3;

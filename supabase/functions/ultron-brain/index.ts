@@ -389,7 +389,24 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   // make the whole chat unusable while other free Vault keys are healthy.
   const preferredSlice = preferredCandidates.slice(0, requestedModel ? 2 : 0);
   const preferredIds = new Set(preferredSlice.map((item) => item.provider + ":" + item.key.id));
-  const fallbackSlice = automaticCandidates.filter((item) => !preferredIds.has(item.provider + ":" + item.key.id)).slice(0, Math.max(0, 8 - preferredSlice.length));
+  // Interleave provider pools so eight keys from one large provider pool cannot
+  // crowd out healthy fallback keys from Groq or Google AI Studio.
+  const fallbackGroups = new Map<Provider, typeof automaticCandidates>();
+  for (const candidate of automaticCandidates) {
+    const group = fallbackGroups.get(candidate.provider) ?? [];
+    group.push(candidate);
+    fallbackGroups.set(candidate.provider, group);
+  }
+  const orderedFallbackGroups = [...fallbackGroups.entries()].sort((a, b) => compareCandidates(a[1][0]!, b[1][0]!));
+  const interleavedFallback: typeof automaticCandidates = [];
+  for (let round = 0; ; round++) {
+    let added = false;
+    for (const [, group] of orderedFallbackGroups) {
+      if (group[round]) { interleavedFallback.push(group[round]!); added = true; }
+    }
+    if (!added) break;
+  }
+  const fallbackSlice = interleavedFallback.filter((item) => !preferredIds.has(item.provider + ":" + item.key.id)).slice(0, Math.max(0, 8 - preferredSlice.length));
   const candidates = [...preferredSlice, ...fallbackSlice];
   if (!candidates.length) return json({ error: "no_available_model_key", message: requestedModel
     ? "The selected model is no longer available. No connected free model key is currently usable; check the LLM API Keys screen or switch to ULTRON Automatic."

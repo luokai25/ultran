@@ -185,12 +185,6 @@ function renderOpportunity(project: ProductProject): void {
     metric.append(node("strong", "", String(Math.max(0, Math.min(100, Math.round(score)))) + " / 100"), node("span", "", "Opportunity score · " + String(brief.confidence ?? "unrated") + " confidence"));
     panel.append(metric);
   }
-  const score = Number(brief.opportunity_score);
-  if (Number.isFinite(score) && score > 0) {
-    const item = node("div", "product-opportunity-item");
-    item.append(node("strong", "", "Opportunity score"), node("p", "", String(Math.round(score)) + " / 100 · " + String(brief.confidence ?? "unrated") + " confidence"));
-    panel.append(item);
-  }
   const fields: Array<[string, unknown]> = [
     ["Topic", brief.selected_topic], ["Audience", brief.audience], ["Problem", brief.problem],
     ["Market gap", brief.market_gap], ["Product promise", brief.promise],

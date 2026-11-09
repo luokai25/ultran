@@ -667,20 +667,21 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   markdown += "\n\n## References\n" + (canonicalReferences.length ? canonicalReferences.join("\n") : "No public source pages were accessible for analysis; treat this draft as an unvalidated starting point.");
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
-  const citationIndexes = [...markdown.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
-  const wordCount = markdown.trim().split(/\s+/).filter(Boolean).length;
+  const productBody = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
+  const citationIndexes = [...productBody.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
+  const wordCount = productBody.split(/\s+/).filter(Boolean).length;
   const validation = {
-    minimum_length_passed: markdown.length >= 4000,
+    minimum_length_passed: productBody.length >= 4000,
     minimum_word_count_passed: wordCount >= 700,
     word_count: wordCount,
     references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown),
     citation_markers: citationIndexes.length,
     source_citations_match: citationIndexes.every(index => index >= 1 && index <= evidence.length),
-    contents_section: /table of contents|^#{1,3}\s*contents\s*$/im.test(markdown),
-    actionable_workflow: /workflow|step-by-step|implementation plan|process/i.test(markdown),
-    reusable_asset: /template|checklist|worksheet|prompt pack/i.test(markdown),
-    limitations_and_next_steps: /limitations|next steps|caveats/i.test(markdown),
-    placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(markdown),
+    contents_section: /table of contents|^#{1,3}\s*contents\s*$/im.test(productBody),
+    actionable_workflow: /workflow|step-by-step|implementation plan|process/i.test(productBody),
+    reusable_asset: /template|checklist|worksheet|prompt pack/i.test(productBody),
+    limitations_and_next_steps: /limitations|next steps|caveats/i.test(productBody),
+    placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(productBody),
     analyzed_sources: counts.analyzed,
     requested_sources: target,
     quality_checks_passed: false,

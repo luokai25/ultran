@@ -803,7 +803,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   }).eq("id", projectId).eq("owner_id", ownerId).eq("status", "validating").select("id").maybeSingle();
   if (finalizeError) throw finalizeError;
   if (!finalizedProject) {
-    await bucket.remove([storagePath, htmlPath]);
+    await bucket.remove([storagePath, htmlPath, zipPath]);
     await db.from("ultron_artifacts").delete().eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, version });
     await db.from("ultron_product_documents").delete().eq("owner_id", ownerId).eq("project_id", projectId).eq("version", version);
     return { project_id: projectId, status: "paused_or_cancelled", skipped: true };

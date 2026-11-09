@@ -16,6 +16,7 @@ from .connectors.registry import mcp_connector_id
 from .deploy import DeployService
 from .forge import ForgeService
 from .mcp import ApprovalGate, GrantStore, McpClientPool, ServerSpec, ToolGateway
+from .mcp.registry_store import McpServerStore
 from .sandbox import ToolSandbox
 from .workspace import AvatarService, VoiceService
 from .tasks import AgentTaskService
@@ -40,6 +41,7 @@ class Container:
     #: MCP connector runtime (v2). ``registry`` is bound to these two.
     mcp_pool: McpClientPool
     mcp_gateway: ToolGateway
+    mcp_server_store: McpServerStore
     composio: ComposioGateway
 
     @classmethod
@@ -60,6 +62,11 @@ class Container:
         # The MCP runtime is built before the registry is handed out, because the
         # registry is the single answer to "what can Ultron call?" and it must
         # already know how to route an MCP connector when the first request lands.
+        # Dynamic server registrations are restored from the encrypted local registry.
+        mcp_server_store = McpServerStore(
+            settings.data_dir / "mcp_servers.sqlite3",
+            encryption_key=settings.credential_encryption_key or None,
+        )
         mcp_pool = McpClientPool()
         mcp_gateway = ToolGateway(
             mcp_pool,
@@ -73,6 +80,9 @@ class Container:
             require_grants=settings.mcp_require_grants,
         )
         registry.attach_mcp(mcp_pool, mcp_gateway)
+        for spec in mcp_server_store.list():
+            mcp_pool.register(spec, replace=True)
+        # Environment configuration wins over persisted UI registrations.
         for spec in _configured_servers(settings):
             mcp_pool.register(spec, replace=True)
         registry.sync_mcp()
@@ -118,12 +128,14 @@ class Container:
             deploys=DeployService(root=settings.data_dir / "deploys"),
             mcp_pool=mcp_pool,
             mcp_gateway=mcp_gateway,
+            mcp_server_store=mcp_server_store,
             composio=composio,
         )
 
     # ------------------------------------------------------------------ #
     def register_mcp_server(self, spec: ServerSpec, *, connect: bool = True) -> dict:
-        """Register a server, handshake it, and project it into the registry."""
+        """Persist a server, handshake it, and project it into the registry."""
+        self.mcp_server_store.save(spec)
         self.mcp_pool.register(spec, replace=True)
         if connect and spec.enabled:
             self.mcp_pool.connect(spec.id, raise_on_error=False)
@@ -132,6 +144,7 @@ class Container:
 
     def unregister_mcp_server(self, server_id: str) -> None:
         self.mcp_pool.unregister(server_id)
+        self.mcp_server_store.delete(server_id)
         connector_id = mcp_connector_id(server_id)
         if connector_id in self.registry:
             self.registry.unregister(connector_id)

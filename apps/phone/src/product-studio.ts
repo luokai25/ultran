@@ -567,15 +567,23 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   if (html.includes(oldMarkdown)) {
     html = html.replace(oldMarkdown, newMarkdown);
   } else if (!html.includes(newMarkdown)) {
-    // The bundled asset may already contain the enhanced manuscript expression.
-    // If its formatting changed, replace only the export assignment, not the
-    // surrounding finalize/download flow.
+    // Asset revisions can change quoting and whitespace. Locate the complete
+    // markdown assignment by its statement terminator, then replace only that
+    // expression. An already-enriched assignment is accepted as-is.
     const markdownStart = html.indexOf("const markdown=");
-    const finalizeStart = html.indexOf("try{const saved=await ultronApi('finalize'", markdownStart);
-    if (markdownStart < 0 || finalizeStart <= markdownStart) {
-      throw new Error("Offer Builder manuscript export block could not be located safely.");
+    const markdownEnd = markdownStart >= 0 ? html.indexOf(";", markdownStart) : -1;
+    if (markdownStart < 0 || markdownEnd < 0) {
+      throw new Error("Offer Builder manuscript export block is missing");
     }
-    html = html.slice(0, markdownStart) + newMarkdown + "\n" + html.slice(finalizeStart);
+    const currentMarkdown = html.slice(markdownStart, markdownEnd + 1);
+    const alreadyEnriched = currentMarkdown.includes("S.summary?.about")
+      && currentMarkdown.includes("S.summary?.what_you_learn")
+      && currentMarkdown.includes("S.map.map")
+      && currentMarkdown.includes("framework_glossary")
+      && currentMarkdown.includes("S.secs.map");
+    if (!alreadyEnriched) {
+      html = html.slice(0, markdownStart) + newMarkdown + html.slice(markdownEnd + 1);
+    }
   }
   return html;
 }

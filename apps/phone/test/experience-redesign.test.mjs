@@ -131,7 +131,7 @@ test("the conversation shell contains no orb renderer or orbital DOM", async () 
 
 test("mobile empty state keeps quick starts compact above the composer", async () => {
   const css = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
-  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.hero \{[\s\S]*?padding: 24px 0/);
+  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.hero \{[\s\S]*?padding:\s*24px 0/);
   assert.match(css, /\.suggestions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
   assert.match(css, /\.dock\s*\{[\s\S]*?var\(--safe-bottom\)/);
 });
@@ -276,7 +276,7 @@ test("empty mind map hides the empty SVG canvas and removes its forced horizonta
   const source = await readFile(path.join(root, "src/main.ts"), "utf8");
   const css = await readFile(path.join(root, "src/chatgpt-ui.css"), "utf8");
   assert.match(source, /classList\.toggle\("is-empty",empty\)/);
-  assert.match(css, /\.mindmap-canvas-wrap\.is-empty \.mindmap-canvas \{ display: none; \}/);
+  assert.match(css, /\.mindmap-canvas-wrap\.is-empty \.mindmap-canvas \{ display:\s*none; \}/);
   assert.match(css, /\.mindmap-canvas-wrap\.is-empty \{[\s\S]*?overflow: hidden/);
 });
 

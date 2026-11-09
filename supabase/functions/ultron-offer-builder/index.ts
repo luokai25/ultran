@@ -107,20 +107,28 @@ function prompts(stage: string, context: Record<string, unknown>) {
     prompt: "Creator profile: " + clean(context.creator_url, 500) + "\nCreator handle: " + clean(context.creator_handle, 160) + "\nContext: " + clean(context.context, 3000) + "\nSource material/transcripts: " + clean(context.source_text, 12000) + "\nReturn JSON with niche, transformation, content_themes (3 items with theme, monetisation_potential, rating), verdict, audience, voice, verified_stats, missing_data.",
   };
   if (stage === "discovery") return {
-    system: base + " You are a rigorous product opportunity strategist. Score each pocket using pain (30%), worsening (25%), purchasing power (30%), and speed to outcome (15%). Scores are 1-10 and need brief evidence-based rationales. Do not claim validation without evidence.",
-    prompt: "User expertise / goal: " + topic + "\nAudience context: " + audience + "\nMode: " + clean(context.mode, 40) + "\nCreator analysis: " + JSON.stringify(context.creator ?? {}) + "\nGenerate 12 distinct market directions and 18 specific profitable-pocket candidates. Each pocket must contain aud, outcome, avoid, industry, niche, know, prob, statement, s:{pain,worsening,pp,speed}, score_rationales:{pain,worsening,purchasing_power,speed}, and a numeric overall score rounded to one decimal. All four scores must be numeric values from 1 to 10. Use the exact statement pattern: I help [audience] [outcome] without [bad alternative]. Calculate overall with the stated weights. Return JSON {directions:[{title,category,audience,problem}], pockets:[...]} sorted highest score first.",
+    system: base + " You are a market-direction strategist. Produce diverse categories and avoid near-duplicates. Do not claim validation without evidence.",
+    prompt: "User expertise / goal: " + topic + "\nAudience context: " + audience + "\nMode: " + clean(context.mode, 40) + "\nCreator analysis: " + JSON.stringify(context.creator ?? {}) + "\nReturn 12 distinct directions as JSON {directions:[{title,category,audience,problem}]} with a different angle for each.",
   };
   if (stage === "outline") return {
-    system: base + " You are a senior instructional designer. The approved outline becomes the canonical brief for all later stages. Make the three options meaningfully different.",
-    prompt: "Topic: " + topic + "\nSelected pocket: " + JSON.stringify(pocket) + "\nFormat: " + clean(context.format, 80) + "\nDepth: " + clean(context.depth, 80) + "\nFeedback: " + clean(context.feedback, 2000) + "\nCreate exactly 3 distinct product outlines. Each has key (A/B/C), name, promise, from_state, to_state, chapters (7-12 with title and learning outcome), version (1). Return JSON {outlines:[...]}",
+    system: base + " You are a senior instructional designer. Generate one proposal at a time. Each proposal must be meaningfully different from the previous proposals and the approved outline becomes the canonical brief for every later stage.",
+    prompt: "Topic: " + topic + "\nSelected pocket: " + JSON.stringify(pocket) + "\nFormat: " + clean(context.format, 80) + "\nDepth: " + clean(context.depth, 80) + "\nFeedback: " + clean(context.feedback, 2000) + "\nOption key: " + clean(context.option_key, 1) + "\nPrevious proposals to avoid repeating: " + JSON.stringify(context.previous_outlines ?? []) + "\nCreate exactly ONE original product outline. Include key, name, promise, from_state, to_state, chapters (7-12 objects with title and learning_outcome), version (1). Return JSON {outline:{...}}.",
   };
   if (stage === "transformation") return {
-    system: base + " You are a behavior-change and instructional design specialist. Make the transformation concrete, measurable, and achievable.",
-    prompt: "Topic: " + topic + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nReturn JSON with before_after rows for Emotional State, Core Fear, Daily Experience, Knowledge, Behavior, Identity; each row has before and after. Also return 4-7 transformation_stages with stage, goal, description, evidence_of_progress.",
+    system: base + " You are a behavior-change and instructional design specialist. Make the transformation concrete, measurable, and achievable. Use second-person language for guided mode and third-person language for creator mode.",
+    prompt: "Topic: " + topic + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nReturn JSON with exactly four before_after rows for Emotional State, Core Fear, Daily Experience, Identity; each has before and after, each 2-3 concrete sentences. Also return exactly five transformation_stages with stage, goal, description, evidence_of_progress.",
   };
   if (stage === "section") return {
-    system: base + " You are a professional nonfiction author. Write original, substantial, practical material. Do not fabricate sources. Do not repeat other sections. Include examples, a practical exercise, and a concise takeaway.",
-    prompt: "Write one complete section of a digital product. Topic: " + topic + "\nAudience: " + audience + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nTransformation map: " + JSON.stringify(context.transformation ?? {}) + "\nTone: " + clean(context.tone, 100) + "\nSupporting references supplied by owner: " + clean(context.references, 10000) + "\nSection title: " + clean(context.section_title, 240) + "\nSection number: " + String(context.section_index ?? 1) + "\nOther section titles (avoid duplication): " + JSON.stringify(context.all_sections ?? []) + "\nWrite approximately 700-1000 words in Markdown. Return only the section body.",
+    system: base + " You are a professional nonfiction author. Write original, substantial, practical material. Do not fabricate sources. Do not repeat other sections. Use the named frameworks consistently. Include examples, a practical exercise, a concise takeaway, and typed editorial components such as callouts, checklists, timelines, and tables where useful.",
+    prompt: "Write one complete section of a digital product. Topic: " + topic + "\nAudience: " + audience + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nTransformation map: " + JSON.stringify(context.transformation ?? {}) + "\nFramework glossary: " + JSON.stringify(context.framework_glossary ?? []) + "\nPrevious sections (maintain continuity and avoid repetition): " + JSON.stringify(context.previous_sections ?? []) + "\nTone: " + clean(context.tone, 100) + "\nSupporting references supplied by owner: " + clean(context.references, 10000) + "\nSection title: " + clean(context.section_title, 240) + "\nSection number: " + String(context.section_index ?? 1) + "\nOther section titles: " + JSON.stringify(context.all_sections ?? []) + "\nWrite approximately 700-1000 words in Markdown. If the material contains advice in health, money, legal, or mental-health domains, clearly separate general education from professional advice and avoid unsafe instructions. Return only the section body.",
+  };
+  if (stage === "summary") return {
+    system: base + " You are a senior nonfiction editor. Create a clear, specific summary from the approved canonical brief. Invent memorable named frameworks only when they can be used consistently in the book.",
+    prompt: "Topic: " + topic + "\nPocket: " + JSON.stringify(pocket) + "\nApproved outline: " + JSON.stringify(context.outline ?? {}) + "\nTransformation map: " + JSON.stringify(context.transformation ?? {}) + "\nReturn JSON with title, subtitle, about, what_you_learn (4 bullets), predicted_word_count_range, reading_minutes, chapter_count, bonus_count, framework_glossary (3-6 named frameworks with one-sentence definitions), and bonus_materials (2).",
+  };
+  if (stage === "quality") return {
+    system: base + " You are a strict developmental editor and safety reviewer. Do not rewrite the whole book. Find concrete problems and propose precise fixes.",
+    prompt: "Review this manuscript for repetition, unsupported factual claims, contradictions, weak sections, and unsafe advice. Product brief: " + JSON.stringify({topic,pocket,outline:context.outline,transformation:context.transformation}) + "\nSections: " + JSON.stringify(context.sections ?? []) + "\nReturn JSON with overall_score (1-10), repeated_phrases, weak_sections (section_title,issue,fix), unsupported_claims, safety_flags, consistency_flags, passed (boolean). Do not invent citations.",
   };
   if (stage === "brand") return {
     system: base + " You are an editorial art director and product brand designer. Return accessible, coherent colors with strong contrast.",
@@ -187,18 +195,47 @@ Deno.serve(async (req: Request) => {
     if (body.action === "generate") {
       const stage = clean(body.stage, 40);
       const context = isObject(body.context) ? body.context : {};
-      const prompt = prompts(stage, context);
       await event(auth.ownerId, projectId, stage, "offer.generation_started", { stage });
-      const generated = await brain(auth.authorization, prompt.system, prompt.prompt, stage === "section" ? 5000 : 6500);
-      let result: unknown = generated;
-      if (stage !== "section") result = parseJson(generated);
+      let result: unknown;
+      if (stage === "discovery") {
+        const directionPrompt = prompts("discovery", context);
+        const directionData = parseJson(await brain(auth.authorization, directionPrompt.system, directionPrompt.prompt, 3500));
+        const directions = Array.isArray(directionData.directions) ? directionData.directions.slice(0, 12) : [];
+        if (!directions.length) throw new Error("no_market_directions_returned");
+        await event(auth.ownerId, projectId, stage, "offer.directions_completed", { count: directions.length });
+        const brainstormSystem = "You are a digital-product opportunity brainstormer. For every supplied direction, create one or two distinct specific profitable pockets. Do not score them yet. Do not claim real-world market validation without evidence.";
+        const brainstormPrompt = "Topic: " + clean(context.topic, 300) + "\nDirections: " + JSON.stringify(directions) + "\nCreate 1-2 pockets for every direction. Each pocket must include direction_title, aud, outcome, avoid, industry, niche, know, prob, and statement using: I help [audience] [outcome] without [bad alternative]. Return JSON {pockets:[...]} with 18-24 pockets and no near-duplicates.";
+        const brainstormData = parseJson(await brain(auth.authorization, brainstormSystem, brainstormPrompt, 6500));
+        const rawPockets = Array.isArray(brainstormData.pockets) ? brainstormData.pockets.slice(0, 24) : [];
+        if (!rawPockets.length) throw new Error("no_profitable_pockets_returned");
+        await event(auth.ownerId, projectId, stage, "offer.brainstorm_completed", { count: rawPockets.length });
+        const scoreSystem = "You are a rigorous product opportunity evaluator. Score each pocket using pain (30%), worsening (25%), purchasing power (30%), and speed to outcome (15%). Use numeric 1-10 scores and concise rationales. Do not inflate scores. Do not claim validation without evidence.";
+        const scorePrompt = "Score every pocket below without changing its core statement. Return JSON {pockets:[...]} with each original pocket plus s:{pain,worsening,pp,speed}, score_rationales:{pain,worsening,purchasing_power,speed}, and numeric overall rounded to one decimal. All sub-scores are numeric from 1 to 10. Calculate overall = 0.30*pain + 0.25*worsening + 0.30*purchasing_power + 0.15*speed. Pockets: " + JSON.stringify(rawPockets);
+        const scoredData = parseJson(await brain(auth.authorization, scoreSystem, scorePrompt, 6500));
+        const pockets = Array.isArray(scoredData.pockets) ? scoredData.pockets : [];
+        result = { directions, pockets: pockets.sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.overall) - Number(a.overall)) };
+      } else if (stage === "outline") {
+        const outlines: Record<string, unknown>[] = [];
+        for (const key of ["A", "B", "C"]) {
+          const onePrompt = prompts("outline", { ...context, option_key: key, previous_outlines: outlines });
+          const oneData = parseJson(await brain(auth.authorization, onePrompt.system, onePrompt.prompt, 3500));
+          const outline = isObject(oneData.outline) ? oneData.outline : oneData;
+          outlines.push({ ...outline, key, version: 1 });
+          await event(auth.ownerId, projectId, stage, "offer.outline_option_completed", { key });
+        }
+        result = { outlines };
+      } else {
+        const prompt = prompts(stage, context);
+        const generated = await brain(auth.authorization, prompt.system, prompt.prompt, stage === "section" ? 5000 : 6500);
+        result = stage === "section" ? generated : parseJson(generated);
+      }
       const generatedMap = isObject(builder.generated) ? builder.generated : {};
       const nextBuilder = { ...builder, generated: { ...generatedMap, [stage]: result }, updated_at: new Date().toISOString() };
       const nextConfiguration = { ...configuration, builder: "offer_builder", offer_builder: nextBuilder };
       const { error } = await auth.db.from("ultron_product_projects").update({
         configuration: nextConfiguration,
         active_stage: "offer_" + stage,
-        progress: Math.min(90, Math.max(Number(project.progress) || 0, stage === "discovery" ? 15 : stage === "outline" ? 30 : stage === "transformation" ? 45 : stage === "section" ? 75 : 85)),
+        progress: Math.min(90, Math.max(Number(project.progress) || 0, stage === "discovery" ? 15 : stage === "outline" ? 30 : stage === "transformation" ? 45 : stage === "summary" ? 52 : stage === "section" ? 75 : stage === "quality" ? 82 : 85)),
         updated_at: new Date().toISOString(),
       }).eq("id", projectId).eq("owner_id", auth.ownerId);
       if (error) throw error;

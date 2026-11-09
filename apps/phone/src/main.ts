@@ -3545,7 +3545,7 @@ function applyTheme(id: ThemeId): void {
   css.setProperty("--accent-bright", theme.bright);
   css.setProperty("--accent-glow", `#${theme.accent.toString(16).padStart(6, "0")}55`);
   css.setProperty("--eye", theme.bright);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#080609");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#212121");
   for (const button of themesEl.querySelectorAll<HTMLButtonElement>(".theme")) {
     button.setAttribute("aria-pressed", String(button.dataset.theme === id));
   }

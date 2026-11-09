@@ -228,7 +228,7 @@ export function initConnectors(deps: Deps): void {
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const summary = payload.summary ?? {};
       mcpAuditList.replaceChildren();
-      if (!entries.length) mcpAuditList.append(el("p", "conn-empty", "No MCP tool calls recorded in this backend session yet."));
+      if (!entries.length) mcpAuditList.append(el("p", "conn-empty", "No MCP tool calls recorded yet."));
       for (const entry of entries) {
         const row = el("article", "mcp-audit-row");
         const top = el("div", "mcp-audit-row-top");
@@ -240,7 +240,7 @@ export function initConnectors(deps: Deps): void {
         row.append(top, el("small", undefined, reason.slice(0, 240)), el("small", "mcp-audit-meta", when + " · " + String(entry.latency_ms ?? 0) + " ms · " + caps));
         mcpAuditList.append(row);
       }
-      mcpAuditStatus.textContent = String(summary.total ?? entries.length) + " calls in this backend session · " + String(summary.ok ?? 0) + " successful · " + String(summary.denied ?? 0) + " denied · last 30 shown.";
+      mcpAuditStatus.textContent = String(summary.total ?? entries.length) + " calls retained in the backend audit store · " + String(summary.ok ?? 0) + " successful · " + String(summary.denied ?? 0) + " denied · last 30 shown.";
     } catch (error) {
       mcpAuditStatus.textContent = error instanceof Error ? error.message : "Could not load MCP activity.";
     }

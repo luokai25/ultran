@@ -1,6 +1,6 @@
 # ULTRON Power Upgrade Plan
 
-**Status:** Phase 1 local MCP persistence complete; Phase 2 cloud bridge next  
+**Status:** Phase 1 local MCP persistence complete; native MCP manager and public-endpoint preflight added to the shared client; Phase 2 cloud bridge next  
 **Repository:** `luokai25/ultran`  
 **Integration rule:** work directly on `main`; preserve the existing local-first architecture  
 **Cost rule:** reuse the current Supabase, Vercel, Cloudflare and existing provider integrations; no new paid service or dependency without explicit approval.
@@ -25,19 +25,16 @@ This is not a greenfield MCP project. The repository already contains:
 
 ### Gaps found
 
-1. **Native MCP server registration is not durable.** The Python runtime loads configured servers from `ULTRON_MCP_SERVERS`; API registrations go into the in-process pool. Restarting the backend loses dynamically registered server definitions.
-2. **MCP runtime state is not cloud-shared.** The Supabase connector table currently represents Composio account connections, not a durable registry of arbitrary native MCP endpoints and their discovered tool manifests.
-3. **Grant persistence is weaker than approval persistence.** Approval records can use SQLite persistence; the HMAC GrantStore itself is process-memory only and its signing key is generated at startup.
-4. **MCP audit history is process-local.** The gateway's recent audit entries are held in memory rather than a durable, owner-scoped event stream.
-5. **The canonical phone UI's cloud connector flow is Composio-oriented.** It can list/connect/disconnect Composio accounts and tools, but it does not yet provide a complete native MCP server manager with endpoint registration, transport selection, probe, trust/pin review, tool permissions and lifecycle.
-6. **Production API owner authentication — implemented, verification pending.** FastAPI now requires a live Supabase bearer session on every non-health production route, verifies the user through Supabase Auth, checks the RLS-protected singleton `ultron_instance.owner_id`, ignores caller-selected workspace headers, and returns fail-closed errors when the auth provider is unavailable. The phone client attaches its current owner session to API requests and task event streams. Production now requires `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in the private server `.env`; these values must be set before deploying the API update. CI tests cover unauthenticated requests, valid owner sessions and workspace isolation; wrong-owner and expired-token regression cases remain to add.
-7. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
+1. **MCP runtime state is not cloud-shared.** The current durable registry lives with the authenticated backend in SQLite; Supabase connector rows represent Composio accounts, not a cross-device cloud registry of arbitrary MCP endpoints and their manifests.
+2. **Native MCP manager is implemented in the shared phone/web client, with remaining lifecycle gaps.** The Connectors screen can register a public HTTPS Streamable HTTP endpoint, keep an optional bearer token in the encrypted backend registry, probe/reload tools, display health and manifest hashes, inspect tool schemas/capabilities, remove servers and review recent calls. Remaining work: server editing, manifest pin/review, grant/approval controls and a cloud-shared registry. Stdio stays a backend/local-runtime feature and is not exposed as arbitrary command execution from the phone.
+3. **Production API owner authentication — CI verified, production configuration still required.** FastAPI requires a live Supabase bearer session on non-health routes, verifies the user through Supabase Auth, checks the RLS-backed singleton owner, ignores caller-selected workspace headers and fails closed when auth is unavailable. The phone client attaches its owner session to API requests and task event streams. Production requires `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in the private server `.env`; verify the deployed health check after configuration. Latest CI covers owner auth and workspace isolation.
+4. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
 
 ## Current security implementation
 
 - **Committed to `main`:** FastAPI owner-session middleware, Supabase Auth verification, RLS-backed singleton-owner verification, production workspace pinning, and bearer propagation from the phone client.
 - **Deployment prerequisite:** set `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in `infra/hetzner/.env` before restarting a production API. The publishable key is not a service-role secret. Never add a service-role key to the phone app.
-- **Verification:** CI must pass the new production-auth regression tests. The API must not be exposed publicly until the deployment environment is configured and the new build passes its health check.
+- **Verification:** latest CI passes the production-auth regression tests. The API must not be exposed publicly until the deployment environment is configured and the new build passes its health check.
 
 Google Workspace setup guide: [`GOOGLE-WORKSPACE-CONNECTOR.md`](GOOGLE-WORKSPACE-CONNECTOR.md).
 
@@ -126,7 +123,7 @@ Required MCP manager states:
 5. Add tests for restart recovery, encryption-required behavior, tamper detection, grant expiry/revocation/single-use and audit redaction.
 6. Preserve the existing MCP protocol, connector projection and permission pipeline.
 
-**Exit criteria:** the server-definition persistence and encryption tests are added. Full backend CI must pass before this step is considered verified. Remaining Phase 1 work: durable grant signing material, durable audit history, and restart/revocation/single-use regression tests.
+**Exit criteria:** local server definitions, encrypted credentials, persistent grants and bounded audit retention have regression tests. The latest full CI run passes. Remaining hardening: pin resolved DNS addresses to the actual HTTP connection and add a dedicated durable cloud registry in Phase 2.
 
 ### Phase 2 — authenticated cloud MCP bridge
 **Next implementation target.** First close the critical FastAPI production authentication gap described in the audit. Then design the cloud registry and remote Streamable HTTP bridge with strict egress protections before enabling endpoint invocation.
@@ -139,12 +136,14 @@ Required MCP manager states:
 **Exit criteria:** a user can register a remote HTTP MCP endpoint from the phone, probe it, see its tools and invoke a read-only tool without exposing credentials; write tools pause for exact approval.
 
 ### Phase 3 — canonical connector manager
-1. Unify built-in, Composio, native MCP and cloud MCP listings.
-2. Add endpoint management, tool inventory, permission review and health states to `apps/phone`.
-3. Keep all current connector actions and the existing Composio flow working.
-4. Add responsive and Android regression tests.
+1. **Partially implemented:** the shared `apps/phone` Connectors screen now includes Composio OAuth plus a native remote MCP manager.
+2. **Implemented:** register a public HTTPS endpoint, optionally supply a bearer token (cleared from the form and stored in the encrypted backend registry), handshake, inspect discovered tool schemas/capabilities, probe, view health/manifest hash and remove a server.
+3. **Implemented:** Google OAuth completion is detected automatically after the browser consent flow; connector search and category filters remain visible; write actions are disabled until an exact tool is explicitly granted.
+4. **Implemented:** recent MCP call metadata is displayed and refreshed every five seconds while the Connectors screen is open. The source audit is durable in the backend SQLite store.
+5. Remaining: edit server definitions, pin/review manifest changes, manage per-tool MCP grants/approvals in the UI, unify cloud MCP records, and expose a safe local-stdio manager only in an appropriate desktop/local-runtime context.
+6. Keep all current connector actions and the existing Composio flow working; complete responsive and Android regression tests.
 
-**Exit criteria:** every visible control works; the same feature works in web and APK; no secret is stored in browser/local storage.
+**Exit criteria:** every visible control works; the same feature works in web and APK; no secret is stored in browser/local storage; manifest trust and grants are reviewable.
 
 ### Phase 4 — agent supervisor and skill lifecycle
 1. Add explicit multi-step task plans and specialist worker delegation.

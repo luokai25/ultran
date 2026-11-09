@@ -44,7 +44,7 @@ assert.ok(main.includes('apiKeySaveButton.addEventListener'), "missing API key s
 assert.ok(main.includes('apiKeyRemoveButton.addEventListener'), "missing API key removal handler");
 assert.ok(main.includes('cloudLlmAddButton.addEventListener'), "missing Supabase API key save handler");
 assert.ok(main.includes('refreshCloudLlmScreen'), "missing Supabase cloud key/status refresh");
-assert.ok(main.includes('NativeSecureStorage.set'), "API keys must use Android encrypted storage");
+assert.ok(main.includes('nativeSecureStorage.set'), "API keys must use Android encrypted storage");
 assert.ok(main.includes('providerGenerationToken'), "API provider streaming must render token events");
 
 // A missing required node aborts module evaluation before any interaction works.

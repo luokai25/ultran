@@ -100,6 +100,11 @@ export function makeDocx(title: string, markdown: string): Uint8Array {
     "word/_rels/document.xml.rels": '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
   });
 }
+export function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  const safe = /^[\\t\\r\\n ]*[=+\\-@]/.test(text) ? "'" + text : text;
+  return '"' + safe.replace(/"/g, '""') + '"';
+}
 function parseCsvRows(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [], cell = "", quoted = false;

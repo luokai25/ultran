@@ -133,10 +133,10 @@ async function updateStudioKey(ownerId: string, candidate: StudioCandidate, patc
     .eq("owner_id", ownerId).eq("id", candidate.key.id);
   if (error) throw error;
 }
-function studioModelUrl(candidate: StudioCandidate, streaming: boolean, secret: string): string {
+function studioModelUrl(candidate: StudioCandidate, streaming: boolean): string {
   if (candidate.provider === "google_ai_studio") {
     return "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(candidate.model.replace(/^models\//, "")) +
-      (streaming ? ":streamGenerateContent?alt=sse&key=" : ":generateContent?key=") + encodeURIComponent(secret);
+      (streaming ? ":streamGenerateContent?alt=sse" : ":generateContent");
   }
   const base = candidate.provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.groq.com/openai/v1";
   return base + "/chat/completions";
@@ -156,7 +156,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
     let secret: string;
     try { secret = await readStudioSecret(db, candidate); } catch { continue; }
     const google = candidate.provider === "google_ai_studio";
-    const endpoint = studioModelUrl(candidate, false, secret);
+    const endpoint = studioModelUrl(candidate, false);
     const requestMessages = messages.map(message => ({ role: message.role, content: message.parts.map(part => part.text).join("\n") }));
     const payload = google
       ? { contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }
@@ -164,7 +164,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: google ? { "Content-Type": "application/json" } : {
+        headers: google ? { "Content-Type": "application/json", "x-goog-api-key": secret } : {
           Authorization: "Bearer " + secret, "Content-Type": "application/json",
           ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
         },
@@ -231,7 +231,7 @@ async function callStudioStreaming(ownerId: string, prompt: string, projectId: s
     try {
       const secret = await readStudioSecret(db, candidate);
       const google = candidate.provider === "google_ai_studio";
-      const endpoint = studioModelUrl(candidate, true, secret);
+      const endpoint = studioModelUrl(candidate, true);
       const payload = google
         ? { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }
         : { model: candidate.model, messages: [{ role: "user", content: prompt }], temperature: 0.35, max_tokens: 8192, stream: true, stream_options: { include_usage: true } };

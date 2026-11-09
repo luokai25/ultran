@@ -7,54 +7,31 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => readFile(path.join(root, file), "utf8");
 
-test("secondary console composes the complete ULTRON owner surface", async () => {
+test("legacy Next.js entrypoint redirects to the single canonical web and APK client", async () => {
   const page = await read("src/app/page.tsx");
-  const consoleSource = await read("src/components/UltronConsole.tsx");
-  assert.match(page, /import UltronConsole from "@\/components\/UltronConsole"/);
-  assert.match(page, /return <UltronConsole \/>/);
-  for (const section of ["overview", "brain", "voice", "architecture"]) {
-    assert.match(consoleSource, new RegExp(`id="${section}"`));
-    assert.match(consoleSource, new RegExp(`href="#${section}"`));
-  }
-  assert.match(consoleSource, /aria-label="ULTRON console navigation"/);
-  assert.ok(consoleSource.includes("https://ultron-web-6et.pages.dev/"));
-  assert.match(consoleSource, /<AvatarHero speaking=\{speaking\} \/>/);
-  assert.match(consoleSource, /<ModelHub \/>/);
-  assert.match(consoleSource, /<UltronVoice onSpeakingChange=\{setSpeaking\} \/>/);
-  assert.match(consoleSource, /Four connected layers/);
+  assert.match(page, /import \{ redirect \} from "next\/navigation"/);
+  assert.match(page, /redirect\("https:\/\/ultron-app-web\.luo-chat-ops\.workers\.dev\/"\)/);
+  assert.doesNotMatch(page, /UltronConsole|AvatarHero|UltronVoice/);
 });
 
-test("secondary console uses shared tokens and deliberate responsive avatar sizing", async () => {
+test("legacy shell retains the canonical charcoal and green design tokens", async () => {
   const css = await read("src/app/globals.css");
-  assert.match(css, /--u-accent:\s*#d5b779/);
-  assert.match(css, /\.ultron-nav a/);
-  assert.match(css, /\.ultron-stage \{/);
-  assert.match(css, /@media \(max-width: 900px\)/);
-  assert.match(css, /@media \(max-width: 560px\)/);
-  assert.match(css, /\.ultron-architecture-grid/);
+  assert.match(css, /--bg:\s*#212121/);
+  assert.match(css, /--surface:\s*#2f2f2f/);
+  assert.match(css, /--accent:\s*#10a37f/);
+  assert.match(css, /--accent-hover:\s*#0e9272/);
+  assert.match(css, /:focus-visible/);
+  assert.doesNotMatch(css, /--u-accent:\s*#d5b779|ultron-stage|ultron-nav/);
 });
 
-test("avatar core exposes real expression and environment controls", async () => {
-  const avatar = await read("src/components/AvatarHero.tsx");
-  assert.match(avatar, /type Props = \{ speaking: boolean \}/);
-  assert.match(avatar, /role="group" aria-label="Core expression"/);
-  assert.match(avatar, /role="group" aria-label="Core environment"/);
-  assert.match(avatar, /aria-pressed=\{emotion === id\}/);
-  assert.match(avatar, /aria-pressed=\{scene === id\}/);
-  assert.match(avatar, /data-core-fallback="true"/);
+test("legacy orb and voice components are not mounted by the public entrypoint", async () => {
+  const page = await read("src/app/page.tsx");
+  assert.doesNotMatch(page, /AvatarHero|Core expression|Core environment|UltronVoice/);
+  assert.match(page, /redirect\(/);
 });
 
-test("voice console owns speaking state and offers a browser speech fallback", async () => {
-  const voice = await read("src/components/UltronVoice.tsx");
-  const consoleSource = await read("src/components/UltronConsole.tsx");
-  assert.match(voice, /speechSynthesis/);
-  assert.match(voice, /onSpeakingChange/);
-  assert.match(consoleSource, /const \[speaking, setSpeaking\] = useState\(false\)/);
-  assert.match(consoleSource, /<UltronVoice onSpeakingChange=\{setSpeaking\} \/>/);
-});
-
-test("metadata identifies the personal AI control console", async () => {
+test("legacy Next.js shell metadata identifies the single private ULTRON experience", async () => {
   const layout = await read("src/app/layout.tsx");
-  assert.match(layout, /ULTRON · Personal AI Control Console/);
-  assert.match(layout, /local-first personal AI system/);
+  assert.match(layout, /title:\s*"ULTRON"/);
+  assert.match(layout, /One consistent web and Android experience/);
 });

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { strToU8, zipSync } from "npm:fflate@0.8.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -745,6 +746,54 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   }, { onConflict: "project_id,title,version" });
   if (htmlDocument.error) throw htmlDocument.error;
+  const csvCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+  const sourceRegister = [
+    ["source_number", "title", "domain", "url"].join(","),
+    ...selectedSources.map((source, index) => [
+      String(index + 1), csvCell(source.title), csvCell(source.domain), csvCell(source.canonical_url),
+    ].join(",")),
+  ].join("\n");
+  const manifest = {
+    product_title: title, version, generated_at: new Date().toISOString(),
+    project_id: projectId, research_target: target, analyzed_sources: counts.analyzed,
+    coverage_reason: coverageReason, formats: ["markdown", "html", "zip"],
+    note: "Original product content with source metadata. Source page text is not redistributed.",
+  };
+  const packageFiles: Record<string, Uint8Array> = {
+    "README.txt": strToU8(title + "\nULTRON Digital Product Package · v" + version + "\n\nIncludes the original product in Markdown and HTML, a source register, evidence synthesis and quality report.\nResearch coverage: " + counts.analyzed + " analyzed pages out of " + target + " requested.\nReview every claim and citation before commercial publication.\n"),
+    "product.md": markdownBytes,
+    "product.html": htmlBytes,
+    "research/source-register.csv": strToU8(sourceRegister),
+    "research/evidence-synthesis.json": strToU8(JSON.stringify(synthesis, null, 2)),
+    "quality/validation-report.json": strToU8(JSON.stringify(validation, null, 2)),
+    "manifest.json": strToU8(JSON.stringify(manifest, null, 2)),
+  };
+  const zipBytes = zipSync(packageFiles, { level: 6 });
+  const zipPath = ownerId + "/products/" + projectId + "/product-v" + version + ".zip";
+  const zipUpload = await bucket.upload(zipPath, zipBytes, { contentType: "application/zip", upsert: true });
+  if (zipUpload.error) throw zipUpload.error;
+  const zipChecksumBytes = await crypto.subtle.digest("SHA-256", zipBytes);
+  const zipChecksum = Array.from(new Uint8Array(zipChecksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const zipArtifactPayload = {
+    owner_id: ownerId, name: title + "-package-v" + version + ".zip",
+    description: "Complete private digital product bundle with source register and quality report.",
+    artifact_type: "archive", mime_type: "application/zip", bucket_id: "ultron-private", storage_path: zipPath,
+    byte_size: zipBytes.byteLength, checksum_sha256: zipChecksum, source_job_id: jobId,
+    metadata: { product_project_id: projectId, format: "zip", version, private: true },
+  };
+  const { data: existingZipArtifact, error: existingZipError } = await db.from("ultron_artifacts").select("id")
+    .eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, format: "zip", version }).maybeSingle();
+  if (existingZipError) throw existingZipError;
+  const zipArtifactResult = existingZipArtifact
+    ? await db.from("ultron_artifacts").update(zipArtifactPayload).eq("owner_id", ownerId).eq("id", existingZipArtifact.id).select("id").single()
+    : await db.from("ultron_artifacts").insert(zipArtifactPayload).select("id").single();
+  if (zipArtifactResult.error) throw zipArtifactResult.error;
+  const zipDocument = await db.from("ultron_product_documents").upsert({
+    owner_id: ownerId, project_id: projectId, title: title + " (Package)", format: "zip", status: "final", version,
+    storage_path: zipPath, mime_type: "application/zip", byte_size: zipBytes.byteLength,
+    checksum_sha256: zipChecksum, validation_report: { includes_markdown: true, includes_html: true, includes_source_register: true, includes_synthesis: true, includes_quality_report: true },
+  }, { onConflict: "project_id,title,version" });
+  if (zipDocument.error) throw zipDocument.error;
   const finalStatus = counts.analyzed >= target && validation.quality_checks_passed && (evidence.length === 0 || validation.citation_markers > 0) ? "completed" : "partial";
   const { data: finalizedProject, error: finalizeError } = await db.from("ultron_product_projects").update({
     title, status: finalStatus, active_stage: "packaging", progress: 100, draft_markdown: markdown,
@@ -845,7 +894,8 @@ Deno.serve(async (req: Request) => {
       }
       const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {
         if (!document.storage_path) return { ...document, download_url: null };
-        const filename = project.title + "-v" + document.version + (document.format === "html" ? ".html" : ".md");
+        const extension = document.format === "html" ? "html" : document.format === "zip" ? "zip" : "md";
+        const filename = project.title + "-v" + document.version + "." + extension;
         const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600, { download: filename });
         return { ...document, download_url: signedDocument?.signedUrl ?? null };
       }));

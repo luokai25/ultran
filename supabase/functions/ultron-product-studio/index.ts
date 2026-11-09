@@ -392,6 +392,9 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
   const bucket = db.storage.from("ultron-private");
   const upload = await bucket.upload(storagePath, new TextEncoder().encode(markdown), { contentType: "text/markdown; charset=utf-8", upsert: true });
   if (upload.error) throw upload.error;
+  const htmlPath = ownerId + "/products/" + projectId + "/product-v1.html";
+  const htmlUpload = await bucket.upload(htmlPath, new TextEncoder().encode(html), { contentType: "text/html; charset=utf-8", upsert: true });
+  if (htmlUpload.error) throw htmlUpload.error;
   const checksumBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(markdown));
   const checksum = Array.from(new Uint8Array(checksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
   const { data: artifact, error: artifactError } = await db.from("ultron_artifacts").insert({
@@ -405,6 +408,21 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
     owner_id: ownerId, project_id: projectId, title, format: "markdown", status: "final", version: 1,
     storage_path: storagePath, mime_type: "text/markdown", byte_size: new TextEncoder().encode(markdown).byteLength,
     checksum_sha256: checksum, validation_report: { minimum_length_passed: true, citations_included: /references/i.test(markdown), analyzed_sources: analyzed },
+  });
+  const htmlBytes = new TextEncoder().encode(html);
+  const htmlChecksumBytes = await crypto.subtle.digest("SHA-256", htmlBytes);
+  const htmlChecksum = Array.from(new Uint8Array(htmlChecksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const { data: htmlArtifact, error: htmlArtifactError } = await db.from("ultron_artifacts").insert({
+    owner_id: ownerId, name: title + ".html", description: "Standalone HTML edition of the ULTRON digital product.",
+    artifact_type: "file", mime_type: "text/html", bucket_id: "ultron-private", storage_path: htmlPath,
+    byte_size: htmlBytes.byteLength, checksum_sha256: htmlChecksum, source_job_id: jobId,
+    metadata: { product_project_id: projectId, format: "html", private: true },
+  }).select("id").single();
+  if (htmlArtifactError) throw htmlArtifactError;
+  await db.from("ultron_product_documents").insert({
+    owner_id: ownerId, project_id: projectId, title: title + " (HTML)", format: "html", status: "final", version: 1,
+    storage_path: htmlPath, mime_type: "text/html", byte_size: htmlBytes.byteLength,
+    checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   });
   const finalStatus = analyzed >= Number(project.research_target || 200) ? "completed" : "partial";
   await db.from("ultron_product_projects").update({
@@ -485,7 +503,7 @@ Deno.serve(async (req: Request) => {
       const [events, sources, documents] = await Promise.all([
         auth.db.from("ultron_product_events").select("sequence,stage,event_type,payload,created_at").eq("owner_id", auth.id).eq("project_id", id).order("sequence", { ascending: true }).limit(200),
         auth.db.from("ultron_product_sources").select("id,title,canonical_url,domain,fetch_status,relevance_score,extraction_summary,retrieved_at").eq("owner_id", auth.id).eq("project_id", id).order("relevance_score", { ascending: false }).limit(200),
-        auth.db.from("ultron_product_documents").select("id,title,format,status,version,byte_size,created_at").eq("owner_id", auth.id).eq("project_id", id).order("created_at", { ascending: false }),
+        auth.db.from("ultron_product_documents").select("id,title,format,status,version,byte_size,storage_path,created_at").eq("owner_id", auth.id).eq("project_id", id).order("created_at", { ascending: false }),
       ]);
       const download = project.artifact_id ? await auth.db.from("ultron_artifacts").select("storage_path,bucket_id").eq("owner_id", auth.id).eq("id", project.artifact_id).maybeSingle() : { data: null };
       let download_url: string | null = null;
@@ -493,7 +511,12 @@ Deno.serve(async (req: Request) => {
         const { data: signed } = await db.storage.from(download.data.bucket_id).createSignedUrl(download.data.storage_path, 3600);
         download_url = signed?.signedUrl ?? null;
       }
-      return json({ ok: true, project, events: events.data ?? [], sources: sources.data ?? [], documents: documents.data ?? [], download_url });
+      const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {
+        if (!document.storage_path) return { ...document, download_url: null };
+        const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600);
+        return { ...document, download_url: signedDocument?.signedUrl ?? null };
+      }));
+      return json({ ok: true, project, events: events.data ?? [], sources: sources.data ?? [], documents: documentRows, download_url });
     }
     if (body.action === "cancel" || body.action === "pause") {
       const id = clean(body.project_id, 80);

@@ -515,6 +515,12 @@ async function decodeOfferBuilderHtml(): Promise<string> {
   const compressed = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
   let html = await new Response(stream).text();
+  // srcdoc can expose an opaque origin ("null") inside Android WebView.
+  // postMessage rejects "null" as a targetOrigin; use "*" and authenticate
+  // every inbound action by the exact iframe WindowProxy below.
+  const offerActionMessage = "parent.postMessage({type:'ULTRON_OFFER_ACTION',id,action,payload:payload||{}},location.origin);";
+  if (!html.includes(offerActionMessage)) throw new Error("Offer Builder message bridge source was not found.");
+  html = html.replace(offerActionMessage, "parent.postMessage({type:'ULTRON_OFFER_ACTION',id,action,payload:payload||{}},'*');");
   const replaceBlock = (source: string, start: string, end: string, replacement: string) => {
     const from = source.indexOf(start);
     const to = source.indexOf(end, from + start.length);
@@ -650,12 +656,12 @@ async function mountOfferBuilder(): Promise<void> {
   document.body.append(host);
 
   offerBuilderMessageHandler = async (event: MessageEvent) => {
-    if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+    if (event.source !== frame.contentWindow || (event.origin !== location.origin && event.origin !== "null")) return;
     const message = event.data as { type?: string; id?: string; action?: string; payload?: Record<string, unknown> } | null;
     if (!message || message.type !== "ULTRON_OFFER_ACTION" || !message.id || !message.action) return;
     const allowed = new Set(["create", "get", "save", "generate", "finalize"]);
     if (!allowed.has(message.action)) {
-      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, error: "Unsupported Offer Builder action." }, location.origin);
+      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, error: "Unsupported Offer Builder action." }, "*");
       return;
     }
     try {
@@ -667,12 +673,12 @@ async function mountOfferBuilder(): Promise<void> {
         const detail = data && typeof data === "object" ? String((data as Record<string, unknown>).message ?? (data as Record<string, unknown>).error ?? "ULTRON did not confirm the operation.") : "ULTRON returned an invalid response.";
         throw new Error(detail);
       }
-      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: data }, location.origin);
+      frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: data }, "*");
     } catch (error) {
       frame.contentWindow?.postMessage({
         type: "ULTRON_OFFER_RESULT", id: message.id,
         error: error instanceof Error ? error.message : "Offer Builder request failed.",
-      }, location.origin);
+      }, "*");
     }
   };
   window.addEventListener("message", offerBuilderMessageHandler);

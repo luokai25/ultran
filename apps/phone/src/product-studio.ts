@@ -40,7 +40,8 @@ async function invoke(action: string, payload: Record<string, unknown> = {}): Pr
   if (result.ok !== true) throw new Error("Product Studio did not confirm the operation.");
   return result;
 }
-function statusLabel(status: string): string {
+function statusLabel(status: string, errorMessage = ""): string {
+  if (status === "waiting_for_provider" && errorMessage.includes("daily free Google Search")) return "Waiting for daily free-search reset";
   const labels: Record<string, string> = {
     queued: "Queued", identifying: "Identifying opportunity", researching: "Researching",
     synthesizing: "Synthesizing evidence", creating: "Creating product", validating: "Quality review",
@@ -66,7 +67,7 @@ function renderProjects(projects: ProductProject[]): void {
     button.type = "button";
     button.setAttribute("aria-current", String(project.id === selectedProjectId));
     const copy = node("span", "product-project-copy");
-    copy.append(node("strong", "", project.title), node("small", "", statusLabel(project.status)));
+    copy.append(node("strong", "", project.title), node("small", "", statusLabel(project.status, project.error_message)));
     const meta = node("span", "product-project-meta", String(project.source_counts?.analyzed ?? 0) + " sources");
     button.append(copy, meta);
     button.addEventListener("click", () => void loadProject(project.id));
@@ -250,7 +251,7 @@ function renderDetail(detail: ProductDetail): void {
   el<HTMLElement>("product-studio-workspace").hidden = false;
   el<HTMLElement>("product-studio-title").textContent = project.title;
   renderOpportunity(project);
-  el<HTMLElement>("product-studio-status").textContent = statusLabel(project.status);
+  el<HTMLElement>("product-studio-status").textContent = statusLabel(project.status, project.error_message);
   const progress = el<HTMLProgressElement>("product-studio-progress");
   progress.value = Math.max(0, Math.min(100, Number(project.progress) || 0));
   el<HTMLElement>("product-studio-stage").textContent = project.active_stage.replace(/_/g, " ");
@@ -288,7 +289,7 @@ function renderDetail(detail: ProductDetail): void {
   pause.hidden = !["queued","identifying","researching","synthesizing","creating","validating","packaging","waiting_for_provider"].includes(project.status);
   const resume = el<HTMLButtonElement>("product-studio-resume");
   resume.hidden = !["partial","failed","paused","waiting_for_provider"].includes(project.status);
-  resume.textContent = project.status === "partial" ? "Improve draft / continue" : project.status === "waiting_for_provider" ? "Retry when a free model is available" : project.status === "paused" ? "Resume project" : "Retry project";
+  resume.textContent = project.status === "partial" ? "Improve draft / continue" : project.status === "waiting_for_provider" ? project.error_message?.includes("daily free Google Search") ? "Retry after daily search reset" : "Retry when a free model is available" : project.status === "paused" ? "Resume project" : "Retry project";
   const warning = el<HTMLElement>("product-studio-warning");
   warning.hidden = !project.error_message && project.status !== "partial" && project.status !== "waiting_for_provider";
   warning.textContent = project.error_message || (project.status === "partial" ? String(project.synthesis_summary?.coverage_note ?? "Review the actual source coverage and quality checks before publication.") : project.status === "waiting_for_provider" ? "ULTRON is waiting for an eligible free model. Search-grounded research needs Google AI Studio; synthesis and drafting can use any eligible connected free provider. Your project remains saved." : "");

@@ -239,21 +239,6 @@ function renderOpportunity(project: ProductProject): void {
     item.append(list);
     panel.append(item);
   }
-  const validation = isRecord(synthesis.validation) ? synthesis.validation : {};
-  if (Object.keys(validation).length) {
-    const item = node("div", "product-opportunity-item product-opportunity-quality");
-    item.append(node("strong", "", "Quality checks"));
-    const checks: Array<[string, unknown]> = [
-      ["Minimum length", validation.minimum_length_passed],
-      ["References section", validation.references_section],
-      ["Source citations", validation.source_citations_match],
-    ];
-    const list = node("ul", "product-opportunity-themes");
-    for (const [label, value] of checks) list.append(node("li", "", label + ": " + (value === true ? "passed" : value === false ? "needs review" : "not checked")));
-    list.append(node("li", "", "Analyzed sources: " + String(validation.analyzed_sources ?? 0) + " / " + String(validation.requested_sources ?? project.research_target)));
-    item.append(list);
-    panel.append(item);
-  }
   if (!panel.childElementCount) panel.append(node("p", "product-studio-empty", "ULTRON is still building the opportunity brief and comparing source evidence."));
 }
 function isRecord(value: unknown): value is Record<string, unknown> {

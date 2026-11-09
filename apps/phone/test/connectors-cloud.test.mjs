@@ -95,3 +95,9 @@ test("simple Google and productivity actions enter the tool-capable agent path",
  assert.match(main,/refactor\|read\|show\|find\|open\|send\|reply\|draft\|compose\|upload/);
  assert.match(main,/const usePrometheus = .*explicitWork/);
 });
+
+test("Google and other connector tool catalogues are searchable without truncating discovery",()=>{
+ assert.match(screen,/Search all tools by name or description/);
+ assert.match(screen,/cachedTools\.filter/);
+ assert.match(screen,/matching\.slice\(0, 40\)/);
+});

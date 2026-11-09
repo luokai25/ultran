@@ -131,7 +131,7 @@ type Store = { conversations: Conversation[]; activeId: string | null; agentId?:
 type Theme = { label: string; accent: number; bright: string; fog: number };
 
 const THEMES: Record<ThemeId, Theme> = {
-  ultron: { label: "Ultron", accent: 0x9ca3af, bright: "#d1d5db", fog: 0x07090b },
+  ultron: { label: "Ultron", accent: 0x10a37f, bright: "#10a37f", fog: 0x212121 },
 };
 
 const SUGGESTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -149,20 +149,6 @@ function req<T extends Element>(selector: string): T {
   const node = document.querySelector<T>(selector);
   if (!node) throw new Error(`phone shell: missing required node ${selector}`);
   return node;
-}
-
-// Desktop-only cursor lighting adds depth without moving or obscuring controls.
-const cinematicPointer = window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)");
-if (cinematicPointer.matches) {
-  let pointerFrame = 0;
-  window.addEventListener("pointermove", (event) => {
-    if (pointerFrame) return;
-    pointerFrame = window.requestAnimationFrame(() => {
-      document.documentElement.style.setProperty("--pointer-x", `${event.clientX}px`);
-      document.documentElement.style.setProperty("--pointer-y", `${event.clientY}px`);
-      pointerFrame = 0;
-    });
-  }, { passive: true });
 }
 
 const app = req<HTMLElement>("#app");

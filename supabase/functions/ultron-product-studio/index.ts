@@ -607,7 +607,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     if (!queries.length) queries = [clean(opportunity.selected_topic, 400) || request];
   }
   const { data: priorSources } = await db.from("ultron_product_sources").select("domain,canonical_url").eq("owner_id", ownerId).eq("project_id", projectId).limit(600);
-  const allPriorDomains = new Set((priorSources || []).map(row => clean(row.domain, 120).replace(/^www\\./, "")).filter(Boolean));
+  const allPriorDomains = new Set((priorSources || []).map(row => clean(row.domain, 120).replace(/^www\./, "")).filter(Boolean));
   const priorDomains = [...allPriorDomains].slice(-100);
   const researchAngles = ["market demand and customer pain", "competitor weaknesses and user complaints", "pricing and willingness to pay", "workflows and implementation", "official standards and compliance", "case studies and measured outcomes", "technical feasibility and tool choices", "risks, mistakes and quality benchmarks", "underserved audiences and accessibility", "long-term costs and sustainability", "templates and operational processes", "independent reviews and counter-evidence"];
   const query = queries[researchRound % queries.length] + " " + researchAngles[researchRound % researchAngles.length];
@@ -630,7 +630,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     try {
       const url = new URL(item.url); url.hash = "";
       if (priorUrls.has(url.toString())) return [];
-      return [{ item, canonical: url.toString(), domain: url.hostname.replace(/^www\\./, "") }];
+      return [{ item, canonical: url.toString(), domain: url.hostname.replace(/^www\./, "") }];
     } catch { return []; }
   });
   const seenDomains = new Set<string>();

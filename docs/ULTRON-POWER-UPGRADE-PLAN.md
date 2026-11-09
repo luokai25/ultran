@@ -1,0 +1,188 @@
+# ULTRON Power Upgrade Plan
+
+**Status:** Architecture audit completed; Phase 1 implementation is next  
+**Repository:** `luokai25/ultran`  
+**Integration rule:** work directly on `main`; preserve the existing local-first architecture  
+**Cost rule:** reuse the current Supabase, Vercel, Cloudflare and existing provider integrations; no new paid service or dependency without explicit approval.
+
+## Product objective
+
+Turn ULTRON into a dependable personal AI operating system: one identity and memory layer, one capability registry, one policy-enforced execution path, and a set of local/cloud workers that can research, create, code, automate and deliver work across the Android app and web client.
+
+The system must remain model-independent. OpenAI-compatible, Google, Groq, OpenRouter, local Ollama and future model providers supply reasoning; ULTRON owns identity, planning, tools, permissions, memory, execution, verification and delivery.
+
+## Existing implementation confirmed on 2026-11-09
+
+This is not a greenfield MCP project. The repository already contains:
+
+- A Python MCP client runtime with **stdio and Streamable HTTP transports**, protocol handshake, paginated tool discovery, connection health, manifest hashing/pinning and failure isolation.
+- A policy gateway with tool schemas, capability filtering, signed grants, approval gates, payload/time budgets, URL egress allow-lists and audit metadata.
+- MCP servers projected into the existing connector registry, so built-in and MCP tools can share the same catalog and execution contract.
+- A read-only MCP server mode that lets external MCP hosts inspect ULTRON without granting them the ability to register servers, issue grants or approve actions.
+- A built-in connector catalog and a Composio-hosted OAuth/MCP integration.
+- A Supabase connector connection table with owner-scoped RLS, plus an authenticated Supabase Edge Function for the Composio flow.
+- Supabase-backed cloud jobs, maintenance scheduling, skills/tool specs, generated-tool lifecycle, memory and artifact infrastructure.
+
+### Gaps found
+
+1. **Native MCP server registration is not durable.** The Python runtime loads configured servers from `ULTRON_MCP_SERVERS`; API registrations go into the in-process pool. Restarting the backend loses dynamically registered server definitions.
+2. **MCP runtime state is not cloud-shared.** The Supabase connector table currently represents Composio account connections, not a durable registry of arbitrary native MCP endpoints and their discovered tool manifests.
+3. **Grant persistence is weaker than approval persistence.** Approval records can use SQLite persistence; the HMAC GrantStore itself is process-memory only and its signing key is generated at startup.
+4. **MCP audit history is process-local.** The gateway's recent audit entries are held in memory rather than a durable, owner-scoped event stream.
+5. **The canonical phone UI's cloud connector flow is Composio-oriented.** It can list/connect/disconnect Composio accounts and tools, but it does not yet provide a complete native MCP server manager with endpoint registration, transport selection, probe, trust/pin review, tool permissions and lifecycle.
+6. **The standalone Python control plane is local-first, not an internet-facing authenticated API.** Its workspace is selected by `X-Ultron-Workspace`; the repository documentation explicitly warns that this is not end-user authentication. It defaults to loopback, which is appropriate for local development. Do not expose its mutating MCP routes publicly until a real authentication and authorization boundary is added.
+7. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
+
+## Target architecture
+
+### 1. ULTRON Core
+- Single identity and system instruction layer, separate from any model provider.
+- Task classifier and planner that selects quick, standard, deep or critical execution.
+- Model router with health-aware provider fallback, context budgets and cost limits.
+- Structured tool-call contract; model output never directly grants itself permission.
+
+### 2. Unified Capability Gateway
+One registry and one policy pipeline for:
+- Built-in native connectors.
+- Remote MCP servers over Streamable HTTP.
+- Local MCP servers over stdio or HTTP.
+- Composio-managed OAuth toolkits.
+- Future OpenAPI/REST adapters and ULTRON-authored skills.
+
+Every tool must expose a validated schema, declared capabilities, auth requirements, exact egress hosts, trust level, version and owner/workspace scope. Unknown capabilities default to approval-required, never read-only.
+
+### 3. Durable connector control plane
+- Persist server definitions, connection metadata, trust decisions, pinned manifest hashes and discovered tool schemas.
+- Encrypt endpoint headers, environment values and OAuth credentials at rest. Never store raw secrets in public tables or return them to the client.
+- Separate metadata from secret material; use the existing encrypted credential vault or a dedicated server-side secret store.
+- Persist grants, approval decisions and tool-call audit events with owner/workspace scope.
+- Health checks and probes must not execute write-capable tools.
+
+### 4. Cloud MCP bridge
+- Supabase-authenticated owner identity, enforced server-side.
+- Remote Streamable HTTP transport only; no arbitrary command execution or stdio in Edge Functions.
+- Strict hostname/port allow-list, DNS/IP private-range checks, redirect revalidation, request and response size limits, timeouts and per-connector rate limits.
+- OAuth and API credentials remain server-side.
+- RLS on every exposed table; no service-role key in the APK or browser.
+- Writes, deletes, execution and admin actions require a fresh, exact, expiring approval.
+
+### 5. Agent and skill system
+- ULTRON remains the supervisor; specialist agents are scoped workers, not competing identities.
+- Skills are versioned, signed/hashed packages with declared tools, inputs, outputs and permissions.
+- Generated tools move through draft → static validation → sandbox tests → evaluation → approval → active → rollback/retire.
+- No generated code can grant itself permissions or directly access secrets.
+- Use existing job queue and worker infrastructure rather than creating a second scheduler.
+
+### 6. Memory and knowledge
+- Hot memory: current conversation, active task state and short-lived working context.
+- Warm memory: owner-approved facts, preferences, project decisions and recent task summaries.
+- Cold memory: indexed documents, artifacts, tool traces and historical knowledge.
+- Retrieval must be owner-scoped, source-aware and capable of honoring corrections/deletions.
+- Memory consolidation runs as a bounded background job with evidence and provenance.
+
+### 7. Autonomy and delivery
+- Plan → execute → verify → repair/retry within explicit budgets → deliver artifact and summary.
+- Long tasks run through the existing durable Supabase queue.
+- User-visible status must reflect real job state; no fake progress or silently disappearing work.
+- Destructive or external side-effect actions pause for human approval.
+- Maintenance, stale-lease recovery, memory consolidation and health checks remain background operations.
+
+### 8. Android and web experience
+The canonical client remains `apps/phone`, shared by the web client and Capacitor APK. Add a native MCP manager to the existing Connectors area, not a separate competing connector system.
+
+Required MCP manager states:
+- Empty, configured, connecting, healthy, failed and quarantined servers.
+- Add/edit endpoint, transport, authentication method and exact allowed hosts.
+- Probe/handshake and discovered tool inventory.
+- Manifest hash/pin changes with explicit trust review.
+- Per-tool capability display, enable/disable, grant and approval state.
+- Credential connected/expired/revoked states with masked metadata only.
+- Recent tool-call audit, latency and failure details.
+- Responsive layouts, keyboard/focus handling and Android safe-area support.
+
+## Delivery phases and acceptance criteria
+
+### Phase 1 — durable MCP foundation
+1. Add a versioned, encrypted native MCP server registry for the local runtime.
+2. Persist and restore safe server definitions on restart; reject persistence of secret-bearing config when encryption is unavailable.
+3. Persist grant signing material safely so a restart does not silently invalidate every legitimate grant; keep expiry, revocation and single-use checks.
+4. Make tool-call audit history durable with bounded retention and secret redaction.
+5. Add tests for restart recovery, encryption-required behavior, tamper detection, grant expiry/revocation/single-use and audit redaction.
+6. Preserve the existing MCP protocol, connector projection and permission pipeline.
+
+**Exit criteria:** a registered server survives backend restart; secrets are never written in plaintext; invalid/tampered grants remain denied; audit history survives restart; existing stdio/HTTP protocol tests still pass.
+
+### Phase 2 — authenticated cloud MCP bridge
+1. Add owner-scoped Supabase schema for remote MCP server metadata and discovered tools.
+2. Add authenticated Edge Function operations for register, probe, list, enable/disable and invoke.
+3. Implement Streamable HTTP client with SSRF-safe egress and strict resource limits.
+4. Persist grants, approvals and audit events in Supabase.
+5. Add RLS and security/performance advisor verification.
+
+**Exit criteria:** a user can register a remote HTTP MCP endpoint from the phone, probe it, see its tools and invoke a read-only tool without exposing credentials; write tools pause for exact approval.
+
+### Phase 3 — canonical connector manager
+1. Unify built-in, Composio, native MCP and cloud MCP listings.
+2. Add endpoint management, tool inventory, permission review and health states to `apps/phone`.
+3. Keep all current connector actions and the existing Composio flow working.
+4. Add responsive and Android regression tests.
+
+**Exit criteria:** every visible control works; the same feature works in web and APK; no secret is stored in browser/local storage.
+
+### Phase 4 — agent supervisor and skill lifecycle
+1. Add explicit multi-step task plans and specialist worker delegation.
+2. Route all tools through the same capability gateway.
+3. Improve sandboxed skill/tool generation, test/evaluation, approvals, activation and rollback.
+4. Add run traces and recovery for interrupted jobs.
+
+### Phase 5 — memory and proactive operation
+1. Complete hot/warm/cold memory retrieval and consolidation.
+2. Connect project files and approved sources to grounded retrieval.
+3. Add proactive task suggestions and scheduled maintenance using existing cron/queue infrastructure.
+4. Keep autonomous work bounded, observable and interruptible.
+
+### Phase 6 — research, creation and delivery
+1. Add reusable research, browser, coding, document, spreadsheet, image, voice and media workflows through registered connectors.
+2. Improve the existing product studio and artifact pipeline.
+3. Require source/evidence validation before delivery and provide downloadable artifacts through private storage.
+
+### Phase 7 — hardening and release
+1. Run full phone, backend, Supabase security and Android build suites.
+2. Review all auth, RLS, secret, SSRF, egress, permission and approval boundaries.
+3. Verify the production web deployment and signed APK release assets.
+4. Publish a capability matrix showing what is live, local-only, cloud-only, unavailable or awaiting credentials.
+
+## Connector strategy
+
+Prefer this order:
+1. Existing ULTRON native capabilities and local tools.
+2. Existing Supabase, GitHub, Vercel and Cloudflare integrations for development/deployment.
+3. Firecrawl/Exa/Browser Use for research and browsing, subject to user-connected credentials and terms.
+4. Existing Composio OAuth gateway for supported SaaS accounts.
+5. Direct remote MCP or OpenAPI connectors where a provider is not covered.
+6. Voice/media/document integrations only when configured and their cost is understood.
+
+An external ChatGPT connector is not automatically an ULTRON connector. ULTRON must connect through its own secure API, MCP endpoint, OAuth flow or supported provider adapter. The ElevenLabs MCP registry is specific to ElevenLabs agents; Plugin Creator creates ChatGPT plugins, not ULTRON MCP servers.
+
+## Security invariants
+
+- Never put provider secrets, service-role keys, signing keys or GitHub tokens in the APK, frontend bundle, logs, commits or model context.
+- Rotate any credential that has been pasted into chat, a repository instruction or an otherwise exposed plaintext file.
+- Never trust a model-proposed capability, connector manifest or tool result as authorization.
+- Default unknown tools to approval-required.
+- Bind grants, approvals, connector records and audit events to the authenticated owner and workspace.
+- Block loopback, private, link-local and metadata IP ranges for cloud egress; revalidate redirects and resolved addresses.
+- Use RLS on every exposed Supabase table and verify policies with Supabase advisors.
+- Keep destructive operations and external side effects behind exact, expiring, single-action approvals.
+
+## Audit notes and known operational checks
+
+- Supabase migrations currently include the connector metadata, cloud skills/tool specs, durable job queue, maintenance scheduler, brain memory and product-studio worker foundations.
+- Active cron jobs observed: brain supervisor every minute, cloud job worker every minute and maintenance queue every five minutes.
+- Security advisor currently reports leaked-password protection disabled; enable it in Supabase Auth settings.
+- Performance advisor currently reports unused indexes. Do not remove them just because the project is young; re-check after real query volume.
+- The latest observed Android release workflow run #1070 completed successfully, but the signed release asset must be checked separately before telling the owner an APK is available.
+
+## Working rule
+
+Implement one phase at a time, verify it with tests and live checks, commit directly to `main`, and do not claim deployment or device verification unless it has actually succeeded.

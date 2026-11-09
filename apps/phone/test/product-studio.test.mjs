@@ -23,6 +23,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(html, /id="product-studio-pause"/);
   assert.match(main, /initProductStudio\(/);
   assert.match(main, /openProductStudioScreen/);
+  assert.match(main, /openCloudSettings:.*navSettingsButton\.click/s);
+  assert.match(main, /cloud-sync-heading.*scrollIntoView/s);
   assert.match(moduleSource, /functions\.invoke\("ultron-product-studio"/);
   assert.match(moduleSource, /product-studio-refresh-list/);
   assert.match(moduleSource, /product-studio-resume/);
@@ -32,6 +34,9 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /opportunity_score/);
   assert.match(moduleSource, /validation/);
   assert.match(moduleSource, /function renderQuality/);
+  assert.match(moduleSource, /product-studio-connect/);
+  assert.match(moduleSource, /openCloudSettings\(\)/);
+  assert.match(css, /\.product-studio-connect/);
   assert.match(moduleSource, /Editable Excel workbook/);
   assert.match(moduleSource, /Editable PowerPoint deck/);
   assert.match(css, /@media\(min-width:900px\)/);

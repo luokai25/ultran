@@ -276,6 +276,25 @@ async function robotsRules(origin: string): Promise<Array<{ allow: boolean; path
   robotsCache.set(origin, task);
   return task;
 }
+async function readPublicTextLimited(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let output = "", total = 0;
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    const remaining = maxBytes - total;
+    if (chunk.value.byteLength > remaining) {
+      output += decoder.decode(chunk.value.slice(0, Math.max(0, remaining)), { stream: true });
+      await reader.cancel();
+      break;
+    }
+    total += chunk.value.byteLength;
+    output += decoder.decode(chunk.value, { stream: true });
+  }
+  return output + decoder.decode();
+}
 async function fetchPublicResearchPage(start: string): Promise<{ response: Response | null; blocked: boolean }> {
   let current = new URL(start);
   for (let hop = 0; hop < 4; hop++) {
@@ -391,7 +410,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
       if (!/text\/html|text\/plain/i.test(contentType)) return { record, status: "rejected" as const, text: "", contentType };
       const declaredSize = Number(response.headers.get("content-length") || 0);
       if (declaredSize > 1_500_000) return { record, status: "rejected" as const, text: "", contentType };
-      const raw = (await response.text()).slice(0, 1_500_000);
+      const raw = await readPublicTextLimited(response, 1_500_000);
       const extracted = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 4500);
       if (extracted.length < 300) return { record, status: "opened" as const, text: extracted, contentType };
       return { record, status: "analyzed" as const, text: extracted, contentType, finalUrl: response.url || record.canonical };

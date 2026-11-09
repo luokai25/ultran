@@ -942,6 +942,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const productBody = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
   const citationIndexes = [...productBody.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
+  const uniqueCitationIndexes = [...new Set(citationIndexes)];
+  const minimumCitationSources = Math.min(5, Math.max(1, evidence.length));
   const sourceUrlSet = new Set(evidence.map(item => {
     try { const url = new URL(item.url); url.hash = ""; return url.toString(); } catch { return ""; }
   }));
@@ -956,13 +958,15 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     word_count: wordCount,
     references_section: /^#{1,3}\s*(references|sources)\s*$/im.test(markdown),
     citation_markers: citationIndexes.length,
-    source_citations_match: citationIndexes.every(index => index >= 1 && index <= evidence.length),
+    distinct_cited_sources: uniqueCitationIndexes.length,
+    minimum_citation_sources: minimumCitationSources,
+    source_citations_match: uniqueCitationIndexes.length >= minimumCitationSources && uniqueCitationIndexes.every(index => index >= 1 && index <= evidence.length),
     body_external_links_match_sources: bodyExternalLinksMatchSources,
     contents_section: /table of contents|^#{1,3}\s*contents\s*$/im.test(productBody),
     actionable_workflow: /workflow|step-by-step|implementation plan|process/i.test(productBody),
     reusable_asset: /template|checklist|worksheet|prompt pack/i.test(productBody),
     limitations_and_next_steps: /limitations|next steps|caveats/i.test(productBody),
-    placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(productBody),
+    placeholder_free: !/\b(todo|tbd|placeholder|lorem ipsum|insert here|coming soon|your name here)\b|\[(?:todo|tbd|placeholder)\]/i.test(productBody),
     spreadsheet_csv_valid: !spreadsheetCsvRequired || Boolean(productCsv),
     spreadsheet_xlsx_valid: !spreadsheetCsvRequired || Boolean(xlsxBytes?.byteLength),
     presentation_pptx_valid: !presentationRequired || Boolean(pptxBytes?.byteLength),

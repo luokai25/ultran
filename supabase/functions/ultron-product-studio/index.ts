@@ -791,7 +791,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const sourceUrlSet = new Set(evidence.map(item => {
     try { const url = new URL(item.url); url.hash = ""; return url.toString(); } catch { return ""; }
   }));
-  const bodyMarkdownLinks = [...productBody.matchAll(/\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/gi)].map(match => match[1].replace(/[.,;:!?]+$/, ""));
+  const bodyMarkdownLinks = [...productBody.matchAll(/\]\((https?:\/\/[^\s)]+)\)/gi)].map(match => match[1].replace(/[.,;:!?]+$/, ""));
   const bodyExternalLinksMatchSources = bodyMarkdownLinks.every(value => {
     try { const url = new URL(value); url.hash = ""; return sourceUrlSet.has(url.toString()); } catch { return false; }
   });

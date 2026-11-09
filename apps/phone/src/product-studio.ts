@@ -608,6 +608,52 @@ function closeOfferBuilder(): void {
   options?.closeScreen();
 }
 
+function restoreOfferBuilderState(saved: Record<string, unknown>, generated: Record<string, unknown>): Record<string, unknown> {
+  const state = { ...saved };
+  if (isRecord(generated.creator)) state.creator = generated.creator;
+  if (isRecord(generated.discovery)) {
+    const discovery = generated.discovery;
+    if (Array.isArray(discovery.directions)) state.directions = discovery.directions;
+    if (Array.isArray(discovery.pockets)) state.pockets = discovery.pockets;
+  }
+  if (isRecord(generated.outline) && Array.isArray(generated.outline.outlines)) state.outlines = generated.outline.outlines;
+  if (isRecord(generated.transformation)) {
+    const transformation = generated.transformation;
+    if (Array.isArray(transformation.before_after)) {
+      state.vtm = transformation.before_after.map((item) => {
+        const row = isRecord(item) ? item : {};
+        return [row.state ?? row.label ?? "State", row.before ?? "", row.after ?? ""];
+      });
+    }
+    if (Array.isArray(transformation.transformation_stages)) {
+      state.map = transformation.transformation_stages.map((item) => {
+        const row = isRecord(item) ? item : {};
+        return [row.stage ?? "Stage", row.goal ?? "", row.description ?? ""];
+      });
+    }
+  }
+  for (const key of ["summary", "quality", "brand", "store"] as const) {
+    const value = generated[key === "summary" ? "summary" : key];
+    if (isRecord(value)) state[key] = value;
+  }
+  if (isRecord(generated.section)) {
+    const section = generated.section;
+    if (typeof section.value === "string") {
+      const index = Math.max(0, Math.trunc(Number(section.index) || 1) - 1);
+      const sections = Array.isArray(state.secs) ? [...state.secs] : [];
+      const existing = isRecord(sections[index]) ? sections[index] as Record<string, unknown> : {};
+      sections[index] = {
+        ...existing,
+        t: typeof section.title === "string" ? section.title : existing.t ?? "Section " + (index + 1),
+        markdown: section.value,
+        html: section.value,
+      };
+      state.secs = sections;
+    }
+  }
+  return state;
+}
+
 async function waitForOfferBuilderRun(runId: string, frame: HTMLIFrameElement): Promise<Record<string, unknown>> {
   let delay = 1200;
   while (offerBuilderHost && frame.isConnected) {
@@ -709,6 +755,24 @@ async function mountOfferBuilder(): Promise<void> {
       if (message.action === "generate" && responseData.queued === true && typeof responseData.run_id === "string") {
         void cloudClient.functions.invoke("ultron-jobs", { body: { action: "process", limit: 1 } }).catch(() => undefined);
         responseData = await waitForOfferBuilderRun(responseData.run_id, frame);
+      }
+      if (message.action === "get") {
+        const activeRun = isRecord(responseData.active_run) ? responseData.active_run : null;
+        if (activeRun && typeof activeRun.id === "string") {
+          void cloudClient.functions.invoke("ultron-jobs", { body: { action: "process", limit: 1 } }).catch(() => undefined);
+          try { await waitForOfferBuilderRun(activeRun.id, frame); } catch (resumeError) {
+            console.warn("[ULTRON Offer Builder resume]", resumeError instanceof Error ? resumeError.message : "resume_failed");
+          }
+          const refreshed = await cloudClient.functions.invoke("ultron-offer-builder", {
+            body: { action: "get", project_id: message.payload?.project_id },
+          });
+          if (!refreshed.error && refreshed.data && typeof refreshed.data === "object" && (refreshed.data as Record<string, unknown>).ok === true) {
+            responseData = refreshed.data as Record<string, unknown>;
+          }
+        }
+        if (isRecord(responseData.state) && isRecord(responseData.generated)) {
+          responseData.state = restoreOfferBuilderState(responseData.state, responseData.generated);
+        }
       }
       frame.contentWindow?.postMessage({ type: "ULTRON_OFFER_RESULT", id: message.id, result: responseData }, "*");
     } catch (error) {

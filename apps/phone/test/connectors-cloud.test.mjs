@@ -9,6 +9,7 @@ const migration=readFileSync(resolve(root,"supabase/migrations/20261105040627_ul
 const screen=readFileSync(resolve(root,"apps/phone/src/connectors-ui.ts"),"utf8");
 const html=readFileSync(resolve(root,"apps/phone/index.html"),"utf8");
 const runtime=readFileSync(resolve(root,"supabase/functions/ultron-runtime/index.ts"),"utf8");
+const main=readFileSync(resolve(root,"apps/phone/src/main.ts"),"utf8");
 test("Composio API key stays server-side and owner auth is enforced",()=>{assert.match(gateway,/auth\.getUser\(token\)/);assert.match(gateway,/ultron_instance/);assert.match(gateway,/Deno\.env\.get\("COMPOSIO_API_KEY"\)/);assert.match(gateway,/backend\.composio\.dev\/api\/v3\.1/);assert.match(gateway,/composio\("\/connected_accounts\/link"/);});
 test("Composio gateway credentials are verified and stored in Supabase Vault",()=>{
  assert.match(gateway,/body\.action==="save_key"/);
@@ -47,4 +48,11 @@ test("connector read-only classification is prefix-based and fails closed for mi
  assert.match(gateway,/const action=toolSlug\.slice\(prefix\.length\)/);
  assert.match(gateway,/const readOnly=isReadOnlyTool\(toolSlug,toolkit\)/);
  assert.doesNotMatch(gateway,/const readOnly=\/\(\^\|_\)\(GET\|LIST\|SEARCH/);
+});
+
+test("ULTRON agent can discover and invoke Google Workspace tools from natural requests",()=>{
+ assert.match(main,/Google Workspace is available as one Google Super connection/);
+ assert.match(main,/toolkit.*googlesuper/);
+ assert.match(main,/google workspace|google calendar|google drive|google sheets|google docs/);
+ assert.match(main,/emails|inbox|mail/);
 });

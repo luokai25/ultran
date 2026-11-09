@@ -508,7 +508,7 @@ Deno.serve(async (req: Request) => {
                 const { error: eventError } = await db.from("ultron_product_events").insert({
                   owner_id: owner_id, project_id: projectId, stage: "system",
                   event_type: exhausted ? "job.failed" : waitingForProvider ? "provider.waiting" : "job.retrying",
-                  payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after reviewing the failure." : waitingForProvider ? "A free provider is temporarily unavailable. ULTRON will retry after its cooldown." : "A temporary worker error occurred. ULTRON will retry this checkpoint.", retry_after_seconds: delay },
+                  payload: { message: exhausted ? "The run stopped after its retry limit. Resume it after reviewing the failure." : dailySearchCap ? "The safe daily free Google Search budget was reached. ULTRON will retry after the daily reset; no paid search requests are sent." : waitingForProvider ? "A free provider is temporarily unavailable. ULTRON will retry after its cooldown." : "A temporary worker error occurred. ULTRON will retry this checkpoint.", retry_after_seconds: delay },
                 });
                 if (eventError) throw eventError;
               }

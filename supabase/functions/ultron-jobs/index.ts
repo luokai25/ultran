@@ -489,7 +489,7 @@ Deno.serve(async (req: Request) => {
           const attempts = Number(job.attempts ?? 1), maxAttempts = Number(job.max_attempts ?? 5);
           const exhausted = terminal || attempts >= maxAttempts;
           const waitingForProvider = job.job_type === "product.generate" &&
-            /no_eligible_free_model_key|no_free_google_search_model_available|_http_(429|5\\d\\d)|provider_unavailable|quota|rate.?limit|timed? ?out|fetch failed/i.test(message);
+            /no_eligible_free_model_key|no_eligible_free_model_across_connected_providers|no_free_google_search_model_available|_http_(429|5\d\d)|provider_unavailable|quota|rate.?limit|timed? ?out|fetch failed/i.test(message);
           const delay = waitingForProvider || message.startsWith("model_not_configured") ? 3600 : Math.min(3600, 15 * (2 ** Math.max(0, attempts - 1)));
           if (job.job_type === "product.generate") {
             const payload = isObject(job.payload) ? job.payload : {};

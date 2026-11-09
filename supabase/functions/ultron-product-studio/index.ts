@@ -237,7 +237,7 @@ async function callStudioStreaming(ownerId: string, prompt: string, projectId: s
         : { model: candidate.model, messages: [{ role: "user", content: prompt }], temperature: 0.35, max_tokens: 8192, stream: true, stream_options: { include_usage: true } };
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: google ? { "Content-Type": "application/json" } : {
+        headers: google ? { "Content-Type": "application/json", "x-goog-api-key": secret } : {
           Authorization: "Bearer " + secret, "Content-Type": "application/json", Accept: "text/event-stream",
           ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON Product Studio" } : {}),
         },

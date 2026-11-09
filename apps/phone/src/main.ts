@@ -3741,10 +3741,8 @@ function resize(): void {
 
 /** Load the 3D engine only when the hero is actually visible. */
 function syncRender(): void {
-  const shouldShow = app.dataset.chatting !== "true" && !document.hidden;
+  // ULTRON uses a text-first interface; no avatar, orb or ambient renderer.
   haloEl.dataset.active = String(speaking || thinking);
-  if (shouldShow) void initializeAvatar();
-  avatarSync?.();
 }
 
 function setThinking(next: boolean): void {

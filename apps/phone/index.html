@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="./src/design-system.css" />
     <link rel="stylesheet" href="./src/quiet-ui.css" />
     <link rel="stylesheet" href="./src/motion-experience.css" />
+    <link rel="stylesheet" href="./src/product-studio.css" />
   </head>
   <body>
     <div id="app">
@@ -170,6 +171,58 @@
           <small class="llm-key-note">ULTRON detects supported key formats automatically. Android stores the key encrypted with the device Keystore. Only compatible chat-completion APIs are enabled; unsupported key types are identified instead of being silently accepted.</small>
         </section>
       </section>
+      <section id="product-studio-screen" class="feature-screen product-studio-screen" aria-label="AI Digital Products Generating" hidden>
+        <header class="feature-head">
+          <div><span class="feature-eyebrow">ULTRON · PRODUCT STUDIO</span><h1>AI Digital Products Generating</h1><p>Find an opportunity, research the evidence, then create an original product.</p></div>
+          <button id="product-studio-refresh" class="icon-btn" type="button" aria-label="Refresh projects">↻</button>
+        </header>
+        <div id="product-studio-notice" class="product-studio-notice" role="status" aria-live="polite">Connect your ULTRON cloud account to begin.</div>
+        <section id="product-studio-start">
+          <div class="product-studio-intro">
+            <span class="section-eyebrow">FROM PROBLEM TO PRODUCT</span>
+            <h2>Turn a real problem into something people can use.</h2>
+            <p>ULTRON investigates public evidence, identifies a useful gap and creates a private, source-backed digital product. Research coverage is reported honestly. Nothing is published or sold automatically.</p>
+          </div>
+          <form id="product-studio-form" class="product-studio-form">
+            <label for="product-studio-request">What problem, audience or topic should I investigate?
+              <textarea id="product-studio-request" maxlength="4000" placeholder="Example: Help independent tutors reduce the time they spend preparing lessons and tracking student progress…"></textarea>
+            </label>
+            <label for="product-studio-depth">Research depth
+              <select id="product-studio-depth">
+                <option value="50">50 sources · focused</option>
+                <option value="100">100 sources · broad</option>
+                <option value="200" selected>200 sources · extensive</option>
+                <option value="500">500 sources · deep research</option>
+              </select>
+            </label>
+            <div class="product-studio-actions">
+              <button id="product-studio-submit" class="product-studio-primary" type="submit">Start creating</button>
+              <button id="product-studio-discover" type="button">Find an opportunity for me</button>
+            </div>
+          </form>
+          <section class="product-studio-project-section">
+            <div class="product-studio-section-head"><h3>Your projects</h3><button id="product-studio-refresh-list" type="button">Refresh list</button></div>
+            <div id="product-studio-projects" class="product-studio-projects"><p class="product-studio-empty">Your projects will appear here.</p></div>
+          </section>
+        </section>
+        <section id="product-studio-workspace" class="product-studio-workspace" hidden>
+          <div class="product-studio-toolbar">
+            <div><span class="feature-eyebrow">LIVE PROJECT</span><h2 id="product-studio-title">Product project</h2><span id="product-studio-status" class="product-studio-status">Queued</span></div>
+            <div class="product-studio-actions"><button id="product-studio-new" type="button">New project</button><button id="product-studio-cancel" type="button" hidden>Cancel run</button><a id="product-studio-download" class="product-studio-download" hidden download>Download draft</a></div>
+          </div>
+          <progress id="product-studio-progress" class="product-studio-progress" max="100" value="0" aria-label="Project progress"></progress>
+          <div class="product-studio-stage">Current stage: <strong id="product-studio-stage">Queued</strong></div>
+          <p id="product-studio-warning" class="product-studio-warning" hidden></p>
+          <div class="product-studio-grid">
+            <div class="product-studio-left">
+              <section class="product-studio-pane"><h3>Research coverage</h3><div id="product-source-counts" class="product-source-counts"></div></section>
+              <section class="product-studio-pane"><h3>Activity</h3><div id="product-studio-events" class="product-studio-events"><p class="product-studio-empty">Waiting for work to start.</p></div></section>
+              <section class="product-studio-pane"><h3>Research sources</h3><div id="product-studio-sources" class="product-studio-sources"><p class="product-studio-empty">Sources will appear here.</p></div></section>
+            </div>
+            <section class="product-studio-pane product-studio-right"><h3>Live product preview</h3><div id="product-studio-preview-empty" class="product-studio-preview-empty">The preview appears when ULTRON saves the first draft.</div><iframe id="product-studio-preview" class="product-studio-preview" title="Digital product preview" sandbox="" hidden></iframe></section>
+          </div>
+        </section>
+      </section>
       <section id="vault-screen" class="feature-screen mindmap-screen" aria-label="Combined knowledge mind map" hidden>
         <header class="feature-head"><div><span class="feature-eyebrow">YOUR SECOND BRAIN · LOCAL</span><h1>Mind Map</h1><p>One connected knowledge graph from every conversation.</p></div><button id="vault-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
         <div class="mindmap-toolbar"><span id="mindmap-stats">Combining all sessions…</span><input id="mindmap-search" type="search" inputmode="search" placeholder="Find a person, project or idea…" aria-label="Search mind map" /><button id="mindmap-refresh" class="ghost" type="button">Rebuild map</button></div>
@@ -244,6 +297,7 @@
         <button id="drawer-learning" class="drawer-link" type="button"><span aria-hidden="true">⌁</span>Learning Review</button>
         <button id="drawer-capabilities" class="drawer-link" type="button"><span aria-hidden="true">✳</span>ULTRON Capabilities</button>
         <button id="drawer-llm-api-keys" class="drawer-link" type="button"><span aria-hidden="true">⌘</span>LLM API KEYS</button>
+        <button id="drawer-product-studio" class="drawer-link" type="button"><span aria-hidden="true">✧</span>AI Digital Products Generating</button>
         <button id="connectors-btn" class="drawer-link">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0V8zM12 17v4"/></svg>
           Tools &amp; Connectors

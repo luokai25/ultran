@@ -102,7 +102,7 @@ export function makeDocx(title: string, markdown: string): Uint8Array {
 }
 export function csvCell(value: unknown): string {
   const text = String(value ?? "");
-  const safe = /^[\\t\\r\\n ]*[=+\\-@]/.test(text) ? "'" + text : text;
+  const safe = /^[\t\r\n ]*[=+@-]/.test(text) ? "'" + text : text;
   return '"' + safe.replace(/"/g, '""') + '"';
 }
 function parseCsvRows(input: string): string[][] {

@@ -54,70 +54,136 @@ function markdownPreview(markdown: string, title: string): string {
   }).join("\n");
   return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(title) + "</title><style>body{margin:0;background:#090a0c;color:#f2f4f7;font:16px/1.75 system-ui,sans-serif}main{max-width:760px;margin:0 auto;padding:40px 22px 80px}h1,h2,h3{line-height:1.25;margin:2em 0 .7em}h1{font-size:2.1rem;margin-top:0}p,li{color:#d5dbe3}a{color:#e8cb91}li{margin:.45em 0}.meta{color:#828d9b;font-size:12px;border-bottom:1px solid #252a32;padding-bottom:18px}</style></head><body><main><h1>" + htmlEscape(title) + "</h1><p class=\"meta\">Created by ULTRON · Research-backed draft · Verify all citations before publication</p>" + blocks + "</main></body></html>";
 }
-function isFreeGoogleModel(model: string): boolean {
+type StudioProvider = "openrouter" | "groq" | "google_ai_studio";
+type StudioCandidate = { provider: StudioProvider; key: Record<string, unknown>; model: string };
+const providerTable = (provider: StudioProvider) => "ultron_" + provider + "_keys";
+function isFreeProviderModel(provider: StudioProvider, model: string): boolean {
   const id = model.toLowerCase().replace(/^models\//, "");
+  if (provider === "openrouter") return id.endsWith(":free");
+  if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
   return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
 }
-async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
-  const deadline = Date.now() + 12_000;
+function studioModelScore(model: string): number {
+  const id = model.toLowerCase();
+  if (/gpt-oss-120b|llama-3\.3-70b|llama-4-scout/.test(id)) return 100;
+  if (/qwen3-32b|gemini-2\.5-flash/.test(id)) return 80;
+  if (/gemini-2\.5-flash-lite|llama-3\.1-8b/.test(id)) return 50;
+  return 30;
+}
+async function listStudioCandidates(ownerId: string, withSearch: boolean): Promise<StudioCandidate[]> {
   const db = service();
-  const deadline = Date.now() + 12_000;
-  const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
-    .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
-    .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
-    .order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(30);
+  const providers: StudioProvider[] = withSearch ? ["google_ai_studio"] : ["openrouter", "groq", "google_ai_studio"];
+  const rows = await Promise.all(providers.map(async (provider) => {
+    const { data, error } = await db.from(providerTable(provider))
+      .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
+      .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
+      .order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(30);
+    if (error) throw error;
+    return (data ?? []).flatMap((key: Record<string, unknown>) => {
+      if (key.cooldown_until && Date.parse(String(key.cooldown_until)) > Date.now()) return [];
+      const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
+      const model = models.filter((value) => isFreeProviderModel(provider, value)).sort((a, b) => studioModelScore(b) - studioModelScore(a))[0];
+      return model ? [{ provider, key, model } as StudioCandidate] : [];
+    });
+  }));
+  return rows.flat().sort((a, b) =>
+    Number(b.key.priority ?? 0) - Number(a.key.priority ?? 0) ||
+    Date.parse(String(a.key.last_used_at ?? "1970-01-01")) - Date.parse(String(b.key.last_used_at ?? "1970-01-01")) ||
+    studioModelScore(b.model) - studioModelScore(a.model)
+  );
+}
+async function readStudioSecret(db: ReturnType<typeof service>, candidate: StudioCandidate): Promise<string> {
+  const { data, error } = await db.rpc("ultron_read_llm_secret", { p_secret_id: candidate.key.vault_secret_id });
+  if (error || typeof data !== "string" || !data) throw new Error("vault_secret_unavailable");
+  return data;
+}
+async function updateStudioKey(ownerId: string, candidate: StudioCandidate, patch: Record<string, unknown>): Promise<void> {
+  const { error } = await service().from(providerTable(candidate.provider)).update(patch)
+    .eq("owner_id", ownerId).eq("id", candidate.key.id);
   if (error) throw error;
-  const candidates = (keys ?? []).flatMap((key) => {
-    if (key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) return [];
-    const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-    const model = models.find(isFreeGoogleModel);
-    return model ? [{ key, model }] : [];
-  });
-  if (!candidates.length) throw new Error("no_eligible_free_google_model");
+}
+function studioModelUrl(candidate: StudioCandidate, streaming: boolean, secret: string): string {
+  if (candidate.provider === "google_ai_studio") {
+    return "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(candidate.model.replace(/^models\//, "")) +
+      (streaming ? ":streamGenerateContent?alt=sse&key=" : ":generateContent?key=") + encodeURIComponent(secret);
+  }
+  const base = candidate.provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.groq.com/openai/v1";
+  return base + "/chat/completions";
+}
+function openAIContent(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
+  return "";
+}
+async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean) {
+  const db = service();
+  const deadline = Date.now() + 18_000;
+  const candidates = await listStudioCandidates(ownerId, withSearch);
+  if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
   let lastError = "provider_unavailable";
   for (const candidate of candidates.slice(0, 8)) {
-    const { data: secret, error: secretError } = await db.rpc("ultron_read_llm_secret", { p_secret_id: candidate.key.vault_secret_id });
-    if (secretError || typeof secret !== "string" || !secret) continue;
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(candidate.model) + ":generateContent?key=" + encodeURIComponent(secret);
+    let secret: string;
+    try { secret = await readStudioSecret(db, candidate); } catch { continue; }
+    const google = candidate.provider === "google_ai_studio";
+    const endpoint = studioModelUrl(candidate, false, secret);
+    const requestMessages = messages.map(message => ({ role: message.role, content: message.parts.map(part => part.text).join("\n") }));
+    const payload = google
+      ? { contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }
+      : { model: candidate.model, messages: requestMessages, temperature: 0.25, max_tokens: 8192 };
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: messages, ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.25, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(Math.min(7_000, deadline - Date.now())),
+        headers: google ? { "Content-Type": "application/json" } : {
+          Authorization: "Bearer " + secret, "Content-Type": "application/json",
+          ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(15_000, deadline - Date.now()))),
       });
       const raw = await response.text();
       if (!response.ok) {
-        lastError = "google_ai_http_" + response.status;
-        if (response.status === 429) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
-        } else if (response.status === 401 || response.status === 403) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status, last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
-        }
+        lastError = candidate.provider + "_http_" + response.status;
+        if (response.status === 429) await updateStudioKey(ownerId, candidate, {
+          status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(),
+          last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString(),
+        });
+        else if (response.status === 401 || response.status === 403) await updateStudioKey(ownerId, candidate, {
+          status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status,
+          last_checked_at: new Date().toISOString(),
+        });
         continue;
       }
       const envelope = JSON.parse(raw) as Record<string, unknown>;
-      const candidatesRaw = Array.isArray(envelope.candidates) ? envelope.candidates : [];
-      const first = isObject(candidatesRaw[0]) ? candidatesRaw[0] : {};
-      const content = isObject(first.content) ? first.content : {};
-      const parts = Array.isArray(content.parts) ? content.parts : [];
-      const text = parts.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("\n").trim();
+      let text = "", grounding: Array<{ url: string; title: string }> = [];
+      let usage = 0;
+      if (google) {
+        const rows = Array.isArray(envelope.candidates) ? envelope.candidates : [];
+        const first = isObject(rows[0]) ? rows[0] : {};
+        const content = isObject(first.content) ? first.content : {};
+        const parts = Array.isArray(content.parts) ? content.parts : [];
+        text = parts.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("\n").trim();
+        const metadata = isObject(first.groundingMetadata) ? first.groundingMetadata : {};
+        const chunks = Array.isArray(metadata.groundingChunks) ? metadata.groundingChunks : [];
+        grounding = chunks.flatMap(chunk => {
+          const web = isObject(chunk) && isObject(chunk.web) ? chunk.web : null;
+          return web && typeof web.uri === "string" ? [{ url: web.uri, title: clean(web.title, 300) }] : [];
+        });
+        usage = isObject(envelope.usageMetadata) ? Number(envelope.usageMetadata.totalTokenCount ?? 0) : 0;
+      } else {
+        const choices = Array.isArray(envelope.choices) ? envelope.choices : [];
+        const first = isObject(choices[0]) ? choices[0] : {};
+        const message = isObject(first.message) ? first.message : {};
+        text = openAIContent(message.content).trim();
+        usage = isObject(envelope.usage) ? Number(envelope.usage.total_tokens ?? 0) : 0;
+      }
       if (!text) { lastError = "empty_model_response"; continue; }
-      const metadata = isObject(first.groundingMetadata) ? first.groundingMetadata : {};
-      const chunks = Array.isArray(metadata.groundingChunks) ? metadata.groundingChunks : [];
-      const grounding = chunks.flatMap(chunk => {
-        const web = isObject(chunk) && isObject(chunk.web) ? chunk.web : null;
-        if (!web || typeof web.uri !== "string") return [];
-        return [{ url: web.uri, title: clean(web.title, 300) }];
-      });
-      const usage = isObject(envelope.usageMetadata) ? Number(envelope.usageMetadata.totalTokenCount ?? 0) : 0;
-      await db.from("ultron_google_ai_studio_keys").update({
+      await updateStudioKey(ownerId, candidate, {
         request_count: Number(candidate.key.request_count ?? 0) + 1,
         tokens_used: Number(candidate.key.tokens_used ?? 0) + Math.max(0, usage),
         last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(),
         last_error: null, cooldown_until: null, status: "connected",
-      }).eq("id", candidate.key.id).eq("owner_id", ownerId);
-      return { text, grounding, model: "google_ai_studio:" + candidate.model };
+      });
+      return { text, grounding, model: candidate.provider + ":" + candidate.model };
     } catch (error) {
       lastError = error instanceof Error ? error.message.slice(0, 180) : "provider_request_failed";
     }
@@ -125,40 +191,40 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   throw new Error(lastError);
 }
 async function callGeminiStreaming(ownerId: string, prompt: string, projectId: string, title: string): Promise<{ text: string; model: string }> {
-  const deadline = Date.now() + 62_000;
   const db = service();
-  const deadline = Date.now() + 65_000;
-  const { data: keys, error } = await db.from("ultron_google_ai_studio_keys")
-    .select("id,vault_secret_id,models,priority,request_count,tokens_used,last_used_at,cooldown_until")
-    .eq("owner_id", ownerId).eq("enabled", true).eq("status", "connected")
-    .order("priority", { ascending: false }).order("last_used_at", { ascending: true, nullsFirst: true }).limit(30);
-  if (error) throw error;
-  const candidates = (keys ?? []).flatMap((key) => {
-    if (key.cooldown_until && Date.parse(key.cooldown_until) > Date.now()) return [];
-    const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-    const model = models.find(isFreeGoogleModel);
-    return model ? [{ key, model }] : [];
-  });
-  if (!candidates.length) throw new Error("no_eligible_free_google_model");
+  const deadline = Date.now() + 68_000;
+  const candidates = await listStudioCandidates(ownerId, false);
+  if (!candidates.length) throw new Error("no_eligible_free_model_key");
   let lastError = "provider_unavailable";
   for (const candidate of candidates.slice(0, 8)) {
-    const { data: secret, error: secretError } = await db.rpc("ultron_read_llm_secret", { p_secret_id: candidate.key.vault_secret_id });
-    if (secretError || typeof secret !== "string" || !secret) continue;
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(candidate.model) + ":streamGenerateContent?alt=sse&key=" + encodeURIComponent(secret);
+    let secret: string;
+    try { secret = await readStudioSecret(db, candidate); } catch { continue; }
+    const google = candidate.provider === "google_ai_studio";
+    const endpoint = studioModelUrl(candidate, true, secret);
+    const payload = google
+      ? { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }
+      : { model: candidate.model, messages: [{ role: "user", content: prompt }], stream: true, stream_options: { include_usage: true }, temperature: 0.35, max_tokens: 8192 };
     try {
       const response = await fetch(endpoint, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 8192 } }),
-        signal: AbortSignal.timeout(Math.min(55_000, deadline - Date.now())),
+        method: "POST",
+        headers: google ? { "Content-Type": "application/json" } : {
+          Authorization: "Bearer " + secret, "Content-Type": "application/json", Accept: "text/event-stream",
+          ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(65_000, deadline - Date.now()))),
       });
       if (!response.ok) {
         const detail = (await response.text()).slice(0, 240);
-        lastError = "google_ai_http_" + response.status;
-        if (response.status === 429) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(), last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
-        } else if (response.status === 401 || response.status === 403) {
-          await db.from("ultron_google_ai_studio_keys").update({ status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status, last_checked_at: new Date().toISOString() }).eq("id", candidate.key.id).eq("owner_id", ownerId);
-        }
+        lastError = candidate.provider + "_http_" + response.status;
+        if (response.status === 429) await updateStudioKey(ownerId, candidate, {
+          status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(),
+          last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString(),
+        });
+        else if (response.status === 401 || response.status === 403) await updateStudioKey(ownerId, candidate, {
+          status: response.status === 401 ? "invalid" : "expired", last_error: "HTTP " + response.status,
+          last_checked_at: new Date().toISOString(),
+        });
         if (response.status !== 429 && response.status < 500) lastError += ":" + detail;
         continue;
       }
@@ -173,14 +239,24 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
         if (!data || data === "[DONE]") return;
         let envelope: Record<string, unknown>;
         try { envelope = JSON.parse(data) as Record<string, unknown>; } catch { return; }
-        const rows = Array.isArray(envelope.candidates) ? envelope.candidates : [];
-        const first = isObject(rows[0]) ? rows[0] : {};
-        const content = isObject(first.content) ? first.content : {};
-        const parts = Array.isArray(content.parts) ? content.parts : [];
-        const piece = parts.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
-        if (piece) output += piece;
-        const meta = isObject(envelope.usageMetadata) ? envelope.usageMetadata : {};
-        usage = Math.max(usage, Number(meta.totalTokenCount ?? 0));
+        if (google) {
+          const rows = Array.isArray(envelope.candidates) ? envelope.candidates : [];
+          const first = isObject(rows[0]) ? rows[0] : {};
+          const content = isObject(first.content) ? first.content : {};
+          const parts = Array.isArray(content.parts) ? content.parts : [];
+          const piece = parts.map(part => isObject(part) && typeof part.text === "string" ? part.text : "").join("");
+          if (piece) output += piece;
+          const meta = isObject(envelope.usageMetadata) ? envelope.usageMetadata : {};
+          usage = Math.max(usage, Number(meta.totalTokenCount ?? 0));
+        } else {
+          const rows = Array.isArray(envelope.choices) ? envelope.choices : [];
+          const first = isObject(rows[0]) ? rows[0] : {};
+          const delta = isObject(first.delta) ? first.delta : {};
+          const piece = openAIContent(delta.content);
+          if (piece) output += piece;
+          const meta = isObject(envelope.usage) ? envelope.usage : {};
+          usage = Math.max(usage, Number(meta.total_tokens ?? 0));
+        }
         if (output.length - lastPersisted >= 1400 || (output.length > lastPersisted && Date.now() - lastPersistAt >= 1800)) {
           await db.from("ultron_product_projects").update({
             status: "creating", active_stage: "creation", progress: 72,
@@ -193,26 +269,25 @@ async function callGeminiStreaming(ownerId: string, prompt: string, projectId: s
       };
       while (true) {
         const chunk = await reader.read();
-        const lines = buffer.split(/\r?\n/);
+        if (chunk.done) break;
         buffer += decoder.decode(chunk.value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? "";
-        for (const line of lines) await consumeLine(line);
+        const rows = buffer.split(/\r?\n/);
+        buffer = rows.pop() ?? "";
+        for (const line of rows) await consumeLine(line);
       }
       buffer += decoder.decode();
       if (buffer.trim()) await consumeLine(buffer);
       if (!output.trim()) throw new Error("empty_stream_response");
-      await db.from("ultron_google_ai_studio_keys").update({
+      await updateStudioKey(ownerId, candidate, {
         request_count: Number(candidate.key.request_count ?? 0) + 1,
         tokens_used: Number(candidate.key.tokens_used ?? 0) + Math.max(0, usage),
         last_used_at: new Date().toISOString(), last_checked_at: new Date().toISOString(),
         last_error: null, cooldown_until: null, status: "connected",
-      }).eq("id", candidate.key.id).eq("owner_id", ownerId);
+      });
       await db.from("ultron_product_projects").update({
-        draft_markdown: output, preview_html: markdownPreview(output, title),
-        updated_at: new Date().toISOString(),
+        draft_markdown: output, preview_html: markdownPreview(output, title), updated_at: new Date().toISOString(),
       }).eq("id", projectId).eq("owner_id", ownerId);
-      return { text: output, model: "google_ai_studio:" + candidate.model };
+      return { text: output, model: candidate.provider + ":" + candidate.model };
     } catch (error) {
       lastError = error instanceof Error ? error.message.slice(0, 180) : "stream_request_failed";
     }

@@ -69,7 +69,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /body_external_links_match_sources/);
   assert.match(source, /uniqueCitationIndexes.length >= minimumCitationSources/);
   assert.match(source, /distinct_cited_sources/);
-  assert.match(source, /a\{color:#aebfd2\}/);
+  assert.match(source, /a\{color:#334e68/);
   assert.match(source, /productFormatGuidance/);
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);

@@ -239,11 +239,11 @@ Implemented and deployed first production slice:
 - Added evidence synthesis for recurring themes, customer pain, counter-evidence, contradictions, market gaps, willingness-to-pay signals, product requirements and confidence.
 - Drafts stream into persisted Markdown and a sandboxed HTML preview. The workspace displays opportunity score, synthesis, source coverage, activity, source links, quality checks and versioned downloads.
 - Added quality gates for minimum length, a 700-word floor, contents/references structure and source-citation integrity.
-- Packaging creates versioned Markdown and HTML documents plus a private ZIP bundle containing the product, source register, evidence-synthesis JSON, validation report and manifest. Source page text is not redistributed.
+- Packaging creates versioned Markdown and HTML documents plus a private ZIP bundle containing the product, source register, evidence-synthesis JSON, validation report and manifest. Spreadsheet-style products also receive a validated CSV export with formula-injection protection. Source page text is not redistributed.
 - Added the Product Studio drawer entry and responsive workflow to the canonical `apps/phone` client shared by web and Android.
 
 Current limits:
 - Research depth depends on Google Search grounding availability, accessible pages, robots rules, free-tier quotas and the diversity of returned sources. A 200/500 target is a target, not a guarantee.
-- Exports currently include Markdown, standalone HTML and a ZIP bundle. PDF, DOCX, XLSX and PPTX renderers are not yet connected to this cloud workflow.
+- Exports currently include Markdown, standalone HTML and a ZIP bundle, with CSV for spreadsheet-style products. PDF, DOCX, XLSX and PPTX renderers are not yet connected to this cloud workflow.
 - The Product Studio provider adapter reuses the existing provider tables, Vault RPC, free-model eligibility rules, cooldowns and usage accounting. Consolidating it with the brain's provider router remains a cleanup task to prevent future policy drift.
 - External publication, storefront listing and sales remain separate owner-approved actions; this feature only creates private files.

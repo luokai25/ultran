@@ -109,6 +109,7 @@ test("Google OAuth reserves a browser tab during the click before the async gate
  assert.match(main,/window\.open\("about:blank", "_blank"\)/);
  assert.match(main,/popup\.location\.replace\(url\)/);
  assert.match(main,/window\.location\.assign\(url\)/);
+ assert.ok(screen.indexOf("preparedExternal = deps.prepareExternal?.() ?? null;") < screen.indexOf("cloudLinked = await deps.linked();"), "the popup must be reserved before any awaited owner-session check");
 });
 test("Google Connect stays clickable and opens owner sign-in when no cloud session exists",()=>{
  assert.match(screen,/entry\.auth === "oauth2" \? true : deps\.backendLinked\(\)/);
@@ -116,6 +117,7 @@ test("Google Connect stays clickable and opens owner sign-in when no cloud sessi
  assert.match(screen,/Sign in to your ULTRON owner account first/);
  assert.match(screen,/deps\.openCloudSettings\?\.\(\)/);
  assert.match(screen,/cloudLinked = await deps\.linked\(\)/);
+ assert.match(screen,/act\.disabled = !canAct \|\| \(entry\.auth === "oauth2" && cloudLinked && !composioConfigured\)/);
  assert.match(screen,/if \(cloudLinked\) await refreshOAuthConnections\(\)/);
  assert.match(main,/openCloudSettings: \(\) =>/);
  assert.match(main,/navSettingsButton\.click\(\)/);

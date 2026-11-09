@@ -497,12 +497,13 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const html = markdownPreview(markdown, title);
   const storagePath = ownerId + "/products/" + projectId + "/product-v1.md";
   const bucket = db.storage.from("ultron-private");
-  const upload = await bucket.upload(storagePath, new TextEncoder().encode(markdown), { contentType: "text/markdown; charset=utf-8", upsert: true });
+  const markdownBytes = new TextEncoder().encode(markdown);
+  const upload = await bucket.upload(storagePath, markdownBytes, { contentType: "text/markdown; charset=utf-8", upsert: true });
   if (upload.error) throw upload.error;
   const htmlPath = ownerId + "/products/" + projectId + "/product-v1.html";
   const htmlUpload = await bucket.upload(htmlPath, new TextEncoder().encode(html), { contentType: "text/html; charset=utf-8", upsert: true });
   if (htmlUpload.error) throw htmlUpload.error;
-  const checksumBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(markdown));
+  const checksumBytes = await crypto.subtle.digest("SHA-256", markdownBytes);
   const checksum = Array.from(new Uint8Array(checksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
   const markdownArtifactPayload = {
     owner_id: ownerId, name: title + ".md", description: "Original research-backed digital product draft created by ULTRON.",

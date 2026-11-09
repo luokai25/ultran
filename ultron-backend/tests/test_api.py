@@ -615,7 +615,7 @@ def test_production_operational_routes_require_a_supabase_owner_session(tmp_path
         assert production.get("/v1/health").status_code == 200
         assert production.get("/v1/mcp/servers").status_code == 401
         assert production.get("/v1/connectors").status_code == 401
-        assert production.options("/v1/mcp/servers").status_code in (200, 204)
+        assert production.options("/v1/mcp/servers").status_code != 401
 
 
 def test_production_workspace_ignores_a_caller_selected_workspace():

@@ -9,7 +9,8 @@ import { loadSkillResource, searchSkillCatalog } from "./skills-engine";
 import { invokeUltronCapabilities } from "./capability-cloud";
 import { initCapabilityPanel } from "./capability-panel";
 import { invokeUltronRuntime } from "./runtime-cloud";
-import { cancelUltronJob, enqueueUltronMemoryConsolidation, listUltronJobs, startUltronJobWorker, stopUltronJobWorker, type UltronJob } from "./runtime-jobs";
+import { cancelUltronJob, enqueueUltronMemoryConsolidation, processUltronJobs, listUltronJobs, startUltronJobWorker, stopUltronJobWorker, type UltronJob } from "./runtime-jobs";
+import { initProductStudio, openProductStudioScreen } from "./product-studio";
 import { listUltronConnectorTools, queueUltronConnectorTool } from "./connectors-cloud";
 /**
  * Ultron phone client - a conversation console.
@@ -5090,6 +5091,8 @@ androidAppSettingsButton.addEventListener("click", () => {
     .catch(error => { androidAccessStatus.textContent = error instanceof Error ? error.message : "Could not open app settings."; });
 });
 
+req<HTMLButtonElement>("#drawer-product-studio").addEventListener("click", () => { void openProductStudioScreen(); });
+
 req<HTMLButtonElement>("#drawer-llm-api-keys").addEventListener("click", () => {
   showFeatureScreen("llm-api-keys-screen", navChatButton);
   renderProviderKeyState();
@@ -5235,6 +5238,8 @@ if (synth) {
 /* ------------------------------------------------------------------ *
  * Boot
  * ------------------------------------------------------------------ */
+
+initProductStudio({ openScreen: () => showFeatureScreen("product-studio-screen", navChatButton), wakeWorker: () => processUltronJobs(1) });
 
 initConnectors({
   linked: async () => Boolean(await getCloudSession()),

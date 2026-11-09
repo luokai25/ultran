@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { strToU8, zipSync } from "npm:fflate@0.8.2";
-import { extractCodeFiles, makeDocx, makePptx, makeXlsx } from "./formats.ts";
+import { csvCell as sanitizeCsvCell, extractCodeFiles, makeDocx, makePptx, makeXlsx } from "./formats.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -1023,18 +1023,13 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: csvArtifactResult.data.id, title: title + " (Spreadsheet data)", format: "csv", rows: productCsv.rows, columns: productCsv.columns });
   }
 
-  const csvCell = (value: unknown) => {
-    const item = String(value ?? "").trim();
-    const safe = /^[=+@]/.test(item) || (/^-/.test(item) && !/^-?\d+(?:\.\d+)?$/.test(item)) ? "'" + item : item;
-    return '"' + safe.replace(/"/g, '""') + '"';
-  };
   const docxArtifactId = await persistStudioExport(db, ownerId, projectId, jobId, title, version, "docx", docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "document", "Editable Word edition of the original digital product.", { rtl_supported: /[\u0600-\u06FF]/.test(markdown), heading_styles: true });
   const pptxArtifactId = pptxBytes ? await persistStudioExport(db, ownerId, projectId, jobId, title, version, "pptx", pptxBytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "document", "Editable PowerPoint edition of the presentation product.", { slides: Math.min(30, markdown.split(/^# /m).length - 1 || 1) }) : null;
   const xlsxArtifactId = xlsxBytes ? await persistStudioExport(db, ownerId, projectId, jobId, title, version, "xlsx", xlsxBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "document", "Editable Excel workbook generated from the validated spreadsheet data.", { rows: productCsv?.rows ?? 0, columns: productCsv?.columns ?? 0, formula_injection_protection: true }) : null;
   const sourceRegister = [
     ["source_number", "title", "domain", "url"].join(","),
     ...selectedSources.map((source, index) => [
-      String(index + 1), csvCell(source.title), csvCell(source.domain), csvCell(source.canonical_url),
+      String(index + 1), sanitizeCsvCell(source.title), sanitizeCsvCell(source.domain), sanitizeCsvCell(source.canonical_url),
     ].join(",")),
   ].join("\n");
   const manifest = {

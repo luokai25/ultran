@@ -40,7 +40,7 @@ The backend also exposes summary and quality-review stages for future UI wiring.
 - The current cover is a styled HTML cover concept; image-file generation is not yet connected.
 - The store page is generated and saved to the ULTRON project. It is not automatically published to Shopify.
 - The final export currently saved by this flow is Markdown. PDF/DOCX export can be added through the existing artifact/document pipeline.
-- Generation is server-backed and checkpoints are persisted, but the Offer Builder is not yet a durable background job queue. Completed sections survive a reload; unfinished sections can be resumed from the saved project.
+- Generation is server-backed and checkpoints are persisted, but the Offer Builder is not yet a durable background job queue. Generated sections are saved in the project record; automatic section-level resume in the UI still needs a follow-up fix.
 
 ## Security
 

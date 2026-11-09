@@ -34,6 +34,8 @@ test("Product Studio is registered in the canonical shared web and Android clien
   assert.match(moduleSource, /function renderQuality/);
   assert.match(css, /@media\(min-width:900px\)/);
   assert.match(css, /@media\(max-width:420px\)/);
+  assert.match(css, /--u-accent:#cbd5e1/);
+  assert.doesNotMatch(css, /#e8cb91|rgba\(232,180,93|rgba\(82,180,130/);
   assert.ok(ledger.includes("product-studio-screen"), "screen coverage ledger must list Product Studio");
   assert.ok(design.includes("#product-studio-screen"), "design inventory must list Product Studio");
 });
@@ -53,6 +55,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /x-goog-api-key/);
   assert.match(source, /canonicalReferences/);
   assert.match(source, /body_external_links_match_sources/);
+  assert.match(source, /a\{color:#aebfd2\}/);
   assert.match(source, /productFormatGuidance/);
   assert.match(source, /spreadsheet-ready product/);
   assert.match(source, /presentation-ready product/);

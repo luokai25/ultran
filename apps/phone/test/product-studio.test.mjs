@@ -67,7 +67,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /function makePptx/);
   assert.match(source, /persistStudioExport/);
   assert.match(source, /artifact_ids: \{ docx:/);
-  assert.match(source, /"product\\.html": htmlBytes,\\n\\s+"product\\.docx": docxBytes/);
+  assert.ok(source.includes('"product.html": htmlBytes,' + "\n" + '    "product.docx": docxBytes'));
   assert.match(source, /product-v" \+ version \+ "\\.docx/);
   assert.match(source, /product-v" \+ version \+ "\\.pptx/);
   assert.match(source, /product-v" \+ version \+ "\\.xlsx/);

@@ -673,3 +673,66 @@ def test_production_accepts_a_valid_registered_owner_session_and_ignores_workspa
         )
         assert response.status_code == 200
         assert response.json()["workspace_id"] == "local"
+
+
+def test_production_rejects_a_different_supabase_instance_owner(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from cryptography.fernet import Fernet
+    import ultron_backend.app as app_module
+    from ultron_backend.app import create_app
+    from ultron_backend.config import Settings
+
+    class FakeResponse:
+        def __init__(self, status, payload): self.status_code, self.payload = status, payload
+        def json(self): return self.payload
+        def raise_for_status(self): return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return None
+        async def get(self, url, **kwargs):
+            if url.endswith("/auth/v1/user"):
+                return FakeResponse(200, {"id": "owner-a"})
+            return FakeResponse(200, [{"owner_id": "owner-b"}])
+
+    monkeypatch.setattr(app_module.httpx, "AsyncClient", FakeClient)
+    settings = Settings(
+        environment="production", data_dir=tmp_path / "wrong-owner-data",
+        credential_encryption_key=Fernet.generate_key().decode("ascii"),
+        supabase_url="https://project.supabase.co", supabase_publishable_key="sb_publishable_test",
+    )
+    with TestClient(create_app(settings)) as production:
+        response = production.get("/v1/capabilities", headers={"Authorization": "Bearer valid-but-wrong-owner"})
+        assert response.status_code == 403
+        assert response.json()["error"] == "registered_owner_required"
+
+
+def test_production_rejects_an_expired_supabase_session(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from cryptography.fernet import Fernet
+    import ultron_backend.app as app_module
+    from ultron_backend.app import create_app
+    from ultron_backend.config import Settings
+
+    class FakeResponse:
+        status_code = 401
+        def json(self): return {"message": "expired"}
+        def raise_for_status(self): return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return None
+        async def get(self, url, **kwargs): return FakeResponse()
+
+    monkeypatch.setattr(app_module.httpx, "AsyncClient", FakeClient)
+    settings = Settings(
+        environment="production", data_dir=tmp_path / "expired-owner-data",
+        credential_encryption_key=Fernet.generate_key().decode("ascii"),
+        supabase_url="https://project.supabase.co", supabase_publishable_key="sb_publishable_test",
+    )
+    with TestClient(create_app(settings)) as production:
+        response = production.get("/v1/capabilities", headers={"Authorization": "Bearer expired-session"})
+        assert response.status_code == 401
+        assert response.json()["error"] == "invalid_or_expired_owner_session"

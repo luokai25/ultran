@@ -635,7 +635,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
   const citationIndexes = [...markdown.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]));
   const wordCount = markdown.trim().split(/\s+/).filter(Boolean).length;
-  const validation: Record<string, unknown> = {
+  const validation = {
     minimum_length_passed: markdown.length >= 4000,
     minimum_word_count_passed: wordCount >= 700,
     word_count: wordCount,
@@ -649,6 +649,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(markdown),
     analyzed_sources: counts.analyzed,
     requested_sources: target,
+    quality_checks_passed: false,
   };
   validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
     validation.references_section && validation.source_citations_match && validation.contents_section &&

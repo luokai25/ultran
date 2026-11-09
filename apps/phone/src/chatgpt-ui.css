@@ -259,3 +259,12 @@ progress { width:100%; accent-color:var(--accent); }
 /* Keep the home state focused on one prompt and the composer. */
 .subgreeting, .identity-visual-section { display:none !important; }
 .identity-symbol { color:var(--text-secondary); font-size:11px; font-weight:650; letter-spacing:.02em; }
+
+/* Secondary-page details that need their own interaction affordances. */
+.mindmap-canvas-wrap { width:100%; min-height:220px; overflow:auto; border:1px solid var(--border); border-radius:12px; background:var(--surface-soft); }
+.mindmap-canvas-wrap.is-empty { overflow:hidden; }
+.mindmap-canvas-wrap.is-empty .mindmap-canvas { display:none; }
+.mindmap-canvas { display:block; width:100%; min-height:220px; }
+.learning-filters { display:flex; flex-wrap:wrap; gap:8px; }
+.learning-filters button { min-width:48px; min-height:48px; padding:8px 12px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--text-secondary); }
+.learning-filters button[aria-pressed="true"] { background:var(--surface-raised); border-color:var(--border-strong); color:var(--text); }

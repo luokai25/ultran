@@ -93,7 +93,7 @@ function renderEvents(events: ProductEvent[]): void {
     list.append(node("p", "product-studio-empty", "Activity will appear here as each stage is committed."));
     return;
   }
-  for (const event of events.slice(-80).reverse()) {
+  for (const event of events.slice(0, 80)) {
     const row = node("article", "product-event");
     const dot = node("span", "product-event-dot");
     const copy = node("div", "product-event-copy");

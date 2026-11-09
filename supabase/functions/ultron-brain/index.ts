@@ -387,7 +387,7 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   // Honor the selected model first, but reserve capacity for cross-provider
   // fallback. A stale model, rate limit or retired provider model must not
   // make the whole chat unusable while other free Vault keys are healthy.
-  const preferredSlice = preferredCandidates.slice(0, requestedModel ? 2 : 0);
+  const preferredSlice = preferredCandidates;
   const preferredIds = new Set(preferredSlice.map((item) => item.provider + ":" + item.key.id));
   // Interleave provider pools so eight keys from one large provider pool cannot
   // crowd out healthy fallback keys from Groq or Google AI Studio.
@@ -406,13 +406,13 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
     }
     if (!added) break;
   }
-  const fallbackSlice = interleavedFallback.filter((item) => !preferredIds.has(item.provider + ":" + item.key.id)).slice(0, Math.max(0, 8 - preferredSlice.length));
+  const fallbackSlice = interleavedFallback.filter((item) => !preferredIds.has(item.provider + ":" + item.key.id));
   const candidates = [...preferredSlice, ...fallbackSlice];
   if (!candidates.length) return json({ error: "no_available_model_key", message: requestedModel
     ? "The selected model is no longer available. No connected free model key is currently usable; check the LLM API Keys screen or switch to ULTRON Automatic."
     : "No connected key currently has an available free-tier chat model. Add another key or wait for a provider quota to reset." }, 503);
   let lastError = "No provider key could complete the request.";
-  for (const candidate of candidates.slice(0, 8)) {
+  for (const candidate of candidates) {
     const { provider, key, chosenModel } = candidate;
     let secret: string;
     try { secret = await getKeySecret(db, key.vault_secret_id); }
@@ -675,6 +675,10 @@ Deno.serve(async (request: Request) => {
       if (!internalRequest) return json({ error: "unauthorized_worker" }, 401);
       isWorkerRequest = true;
       return await handleWorker(db, internalOwnerId, Number(body.limit) || 2);
+    }
+    if (body.action === "worker_chat") {
+      if (!internalRequest) return json({ error: "unauthorized_worker" }, 401);
+      return await handleChat(db, internalOwnerId, body, request);
     }
     let ownerId: string;
     if (internalRequest) {

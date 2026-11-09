@@ -35,6 +35,7 @@ test("Product Studio backend uses Vault keys, grounded research and bounded publ
   const source = await read("supabase/functions/ultron-product-studio/index.ts");
   assert.match(source, /ultron_read_llm_secret/);
   assert.match(source, /ultron_google_ai_studio_keys/);
+  assert.match(source, /isFreeGoogleModel/);
   assert.match(source, /enabled", true/);
   assert.match(source, /google_search/);
   assert.match(source, /robots\.txt/);
@@ -46,6 +47,8 @@ test("Product Studio backend uses Vault keys, grounded research and bounded publ
   assert.match(source, /ultron-private/);
   assert.match(source, /content_storage_path/);
   assert.match(source, /research_round/);
+  assert.match(source, /valid_claimed_product_job_required/);
+  assert.match(source, /x-ultron-cron-secret/);
   assert.match(source, /stalled_rounds/);
   assert.match(source, /next_batch_queued/);
   assert.match(source, /references_section/);

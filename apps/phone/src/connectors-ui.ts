@@ -395,59 +395,72 @@ export function initConnectors(deps: Deps): void {
     const buttons = el("div", "sheet-actions");
     let toolsStatus: HTMLElement | null = null;
     let toolsList: HTMLElement | null = null;
-    const refreshAvailableTools = async (): Promise<void> => {
-      if (!toolsStatus || !toolsList) return;
-      toolsStatus.textContent = "Loading tools from the ULTRON gateway…";
-      toolsList.replaceChildren();
-      try {
-        const available = await listUltronConnectorTools(toolkit);
-        const matching = available.filter((tool) => tool.toolkit_slug.replace(/-/g, "_") === toolkit);
-        if (matching.length === 0) {
-          toolsStatus.textContent = "No executable tools were returned for this connected provider.";
-          return;
+    let cachedTools: UltronConnectorTool[] = [];
+let toolsSearch: HTMLInputElement | null = null;
+const renderAvailableTools = (): void => {
+  if (!toolsStatus || !toolsList) return;
+  const query = toolsSearch?.value.trim().toLowerCase() ?? "";
+  const matching = cachedTools.filter((tool) => !query || (tool.tool_slug + " " + tool.description).toLowerCase().includes(query));
+  toolsList.replaceChildren();
+  if (matching.length === 0) {
+    toolsStatus.textContent = "No tools match that search.";
+    return;
+  }
+  toolsStatus.textContent = cachedTools.length + " cloud tools available; " + matching.length + " match. Write tools are disabled until you enable each exact action below. Showing up to " + Math.min(40, matching.length) + ".";
+  for (const tool of matching.slice(0, 40)) {
+    const row = el("article", "github-capability-row");
+    const details = el("div", "conn-tool-details");
+    details.append(el("strong", "conn-tool-name", tool.tool_slug));
+    details.append(el("p", "conn-tool-description", tool.description || "No description supplied by provider."));
+    row.append(details);
+    if (tool.read_only) {
+      row.append(el("span", "badge", "Read-only"));
+    } else {
+      const permissionButton = el("button", tool.allowed ? "ghost danger" : "ghost", tool.allowed ? "Disable write access" : "Allow without asking");
+      permissionButton.type = "button";
+      permissionButton.addEventListener("click", async () => {
+        const message = tool.allowed
+          ? "Disable future executions of " + tool.tool_slug + "?"
+          : "Allow ULTRON to run " + tool.tool_slug + " without asking each time? This is a persistent grant for this exact tool.";
+        if (!window.confirm(message)) return;
+        permissionButton.disabled = true;
+        try {
+          await setUltronConnectorToolPermission({ connectionId: tool.connection_id, toolSlug: tool.tool_slug, allow: !tool.allowed });
+          await refreshAvailableTools();
+        } catch (error) {
+          toolsStatus!.textContent = error instanceof Error ? error.message : "Could not update tool permission.";
+          permissionButton.disabled = false;
         }
-        toolsStatus.textContent = `${matching.length} cloud tools available. Read-only tools work within granted scopes; write tools are disabled until you enable each exact action below. Showing the first ${Math.min(40, matching.length)} here.`;
-        for (const tool of matching.slice(0, 40)) {
-          const row = el("article", "github-capability-row");
-          const details = el("div", "conn-tool-details");
-          details.append(el("strong", "conn-tool-name", tool.tool_slug));
-          details.append(el("p", "conn-tool-description", tool.description || "No description supplied by provider."));
-          row.append(details);
-          if (tool.read_only) {
-            row.append(el("span", "badge", "Read-only"));
-          } else {
-            const permissionButton = el("button", tool.allowed ? "ghost danger" : "ghost", tool.allowed ? "Disable write access" : "Allow without asking");
-            permissionButton.type = "button";
-            permissionButton.addEventListener("click", async () => {
-              const message = tool.allowed
-                ? "Disable future executions of " + tool.tool_slug + "?"
-                : "Allow ULTRON to run " + tool.tool_slug + " without asking each time? This is a persistent grant for this exact tool.";
-              if (!window.confirm(message)) return;
-              permissionButton.disabled = true;
-              try {
-                await setUltronConnectorToolPermission({ connectionId: tool.connection_id, toolSlug: tool.tool_slug, allow: !tool.allowed });
-                await refreshAvailableTools();
-              } catch (error) {
-                toolsStatus!.textContent = error instanceof Error ? error.message : "Could not update tool permission.";
-                permissionButton.disabled = false;
-              }
-            });
-            row.append(permissionButton);
-          }
-          toolsList.append(row);
-        }
-      } catch (error) {
-        toolsStatus.textContent = error instanceof Error ? error.message : "Could not load tools from the ULTRON gateway.";
-      }
-    };
-    if (entry.auth === "oauth2") {
-      detailEl.append(el("div", "drawer-label", "CLOUD TOOLS"));
-      toolsStatus = el("small", "conn-note", oauthOn ? "Checking available tools…" : "Connect this provider to load its cloud tools.");
-      toolsList = el("div", "github-capability-list");
-      detailEl.append(toolsStatus, toolsList);
-      if (oauthOn) void refreshAvailableTools();
+      });
+      row.append(permissionButton);
     }
-
+    toolsList.append(row);
+  }
+};
+const refreshAvailableTools = async (): Promise<void> => {
+  if (!toolsStatus || !toolsList) return;
+  toolsStatus.textContent = "Loading tools from the ULTRON gateway…";
+  toolsList.replaceChildren();
+  try {
+    const available = await listUltronConnectorTools(toolkit);
+    cachedTools = available.filter((tool) => tool.toolkit_slug.replace(/-/g, "_") === toolkit);
+    renderAvailableTools();
+  } catch (error) {
+    toolsStatus.textContent = error instanceof Error ? error.message : "Could not load tools from the ULTRON gateway.";
+  }
+};
+if (entry.auth === "oauth2") {
+  detailEl.append(el("div", "drawer-label", "CLOUD TOOLS"));
+  toolsSearch = el("input", "conn-tool-search");
+  toolsSearch.type = "search";
+  toolsSearch.autocomplete = "off";
+  toolsSearch.placeholder = "Search all tools by name or description";
+  toolsSearch.addEventListener("input", renderAvailableTools);
+  toolsStatus = el("small", "conn-note", oauthOn ? "Checking available tools…" : "Connect this provider to load its cloud tools.");
+  toolsList = el("div", "github-capability-list");
+  detailEl.append(toolsSearch, toolsStatus, toolsList);
+  if (oauthOn) void refreshAvailableTools();
+}
     const close = el("button", "ghost", "Close");
     close.type = "button";
     close.addEventListener("click", closeDetail);

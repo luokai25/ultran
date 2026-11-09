@@ -57,6 +57,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /x-goog-api-key/);
   assert.match(source, /canonicalReferences/);
   assert.match(source, /body_external_links_match_sources/);
+  assert.match(source, /uniqueCitationIndexes.length >= minimumCitationSources/);
+  assert.match(source, /distinct_cited_sources/);
   assert.match(source, /a\{color:#aebfd2\}/);
   assert.match(source, /productFormatGuidance/);
   assert.match(source, /spreadsheet-ready product/);

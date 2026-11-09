@@ -102,11 +102,11 @@ Required MCP manager states:
 
 ## Delivery phases and acceptance criteria
 
-### Google Workspace connector — implementation in progress
-- Add one Google Super OAuth connection to the phone connector catalog. It routes through the existing owner-authenticated Supabase Edge Function and Composio gateway.
-- One account can expose Gmail, Calendar, Drive, Docs, Sheets, Contacts, Tasks and Meet tools through a single toolkit. Tool schemas are discovered dynamically from the provider.
+### Google Workspace connector — implemented; awaiting owner credential
+- **Implemented:** add one Google Super OAuth connection to the phone connector catalog. It routes through the existing owner-authenticated Supabase Edge Function and Composio gateway.
+- **Implemented:** one account can expose Gmail, Calendar, Drive, Docs, Sheets, Contacts, Tasks and Meet tools through a single toolkit. Tool schemas are discovered dynamically from the provider.
 - Google credentials are never pasted into chat or shipped in the APK. The owner signs in on Google's own OAuth consent page. The Composio project key is kept in Supabase Vault.
-- All external writes remain approval-gated; the model cannot grant itself write permissions.
+- **Implemented:** the agent's local tool router recognizes Google Workspace service requests and routes discovery/invocation through the shared connector gateway. External writes remain permission-gated; the model cannot grant itself write permissions.
 - Current blocker before live connection: the Supabase owner settings report that the Composio gateway key is not configured. The owner must create a free Composio project key and enter it in the ULTRON Connectors screen before the Google OAuth button can create a connection.
 
 

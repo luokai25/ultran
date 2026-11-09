@@ -156,7 +156,9 @@ The secondary Next.js surface currently has one route at `apps/web/src/app/page.
 - 2026-11-06, local browser QA: 390×844 mobile and 1440×900 desktop previews showed no document horizontal overflow, browser exceptions or failed network responses across Chat, Models, Mind Map, Connectors, Settings, Identities, Learning Review, Capabilities and LLM API Keys. Desktop navigation is a persistent side rail; mobile retains the bottom bar. Authenticated live sign-in was not simulated in this browser run.
 
 
-## AI Digital Product Studio (added 2026-11-09)\n\nCanonical feature screen: `#product-studio-screen`.
+## AI Digital Product Studio (added 2026-11-09)
+
+Canonical feature screen: `#product-studio-screen`.
 
 - Entry: three-line drawer item "AI Digital Products Generating" in canonical `apps/phone`.
 - Start states: disconnected cloud account, empty project list, request prompt, autonomous opportunity discovery, research-depth selector, queueing and queue errors.

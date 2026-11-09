@@ -488,6 +488,42 @@ function productFormatGuidance(value: unknown): string {
   return "Create a polished practical guide with a clear promise, contents, detailed chapters, step-by-step implementation, examples, reusable checklists, troubleshooting, limitations, and next steps.";
 }
 
+function sanitizeProductCsv(markdown: string): { content: string; rows: number; columns: number } | null {
+  const fence = String.fromCharCode(96).repeat(3);
+  const match = markdown.match(new RegExp(fence + "csv[ \\t]*\\r?\\n([\\s\\S]*?)" + fence, "i"));
+  if (!match) return null;
+  const input = match[1].trim();
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let index = 0; index < input.length; index++) {
+    const character = input[index];
+    if (character === '"') {
+      if (quoted && input[index + 1] === '"') { cell += '"'; index++; }
+      else quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      row.push(cell); cell = "";
+    } else if (character === "\n" && !quoted) {
+      row.push(cell);
+      if (row.some(value => value.trim())) rows.push(row);
+      row = []; cell = "";
+    } else cell += character;
+  }
+  row.push(cell);
+  if (row.some(value => value.trim())) rows.push(row);
+  if (quoted || rows.length < 2) return null;
+  const columns = rows[0].length;
+  if (columns < 2 || rows.some(value => value.length !== columns)) return null;
+  const safeRows = rows.map(value => value.map(raw => {
+    const item = raw.trim();
+    return /^[=+@]/.test(item) || /^-\s*[A-Za-z(]/.test(item) ? "'" + item : item;
+  }));
+  const content = safeRows.map(value => value.map(item => '"' + item.replace(/"/g, '""') + '"').join(",")).join("\n");
+  return { content, rows: rows.length - 1, columns };
+}
+function requiresSpreadsheetCsv(value: unknown): boolean {
+  return /spreadsheet|calculator|tracker|planner|budget|data/i.test(String(value ?? ""));
+}
+
 async function workerProcess(projectId: string, ownerId: string, jobId: string, researchRound = 0): Promise<Record<string, unknown>> {
   const db = service();
   const { data: project, error } = await db.from("ultron_product_projects").select("*").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
@@ -717,6 +753,8 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     return (index + 1) + ". [" + (safeTitle || "Research source") + "](" + item.url + ")";
   });
   markdown = markdown.replace(/^#{1,3}\s*(references|sources)\s*$[\s\S]*$/im, "").trim();
+  const productCsv = sanitizeProductCsv(markdown);
+  const spreadsheetCsvRequired = requiresSpreadsheetCsv(opportunity.product_format);
   markdown += "\n\n## References\n" + (canonicalReferences.length ? canonicalReferences.join("\n") : "No public source pages were accessible for analysis; treat this draft as an unvalidated starting point.");
 
   await db.from("ultron_product_projects").update({ status: "validating", active_stage: "quality", progress: 92, updated_at: new Date().toISOString() }).eq("id", projectId).eq("owner_id", ownerId);
@@ -735,13 +773,14 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     reusable_asset: /template|checklist|worksheet|prompt pack/i.test(productBody),
     limitations_and_next_steps: /limitations|next steps|caveats/i.test(productBody),
     placeholder_free: !/\b(todo|lorem ipsum|insert here|coming soon)\b/i.test(productBody),
+    spreadsheet_csv_valid: !spreadsheetCsvRequired || Boolean(productCsv),
     analyzed_sources: counts.analyzed,
     requested_sources: target,
     quality_checks_passed: false,
   };
   validation.quality_checks_passed = Boolean(validation.minimum_length_passed && validation.minimum_word_count_passed &&
     validation.references_section && validation.source_citations_match && validation.contents_section &&
-    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free);
+    validation.actionable_workflow && validation.reusable_asset && validation.limitations_and_next_steps && validation.placeholder_free && validation.spreadsheet_csv_valid);
   await addEvent(db, ownerId, projectId, "quality", "quality.checked", validation);
   if (["cancelled","paused","missing"].includes(await projectStopStatus(ownerId, projectId))) return { skipped: true, status: await projectStopStatus(ownerId, projectId) };
   const html = markdownPreview(markdown, title);
@@ -800,6 +839,36 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
     checksum_sha256: htmlChecksum, validation_report: { preview_sandboxed: true, standalone_document: true },
   }, { onConflict: "project_id,title,version" });
   if (htmlDocument.error) throw htmlDocument.error;
+  const csvPath = ownerId + "/products/" + projectId + "/product-v" + version + ".csv";
+  if (productCsv) {
+    const csvBytes = new TextEncoder().encode(productCsv.content);
+    const csvUpload = await bucket.upload(csvPath, csvBytes, { contentType: "text/csv; charset=utf-8", upsert: true });
+    if (csvUpload.error) throw csvUpload.error;
+    const csvChecksumBytes = await crypto.subtle.digest("SHA-256", csvBytes);
+    const csvChecksum = Array.from(new Uint8Array(csvChecksumBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
+    const csvArtifactPayload = {
+      owner_id: ownerId, name: title + "-data-v" + version + ".csv",
+      description: "Spreadsheet-ready data template generated for the digital product.",
+      artifact_type: "file", mime_type: "text/csv", bucket_id: "ultron-private", storage_path: csvPath,
+      byte_size: csvBytes.byteLength, checksum_sha256: csvChecksum, source_job_id: jobId,
+      metadata: { product_project_id: projectId, format: "csv", version, rows: productCsv.rows, columns: productCsv.columns, formula_injection_protection: true, private: true },
+    };
+    const { data: existingCsvArtifact, error: existingCsvError } = await db.from("ultron_artifacts").select("id")
+      .eq("owner_id", ownerId).contains("metadata", { product_project_id: projectId, format: "csv", version }).maybeSingle();
+    if (existingCsvError) throw existingCsvError;
+    const csvArtifactResult = existingCsvArtifact
+      ? await db.from("ultron_artifacts").update(csvArtifactPayload).eq("owner_id", ownerId).eq("id", existingCsvArtifact.id).select("id").single()
+      : await db.from("ultron_artifacts").insert(csvArtifactPayload).select("id").single();
+    if (csvArtifactResult.error) throw csvArtifactResult.error;
+    const csvDocument = await db.from("ultron_product_documents").upsert({
+      owner_id: ownerId, project_id: projectId, title: title + " (Spreadsheet data)", format: "csv", status: "final", version,
+      storage_path: csvPath, mime_type: "text/csv", byte_size: csvBytes.byteLength,
+      checksum_sha256: csvChecksum, validation_report: { rows: productCsv.rows, columns: productCsv.columns, formula_injection_protection: true },
+    }, { onConflict: "project_id,title,version" });
+    if (csvDocument.error) throw csvDocument.error;
+    await addEvent(db, ownerId, projectId, "packaging", "artifact.created", { artifact_id: csvArtifactResult.data.id, title: title + " (Spreadsheet data)", format: "csv", rows: productCsv.rows, columns: productCsv.columns });
+  }
+
   const csvCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
   const sourceRegister = [
     ["source_number", "title", "domain", "url"].join(","),
@@ -810,13 +879,14 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string, 
   const manifest = {
     product_title: title, version, generated_at: new Date().toISOString(),
     project_id: projectId, research_target: target, analyzed_sources: counts.analyzed,
-    coverage_reason: coverageReason, formats: ["markdown", "html", "zip"],
+    coverage_reason: coverageReason, formats: ["markdown", "html", ...(productCsv ? ["csv"] : []), "zip"],
     note: "Original product content with source metadata. Source page text is not redistributed.",
   };
   const packageFiles: Record<string, Uint8Array> = {
-    "README.txt": strToU8(title + "\nULTRON Digital Product Package · v" + version + "\n\nIncludes the original product in Markdown and HTML, a source register, evidence synthesis and quality report.\nResearch coverage: " + counts.analyzed + " analyzed pages out of " + target + " requested.\nReview every claim and citation before commercial publication.\n"),
+    "README.txt": strToU8(title + "\nULTRON Digital Product Package · v" + version + "\n\nIncludes the original product in Markdown and HTML, " + (productCsv ? "spreadsheet data, " : "") + "a source register, evidence synthesis and quality report.\nResearch coverage: " + counts.analyzed + " analyzed pages out of " + target + " requested.\nReview every claim and citation before commercial publication.\n"),
     "product.md": markdownBytes,
     "product.html": htmlBytes,
+    ...(productCsv ? { "product-data.csv": strToU8(productCsv.content) } : {}),
     "research/source-register.csv": strToU8(sourceRegister),
     "research/evidence-synthesis.json": strToU8(JSON.stringify(synthesis, null, 2)),
     "quality/validation-report.json": strToU8(JSON.stringify(validation, null, 2)),
@@ -949,7 +1019,7 @@ Deno.serve(async (req: Request) => {
       }
       const documentRows = await Promise.all((documents.data ?? []).map(async (document) => {
         if (!document.storage_path) return { ...document, download_url: null };
-        const extension = document.format === "html" ? "html" : document.format === "zip" ? "zip" : "md";
+        const extension = document.format === "html" ? "html" : document.format === "zip" ? "zip" : document.format === "csv" ? "csv" : "md";
         const filename = project.title + "-v" + document.version + "." + extension;
         const { data: signedDocument } = await db.storage.from("ultron-private").createSignedUrl(document.storage_path, 3600, { download: filename });
         return { ...document, download_url: signedDocument?.signedUrl ?? null };

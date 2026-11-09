@@ -46,6 +46,18 @@ jobs:
         working-directory: ultron-backend
         run: python -m pytest -q
 
+  edge-artifact-formats:
+    name: Edge artifact format tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.1.4
+      - name: Test native Office artifact packages
+        run: deno test --allow-net supabase/functions/ultron-product-studio/formats_test.ts
+
   verify:
     name: Verify
     runs-on: ubuntu-latest

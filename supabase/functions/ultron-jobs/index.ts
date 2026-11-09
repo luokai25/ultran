@@ -498,7 +498,7 @@ Deno.serve(async (req: Request) => {
             const payload = isObject(job.payload) ? job.payload : {};
             const projectId = typeof payload.project_id === "string" ? payload.project_id : "";
             if (projectId) {
-              const projectPatch: Record<string, unknown> = { error_message: message.slice(0, 500), updated_at: new Date().toISOString() };
+              const projectPatch: Record<string, unknown> = { error_message: dailySearchCap ? "ULTRON reached its safe daily free Google Search grounding budget. It will retry after the daily quota resets. No paid search requests are sent." : message.slice(0, 500), updated_at: new Date().toISOString() };
               if (exhausted) projectPatch.status = "failed";
               else if (waitingForProvider) projectPatch.status = "waiting_for_provider";
               const { data: projectUpdate, error: projectUpdateError } = await db.from("ultron_product_projects")

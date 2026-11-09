@@ -495,3 +495,10 @@ progress { width:100%; accent-color:var(--accent); }
   .feature-screen .mindmap-toolbar { align-items:stretch; }
   .feature-screen .learning-filters { width:100%; }
 }
+
+.feature-screen a,
+#connectors-panel a,
+#workspace-panel a { color:var(--accent); }
+.feature-screen a:hover,
+#connectors-panel a:hover,
+#workspace-panel a:hover { color:var(--accent-hover); }

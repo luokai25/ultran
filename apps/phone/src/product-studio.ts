@@ -15,6 +15,10 @@ type StudioOptions = { openScreen: () => void; closeScreen: () => void; openClou
 let options: StudioOptions | null = null;
 let selectedProjectId = "";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let liveChannel: ReturnType<typeof cloudClient.channel> | null = null;
+let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let liveRefreshInFlight = false;
+let liveRefreshPending = false;
 let busy = false;
 let lastPreviewProjectId = "";
 let lastPreviewHtml = "";
@@ -331,25 +335,99 @@ async function loadProject(id: string): Promise<void> {
     const result = await invoke("get", { project_id: id }) as unknown as ProductDetail & Record<string, unknown>;
     renderDetail(result);
     await loadProjects();
+    await startLiveUpdates(id);
     startPolling();
   } catch (error) {
     setNotice(error instanceof Error ? error.message : "Could not load this project.", true);
   }
 }
-function startPolling(): void {
+function stopPolling(): void {
   if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+function stopLiveUpdates(): void {
+  if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+  liveRefreshTimer = null;
+  liveRefreshPending = false;
+  if (liveChannel) {
+    const channel = liveChannel;
+    liveChannel = null;
+    void cloudClient.removeChannel(channel).catch(() => undefined);
+  }
+}
+function queueLiveRefresh(projectId: string): void {
+  if (projectId !== selectedProjectId) return;
+  if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+  liveRefreshTimer = setTimeout(() => {
+    liveRefreshTimer = null;
+    void refreshLiveProject(projectId);
+  }, 250);
+}
+async function refreshLiveProject(projectId: string): Promise<void> {
+  if (projectId !== selectedProjectId) return;
+  if (liveRefreshInFlight) {
+    liveRefreshPending = true;
+    return;
+  }
+  liveRefreshInFlight = true;
+  try {
+    const result = await invoke("get", { project_id: projectId }) as unknown as ProductDetail & Record<string, unknown>;
+    if (projectId !== selectedProjectId) return;
+    renderDetail(result);
+    const status = result.project?.status;
+    if (["completed","partial","failed","cancelled","paused"].includes(String(status))) {
+      stopPolling();
+      stopLiveUpdates();
+      void loadProjects();
+    }
+  } catch {
+    setNotice("Live updates are reconnecting. Your saved project remains safe; automatic refresh will retry.");
+  } finally {
+    liveRefreshInFlight = false;
+    if (liveRefreshPending && projectId === selectedProjectId) {
+      liveRefreshPending = false;
+      queueLiveRefresh(projectId);
+    }
+  }
+}
+async function startLiveUpdates(projectId: string): Promise<void> {
+  stopLiveUpdates();
+  const session = await getCloudSession();
+  if (!session || projectId !== selectedProjectId) return;
+  liveChannel = cloudClient
+    .channel("product-studio:" + projectId)
+    .on("postgres_changes", {
+      event: "UPDATE",
+      schema: "public",
+      table: "ultron_product_projects",
+      filter: "id=eq." + projectId,
+    }, () => queueLiveRefresh(projectId))
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "ultron_product_events",
+      filter: "project_id=eq." + projectId,
+    }, () => queueLiveRefresh(projectId))
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") queueLiveRefresh(projectId);
+    });
+}
+function startPolling(): void {
+  stopPolling();
+  // Realtime drives the live workspace; this slower poll is a recovery path
+  // for missed events, offline tabs and transient channel disconnects.
   pollTimer = setInterval(() => {
     if (!selectedProjectId || document.hidden) return;
     void invoke("get", { project_id: selectedProjectId }).then((result) => {
       renderDetail(result as unknown as ProductDetail);
       const status = (result.project as ProductProject | undefined)?.status;
       if (["completed","partial","failed","cancelled","paused"].includes(String(status))) {
-        if (pollTimer) clearInterval(pollTimer);
-        pollTimer = null;
+        stopPolling();
+        stopLiveUpdates();
         void loadProjects();
       }
     }).catch(() => setNotice("Connection interrupted. Your project remains saved; reconnect to refresh it."));
-  }, 5000);
+  }, 15000);
 }
 async function startProject(request: string): Promise<void> {
   if (busy) return;
@@ -384,12 +462,12 @@ export function initProductStudio(value: StudioOptions): void {
     void startProject("");
   });
   el<HTMLButtonElement>("product-studio-refresh").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
-  el<HTMLButtonElement>("product-studio-back").addEventListener("click", () => options?.closeScreen());
+  el<HTMLButtonElement>("product-studio-back").addEventListener("click", () => { stopPolling(); stopLiveUpdates(); options?.closeScreen(); });
   el<HTMLButtonElement>("product-studio-refresh-list").addEventListener("click", () => void loadProjects().catch(error => setNotice(error instanceof Error ? error.message : "Refresh failed.", true)));
   el<HTMLButtonElement>("product-studio-new").addEventListener("click", () => {
     selectedProjectId = "";
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    stopPolling();
+    stopLiveUpdates();
     el<HTMLElement>("product-studio-workspace").hidden = true;
     el<HTMLElement>("product-studio-start").hidden = false;
     setNotice("Ready to create a new product.");
@@ -437,8 +515,8 @@ export async function openProductStudioScreen(): Promise<void> {
     else {
       el<HTMLElement>("product-studio-start").hidden = false;
       el<HTMLElement>("product-studio-workspace").hidden = true;
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
+      stopPolling();
+      stopLiveUpdates();
     }
   } catch (error) {
     setNotice(error instanceof Error ? error.message : "Connect ULTRON cloud to use Product Studio.", true);

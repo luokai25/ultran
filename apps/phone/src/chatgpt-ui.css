@@ -262,7 +262,7 @@ progress { width:100%; accent-color:var(--accent); }
 
 /* Secondary-page details that need their own interaction affordances. */
 .mindmap-canvas-wrap { width:100%; min-height:220px; overflow:auto; border:1px solid var(--border); border-radius:12px; background:var(--surface-soft); }
-.mindmap-canvas-wrap.is-empty { overflow:hidden; }
+.mindmap-canvas-wrap.is-empty { overflow: hidden; }
 .mindmap-canvas-wrap.is-empty .mindmap-canvas { display:none; }
 .mindmap-canvas { display:block; width:100%; min-height:220px; }
 .learning-filters { display:flex; flex-wrap:wrap; gap:8px; }
@@ -272,5 +272,64 @@ progress { width:100%; accent-color:var(--accent); }
 .attachment-preview { max-height:88px; overflow-y:auto; }
 .attachment-thumb { width:56px; height:56px; object-fit:cover; }
 .attachment-chip { max-width:min(100%, 320px); max-height:68px; overflow:hidden; }
-.attachment-chip .attachment-snippet, .message-attachment .attachment-snippet { display:none; }
+.attachment-chip .attachment-snippet { display: none; }
+.message-attachment .attachment-snippet { display: none; }
 .message-attachment { max-height:68px; overflow:hidden; }
+
+/* Feature pages share the same quiet hierarchy instead of bespoke themes. */
+.feature-screen, #connectors-panel, #workspace-panel {
+  color: var(--text);
+  scrollbar-color: var(--surface-hover) transparent;
+}
+.feature-screen > :not(.feature-head), #connectors-panel > :not(.panel-head), #workspace-panel > :not(.workspace-head) {
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+.feature-screen .feature-head, #connectors-panel .panel-head, #workspace-panel .workspace-head {
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+.identity-visual-section, .capability-hero-mark, .github-mark { display: none !important; }
+.identity-cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 10px; }
+.identity-card { min-height: 76px; justify-content: flex-start; text-align: left; }
+.identity-card[aria-pressed="true"], .identity-card.is-active { border-color: var(--border-strong); background: var(--surface-raised); }
+.identity-program-grid { grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+.llm-key-card, .product-studio-form, .product-studio-project-section,
+.learning-section, .capability-section, .mindmap-toolbar, .mindmap-detail {
+  min-width: 0;
+}
+.llm-key-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.ultron-universal-key-entry, .ultron-key-file-import { border-color: var(--border); }
+.ultron-key-detected { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.cloud-provider-directory { display: grid; gap: 12px; }
+.cloud-provider-group { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.llm-key-import { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.product-studio-intro { padding: 0; border: 0; background: transparent; }
+.product-studio-form { gap: 14px; }
+.product-studio-actions, .product-studio-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.product-studio-primary { min-height: 42px; padding: 9px 16px; border: 1px solid var(--accent); border-radius: 9px; background: var(--accent); color: #fff; }
+.product-studio-projects { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 10px; }
+.learning-stats, .capability-stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 10px; }
+.learning-stats > *, .capability-stat { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.learning-toolbar, .mindmap-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.learning-section-head, .capability-section-head, .product-studio-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.learning-safety-note, .capability-feedback, .product-studio-notice { border-color: var(--border); background: var(--surface-soft); }
+.capability-hero { display: block; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.capability-hero h2 { margin: 0; font-size: 20px; }
+.capability-list, .learning-proposals, .learning-events, .cloud-llm-keys, .identity-cards { min-width: 0; }
+.workspace-stats { grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); }
+.workspace-team-builder { display: grid; gap: 10px; }
+.workspace-team-actions { justify-content: flex-start; }
+.conn-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 10px; }
+.conn-card { width: 100%; min-width: 0; min-height: 100px; align-items: flex-start; text-align: left; }
+.github-intro { border-color: var(--border); background: transparent; }
+.mcp-manager, .composio-key-setup, .permission-overview, .composio-health { border-color: var(--border); background: var(--surface-soft); }
+.mindmap-toolbar input { flex: 1 1 240px; min-width: 0; }
+.mindmap-canvas-wrap.is-empty { overflow: hidden; }
+@media (max-width: 520px) {
+  .identity-cards, .product-studio-projects, .conn-list { grid-template-columns: 1fr; }
+  .learning-stats, .capability-stats, .workspace-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .learning-toolbar, .mindmap-toolbar { align-items: stretch; }
+  .learning-toolbar > *, .mindmap-toolbar > * { flex: 1 1 100%; }
+  .llm-key-header-actions { width: 100%; }
+}

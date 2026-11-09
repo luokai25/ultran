@@ -89,6 +89,7 @@ pre code { padding:0; background:transparent; }
 .tool:hover { background:var(--surface-hover); color:var(--text); }
 .link-pill { margin-left:auto; padding:3px 8px; border-radius:20px; color:var(--muted); background:rgba(255,255,255,.05); font-size:11px; }
 .link-pill[data-state="connected"],.link-pill[data-state="online"] { color:var(--success); }
+.link-pill[data-state="connecting"] { color:var(--text-secondary); background:rgba(255,255,255,.08); }
 .send { width:36px; height:36px; display:grid; place-items:center; border:0; border-radius:50%; background:var(--text); color:#171717; }
 .send:disabled { background:var(--surface-hover); color:var(--muted); opacity:1; }
 .send:hover:not(:disabled) { background:#fff; }

@@ -163,7 +163,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
       .eq("owner_id", ownerId).in("event_type", ["opportunity.search.requested", "research.search.requested"])
       .gte("created_at", dayStart.toISOString());
     if (error) throw error;
-    if ((count ?? 0) >= 150) throw new Error("free_google_search_daily_cap_reached");
+    if ((count ?? 0) >= 25) throw new Error("free_google_search_daily_cap_reached");
     await addEvent(db, ownerId, projectId, searchStage, searchStage === "identification" ? "opportunity.search.requested" : "research.search.requested", { message: "Using the free Google Search grounding budget." });
   }
   const candidates = await listStudioCandidates(ownerId, withSearch);

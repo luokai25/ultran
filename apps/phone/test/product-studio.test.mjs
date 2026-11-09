@@ -90,7 +90,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /"product.xlsx": xlsxBytes/);
   assert.match(source, /sanitizeProductCsv/);
   assert.match(source, /formulaLike/);
-  assert.match(source, /const csvCell =/);
+  assert.match(source, /csvCell as sanitizeCsvCell/);
+  assert.match(formats, /export function csvCell/);
   assert.match(source, /retryVersion/);
   assert.match(source, /spreadsheet_csv_valid/);
   assert.match(source, /product-data\.csv/);

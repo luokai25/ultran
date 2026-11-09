@@ -124,73 +124,87 @@ export async function streamUltronSupabaseChat(
   onToken: (token: string | null) => void,
   provider?: CloudProviderId,
 ): Promise<string> {
-  let session = await getCloudSession();
-  if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
-  const safeMessages = prepareCloudChatMessages(messages);
-  if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
-    throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
-  }
-  const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3 });
-  const send = (accessToken: string) => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY,
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
-    body: requestBody,
-    signal,
-  });
-  let response = await send(session.access_token);
-  if (response.status === 401 && !signal.aborted) {
-    const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
-    if (!refreshError && refreshed.session) {
-      session = refreshed.session;
-      response = await send(session.access_token);
+  const controller = new AbortController();
+  const abortFromCaller = (): void => controller.abort();
+  if (signal.aborted) controller.abort();
+  else signal.addEventListener("abort", abortFromCaller, { once: true });
+  const timeout = window.setTimeout(() => controller.abort(), 90_000);
+  try {
+    let session = await getCloudSession();
+    if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
+    const safeMessages = prepareCloudChatMessages(messages);
+    if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
+      throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
     }
-  }
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    let message = detail.slice(0, 500);
-    try { const parsed = JSON.parse(detail) as Record<string, unknown>; message = String(parsed.message ?? parsed.error ?? message); } catch { /* provider or gateway returned plain text */ }
-    if (response.status === 400 && /valid_messages_required/.test(message)) {
-      throw new Error("ULTRON's cloud prompt exceeded a message-size limit. The request was shortened safely; send again.");
+    const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3 });
+    const send = (accessToken: string) => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: requestBody,
+      signal: controller.signal,
+    });
+    let response = await send(session.access_token);
+    if (response.status === 401 && !controller.signal.aborted) {
+      const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
+      if (!refreshError && refreshed.session) {
+        session = refreshed.session;
+        response = await send(session.access_token);
+      }
     }
-    if (response.status === 413) throw new Error("This conversation is too large for the cloud request. Start a fresh chat or shorten the attached context.");
-    throw new Error(`ULTRON Supabase returned HTTP ${response.status}: ${message}`);
-  }
-  if (!response.body) throw new Error("ULTRON Supabase did not return a readable response stream.");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let content = "";
-  const consume = (block: string): void => {
-    for (const line of block.split(/\r?\n/)) {
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-      const event = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }>; error?: string | { message?: string }; message?: string };
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      let message = detail.slice(0, 500);
+      try { const parsed = JSON.parse(detail) as Record<string, unknown>; message = String(parsed.message ?? parsed.error ?? message); } catch { /* provider or gateway returned plain text */ }
+      if (response.status === 400 && /valid_messages_required/.test(message)) {
+        throw new Error("ULTRON's cloud prompt exceeded a message-size limit. The request was shortened safely; send again.");
+      }
+      if (response.status === 413) throw new Error("This conversation is too large for the cloud request. Start a fresh chat or shorten the attached context.");
+      throw new Error(`ULTRON Supabase returned HTTP ${response.status}: ${message}`);
+    }
+    if (!response.body) throw new Error("ULTRON Supabase did not return a readable response stream.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    const consume = (block: string): void => {
+      const data = block.split(/\\r?\\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\\n");
+      if (!data || data === "[DONE]") return;
+      let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }>; error?: string | { message?: string }; message?: string };
+      try { event = JSON.parse(data) as typeof event; }
+      catch { throw new Error("ULTRON received an invalid event from the cloud response stream."); }
       if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
       const delta = event.choices?.[0]?.delta?.content;
       const token = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
       if (token) { content += token; onToken(token); }
+    };
+    while (true) {
+      if (controller.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      let boundary = buffer.search(/\\r?\\n\\r?\\n/);
+      while (boundary >= 0) {
+        const match = buffer.slice(boundary).match(/^\\r?\\n\\r?\\n/);
+        consume(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+        boundary = buffer.search(/\\r?\\n\\r?\\n/);
+      }
+      if (chunk.done) break;
     }
-  };
-  while (true) {
-    if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
-    const chunk = await reader.read();
-    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-    let boundary = buffer.search(/\r?\n\r?\n/);
-    while (boundary >= 0) {
-      const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
-      consume(buffer.slice(0, boundary));
-      buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
-      boundary = buffer.search(/\r?\n\r?\n/);
+    if (buffer.trim()) consume(buffer);
+    if (!content.trim()) throw new Error("ULTRON Supabase completed without returning any text.");
+    return content.trim();
+  } catch (error) {
+    if (controller.signal.aborted && !signal.aborted) {
+      throw new Error("ULTRON's cloud response timed out after 90 seconds. Try again or select ULTRON Automatic.");
     }
-    if (chunk.done) break;
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    signal.removeEventListener("abort", abortFromCaller);
   }
-  if (buffer.trim()) consume(buffer);
-  if (!content.trim()) throw new Error("ULTRON Supabase completed without returning any text.");
-  return content.trim();
 }

@@ -113,11 +113,22 @@ function isFreeProviderModel(provider: StudioProvider, model: string): boolean {
 function isFreeGoogleSearchModel(model: string): boolean {
   return /^gemini-2\.5-(?:flash|flash-lite)(?:-|$)/.test(model.toLowerCase().replace(/^models\//, ""));
 }
-function studioModelScore(model: string): number {
-  const id = model.toLowerCase();
+function studioModelScore(model: string, withSearch = false): number {
+  const id = model.toLowerCase().replace(/^models\//, "");
+  if (withSearch) {
+    // Google Search grounding is free-tier supported on Gemini 2.5 Flash-Lite.
+    // Prefer Lite, then retain Flash as a compatibility fallback.
+    if (/^gemini-2\.5-flash-lite(?:-|$)/.test(id)) return 100;
+    if (/^gemini-2\.5-flash(?:-|$)/.test(id)) return 90;
+    return 0;
+  }
   if (/gpt-oss-120b|llama-3\.3-70b|llama-4-scout/.test(id)) return 100;
-  if (/qwen3-32b|gemini-2\.5-flash/.test(id)) return 80;
-  if (/gemini-2\.5-flash-lite|llama-3\.1-8b/.test(id)) return 50;
+  if (/^gemini-3\.8-flash(?:-|$)/.test(id)) return 95;
+  if (/^gemini-3\.(?:7|6)-flash(?:-|$)/.test(id)) return 90;
+  if (/^gemini-3\.5-flash(?:-|$)/.test(id) && !/lite/.test(id)) return 85;
+  if (/qwen3-32b|^gemini-3\.5-flash-lite|^gemini-3\.1-flash-lite/.test(id)) return 80;
+  if (/^gemini-2\.5-flash(?:-|$)/.test(id) && !/lite/.test(id)) return 75;
+  if (/^gemini-2\.5-flash-lite|llama-3\.1-8b/.test(id)) return 65;
   return 30;
 }
 async function listStudioCandidates(ownerId: string, withSearch: boolean): Promise<StudioCandidate[]> {
@@ -132,14 +143,17 @@ async function listStudioCandidates(ownerId: string, withSearch: boolean): Promi
     return (data ?? []).flatMap((key: Record<string, unknown>) => {
       if (key.cooldown_until && Date.parse(String(key.cooldown_until)) > Date.now()) return [];
       const models = Array.isArray(key.models) ? key.models.filter((model): model is string => typeof model === "string") : [];
-      const model = models.filter((value) => isFreeProviderModel(provider, value) && (!withSearch || isFreeGoogleSearchModel(value))).sort((a, b) => studioModelScore(b) - studioModelScore(a))[0];
-      return model ? [{ provider, key, model } as StudioCandidate] : [];
+      const eligible = models
+        .filter((value) => isFreeProviderModel(provider, value) && (!withSearch || isFreeGoogleSearchModel(value)))
+        .sort((a, b) => studioModelScore(b, withSearch) - studioModelScore(a, withSearch))
+        .slice(0, withSearch ? 2 : 3);
+      return eligible.map((model) => ({ provider, key, model } as StudioCandidate));
     });
   }));
   return rows.flat().sort((a, b) =>
     Number(b.key.priority ?? 0) - Number(a.key.priority ?? 0) ||
     Date.parse(String(a.key.last_used_at ?? "1970-01-01")) - Date.parse(String(b.key.last_used_at ?? "1970-01-01")) ||
-    studioModelScore(b.model) - studioModelScore(a.model)
+    studioModelScore(b.model, withSearch) - studioModelScore(a.model, withSearch)
   );
 }
 async function readStudioSecret(db: ReturnType<typeof service>, candidate: StudioCandidate): Promise<string> {
@@ -166,7 +180,7 @@ function openAIContent(value: unknown): string {
   return "";
 }
 async function callGemini(ownerId: string, messages: Array<{ role: string; parts: Array<{ text: string }> }>, withSearch: boolean, projectId?: string, searchStage = "research") {
-  const deadline = Date.now() + (withSearch ? 12_000 : 32_000);
+  const deadline = Date.now() + (withSearch ? 35_000 : 32_000);
   const db = service();
   if (withSearch) {
     if (!projectId) throw new Error("google_search_project_required");
@@ -181,7 +195,7 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
   const candidates = await listStudioCandidates(ownerId, withSearch);
   if (!candidates.length) throw new Error(withSearch ? "no_free_google_search_model_available" : "no_eligible_free_model_key");
   let lastError = "provider_unavailable";
-  for (const candidate of candidates.slice(0, 8)) {
+  for (const candidate of candidates.slice(0, withSearch ? 24 : 12)) {
     let secret: string;
     try { secret = await readStudioSecret(db, candidate); } catch { continue; }
     const google = candidate.provider === "google_ai_studio";
@@ -198,11 +212,11 @@ async function callGemini(ownerId: string, messages: Array<{ role: string; parts
           ...(candidate.provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}),
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(Math.max(1000, Math.min(withSearch ? 10_000 : 30_000, deadline - Date.now()))),
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(withSearch ? 12_000 : 30_000, deadline - Date.now()))),
       });
       const raw = await response.text();
       if (!response.ok) {
-        lastError = candidate.provider + "_http_" + response.status;
+        lastError = candidate.provider + "_http_" + response.status + "_" + candidate.model;
         if (response.status === 429) await updateStudioKey(ownerId, candidate, {
           status: "connected", cooldown_until: new Date(Date.now() + 60_000).toISOString(),
           last_error: "HTTP 429 · temporary cooldown", last_checked_at: new Date().toISOString(),

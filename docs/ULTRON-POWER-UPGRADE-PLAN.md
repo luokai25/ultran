@@ -30,8 +30,16 @@ This is not a greenfield MCP project. The repository already contains:
 3. **Grant persistence is weaker than approval persistence.** Approval records can use SQLite persistence; the HMAC GrantStore itself is process-memory only and its signing key is generated at startup.
 4. **MCP audit history is process-local.** The gateway's recent audit entries are held in memory rather than a durable, owner-scoped event stream.
 5. **The canonical phone UI's cloud connector flow is Composio-oriented.** It can list/connect/disconnect Composio accounts and tools, but it does not yet provide a complete native MCP server manager with endpoint registration, transport selection, probe, trust/pin review, tool permissions and lifecycle.
-6. **CRITICAL PRODUCTION SECURITY GAP: the Hetzner Caddy configuration reverse-proxies public HTTPS traffic to FastAPI, but the Python API currently has no end-user authentication middleware.** `X-Ultron-Workspace` is a workspace selector, not authentication. The `/v1/mcp` administration routes are therefore not safe to expose through the public Caddy proxy. Treat the Hetzner deployment as blocked until the API validates the Supabase owner session (or an equivalently strong per-device credential) on every non-health route, binds authorization to the single `ultron_instance.owner_id`, and has tests for unauthenticated, wrong-owner and expired-token requests. Do not deploy the MCP management UI or remote MCP invocation over this public API before that gate is closed.
+6. **Production API owner authentication — implemented, verification pending.** FastAPI now requires a live Supabase bearer session on every non-health production route, verifies the user through Supabase Auth, checks the RLS-protected singleton `ultron_instance.owner_id`, ignores caller-selected workspace headers, and returns fail-closed errors when the auth provider is unavailable. The phone client attaches its current owner session to API requests and task event streams. Production now requires `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in the private server `.env`; these values must be set before deploying the API update. CI tests cover unauthenticated requests, valid owner sessions and workspace isolation; wrong-owner and expired-token regression cases remain to add.
 7. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
+
+## Current security implementation
+
+- **Committed to `main`:** FastAPI owner-session middleware, Supabase Auth verification, RLS-backed singleton-owner verification, production workspace pinning, and bearer propagation from the phone client.
+- **Deployment prerequisite:** set `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in `infra/hetzner/.env` before restarting a production API. The publishable key is not a service-role secret. Never add a service-role key to the phone app.
+- **Verification:** CI must pass the new production-auth regression tests. The API must not be exposed publicly until the deployment environment is configured and the new build passes its health check.
+
+Google Workspace setup guide: [`GOOGLE-WORKSPACE-CONNECTOR.md`](GOOGLE-WORKSPACE-CONNECTOR.md).
 
 ## Target architecture
 

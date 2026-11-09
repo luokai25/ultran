@@ -32,7 +32,7 @@ const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKern
   read("android/app/src/main/java/app/ultron/mobile/UltronLocalAiPlugin.java"),
   read("../../ultron-backend/ultron_backend/brain.py"),
   read("../../ultron-backend/ultron_backend/agents.py"),
-  read("src/styles.css"),
+  read("src/chatgpt-ui.css"),
 ]);
 const [capabilityPanel, runtimeCloud] = await Promise.all([read("src/capability-panel.ts"), read("src/runtime-cloud.ts")]);
 
@@ -245,19 +245,19 @@ test("WhatsApp handoff never sends or taps automatically", () => {
 test("Escape closes the topmost ULTRON surface, including settings and connectors", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const connectors = await readFile(new URL("../src/connectors-ui.ts", import.meta.url), "utf8");
-  const quietUi = await readFile(new URL("../src/quiet-ui.css", import.meta.url), "utf8");
+  const chatUi = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
   assert.match(main, /if \(!sheetWrap\.hidden\) closeSheet\(\)/);
   assert.match(main, /if \(!workspacePanel\.hidden\) closeWorkspace\(\)/);
   assert.match(main, /if \(!connectorsPanel\.hidden\) connectorsBackButton\.click\(\)/);
   assert.match(main, /drawer\.getAttribute\("aria-hidden"\) === "false"\) closeDrawer\(\)/);
   assert.match(connectors, /event\.stopPropagation\(\);\s*closeDetail\(\)/);
   assert.match(main, /navModelsButton\.addEventListener\("click", event => \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?openChatModelMenu\(\)/);
-  assert.match(quietUi, /\.feature-screen\s*\{[^}]*width:\s*auto;[^}]*max-width:\s*none;/s);
-  assert.match(quietUi, /\.sheet-wrap\s*\{[^}]*width:\s*auto;[^}]*max-width:\s*none;/s);
+  assert.match(chatUi, /\.feature-screen,\s*#connectors-panel[\s\S]*?position:\s*fixed/);
+  assert.match(chatUi, /\.sheet-wrap\s*\{[^}]*z-index:\s*80/s);
 });
 
 test("mobile navigation is fully wired and respects phone accessibility zoom", async () => {
-  const experience = await read("src/experience.css");
+  const experience = await read("src/chatgpt-ui.css");
   for (const id of ["nav-chat", "nav-connectors", "nav-settings"]) {
     assert.equal((html.match(new RegExp(`id="${id}"`, "g")) ?? []).length, 1);
     assert.ok(main.includes(`#${id}`));
@@ -268,9 +268,9 @@ test("mobile navigation is fully wired and respects phone accessibility zoom", a
   assert.match(main, /#settings-close-btn/);
   assert.match(html, /id="settings-close-btn"/);
   assert.match(experience, /\.bottom-nav/);
-  assert.match(experience, /\.bottom-nav\{[^}]*display:grid/);
-  assert.match(experience, /\.bottom-nav \.nav-item\[hidden\]\{display:none!important\}/);
-  assert.match(experience, /\.nav-item\[aria-current="page"\]/);
+  assert.match(experience, /\.bottom-nav\s*\{[^}]*display:flex/);
+  assert.match(experience, /\[hidden\]\s*\{\s*display:\s*none\s*!important/);
+  assert.match(experience, /\[aria-current="page"\]/);
   assert.doesNotMatch(html, /maximum-scale\s*=\s*1/i);
   const composerMarkup = html.slice(html.indexOf('<form id="composer"'), html.indexOf('</form>', html.indexOf('<form id="composer"')));
   assert.equal((composerMarkup.match(/<button\b/g) ?? []).length, 2, "composer exposes the model selector and adaptive Send/Stop action");

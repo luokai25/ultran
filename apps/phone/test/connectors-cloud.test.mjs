@@ -110,6 +110,15 @@ test("Google OAuth reserves a browser tab during the click before the async gate
  assert.match(main,/popup\.location\.replace\(url\)/);
  assert.match(main,/window\.location\.assign\(url\)/);
 });
+test("Google Connect stays clickable and opens owner sign-in when no cloud session exists",()=>{
+ assert.match(screen,/entry\.auth === "oauth2" \? true : deps\.backendLinked\(\)/);
+ assert.match(screen,/!cloudLinked \? "Sign in to connect"/);
+ assert.match(screen,/Sign in to your ULTRON owner account first/);
+ assert.match(screen,/deps\.openCloudSettings\?\.\(\)/);
+ assert.match(main,/openCloudSettings: \(\) =>/);
+ assert.match(main,/navSettingsButton\.click\(\)/);
+ assert.match(main,/cloudEmailEl\.focus\(\{ preventScroll: true \}\)/);
+});
 test("Google OAuth explains the one-time gateway prerequisite before attempting a redirect",()=>{
  assert.match(screen,/let composioConfigured = false/);
  assert.match(screen,/composioConfigured = result\.configured === true/);

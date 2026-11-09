@@ -128,7 +128,6 @@ export async function streamUltronSupabaseChat(
   const abortFromCaller = (): void => controller.abort();
   if (signal.aborted) controller.abort();
   else signal.addEventListener("abort", abortFromCaller, { once: true });
-  const timeout = window.setTimeout(() => controller.abort(), 90_000);
   try {
     let session = await getCloudSession();
     if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
@@ -227,12 +226,8 @@ export async function streamUltronSupabaseChat(
     if (!content.trim()) throw new Error("ULTRON Supabase completed without returning any text.");
     return content.trim();
   } catch (error) {
-    if (controller.signal.aborted && !signal.aborted) {
-      throw new Error("ULTRON's cloud response timed out after 90 seconds. Try again or select ULTRON Automatic.");
-    }
     throw error;
   } finally {
-    window.clearTimeout(timeout);
     signal.removeEventListener("abort", abortFromCaller);
   }
 }

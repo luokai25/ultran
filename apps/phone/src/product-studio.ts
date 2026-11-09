@@ -189,8 +189,10 @@ function renderQuality(project: ProductProject): void {
     ["presentation_pptx_valid", "Editable PowerPoint deck (when required)"],
     ["docx_export_ready", "Editable Word edition"],
     ["software_code_files_ready", "Source-code examples packaged (when required)"],
+    ["editorial_review_passed", "Independent editorial review ready"],
   ];
-  const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed · " + String(validation.distinct_cited_sources ?? 0) + " cited");
+  const editorialScore = Number(validation.editorial_review_score);
+  const summary = node("p", "product-quality-summary", String(validation.word_count ?? 0) + " words · " + String(validation.analyzed_sources ?? 0) + " sources analyzed · " + String(validation.distinct_cited_sources ?? 0) + " cited" + (Number.isFinite(editorialScore) && editorialScore > 0 ? " · editorial " + Math.round(editorialScore) + "/100" : ""));
   panel.append(summary);
   for (const [key, label] of checks) {
     const passed = validation[key] === true;
@@ -199,6 +201,10 @@ function renderQuality(project: ProductProject): void {
     row.append(node("span", "product-quality-label", label));
     panel.append(row);
   }
+  const reviewStatus = String(validation.editorial_review_status ?? "not_run");
+  if (reviewStatus === "revised") panel.append(node("p", "product-studio-quality-note", "ULTRON revised the sections flagged by its editorial review. Give the final edition a human review before publication."));
+  else if (reviewStatus === "skipped") panel.append(node("p", "product-studio-quality-note", "The independent editorial review was unavailable. Structural and citation checks still ran."));
+  else if (reviewStatus === "reviewed_revision_unavailable" || reviewStatus === "reviewed_revision_rejected" || validation.editorial_review_passed !== true) panel.append(node("p", "product-studio-quality-note", "The editorial review recommends a human review before publication."));
   if (validation.quality_checks_passed !== true) {
     panel.append(node("p", "product-studio-quality-note", "This draft is saved, but it did not pass every quality gate. Improve it before publishing or selling."));
   }

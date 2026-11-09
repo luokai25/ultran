@@ -251,11 +251,11 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
       const response = fetched.response;
       if (!response.ok) return { item, status: "failed" as const, text: "" };
       const type = response.headers.get("content-type") ?? "";
-      if (!/text\\/html|text\\/plain/i.test(type)) return { item, status: "rejected" as const, text: "" };
+      if (!/text\/html|text\/plain/i.test(type)) return { item, status: "rejected" as const, text: "" };
       const declaredSize = Number(response.headers.get("content-length") ?? 0);
       if (declaredSize > 1_500_000) return { item, status: "rejected" as const, text: "" };
       const raw = (await response.text()).slice(0, 1_500_000);
-      const extracted = raw.replace(/<script[\\s\\S]*?<\\/script>/gi, " ").replace(/<style[\\s\\S]*?<\\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\s+/g, " ").trim().slice(0, 4500);
+      const extracted = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 4500);
       if (extracted.length < 300) return { item, status: "failed" as const, text: "" };
       return { item, status: "analyzed" as const, text: extracted, type, finalUrl: response.url || parsed.toString() };
     } catch {
@@ -270,7 +270,7 @@ async function workerProcess(projectId: string, ownerId: string, jobId: string):
     analyzed++;
     const finalUrl = result.finalUrl ?? result.item.url;
     const url = new URL(finalUrl);
-    const domain = url.hostname.replace(/^www\\./, "");
+    const domain = url.hostname.replace(/^www\./, "");
     const hashBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url.toString()));
     const urlHash = Array.from(new Uint8Array(hashBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
     await db.from("ultron_product_sources").upsert({

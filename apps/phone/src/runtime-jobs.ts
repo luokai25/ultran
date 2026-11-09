@@ -78,7 +78,7 @@ export function startUltronJobWorker(): void {
   const tick = async (): Promise<void> => {
     if (workerBusy || (typeof document !== "undefined" && document.visibilityState === "hidden")) return;
     workerBusy = true;
-    try { await processUltronJobs(3); }
+    try { await processUltronJobs(1); }
     catch (error) { console.warn("[ULTRON cloud worker]", error); }
     finally { workerBusy = false; }
   };

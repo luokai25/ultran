@@ -5239,7 +5239,7 @@ if (synth) {
  * Boot
  * ------------------------------------------------------------------ */
 
-initProductStudio({ openScreen: () => showFeatureScreen("product-studio-screen", navChatButton), closeScreen: () => navChatButton.click(), wakeWorker: () => processUltronJobs(1) });
+initProductStudio({ openScreen: () => showFeatureScreen("product-studio-screen", navChatButton), closeScreen: () => navChatButton.click(), openCloudSettings: () => { closeDrawer(); navSettingsButton.click(); window.setTimeout(() => req<HTMLElement>("#cloud-sync-heading").scrollIntoView({ behavior: "smooth", block: "center" }), 120); }, wakeWorker: () => processUltronJobs(1) });
 
 initConnectors({
   linked: async () => Boolean(await getCloudSession()),

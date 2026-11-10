@@ -4234,7 +4234,24 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       // Up to eight verified tool actions, followed by one final model turn.
       for (let modelTurn = 0; modelTurn <= iterationLimit; modelTurn++) {
         let generated = "";
-        await streamUltronBrainChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; }, selectedCloudProvider ?? undefined);
+        let visibleStreamStarted = false;
+        await streamUltronBrainChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, (token) => {
+          if (!token) return;
+          generated += token;
+          if (!visibleStreamStarted) {
+            const prefix = generated.trimStart();
+            const possibleToolEnvelope = prefix.startsWith("{")
+              || /^ULTRON_TOOL_CALL\\s*:/i.test(prefix)
+              || prefix.startsWith("```");
+            // Tool envelopes stay private until parsed. Ordinary answer text is
+            // forwarded immediately so Prometheus no longer waits for a full turn.
+            if (possibleToolEnvelope) return;
+            visibleStreamStarted = true;
+            onToken(generated);
+          } else {
+            onToken(token);
+          }
+        }, selectedCloudProvider ?? undefined);
         tokensUsed += Math.max(1, Math.ceil(generated.length / 4));
         const request = parseLocalToolRequest(generated);
         if (!request) {
@@ -4244,8 +4261,9 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
           saveStore();
           if (!cloudCheckpointAvailable && toolHistory.length) {
             generated += "\n\nULTRON note: the requested actions completed, but optional cloud checkpoint sync was unavailable; the local checkpoint remains saved.";
+            if (visibleStreamStarted) onToken("\n\nULTRON note: the requested actions completed, but optional cloud checkpoint sync was unavailable; the local checkpoint remains saved.");
           }
-          onToken(generated);
+          if (!visibleStreamStarted) onToken(generated);
           return { content: generated, session_id: "" };
         }
         if (!toolRequestMatchesUserIntent(request, goal + "\n" + task)) {

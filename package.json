@@ -4,7 +4,10 @@
   "private": true,
   "description": "ULTRON personal AI workspace: shared Vite/Capacitor client and Supabase cloud runtime",
   "license": "Apache-2.0",
-  "engines": { "node": ">=20.11.0", "pnpm": ">=9.0.0" },
+  "engines": {
+    "node": ">=20.11.0 <23",
+    "pnpm": ">=9.0.0"
+  },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "dev": "pnpm --filter @ultron/phone dev",
@@ -20,5 +23,9 @@
     "prettier": "^3.3.3",
     "typescript": "^5.6.2"
   },
-  "pnpm": { "overrides": { "rollup": "4.66.0" } }
+  "pnpm": {
+    "overrides": {
+      "rollup": "4.66.0"
+    }
+  }
 }

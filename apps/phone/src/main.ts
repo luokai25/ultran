@@ -401,9 +401,17 @@ let llmProvider: ProviderProfile = detectProvider("");
 let llmProviderState: ProviderState = "missing";
 let llmProviderModels: string[] = [];
 let selectedLlmModel = "";
-let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", false);
+let cloudBrainActive = readJson<boolean>("ultron.cloud-brain.active.v1", true);
 let selectedCloudModelId = readJson<string>("ultron.cloud-brain.model.v1", "");
 let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain.provider.v1", null);
+
+// One-time migration: existing installs default to Automatic after this chat
+// routing rebuild. An explicit local-model choice remains persistent afterwards.
+if (!readJson<boolean>("ultron.chat.auto-routing-migrated.v1", false)) {
+  cloudBrainActive = true;
+  writeJson("ultron.cloud-brain.active.v1", true);
+  writeJson("ultron.chat.auto-routing-migrated.v1", true);
+}
 
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };
 for (const convo of store.conversations) {
@@ -3164,7 +3172,7 @@ async function submitTurn(raw: string): Promise<void> {
 
   let result: ChatReply;
   let streamedText = "";
-  if (nativeModelLoaded && Capacitor.getPlatform() === "android") {
+  if (!cloudBrainActive && nativeModelLoaded && Capacitor.getPlatform() === "android") {
     try {
       const profile = profileTask(requestText);
       const runtimeInventory = await localRuntimeInventoryPrompt();
@@ -4242,163 +4250,115 @@ async function openChatModelMenu(): Promise<void> {
   chatModelMenu.style.bottom = (window.innerHeight - modelButtonRect.top + 10) + "px";
   chatModelMenu.style.maxHeight = Math.max(180, modelButtonRect.top - 20) + "px";
   chatModelOptions.replaceChildren();
-  chatModelStatus.textContent = "Checking installed models and connections…";
+  chatModelStatus.textContent = "ULTRON Automatic is the default. Checking Supabase and imported local models…";
   syncChatModelLabel();
-  try {
-    if (Capacitor.getPlatform() === "android") {
+
+  // Keep the picker deliberately small: one automatic cloud brain plus the
+  // names of models actually imported onto this device. Provider/key inventories
+  // belong in the dedicated LLM API Keys screen, never in the chat picker.
+  const automatic = document.createElement("button");
+  automatic.type = "button";
+  automatic.className = "chat-model-option ultron-provider-auto";
+  automatic.setAttribute("aria-current", String(cloudBrainActive && !selectedCloudModelId));
+  const autoTitle = document.createElement("strong");
+  autoTitle.textContent = "ULTRON · Automatic";
+  const autoDetail = document.createElement("small");
+  autoDetail.textContent = "Supabase Vault · automatic model routing · key rotation · failover · tools";
+  const autoMarker = document.createElement("span");
+  autoMarker.className = "chat-model-option-marker";
+  autoMarker.textContent = cloudBrainActive && !selectedCloudModelId ? "✓" : "›";
+  automatic.append(autoTitle, autoDetail, autoMarker);
+  automatic.addEventListener("click", async () => {
+    cloudBrainActive = true;
+    selectedCloudModelId = "";
+    selectedCloudProvider = null;
+    selectedLlmModel = "";
+    writeJson("ultron.cloud-brain.active.v1", true);
+    writeJson("ultron.cloud-brain.model.v1", "");
+    writeJson("ultron.cloud-brain.provider.v1", null);
+    syncChatModelLabel();
+    closeChatModelMenu();
+    try {
+      const session = await getCloudSession();
+      if (!session) {
+        chatModelStatus.textContent = "Automatic is selected. Sign in once to the ULTRON owner account in Settings; the session is then securely persisted and refreshed automatically.";
+        openSheet();
+        return;
+      }
+      const status = await getUltronCloudStatus();
+      const connected = Number(status.connected_keys ?? 0);
+      chatModelStatus.textContent = connected > 0
+        ? "Automatic is active · " + connected + " connected provider key(s) · ULTRON selects the model and fails over automatically."
+        : "Automatic is active, but no usable provider keys are currently available. Add keys in LLM API Keys.";
+    } catch (error) {
+      chatModelStatus.textContent = "Automatic is selected. Supabase health check will retry on the next message: " + (error instanceof Error ? error.message : "connection pending");
+    }
+  });
+  chatModelOptions.appendChild(automatic);
+
+  if (Capacitor.getPlatform() === "android") {
+    try {
       const [status, listed] = await Promise.all([NativeLocalAI.getStatus(), NativeLocalAI.listModels()]);
       nativeModelLoaded = status.loaded;
       nativeLoadedModelName = status.loadedModel;
-      for (const model of listed.models) {
-        addModelChoice(model.name.replace(/\.gguf$/i, ""), `${formatBytes(model.sizeBytes)} · on this device${model.loaded ? " · loaded" : ""}`, async () => {
-          if (model.loaded) return;
-          selectedLlmModel = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false);
-          void persistProviderMetadata();
-          nativeModelStatus.textContent = `Loading ${model.name}…`;
-          chatModelStatus.textContent = `Loading ${model.name} into memory…`;
+      const models = Array.isArray(listed.models) ? listed.models : [];
+      for (const model of models) {
+        const modelName = model.name.replace(/\.gguf$/i, "");
+        addModelChoice(modelName, formatBytes(model.sizeBytes) + " · imported on this device" + (model.loaded ? " · loaded" : ""), async () => {
           try {
-            const result = await NativeLocalAI.loadModel({ name: model.name, projectorName: selectedNativeProjectorName || undefined });
-            nativeModelLoaded = result.loaded;
-            nativeLoadedModelName = result.name;
-            nativeModelSelect.value = result.name;
-            nativeModelStatus.textContent = `Ready: ${result.name} · ${result.contextTokens} context tokens · CPU inference`;
+            if (nativeModelLoaded && nativeLoadedModelName !== model.name) await NativeLocalAI.unloadModel();
+            if (!model.loaded || !nativeModelLoaded || nativeLoadedModelName !== model.name) {
+              nativeModelStatus.textContent = "Loading " + model.name + "…";
+              const result = await NativeLocalAI.loadModel({ name: model.name, projectorName: selectedNativeProjectorName || undefined });
+              nativeModelLoaded = result.loaded;
+              nativeLoadedModelName = result.name;
+              nativeModelSelect.value = result.name;
+              nativeModelStatus.textContent = "Ready: " + result.name + " · " + result.contextTokens + " context tokens · CPU inference";
+            }
+            cloudBrainActive = false;
+            selectedCloudModelId = "";
+            selectedCloudProvider = null;
+            selectedLlmModel = "";
+            writeJson("ultron.cloud-brain.active.v1", false);
+            writeJson("ultron.cloud-brain.model.v1", "");
+            writeJson("ultron.cloud-brain.provider.v1", null);
             syncChatModelLabel();
-            chatModelStatus.textContent = `${result.name} is now active for chat.`;
+            chatModelStatus.textContent = modelName + " is active locally. Choose ULTRON · Automatic to return to the cloud brain.";
           } catch (error) {
             nativeModelStatus.textContent = "Could not load model: " + (error instanceof Error ? error.message : "unknown error");
             chatModelStatus.textContent = nativeModelStatus.textContent;
           }
-        }, model.loaded);
+        }, model.loaded && !cloudBrainActive);
       }
+      if (!models.length) {
+        const empty = document.createElement("p");
+        empty.className = "chat-model-empty";
+        empty.textContent = "No imported local models yet. Import a GGUF model or archive from Model Library.";
+        chatModelOptions.appendChild(empty);
+      }
+    } catch (error) {
+      const warning = document.createElement("p");
+      warning.className = "chat-model-empty";
+      warning.textContent = "Could not read imported local models: " + (error instanceof Error ? error.message : "runtime unavailable");
+      chatModelOptions.appendChild(warning);
     }
-    const [cloudStatus, cloudModels, cloudKeys] = await Promise.all([
-      getUltronCloudStatus().catch(() => null),
-      getUltronCloudModels().catch(() => []),
-      listUltronCloudKeys().catch(() => null),
-    ]);
-    const cloudConnectedKeys = Number(cloudStatus?.connected_keys ?? 0);
-    const providerDirectory: Array<{ id: CloudProviderId; label: string }> = [
-      { id: "openrouter", label: "OpenRouter" },
-      { id: "groq", label: "Groq" },
-      { id: "google_ai_studio", label: "Google AI Studio" },
-      { id: "mistral", label: "Mistral" },
-      { id: "cerebras", label: "Cerebras" },
-      { id: "cohere", label: "Cohere" },
-    ];
-    const renderCloudProviderModels = (providerId: CloudProviderId): void => {
-      const provider = providerDirectory.find((item) => item.id === providerId)!;
-      chatModelOptions.replaceChildren();
-      const back = document.createElement("button");
-      back.type = "button"; back.className = "chat-model-back"; back.textContent = "‹  All providers";
-      back.addEventListener("click", () => renderCloudProviderList(false));
-      chatModelOptions.appendChild(back);
-      const available = cloudModels.filter((model) => model.provider === providerId);
-      if (!available.length) {
-        const empty = document.createElement("p"); empty.className = "chat-model-empty";
-        empty.textContent = provider.label + " has no connected free chat models yet. Add a key or check the provider's free-tier access.";
-        const addKey = document.createElement("button"); addKey.type = "button"; addKey.className = "chat-model-back"; addKey.textContent = "+  Add API key";
-        addKey.addEventListener("click", () => { closeChatModelMenu(); showFeatureScreen("llm-api-keys-screen", navChatButton); void refreshCloudLlmScreen(); });
-        chatModelOptions.append(empty, addKey); return;
-      }
-      for (const model of available) {
-        addModelChoice(model.model_id, provider.label + " · Supabase Vault · " + model.key_count + " key(s)", async () => {
-          if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
-          nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = "";
-          cloudBrainActive = true; selectedCloudModelId = model.model_id; selectedCloudProvider = providerId;
-          writeJson("ultron.cloud-brain.active.v1", true);
-          writeJson("ultron.cloud-brain.model.v1", selectedCloudModelId);
-          writeJson("ultron.cloud-brain.provider.v1", selectedCloudProvider);
-          await refreshNativeModels(); syncChatModelLabel();
-          chatModelStatus.textContent = model.model_id + " is locked as the active " + provider.label + " model. ULTRON will use its verified Supabase Vault key.";
-        }, cloudBrainActive && selectedCloudModelId === model.model_id && selectedCloudProvider === providerId);
-      }
-    };
-    const renderCloudProviderList = (showAll: boolean): void => {
-      chatModelOptions.replaceChildren();
-      const visible = showAll ? providerDirectory : providerDirectory.slice(0, 3);
-      for (const provider of visible) {
-        const group = cloudKeys?.providers.find((item) => item.id === provider.id);
-        const count = cloudModels.filter((model) => model.provider === provider.id).length;
-        const button = document.createElement("button");
-        button.type = "button"; button.className = "chat-model-option ultron-provider-choice";
-        button.setAttribute("aria-current", selectedCloudProvider === provider.id && cloudBrainActive ? "true" : "false");
-        const title = document.createElement("strong"); title.textContent = provider.label;
-        const detail = document.createElement("small");
-        detail.textContent = count ? count + " available models · " + (group?.connected_count ?? 0) + " connected key(s)" : group?.key_count ? "Key saved · no free chat models listed" : "Add a key to connect";
-        const marker = document.createElement("span"); marker.className = "chat-model-option-marker";
-        marker.textContent = selectedCloudProvider === provider.id && cloudBrainActive ? "🔒" : "›";
-        button.append(title, detail, marker);
-        button.addEventListener("click", () => renderCloudProviderModels(provider.id));
-        chatModelOptions.appendChild(button);
-      }
-      if (!showAll) {
-        const more = document.createElement("button"); more.type = "button"; more.className = "ultron-provider-more";
-        more.textContent = "+  More providers";
-        more.addEventListener("click", () => renderCloudProviderList(true));
-        chatModelOptions.appendChild(more);
-      } else {
-        const fewer = document.createElement("button"); fewer.type = "button"; fewer.className = "ultron-provider-more";
-        fewer.textContent = "−  Show three providers";
-        fewer.addEventListener("click", () => renderCloudProviderList(false));
-        chatModelOptions.appendChild(fewer);
-      }
-      const automatic = document.createElement("button"); automatic.type = "button"; automatic.className = "chat-model-option ultron-provider-auto";
-      automatic.setAttribute("aria-current", cloudBrainActive && !selectedCloudModelId ? "true" : "false");
-      const autoTitle = document.createElement("strong"); autoTitle.textContent = "ULTRON · Automatic";
-      const autoDetail = document.createElement("small"); autoDetail.textContent = cloudConnectedKeys + " connected keys · automatic routing and failover";
-      const autoMarker = document.createElement("span"); autoMarker.className = "chat-model-option-marker"; autoMarker.textContent = cloudBrainActive && !selectedCloudModelId ? "🔒" : "›";
-      automatic.append(autoTitle, autoDetail, autoMarker);
-      automatic.addEventListener("click", async () => {
-        if (!cloudConnectedKeys) { showFeatureScreen("llm-api-keys-screen", navChatButton); void refreshCloudLlmScreen(); return; }
-        if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
-        nativeModelLoaded = false; nativeLoadedModelName = ""; selectedLlmModel = "";
-        cloudBrainActive = true; selectedCloudModelId = ""; selectedCloudProvider = null;
-        writeJson("ultron.cloud-brain.active.v1", true); writeJson("ultron.cloud-brain.model.v1", ""); writeJson("ultron.cloud-brain.provider.v1", null);
-        await refreshNativeModels(); syncChatModelLabel();
-        chatModelStatus.textContent = "ULTRON is using automatic provider routing and failover.";
-        closeChatModelMenu();
-      });
-      chatModelOptions.appendChild(automatic);
-    };
-    renderCloudProviderList(false);
-    if (llmProviderState === "connected" && llmApiKey && llmProviderModels.length) {
-      for (const modelName of llmProviderModels) {
-        addModelChoice(modelName, llmProvider.label + " · API key connected", async () => {
-          if (nativeModelLoaded && Capacitor.getPlatform() === "android") await NativeLocalAI.unloadModel();
-          nativeModelLoaded = false; nativeLoadedModelName = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false); selectedLlmModel = modelName;
-          await persistProviderMetadata(); await refreshNativeModels(); syncChatModelLabel();
-          chatModelStatus.textContent = modelName + " is now locked as the active " + llmProvider.label + " model.";
-        }, !nativeModelLoaded && selectedLlmModel === modelName);
-      }
-    }
-    if (settings.localModelEndpoint.trim() && settings.localModel.trim()) {
-      addModelChoice(settings.localModel.trim(), "OpenAI-compatible endpoint · configured", async () => {
-        try {
-          if (nativeModelLoaded) await NativeLocalAI.unloadModel();
-          nativeModelLoaded = false;
-          nativeLoadedModelName = "";
-          selectedLlmModel = ""; cloudBrainActive = false; writeJson("ultron.cloud-brain.active.v1", false);
-          void persistProviderMetadata();
-          saveSettings();
-          await refreshNativeModels();
-          syncChatModelLabel();
-          chatModelStatus.textContent = `Chat will use ${settings.localModel.trim()} through the configured local endpoint.`;
-        } catch (error) {
-          chatModelStatus.textContent = "Could not switch models: " + (error instanceof Error ? error.message : "unknown error");
-        }
-      }, !nativeModelLoaded && activeModelLabel() === settings.localModel.trim());
-    }
-    if (!chatModelOptions.childElementCount) {
-      const empty = document.createElement("p");
-      empty.className = "chat-model-empty";
-      empty.textContent = Capacitor.getPlatform() === "android" ? "No local model or verified API provider yet. Import a model or add one key in LLM API KEYS." : "Configure an OpenAI-compatible endpoint or add a key in LLM API KEYS.";
-      chatModelOptions.appendChild(empty);
-    }
-    chatModelStatus.textContent = "Switch models without leaving your conversation. Model weights stay in Ultron's private storage.";
-    syncChatModelLabel();
-  } catch (error) {
-    chatModelStatus.textContent = "Could not list models: " + (error instanceof Error ? error.message : "unknown error");
   }
+
+  try {
+    const session = await getCloudSession();
+    if (!session) {
+      chatModelStatus.textContent = "ULTRON · Automatic is ready, but the owner session needs one initial sign-in in Settings.";
+    } else {
+      const status = await getUltronCloudStatus();
+      const connected = Number(status.connected_keys ?? 0);
+      chatModelStatus.textContent = connected > 0
+        ? "Automatic cloud brain ready · " + connected + " connected key(s). " + (Capacitor.getPlatform() === "android" ? "Imported local models are listed below." : "No provider or API-key list is shown here.")
+        : "Automatic is selected. No usable provider keys are currently available; add them in LLM API Keys.";
+    }
+  } catch {
+    chatModelStatus.textContent = "Automatic is selected. Supabase will reconnect when the network or owner session is available.";
+  }
+  syncChatModelLabel();
 }
 
 function openSheet(): void {

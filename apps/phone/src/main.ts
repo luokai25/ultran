@@ -66,6 +66,7 @@ import {
   nativeSecureStorage,
 } from "./cloud-sync";
 import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
+import { listDurableRecords, migrateLegacyLocalStorage, putDurableRecords } from "./durable-store";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
@@ -680,6 +681,56 @@ async function deleteNativeModel(): Promise<void> {
   }
 }
 
+let durableChatStoreReady = false;
+let durableChatWriteQueue: Promise<void> = Promise.resolve();
+
+function persistChatToIndexedDb(snapshot: Store): Promise<void> {
+  const records = snapshot.conversations.map((conversation) => ({
+    bucket: "conversations" as const,
+    id: conversation.id,
+    value: conversation,
+  }));
+  records.push({
+    bucket: "metadata" as const,
+    id: "chat-state",
+    value: { activeId: snapshot.activeId, conversationIds: snapshot.conversations.map((conversation) => conversation.id) },
+  } as typeof records[number]);
+  return putDurableRecords(records);
+}
+
+async function initializeDurableChatStore(): Promise<void> {
+  try {
+    // Preserve the legacy source first. The migration deliberately never deletes it.
+    await migrateLegacyLocalStorage([STORE_KEY]);
+    const metadata = await listDurableRecords<{ activeId: string | null; conversationIds: string[] }>("metadata");
+    const chatState = metadata.find((record) => record.id === "chat-state")?.value;
+    if (chatState && Array.isArray(chatState.conversationIds)) {
+      const durableConversations = await Promise.all(
+        chatState.conversationIds.map((id) => listDurableRecords<Conversation>("conversations")
+          .then((rows) => rows.find((row) => row.id === id)?.value ?? null)),
+      );
+      const restored = durableConversations.filter((conversation): conversation is Conversation => Boolean(conversation));
+      if (restored.length || chatState.conversationIds.length === 0) {
+        store.conversations = restored;
+        store.activeId = restored.some((conversation) => conversation.id === chatState.activeId)
+          ? chatState.activeId
+          : restored[0]?.id ?? null;
+      }
+    } else {
+      await persistChatToIndexedDb(store);
+    }
+    durableChatStoreReady = true;
+    // Reconcile after restore so the legacy localStorage copy is updated only
+    // from a successfully read durable snapshot.
+    writeJson(STORE_KEY, store);
+    cloudSyncStatusEl.dataset.state = "local";
+    cloudSyncStatusEl.textContent = "Local history is stored on this device. Cloud sync is optional.";
+  } catch (error) {
+    durableChatStoreReady = false;
+    reportLocalStorageFailure("save", "IndexedDB chat history", error);
+  }
+}
+
 const saveStore = (): void => {
   for (const convo of store.conversations) {
     if (convo.executionLedger) convo.cognitiveCheckpoint = createUltronCheckpoint(convo.id, convo.executionLedger);
@@ -689,6 +740,14 @@ const saveStore = (): void => {
     }
   }
   writeJson(STORE_KEY, store);
+  if (durableChatStoreReady) {
+    const snapshot = JSON.parse(JSON.stringify(store)) as Store;
+    durableChatWriteQueue = durableChatWriteQueue
+      .then(() => persistChatToIndexedDb(snapshot))
+      .catch((error) => {
+        reportLocalStorageFailure("save", "IndexedDB chat history", error);
+      });
+  }
   scheduleCloudSync(store.conversations, (error) => {
     cloudSyncStatusEl.textContent = "Connected, but synchronization failed: " + (error instanceof Error ? error.message : "unknown error");
   });
@@ -5119,7 +5178,10 @@ initConnectors({
 buildThemes();
 applyTheme(settings.theme);
 setLink("offline", settings.endpoint ? "ready" : "local");
-renderConversation();
+void initializeDurableChatStore().finally(() => {
+  renderHistory();
+  renderConversation();
+});
 void refreshNativeModels();
 autosize();
 

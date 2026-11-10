@@ -99,12 +99,15 @@ export async function listLocalProviderKeys(): Promise<Array<Omit<LocalProviderK
   return keys.map(({ apiKey: _secret, ...metadata }) => metadata);
 }
 
-export async function getLocalProviderKey(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey | null> {
+export async function getLocalProviderKeyCandidates(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey[]> {
   const keys = await readEncryptedVault();
-  const candidates = keys.filter((key) => key.provider === provider && key.enabled && key.status === "connected" &&
+  return keys.filter((key) => key.provider === provider && key.enabled && key.status === "connected" &&
     (!modelId || key.models.includes(modelId)))
     .sort((a, b) => b.priority - a.priority || a.created_at.localeCompare(b.created_at));
-  return candidates[0] ?? null;
+}
+
+export async function getLocalProviderKey(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey | null> {
+  return (await getLocalProviderKeyCandidates(provider, modelId))[0] ?? null;
 }
 
 export async function saveLocalProviderKey(input: Omit<LocalProviderKey, "id" | "created_at">): Promise<{ key: Omit<LocalProviderKey, "apiKey">; duplicate: boolean }> {

@@ -224,6 +224,7 @@ let cloudUnsubscribe: (() => void) | null = null;
 let cloudRefreshInFlight = false;
 let cloudRefreshQueued = false;
 let cloudAccountConnected = false;
+const publicWebMode = Capacitor.getPlatform() === "web";
 let cloudRestoreInFlight = false;
 let cloudResumeInFlight = false;
 let lastCloudResumeAt = 0;
@@ -882,7 +883,10 @@ async function restoreCloudAccount(): Promise<void> {
     if (!session) {
       cloudAccountConnected = false;
       updateHeroCloudStatus();
-      cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
+      cloudSyncStatusEl.textContent = publicWebMode
+        ? "Public ULTRON cloud brain ready. No account or sign-in is required. Chat runs directly through the cloud brain."
+        : "Not connected. Local-only mode is active.";
+      if (publicWebMode) void refreshCloudLlmScreen();
       return;
     }
     const { data: owner, error } = await cloudClient
@@ -2091,10 +2095,10 @@ async function removeConversation(id: string): Promise<void> {
 type LinkState = "offline" | "connecting" | "online" | "error";
 
 function updateHeroCloudStatus(checking = false): void {
-  const state = !navigator.onLine ? "offline" : checking ? "checking" : cloudAccountConnected ? "cloud" : "local";
+  const state = !navigator.onLine ? "offline" : checking ? "checking" : cloudAccountConnected || publicWebMode ? "cloud" : "local";
   heroStatusEl.dataset.connection = state;
   coreStatusLabelEl.textContent = state === "cloud"
-    ? "SUPABASE CLOUD LINKED"
+    ? publicWebMode ? "ULTRON CLOUD READY · NO ACCOUNT" : "SUPABASE CLOUD LINKED"
     : state === "checking"
       ? "CHECKING SUPABASE"
       : state === "offline"
@@ -3784,14 +3788,8 @@ async function refreshFreeProviderDirectory(refresh = false): Promise<void> {
 
 async function refreshCloudLlmScreen(): Promise<void> {
   try {
-    const session = await getCloudSession();
-    if (!session) {
-      cloudBrainStateEl.textContent = "Owner session required";
-      cloudBrainStatusEl.dataset.state = "missing";
-      cloudBrainStatusEl.textContent = "Reconnect the ULTRON owner account in Settings. Your saved Vault keys remain untouched.";
-      cloudLlmKeysEl.replaceChildren();
-      return;
-    }
+    // Public single-instance web mode reads the existing server-side key pool
+    // directly through ultron-brain. No visitor account or Supabase session exists.
     // Key inventory and worker health are independent. A transient health
     // endpoint failure must never make already-saved keys disappear.
     const [keysResult, statusResult] = await Promise.allSettled([listUltronCloudKeys(), getUltronCloudStatus()]);
@@ -4817,11 +4815,20 @@ cloudClient.auth.onAuthStateChange((event, session) => {
       cloudUnsubscribe = null;
       stopUltronJobWorker();
       cloudDisconnectButton.disabled = true;
-      cloudSyncStatusEl.textContent = "Not connected. Local-only mode is active.";
-      cloudBrainStateEl.textContent = "Owner session required";
-      cloudBrainStatusEl.dataset.state = "missing";
-      cloudBrainStatusEl.textContent = "Reconnect the ULTRON owner account in Settings to load private provider keys.";
-      cloudLlmKeysEl.replaceChildren();
+      cloudSyncStatusEl.textContent = publicWebMode
+        ? "Public ULTRON cloud brain ready. No account is required."
+        : "Not connected. Local-only mode is active.";
+      if (publicWebMode) {
+        cloudBrainStateEl.textContent = "Public cloud brain";
+        cloudBrainStatusEl.dataset.state = "connected";
+        cloudBrainStatusEl.textContent = "No sign-in required. Existing provider keys are loaded server-side from Supabase Vault.";
+        void refreshCloudLlmScreen();
+      } else {
+        cloudBrainStateEl.textContent = "Owner session required";
+        cloudBrainStatusEl.dataset.state = "missing";
+        cloudBrainStatusEl.textContent = "Reconnect the ULTRON owner account in Settings to load private provider keys.";
+        cloudLlmKeysEl.replaceChildren();
+      }
       return;
     }
     cloudDisconnectButton.disabled = false;

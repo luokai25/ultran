@@ -53,6 +53,34 @@ function freeModel(provider: CloudProviderId, model: string): boolean {
   return false;
 }
 
+function taskComplexity(messages: Array<{ role: string; content: string }>): number {
+  const task = messages.filter((message) => message.role === "user").slice(-6).map((message) => message.content.slice(0, 24000)).join("\\n").toLowerCase();
+  let score = 0;
+  if (/\\b(build|implement|debug|refactor|architecture|research|compare|analy[sz]e|design|migrate|deploy|multi.step|step.by.step|investigate|prove|optimi[sz]e)\\b/.test(task)) score += 2;
+  if (/\\b(code|typescript|javascript|python|sql|android|supabase|github|compiler|stack trace|test suite)\\b/.test(task)) score += 2;
+  if (/\\b(reasoning|mathematical proof|derive|formal|algorithm|security review|large codebase)\\b/.test(task)) score += 2;
+  if (task.length > 5000) score += 1;
+  if (messages.length > 5) score += 1;
+  return Math.min(7, score);
+}
+
+function modelCapabilityScore(model: string, complexity: number): number {
+  const id = model.toLowerCase();
+  const params = Number(id.match(/(?:^|[-_.])(\\d+(?:\\.\\d+)?)b(?:[-_.]|$)/)?.[1] ?? 0);
+  let score = 100 + Math.min(160, params) * 5;
+  if (/gpt-oss-120b/.test(id)) score += 1200;
+  if (/llama-4-maverick/.test(id)) score += 1600;
+  if (/command-a-/.test(id)) score += 1000;
+  if (/llama-4-scout/.test(id)) score += 450;
+  if (/llama-3\\.3-70b|llama-3\\.1-70b|qwen3-32b|command-r-plus/.test(id)) score += 180;
+  if (/reason|r1|qwq|deepseek/.test(id) && complexity >= 3) score += 150;
+  if (/coder|codestral|qwen.*coder|deepseek-coder/.test(id) && complexity >= 2) score += 180;
+  if (/vision|vl|llava/.test(id) && complexity >= 2) score += 80;
+  if (complexity <= 1) score -= params * 7;
+  else score += params * Math.min(5, complexity) * 2;
+  return score;
+}
+
 async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
   const raw = await response.text();
   let result: Record<string, unknown> = {};
@@ -165,16 +193,34 @@ export async function streamUltronBrainChat(
   provider?: CloudProviderId,
 ): Promise<string> {
   const separator = modelId.indexOf("::");
-  const selectedProvider = provider ?? (separator > 0 ? modelId.slice(0, separator) as CloudProviderId : undefined);
+  const qualifiedProvider = separator > 0 ? modelId.slice(0, separator) as CloudProviderId : undefined;
+  const selectedProvider = provider ?? qualifiedProvider;
   const selectedModel = separator > 0 ? modelId.slice(separator + 2) : modelId;
-  if (!selectedProvider || !SUPPORTED_ON_VERCEL.has(selectedProvider)) {
-    throw new Error("Choose a provider and model supported by the independent ULTRON Brain gateway.");
+  if (selectedProvider && !SUPPORTED_ON_VERCEL.has(selectedProvider)) {
+    throw new Error("The selected provider is not supported by the independent ULTRON Brain gateway.");
   }
-  const candidates = await getLocalProviderKeyCandidates(selectedProvider, selectedModel);
-  if (!candidates.length) throw new Error(`No active local ${PROVIDERS[selectedProvider]} key supports this model. Add or enable a key in LLM API Keys.`);
   const safeMessages = prepareCloudChatMessages(messages);
   if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
     throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
+  }
+  const complexity = taskComplexity(safeMessages);
+  const providers = selectedProvider ? [selectedProvider] : [...SUPPORTED_ON_VERCEL];
+  const candidateGroups = await Promise.all(providers.map(async (candidateProvider) => {
+    const keys = await getLocalProviderKeyCandidates(candidateProvider, selectedModel || undefined);
+    return keys.flatMap((key) => {
+      const model = selectedModel || key.models.filter((id) => freeModel(candidateProvider, id))
+        .sort((a, b) => modelCapabilityScore(b, complexity) - modelCapabilityScore(a, complexity))[0] || "";
+      if (!model || (!selectedModel && !freeModel(candidateProvider, model))) return [];
+      return [{ provider: candidateProvider, key, model, score: modelCapabilityScore(model, complexity) }];
+    });
+  }));
+  const candidates = candidateGroups.flat().sort((a, b) =>
+    b.score - a.score || b.key.priority - a.key.priority ||
+    Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01"));
+  if (!candidates.length) {
+    throw new Error(selectedModel
+      ? "No active local provider key supports the selected model. Add or enable a compatible key in LLM API Keys."
+      : "No eligible free-tier chat model is available. Add a provider key or choose a local model.");
   }
 
   const controller = new AbortController();
@@ -198,8 +244,8 @@ export async function streamUltronBrainChat(
           headers: { "Content-Type": "application/json", Accept: "text/event-stream, application/json" },
           cache: "no-store",
           body: JSON.stringify({
-            action: "chat", provider: selectedProvider, model_id: selectedModel,
-            api_key: candidate.apiKey, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3,
+            action: "chat", provider: candidate.provider, model_id: candidate.model,
+            api_key: candidate.key.apiKey, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3,
           }),
           signal: controller.signal,
         });
@@ -222,7 +268,7 @@ export async function streamUltronBrainChat(
           const retryHeader = response.headers.get("retry-after");
           const retryAfterMs = retryHeader && /^\\d+(?:\\.\\d+)?$/.test(retryHeader)
             ? Number(retryHeader) * 1000 : 900_000;
-          await recordLocalProviderKeyResult(selectedProvider, candidate.id, {
+          await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, {
             outcome, error: message, retryAfterMs,
           }).catch(() => undefined);
         }
@@ -272,7 +318,7 @@ export async function streamUltronBrainChat(
         await reader.cancel().catch(() => undefined);
       }
       if (!content.trim()) throw new Error("ULTRON Brain completed without returning any text.");
-      await recordLocalProviderKeyResult(selectedProvider, candidate.id, { outcome: "success", tokens: Math.max(1, Math.ceil(content.length / 4)) }).catch(() => undefined);
+      await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, { outcome: "success", tokens: Math.max(1, Math.ceil(content.length / 4)) }).catch(() => undefined);
       return content.trim();
     }
     if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");

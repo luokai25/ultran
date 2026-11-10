@@ -24,7 +24,7 @@ test("ULTRON design workflow and complete screen inventory remain installed", as
   for (const [index, phase] of ["THINK", "PLAN", "DESIGN", "BUILD", "REVIEW", "TEST", "SHIP", "REFLECT"].entries()) {
     assert.ok(gstack.includes(`### ${index + 1}. ${phase}`), `gstack workflow is missing ${phase}`);
   }
-  for (const area of ["Main conversation experience", "Models and provider credentials", "Memory and learning", "Agent configuration and capabilities", "Connectors and workspace", "Settings and transient surfaces", "Secondary web surface"]) {
+  for (const area of ["Main conversation experience", "Models and provider credentials", "Memory and learning", "Agent configuration and capabilities", "Connectors and workspace", "Settings and transient surfaces", "Shared client screen inventory"]) {
     assert.ok(ledger.includes(area), `screen ledger is missing ${area}`);
   }
   assert.match(agents, /\.agents\/skills\/ultron-gstack\/SKILL\.md/);

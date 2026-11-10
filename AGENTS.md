@@ -11,6 +11,9 @@
 
 ## Engineering rules
 
+For substantial engineering work, follow `.agents/skills/ultron-gstack/SKILL.md`. For interface work, also follow `.agents/skills/ultron-design/SKILL.md`.
+
+
 1. Work only on `main`. Never create or push another branch.
 2. Keep ULTRON separate from Luo Chat.
 3. Inspect current `main` and relevant tests before every write.

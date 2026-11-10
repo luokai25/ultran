@@ -236,7 +236,7 @@ Source and live-browser review on 2026-11-09:
 2. **Orb and cinematic identity removed from the app shell.** The hero canvas, orbital DOM, SVG brand mark, favicon mark generation and Three.js/WebGL renderer were removed. ULTRON is text-first.
 3. **Conversation-first layout shipped.** The home state says “How can I help?”, the model selector sits above the bottom composer, desktop uses a persistent 260px sidebar, and mobile retains compact bottom navigation.
 4. **Secondary screens use the same shared design system.** LLM API Keys, model management, Agents & Identities, Mind Map, Learning Review, Capabilities, Connectors, Workspace, Product Studio and Settings now share the charcoal surfaces, neutral typography, green interaction accent, page headers and list/card primitives. Full state-by-state visual and interaction QA remains outstanding.
-5. **Backend contracts are retained.** Supabase owner sessions, RLS-backed cloud data, streaming, provider keys, native secure storage, connector permissions and approval gates must remain intact through the visual rebuild.
+5. **Backend contracts are retained.** Single-instance server-resolved cloud data, streaming, Vault-backed provider keys, native secure storage, connector permissions and approval gates must remain intact through the visual rebuild.
 6. **Regression cleanup is in progress.** Legacy tests that asserted the old orb and stacked stylesheet design are being replaced with tests for the new single-stylesheet shell. The Vite build has passed; the full CI test suite is being reconciled with the new design contract.
 ## Redesign execution order
 

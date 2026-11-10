@@ -15,7 +15,7 @@ This is a production studio, not a chat prompt preset and not a mock progress da
 ## 2. User experience
 
 ### Entry point
-Add **AI Digital Products Generating** to the existing three-line navigation drawer in the canonical `apps/phone` client. The same screen must work on the deployed web client and inside the Android APK. Do not add it to the separate `apps/web` prototype as a substitute.
+Add **AI Digital Products Generating** to the existing three-line navigation drawer in the canonical `apps/phone` client. The same screen must work on the Vercel web client and inside the Android APK. There is one shared client; do not create a separate web app.
 
 ### Start screen
 Keep the first screen extremely simple:

@@ -1,3 +1,5 @@
+export const config = { maxDuration: 60 };
+
 type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 type RequestBody = {
@@ -27,6 +29,7 @@ type VercelResponse = {
   status(code: number): VercelResponse;
   setHeader(name: string, value: string): void;
   write(chunk: string | Uint8Array): boolean;
+  once(event: "drain", listener: () => void): void;
   end(chunk?: string): void;
 };
 
@@ -150,7 +153,7 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
       body: JSON.stringify(config.cohere
         ? { model, messages, stream: true, max_tokens: maxTokens, temperature }
         : { model, messages, stream: true, max_tokens: maxTokens, temperature }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(55_000),
     });
   } catch {
     sendJson(res, 502, { error: "provider_unreachable", message: "The model provider could not be reached." });
@@ -175,7 +178,7 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        if (!res.write(value)) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        if (!res.write(value)) await new Promise<void>((resolve) => res.once("drain", resolve));
       }
     } else {
       const decoder = new TextDecoder();

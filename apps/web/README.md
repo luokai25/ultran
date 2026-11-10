@@ -1,9 +1,9 @@
 # @ultron/web
 
-> **Non-production prototype.** The only public ULTRON web client is the
-> APK-matched Vite app in `apps/phone`, served by the single Cloudflare Worker
-> at https://ultron-app-web.luo-chat-ops.workers.dev/. Do not create or deploy a
-> separate public hosting project for this Next.js surface.
+> **Legacy surface.** The canonical public ULTRON web client is the
+> APK-matched Vite app in `apps/phone`, hosted on Vercel at
+> https://ultron-pied-gamma.vercel.app/. This Next.js surface forwards visitors
+> to that canonical Vercel app.
 
 The Ultron web console - a Next.js app for inspecting agent runs, browsing
 connectors, managing capability grants, and reviewing usage and entitlements.

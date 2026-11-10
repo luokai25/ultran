@@ -4167,7 +4167,22 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     const basePrompt = buildCapabilityPrompt(goal, "ULTRON Vercel Brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint);
     const messages: Array<{ role: Role | "system"; content: string }> = [
       { role: "system", content: usePrometheus ? basePrompt + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT : basePrompt },
-      ...history.map((item) => ({ role: item.role, content: item.content })),
+      ...history.map((item) => {
+        if (item.role !== "user" || !item.attachments?.length) return { role: item.role, content: item.content };
+        const extracted = item.attachments
+          .filter((attachment) => attachment.text?.trim())
+          .map((attachment) => "\n\n[Attached file: " + attachment.name + "]\n" + attachment.text)
+          .join("");
+        const imageNotes = item.attachments
+          .filter((attachment) => attachment.dataUrl)
+          .map((attachment) => "\n\n[Image attached: " + attachment.name + ". This Vercel Brain text-only request cannot transmit the image bytes yet.]")
+          .join("");
+        const unavailable = item.attachments
+          .filter((attachment) => !attachment.text && !attachment.dataUrl)
+          .map((attachment) => "\n\n[Attached file: " + attachment.name + ". Its contents were not extracted on this device.]")
+          .join("");
+        return { role: item.role, content: item.content + extracted + imageNotes + unavailable };
+      }),
     ];
     if (!usePrometheus) {
       const content = await streamUltronBrainChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, onToken, selectedCloudProvider ?? undefined);

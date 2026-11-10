@@ -103,10 +103,10 @@ export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderG
       request_count: row.request_count, tokens_used: row.tokens_used, cooldown_until: row.cooldown_until, last_used_at: row.last_used_at,
       last_checked_at: row.last_checked_at, last_error: row.last_error, created_at: row.created_at,
     }));
-    return { id: provider, label: PROVIDERS[provider], key_count: keys.length, connected_count: keys.filter((key) => key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length, keys };
+    return { id: provider, label: PROVIDERS[provider], key_count: keys.length, connected_count: keys.filter((key) => key.enabled && (key.status === "connected" || key.status === "rate_limited") && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length, keys };
   });
   const all = providers.flatMap((provider) => provider.keys);
-  return { providers, total_keys: all.length, connected_keys: all.filter((key) => key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length };
+  return { providers, total_keys: all.length, connected_keys: all.filter((key) => key.enabled && (key.status === "connected" || key.status === "rate_limited") && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length };
 }
 
 export async function addUltronCloudKey(provider: CloudProviderId, key: string, label: string): Promise<Record<string, unknown>> {
@@ -209,7 +209,8 @@ export async function streamUltronBrainChat(
   const candidateGroups = await Promise.all(providers.map(async (candidateProvider) => {
     const keys = await getLocalProviderKeyCandidates(candidateProvider, selectedModel || undefined);
     return keys.flatMap((key) => {
-      const model = selectedModel || key.models.filter((id) => freeModel(candidateProvider, id))
+      const model = selectedModel || key.models.filter((id) => freeModel(candidateProvider, id) &&
+        Date.parse(key.blocked_models?.[id] ?? "1970-01-01") <= Date.now())
         .sort((a, b) => modelCapabilityScore(b, complexity) - modelCapabilityScore(a, complexity))[0] || "";
       if (!model || (!selectedModel && !freeModel(candidateProvider, model))) return [];
       return [{ provider: candidateProvider, key, model, score: modelCapabilityScore(model, complexity) }];

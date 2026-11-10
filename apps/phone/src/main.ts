@@ -3208,12 +3208,29 @@ async function submitTurn(raw: string): Promise<void> {
     if (started.ok) executionLedger = started.ledger;
   }
   convo.messages.push({ role: "user", content: text, ...(turnAttachments.length ? { attachments: turnAttachments } : {}) });
+  const message: Message = { id: uid(), role: "assistant", content: "" };
+  convo.messages.push(message);
+  activeAssistantMessage = message;
+  let draftSaveTimer: number | null = null;
+  let streamedText = "";
+  const persistStreamDraft = (): void => {
+    message.content = streamedText;
+    if (draftSaveTimer !== null) return;
+    draftSaveTimer = window.setTimeout(() => {
+      draftSaveTimer = null;
+      convo!.updatedAt = Date.now();
+      saveStore();
+    }, 500);
+  };
   const knowledgeCapture = captureExplicitKnowledge(convo.knowledgeState ?? emptyKnowledgeState(), { id: `user-evidence-${convo.id}-${Date.now().toString(36)}`, text, source: "user_statement", observedAt: Date.now() });
   convo.knowledgeState = knowledgeCapture.state;
   pendingAttachments = [];
   renderPendingAttachments();
   convo.updatedAt = Date.now();
   saveStore();
+  // Do not send the prompt to a model until its user message and empty assistant
+  // draft have been committed to the local database.
+  await durableChatWriteQueue;
 
   promptEl.value = "";
   busy = true;
@@ -3505,12 +3522,15 @@ async function submitTurn(raw: string): Promise<void> {
       recordLearningObservation("task_failure", "outcome." + finalProfile.intent, "A tool execution failure occurred during this task class.", "medium", "runtime", false, "tool_execution", convo.id);
     }
   }
-  const message: Message = { role: "assistant", content: result.content };
-  activeAssistantMessage = message;
+  if (draftSaveTimer !== null) {
+    window.clearTimeout(draftSaveTimer);
+    draftSaveTimer = null;
+  }
+  message.content = result.content;
   if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));
-  convo.messages.push(message);
   convo.updatedAt = Date.now();
   saveStore();
+  await durableChatWriteQueue;
   const deliveryStep = executionLedger.steps.find((step) => step.kind === "deliver" && step.status === "running");
   if (deliveryStep) {
     const delivered = transitionUltronLedger(executionLedger, deliveryStep.id, "completed", {

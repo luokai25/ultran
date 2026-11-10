@@ -1,4 +1,3 @@
-```markdown
 # Documentation
 
 | Document | Purpose |
@@ -20,4 +19,3 @@
 4. Read [the optional Python backend guide](../ultron-backend/README.md).
 
 The Vercel web app and Android APK share the same `apps/phone` client. There is no separate Next.js or Expo app.
-```

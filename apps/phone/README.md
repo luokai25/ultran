@@ -1,4 +1,3 @@
-```markdown
 # ULTRON client
 
 This is the only ULTRON client. It is a Vite + TypeScript web app and the source bundled into the Capacitor Android APK.
@@ -67,4 +66,3 @@ Primary cloud chat calls the Supabase `ultron-brain` Edge Function directly. Vis
 The optional Python control plane in `ultron-backend` provides agent sessions, background task execution and connector operations. It is not required for primary chat. See [its README](../../ultron-backend/README.md).
 
 Keep API keys out of this repository, browser storage, Vercel frontend variables and the APK.
-```

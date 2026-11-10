@@ -1,4 +1,3 @@
-```markdown
 # ULTRON Architecture
 
 > **Current topology:** single-instance personal assistant. Web and Android share one client. Supabase is the cloud runtime; the Python control plane is optional.
@@ -70,4 +69,3 @@ Do not move provider keys into frontend storage or remove the server-side Vault 
 - `.github/workflows/termux-bootstrap.yml` is the manual workflow for optional Android runtime archives.
 
 Use [the root README](../README.md) for commands and [the phone guide](../apps/phone/README.md) for Android build details.
-```

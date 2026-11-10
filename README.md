@@ -1,4 +1,3 @@
-```markdown
 # ULTRON
 
 ULTRON is a personal AI workspace with one shared client for the web and Android. It combines local model execution on Android with a Supabase-powered cloud brain.
@@ -86,4 +85,3 @@ Start with [Architecture](docs/architecture.md), [the phone app guide](apps/phon
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-```

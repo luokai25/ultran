@@ -1,4 +1,3 @@
-```markdown
 # ULTRON repository guidance
 
 ## Product topology
@@ -35,4 +34,3 @@ cd ultron-backend && python -m pytest -q
 ```
 
 For Android changes, verify the Android release workflow. For web changes, verify the Vercel production deployment. Never claim a browser, device, test or deployment check that was not actually completed.
-```

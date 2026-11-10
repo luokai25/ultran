@@ -4240,7 +4240,11 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
           generated += token;
           if (!visibleStreamStarted) {
             const prefix = generated.trimStart();
-            const possibleToolEnvelope = prefix.startsWith("{")
+            const upperPrefix = prefix.toUpperCase();
+            const possibleToolEnvelope = !prefix
+              || "ULTRON_TOOL_CALL:".startsWith(upperPrefix)
+              || upperPrefix.startsWith("ULTRON_TOOL_CALL")
+              || prefix.startsWith("{")
               || /^ULTRON_TOOL_CALL\\s*:/i.test(prefix)
               || prefix.startsWith("```");
             // Tool envelopes stay private until parsed. Ordinary answer text is

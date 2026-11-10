@@ -1,0 +1,26 @@
+# Supabase CLI configuration for the ULTRON cloud brain.
+#
+# The browser/Android client authenticates to these functions with the project's
+# publishable key (not a user JWT), and pg_cron calls them with only the
+# x-ultron-cron-secret header. Supabase's gateway rejects both with HTTP 401 when
+# verify_jwt is on, before ULTRON's own checks run. Every function below performs
+# its own authorization in code (single-instance owner resolution server-side, or the
+# Vault-held cron secret), so gateway JWT verification must stay off for them.
+#
+# Keep this file in sync when deploying: `supabase functions deploy <name>` reads it,
+# so a plain redeploy no longer silently re-enables verify_jwt.
+project_id = "ultron"
+
+[functions.ultron-brain]
+verify_jwt = false
+
+[functions.ultron-runtime]
+verify_jwt = false
+
+[functions.ultron-capabilities]
+verify_jwt = false
+
+# ultron-jobs is called by pg_cron with only the cron secret; its user path still
+# validates a bearer token itself via auth.getUser().
+[functions.ultron-jobs]
+verify_jwt = false

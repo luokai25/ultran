@@ -21,6 +21,16 @@ function cloudFunctionError(error: unknown): { status: number; message: string }
   return { status: 0, message: candidate.message ?? "Supabase function request failed." };
 }
 
+/** Supabase's gateway answers 401 before ULTRON's code runs when an Edge Function is deployed with
+ * JWT verification on: the public client authenticates with a publishable key, which is not a JWT.
+ * Say so instead of showing a bare "Invalid JWT" that reads like a key or provider problem. */
+function gatewayRejection(status: number, message: string): string | null {
+  if ((status === 401 || status === 403) && /jwt|unauthori[sz]ed|invalid.*(token|key)/i.test(message) && !/provider|openrouter|groq|mistral|cohere|google|cerebras/i.test(message)) {
+    return `Supabase rejected the request (HTTP ${status}) before the ULTRON cloud brain ran. The ultron-brain function must be deployed with JWT verification off (supabase/config.toml sets verify_jwt = false): run "supabase functions deploy ultron-brain --project-ref <ref>" from the repo root.`;
+  }
+  return null;
+}
+
 export async function invokeUltronBrain(action: string, payload: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   const response = await fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
     method: "POST",
@@ -36,7 +46,8 @@ export async function invokeUltronBrain(action: string, payload: Record<string, 
   try { result = raw ? JSON.parse(raw) as Record<string, unknown> : {}; }
   catch { throw new Error(`ULTRON cloud brain returned invalid JSON (HTTP ${response.status}).`); }
   if (!response.ok || result.error) {
-    throw new Error(String(result.message ?? result.error ?? `ULTRON cloud brain returned HTTP ${response.status}.`));
+    const message = String(result.message ?? result.error ?? result.msg ?? `ULTRON cloud brain returned HTTP ${response.status}.`);
+    throw new Error(gatewayRejection(response.status, message) ?? message);
   }
   return result;
 }
@@ -167,12 +178,12 @@ export async function streamUltronSupabaseChat(
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       let message = detail.slice(0, 500);
-      try { const parsed = JSON.parse(detail) as Record<string, unknown>; message = String(parsed.message ?? parsed.error ?? message); } catch { /* provider or gateway returned plain text */ }
+      try { const parsed = JSON.parse(detail) as Record<string, unknown>; message = String(parsed.message ?? parsed.msg ?? parsed.error ?? message); } catch { /* provider or gateway returned plain text */ }
       if (response.status === 400 && /valid_messages_required/.test(message)) {
         throw new Error("ULTRON's cloud prompt exceeded a message-size limit. The request was shortened safely; send again.");
       }
       if (response.status === 413) throw new Error("This conversation is too large for the cloud request. Start a fresh chat or shorten the attached context.");
-      throw new Error(`ULTRON Supabase returned HTTP ${response.status}: ${message}`);
+      throw new Error(gatewayRejection(response.status, message) ?? `ULTRON Supabase returned HTTP ${response.status}: ${message}`);
     }
     if (!response.body) throw new Error("ULTRON Supabase did not return a readable response stream.");
     const reader = response.body.getReader();

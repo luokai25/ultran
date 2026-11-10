@@ -24,7 +24,7 @@ The public directory at https://github.com/raullenchai/free-llm-api-resources is
 
 The shared phone/cloud agent prompt uses a resumable goal loop: define success criteria, split substantial work into verifiable milestones, inspect available models/keys/tools/skills/connectors and phone-vs-cloud capabilities, execute, verify, and checkpoint progress. Capability gaps trigger catalog discovery first, then versioned ULTRON-owned tool/skill creation and bounded evaluation. Failed steps are diagnosed and retried through alternate providers, keys, tools or smaller sub-tasks; the loop stops only on verified completion or a concrete blocker.
 
-The cloud brain estimates task complexity from recent user turns and ranks eligible free models by approximate parameter scale and task-fit signals (reasoning, coding and vision). It then ranks provider-key candidates by model score, key priority and least-recent use, with fallback across up to eight candidates. This is a routing heuristic, not a benchmark or a guarantee of unlimited compute: model availability, provider quotas, hardware, permissions and external services remain real constraints. Durable run checkpoints and the job queue let work resume after an app restart.
+The cloud brain estimates task complexity from recent user turns and ranks eligible free models by approximate parameter scale and task-fit signals (reasoning, coding and vision). It then ranks provider-key candidates by model score, key priority and least-recent use, with fallback across the whole eligible key pool. Each attempt has a 20 s response-header timeout and a 25 s first-token timeout, no new attempt starts after 70 s (the browser gives up after 120 s of silence), and a provider that answers HTTP 200 but then sends an in-stream error or an empty completion is skipped like any other failed key. This is a routing heuristic, not a benchmark or a guarantee of unlimited compute: model availability, provider quotas, hardware, permissions and external services remain real constraints. Durable run checkpoints and the job queue let work resume after an app restart.
 
 ## Scheduled cloud worker
 
@@ -39,6 +39,18 @@ Before ULTRON changes generated tools, tool specs, skills or capability proposal
 Recovery is triggered only by an internal mutation failure or a stale in-progress code-change marker. Missing keys, invalid credentials, 429s and exhausted provider quotas are `waiting_for_keys`/`degraded` states and never trigger rollback. Versioned source artifacts remain available for inspection.
 
 This rollback covers ULTRON-authored database-backed tools, skills, specs and proposals. It does not automatically redeploy the Supabase Edge Function source code or push a GitHub revert; those source deployments remain governed by GitHub/CI.
+
+## Deploying Edge Functions
+
+`supabase/config.toml` pins `verify_jwt = false` for `ultron-brain`, `ultron-runtime`, `ultron-capabilities` and `ultron-jobs`. The client authenticates with the publishable key and `pg_cron` sends only `x-ultron-cron-secret`; neither is a JWT, so Supabase's gateway answers HTTP 401 before ULTRON's own checks run if JWT verification is on. Deploy from the repository root so the CLI reads that file:
+
+```bash
+supabase functions deploy ultron-brain ultron-runtime ultron-capabilities ultron-jobs --project-ref vshoxrtrfleptqxkrmtc
+```
+
+CI does not deploy functions. After a deploy, confirm the supervisor is healthy (`cloud_brain_status.state` is `active` or `waiting_for_keys`, never a gateway 401) and send one chat turn.
+
+A chat failure only changes a key's stored status for credential (401 invalid, 403 expired) and quota (429 rate-limited) errors. A retired model (404) or rejected request (400/413/422) leaves the key usable and asks the supervisor to refresh that key's model list; transient 5xx errors and timeouts cool the key down for one minute.
 
 ## Other cloud infrastructure
 

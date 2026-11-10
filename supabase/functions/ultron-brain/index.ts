@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { preflightStream } from "./stream-preflight.ts";
 
 type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 type Json = Record<string, unknown>;
@@ -30,6 +31,12 @@ const PROVIDERS: Record<Provider, { label: string; base: string; modelsUrl: stri
   google_ai_studio: { label: "Google AI Studio", base: "https://generativelanguage.googleapis.com/v1beta/openai", modelsUrl: "https://generativelanguage.googleapis.com/v1beta/openai/models", protocol: "openai" },
 };
 const PROVIDER_IDS = Object.keys(PROVIDERS) as Provider[];
+// Chat fallback budget. The whole key pool stays eligible, but the browser aborts after
+// 120 s without a byte, so no new attempt starts after 70 s; one last 20 s + 25 s
+// attempt then still ends inside that window.
+const CHAT_HEADER_TIMEOUT_MS = 20_000;
+const CHAT_FIRST_TOKEN_TIMEOUT_MS = 25_000;
+const CHAT_SELECTION_BUDGET_MS = 70_000;
 const tableFor = (provider: Provider) => `ultron_${provider}_keys`;
 const service = () => createClient(PROJECT_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const clean = (value: unknown, max = 240) => typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -339,8 +346,29 @@ function openAIMessageStream(response: Response, db: ReturnType<typeof service>,
   return new Response(stream, { status: 200, headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" } });
 }
 
+/** Record a failed chat attempt without punishing a healthy key for model- or request-level errors.
+ * Only credential (401/403) and quota (429) failures change a key's status. A retired model (404)
+ * or a rejected request (400/413/422) leaves the key usable for other models, and transient
+ * 5xx/timeouts cool the key down for a minute instead of marking it unreachable for five. */
+async function markChatFailure(db: ReturnType<typeof service>, ownerId: string, provider: Provider, key: KeyRow, status: number, detail: string, retryAfter: string | null): Promise<void> {
+  const now = new Date().toISOString();
+  const patch: Json = { last_error: detail.slice(0, 500) };
+  if (status === 401) Object.assign(patch, { status: "invalid", last_checked_at: now });
+  else if (status === 403) Object.assign(patch, { status: "expired", last_checked_at: now });
+  else if (status === 429) Object.assign(patch, { status: "rate_limited", last_checked_at: now, cooldown_until: new Date(Date.now() + retryAfterMs(retryAfter)).toISOString() });
+  else if (status === 404) patch.last_checked_at = null; // Ask the supervisor to refresh this key's model list.
+  else if (status >= 500 || status === 408 || status === 409 || status === 425) patch.cooldown_until = new Date(Date.now() + 60_000).toISOString();
+  await updateKey(db, ownerId, provider, key.id, patch).catch(() => undefined);
+}
+
 async function handleChat(db: ReturnType<typeof service>, ownerId: string, body: Json, request: Request): Promise<Response> {
-  const messages = Array.isArray(body.messages) ? body.messages.filter((item): item is Json => isObject(item) && ["system", "user", "assistant"].includes(String(item.role)) && typeof item.content === "string").slice(-80) : [];
+  const validMessages = Array.isArray(body.messages) ? body.messages.filter((item): item is Json => isObject(item) && ["system", "user", "assistant"].includes(String(item.role)) && typeof item.content === "string") : [];
+  // Keep leading system prompts when a long conversation is trimmed to 80 messages;
+  // a plain slice(-80) silently dropped ULTRON's instructions after message 80.
+  let leadingSystem = 0;
+  while (leadingSystem < validMessages.length && validMessages[leadingSystem]!.role === "system") leadingSystem++;
+  const keptLead = validMessages.slice(0, Math.min(leadingSystem, 4));
+  const messages = validMessages.length <= 80 ? validMessages : [...keptLead, ...validMessages.slice(leadingSystem).slice(-(80 - keptLead.length))];
   if (!messages.length || messages.some((message) => String(message.content).length > 24000)) return json({ error: "valid_messages_required" }, 400);
   const failureLedger = await getSetting(db, ownerId, "brain_failure_history");
   const failureItems = Array.isArray(failureLedger?.items) ? failureLedger.items.filter(isObject).slice(-6) : [];
@@ -404,39 +432,70 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
     ? "The selected model is no longer available. No connected free model key is currently usable; check the LLM API Keys screen or switch to ULTRON Automatic."
     : "No connected key currently has an available free-tier chat model. Add another key or wait for a provider quota to reset." }, 503);
   let lastError = "No provider key could complete the request.";
+  const attempts: Array<{ provider: Provider; model: string; outcome: string }> = [];
+  const selectionStarted = Date.now();
   for (const candidate of candidates) {
+    if (request.signal.aborted) return json({ error: "client_closed_request" }, 499);
+    if (attempts.length && Date.now() - selectionStarted > CHAT_SELECTION_BUDGET_MS) break;
     const { provider, key, chosenModel } = candidate;
     let secret: string;
     try { secret = await getKeySecret(db, key.vault_secret_id); }
-    catch { await updateKey(db, ownerId, provider, key.id, { status: "unreachable", last_error: "Vault credential could not be read." }); continue; }
+    catch { await updateKey(db, ownerId, provider, key.id, { status: "unreachable", last_error: "Vault credential could not be read." }); attempts.push({ provider, model: chosenModel, outcome: "vault_unavailable" }); continue; }
     const config = PROVIDERS[provider];
     const endpoint = config.protocol === "cohere" ? `${config.base}/chat` : `${config.base}/chat/completions`;
     const requestMessages = messages.map((message) => ({ role: message.role, content: message.content }));
     const payload: Json = config.protocol === "cohere"
       ? { model: chosenModel, messages: requestMessages, stream: true, temperature: Math.max(0, Math.min(2, Number(body.temperature ?? 0.3))), max_tokens: Math.max(128, Math.min(8192, Number(body.max_tokens ?? 2048))) }
       : { model: chosenModel, messages: requestMessages, stream: true, stream_options: { include_usage: true }, temperature: Math.max(0, Math.min(2, Number(body.temperature ?? 0.3))), max_tokens: Math.max(128, Math.min(8192, Number(body.max_tokens ?? 2048))) };
+    // One controller per attempt: a provider that never answers must fall through
+    // to the next key instead of holding the browser until its 120 s idle timeout.
+    const attempt = new AbortController();
+    const abortAttempt = () => attempt.abort(request.signal.reason);
+    request.signal.addEventListener("abort", abortAttempt, { once: true });
+    const headerTimer = setTimeout(() => attempt.abort(new DOMException("Provider did not respond in time.", "TimeoutError")), CHAT_HEADER_TIMEOUT_MS);
     let upstream: Response;
     try {
       upstream = await fetch(endpoint, {
         method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "text/event-stream", ...(provider === "openrouter" ? { "HTTP-Referer": "https://ultron.app", "X-Title": "ULTRON" } : {}) },
-        body: JSON.stringify(payload), signal: request.signal,
+        body: JSON.stringify(payload), signal: attempt.signal,
       });
-    } catch (error) { lastError = error instanceof Error ? error.message : "Provider connection failed."; continue; }
-    if (!upstream.ok) {
-      const detail = (await upstream.text().catch(() => "")).slice(0, 500);
-      const state = keyStateForStatus(upstream.status);
-      const cooldown = upstream.status === 429 ? new Date(Date.now() + retryAfterMs(upstream.headers.get("retry-after"))).toISOString() : null;
-      await updateKey(db, ownerId, provider, key.id, { status: state, last_checked_at: new Date().toISOString(), last_error: `HTTP ${upstream.status}: ${detail}`, cooldown_until: cooldown });
-      lastError = `${config.label} returned HTTP ${upstream.status}.`;
+    } catch (error) {
+      clearTimeout(headerTimer);
+      request.signal.removeEventListener("abort", abortAttempt);
+      if (request.signal.aborted) return json({ error: "client_closed_request" }, 499);
+      const timedOut = (attempt.signal.reason as { name?: string } | undefined)?.name === "TimeoutError";
+      lastError = timedOut ? `${config.label} did not respond within ${CHAT_HEADER_TIMEOUT_MS / 1000}s.` : error instanceof Error ? error.message : "Provider connection failed.";
+      attempts.push({ provider, model: chosenModel, outcome: timedOut ? "timeout" : "connection_failed" });
+      await markChatFailure(db, ownerId, provider, key, timedOut ? 504 : 503, lastError, null);
       continue;
     }
-    if (!upstream.body) { lastError = `${config.label} returned no response stream.`; continue; }
+    clearTimeout(headerTimer);
+    if (!upstream.ok) {
+      request.signal.removeEventListener("abort", abortAttempt);
+      const detail = (await upstream.text().catch(() => "")).slice(0, 500);
+      lastError = `${config.label} returned HTTP ${upstream.status}.`;
+      attempts.push({ provider, model: chosenModel, outcome: `http_${upstream.status}` });
+      await markChatFailure(db, ownerId, provider, key, upstream.status, `HTTP ${upstream.status}: ${detail}`, upstream.headers.get("retry-after"));
+      continue;
+    }
+    // HTTP 200 does not prove generation started. Wait for the first real event so an
+    // in-stream provider error or an empty completion falls back to another key.
+    const checked = await preflightStream(upstream, config.protocol, { timeoutMs: CHAT_FIRST_TOKEN_TIMEOUT_MS });
+    if (!checked.ok) {
+      request.signal.removeEventListener("abort", abortAttempt);
+      if (request.signal.aborted) return json({ error: "client_closed_request" }, 499);
+      lastError = `${config.label}: ${checked.reason}`;
+      attempts.push({ provider, model: chosenModel, outcome: checked.providerStatus ? `stream_error_${checked.providerStatus}` : "stream_failed" });
+      await markChatFailure(db, ownerId, provider, key, checked.providerStatus ?? 503, `Stream: ${checked.reason}`, null);
+      continue;
+    }
     await updateKey(db, ownerId, provider, key.id, { last_used_at: new Date().toISOString(), last_error: null });
     return config.protocol === "cohere"
-      ? cohereMessageStream(upstream, db, ownerId, provider, key)
-      : openAIMessageStream(upstream, db, ownerId, provider, key);
+      ? cohereMessageStream(checked.response, db, ownerId, provider, key)
+      : openAIMessageStream(checked.response, db, ownerId, provider, key);
   }
-  return json({ error: "all_provider_keys_failed", message: lastError }, 502);
+  const attemptCount = attempts.length;
+  return json({ error: "all_provider_keys_failed", message: `${lastError} (${attemptCount} provider attempt${attemptCount === 1 ? "" : "s"} failed)`, attempts }, 502);
 }
 
 async function captureCapabilitySnapshot(db: ReturnType<typeof service>, ownerId: string): Promise<Json> {

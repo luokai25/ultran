@@ -3787,10 +3787,10 @@ async function refreshFreeProviderDirectory(refresh = false): Promise<void> {
 
 async function refreshCloudLlmScreen(): Promise<void> {
   try {
-    // Public single-instance web mode reads the existing server-side key pool
-    // directly through ultron-brain. No visitor account or Supabase session exists.
-    // Key inventory and worker health are independent. A transient health
-    // endpoint failure must never make already-saved keys disappear.
+    // Provider credentials are held in the encrypted device-local vault.
+    // The Vercel Brain verifies and routes inference; no Supabase session is needed.
+    // Inventory and gateway health are separate so a transient status failure
+    // never hides credentials already saved on this device.
     const [keysResult, statusResult] = await Promise.allSettled([listUltronCloudKeys(), getUltronCloudStatus()]);
     if (keysResult.status === "rejected") throw keysResult.reason;
     const keys = keysResult.value;
@@ -3799,7 +3799,7 @@ async function refreshCloudLlmScreen(): Promise<void> {
       cloudBrainStateEl.textContent = "Keys loaded · health check delayed";
       cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : "unreachable";
       cloudBrainStatusEl.textContent = keys.connected_keys > 0
-        ? `${keys.connected_keys} verified key(s) loaded from Supabase Vault. The separate worker health check is temporarily unavailable; saved credentials are still present.`
+        ? `${keys.connected_keys} verified local key(s) loaded. The gateway health check is temporarily unavailable; saved credentials are still present.`
         : "Saved key inventory loaded. The cloud health check is temporarily unavailable.";
       return;
     }
@@ -3808,8 +3808,8 @@ async function refreshCloudLlmScreen(): Promise<void> {
     cloudBrainStateEl.textContent = state === "active" ? "Cloud brain active" : state === "waiting_for_keys" ? "Waiting for keys" : state;
     cloudBrainStatusEl.dataset.state = keys.connected_keys > 0 ? "connected" : state === "degraded" ? "expired" : "missing";
     cloudBrainStatusEl.textContent = keys.connected_keys > 0
-      ? `Connected · ${keys.connected_keys} valid key(s) across six providers. Supabase checks the pool every minute and automatically avoids invalid or rate-limited keys.`
-      : "No usable free-tier models yet. Add another provider key or check whether the provider account has free-tier model access. The cloud worker will keep checking the pool.";
+      ? `Ready · ${keys.connected_keys} valid local key(s) across six providers. ULTRON selects a compatible key and falls back to another saved key when a provider rejects or rate-limits a request.`
+      : "No active provider keys yet. Add a key in this device's encrypted vault. The assistant can still use a locally installed model.";
     void refreshFreeProviderDirectory(false);
   } catch (error) {
     cloudBrainStateEl.textContent = "Cloud reconnect needed";
@@ -3862,10 +3862,10 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
     cloudLlmProvider.value = "";
     cloudLlmProviderFallback.hidden = true;
     cloudLlmDetected.dataset.state = "connected";
-    cloudLlmDetected.textContent = "Accepted · securely saved and enabled. Paste another key whenever you are ready.";
+    cloudLlmDetected.textContent = "Accepted · encrypted and saved on this device. Paste another key whenever you are ready.";
     cloudLlmKeyInput.focus();
     cloudBrainStatusEl.dataset.state = "connected";
-    cloudBrainStatusEl.textContent = `Saved and verified. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
+    cloudBrainStatusEl.textContent = `Saved in the local encrypted vault. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
     await refreshCloudLlmScreen();
   } catch (error) {
     cloudLlmProviderFallback.hidden = Boolean(detectedProvider);
@@ -3886,7 +3886,7 @@ async function importCloudLlmKeyFiles(): Promise<void> {
   }
   cloudLlmImportButton.disabled = true;
   cloudLlmImportStatus.dataset.state = "unreachable";
-  cloudLlmImportStatus.textContent = "Reading files locally and verifying keys with ULTRON Vault…";
+  cloudLlmImportStatus.textContent = "Reading files locally and verifying keys through the Vercel Brain…";
   let saved = 0;
   let duplicates = 0;
   let failed = 0;
@@ -4871,7 +4871,7 @@ cloudLlmProvider.addEventListener("change", () => {
     cloudLlmDetected.dataset.state = "pending";
     cloudLlmDetected.textContent = "Selected " + cloudLlmProvider.value.replace(/_/g, " ") + " · press Save and verify key.";
     cloudBrainStatusEl.dataset.state = "pending";
-    cloudBrainStatusEl.textContent = "The key has not been sent yet. Save and verify it when ready.";
+    cloudBrainStatusEl.textContent = "The key has not been sent yet. Verify and save it to this device when ready.";
   }
   const links: Record<string, { url: string; label: string }> = {
     openrouter: { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" },

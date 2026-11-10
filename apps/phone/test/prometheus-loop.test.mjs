@@ -24,5 +24,7 @@ test('Supabase cloud brain ranks eligible free models by task complexity and fal
   assert.match(brain, /function modelCapabilityScore\(model: string, complexity: number\)/);
   assert.match(brain, /bestFreeModel\(provider, key\.models \?\? \[\], complexity\)/);
   assert.match(brain, /b\.modelScore - a\.modelScore \|\| b\.key\.priority - a\.key\.priority/);
-  assert.match(brain, /for \(const candidate of candidates\.slice\(0, 8\)\)/);
+  assert.match(brain, /for \(const candidate of candidates\)/);
+  assert.doesNotMatch(brain, /candidates\.slice\(0,\s*8\)/);
+  assert.match(brain, /fallbackGroups = new Map/);
 });

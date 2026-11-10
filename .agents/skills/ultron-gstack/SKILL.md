@@ -28,9 +28,8 @@ Default to preserving scope and working functionality. Expand scope only when a 
 
 Treat these surfaces correctly:
 
-1. **Canonical client: `apps/phone`.** This is the shared Vite application used as the production web client and embedded in the Capacitor Android APK. A visual or behavior change here must work in both contexts.
-2. **Secondary web console: `apps/web`.** This is a separate Next.js surface. Align its tokens, typography, components and interaction language, but do not claim it has the canonical client's full feature coverage.
-3. **Backend and data:** Supabase, API services, workers, provider gateways and connector services are production contracts. Do not casually redesign them to solve a visual problem.
+1. **Canonical client: `apps/phone`.** This is the only Vite application used as the production web client and embedded in the Capacitor Android APK. Every client change must work in both contexts.
+2. **Backend and data:** Supabase is the cloud runtime. `ultron-backend` is the optional Python control plane for agent sessions and connector operations. Do not recreate duplicate clients or unused service layers.
 4. **Design source of truth:** root `DESIGN.md`. Update it when tokens, page inventory, design decisions or interaction contracts change.
 
 ## The gstack sequence
@@ -152,7 +151,7 @@ Use the intent behind gstack's `/ship`.
 - Run the relevant tests again after the final edit.
 - Commit to `main` only, with a descriptive message. Never create a feature branch or force-push.
 - Preserve concurrent commits and inspect the current main head before updating it.
-- Do not claim a Cloudflare deployment or APK artifact exists until CI/deployment output confirms it.
+- Do not claim a Vercel deployment or APK artifact exists until CI/deployment output confirms it.
 - Summarize commit, files, screens, tests, build artifacts and anything not verified.
 
 ### 8. REFLECT — improve the factory
@@ -181,7 +180,7 @@ At minimum, inspect these areas and their nested states:
 - Connectors catalog, connector detail, OAuth, scopes, connected/disconnected/error states.
 - Agent Workspace, team builder, task progress, artifacts, retry, cancel and approvals.
 - Settings and every subsection, voice/presence, workspace tray, drawer, bottom navigation, dialogs, sheets, popovers and confirmation flows.
-- Secondary Next.js pages and shared components under `apps/web/src`.
+- Secondary screens and nested panels within the canonical `apps/phone` client.
 
 A screen is not complete because its route renders. It is complete only when its important states, interactions, responsive behavior and regression coverage have been reviewed.
 

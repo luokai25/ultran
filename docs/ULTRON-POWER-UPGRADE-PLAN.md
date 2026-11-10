@@ -3,7 +3,7 @@
 **Status:** Phase 1 local MCP persistence complete; native MCP manager and public-endpoint preflight added to the shared client; Phase 2 cloud bridge next  
 **Repository:** `luokai25/ultran`  
 **Integration rule:** work directly on `main`; preserve the existing local-first architecture  
-**Cost rule:** reuse the current Supabase, Vercel, Cloudflare and existing provider integrations; no new paid service or dependency without explicit approval.
+**Cost rule:** reuse Supabase, Vercel and existing provider integrations; do not deploy through Cloudflare; no new paid service or dependency without explicit approval.
 
 ## Product objective
 
@@ -27,15 +27,15 @@ This is not a greenfield MCP project. The repository already contains:
 
 1. **MCP runtime state is not cloud-shared.** The current durable registry lives with the authenticated backend in SQLite; Supabase connector rows represent Composio accounts, not a cross-device cloud registry of arbitrary MCP endpoints and their manifests.
 2. **Native MCP manager is implemented in the shared phone/web client, with remaining lifecycle gaps.** The Connectors screen can register a public HTTPS Streamable HTTP endpoint, keep an optional bearer token in the encrypted backend registry, probe/reload tools, display health and manifest hashes, inspect tool schemas/capabilities, remove servers and review recent calls. Remaining work: server editing, manifest pin/review, grant/approval controls and a cloud-shared registry. Stdio stays a backend/local-runtime feature and is not exposed as arbitrary command execution from the phone.
-3. **Production API owner authentication — CI verified, production configuration still required.** FastAPI requires a live Supabase bearer session on non-health routes, verifies the user through Supabase Auth, checks the RLS-backed singleton owner, ignores caller-selected workspace headers and fails closed when auth is unavailable. The phone client attaches its owner session to API requests and task event streams. Production requires `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in the private server `.env`; verify the deployed health check after configuration. Latest CI covers owner auth and workspace isolation.
+3. **Single-instance access — migration in progress.** Public chat resolves the configured ULTRON instance server-side and no longer requires a visitor session. Product Studio, artifacts, capabilities, connector operations, cloud sync and the optional Python control plane still contain legacy owner-session checks and must be converted to the same server-resolved instance contract before the whole product is account-free.
 4. **Cloud and local execution have different capabilities.** Cloud Edge Functions cannot spawn arbitrary stdio processes. The cloud MCP bridge should support remote Streamable HTTP only; stdio remains a local runtime capability.
 
 ## Current security implementation
 
-- **Committed to `main`:** FastAPI owner-session middleware, Supabase Auth verification, RLS-backed singleton-owner verification, production workspace pinning, and bearer propagation from the phone client.
+- **Legacy code still present:** FastAPI owner-session middleware and bearer propagation are not part of the desired single-instance public access model and should be removed only after the optional backend routes use a fixed server-side workspace.
 - **Committed to `main`:** third-party MCP endpoint preflight checks require an allow-listed public HTTPS/443 destination, reject non-public DNS answers, disable redirects and ignore ambient proxy settings. Full DNS-to-socket IP pinning remains a hardening task.
-- **Deployment prerequisite:** set `ULTRON_SUPABASE_URL` and `ULTRON_SUPABASE_PUBLISHABLE_KEY` in `infra/hetzner/.env` before restarting a production API. The publishable key is not a service-role secret. Never add a service-role key to the phone app.
-- **Verification:** latest CI passes the production-auth regression tests. The API must not be exposed publicly until the deployment environment is configured and the new build passes its health check.
+- **Current deployment:** Vercel hosts the web client and Supabase hosts the cloud runtime. No Hetzner, Kubernetes or Render backend deployment is active. The Python control plane remains optional/local; use `ultron-backend/.env.example` for local configuration.
+- **Verification:** the latest chat client path is public, but the remaining legacy session checks must be removed and verified before claiming every secondary feature works without an account.
 
 Google Workspace setup guide: [`GOOGLE-WORKSPACE-CONNECTOR.md`](GOOGLE-WORKSPACE-CONNECTOR.md).
 
@@ -173,7 +173,7 @@ Required MCP manager states:
 
 Prefer this order:
 1. Existing ULTRON native capabilities and local tools.
-2. Existing Supabase, GitHub, Vercel and Cloudflare integrations for development/deployment.
+2. Existing Supabase, GitHub and Vercel integrations for development/deployment.
 3. Firecrawl/Exa/Browser Use for research and browsing, subject to user-connected credentials and terms.
 4. Existing Composio OAuth gateway for supported SaaS accounts.
 5. Direct remote MCP or OpenAPI connectors where a provider is not covered.
@@ -196,7 +196,7 @@ An external ChatGPT connector is not automatically an ULTRON connector. ULTRON m
 
 - Supabase migrations currently include the connector metadata, cloud skills/tool specs, durable job queue, maintenance scheduler, brain memory and product-studio worker foundations.
 - Active cron jobs observed: brain supervisor every minute, cloud job worker every minute and maintenance queue every five minutes.
-- Security advisor currently reports leaked-password protection disabled; enable it in Supabase Auth settings.
+- Keep provider credentials in Supabase Vault; never move provider keys or service-role credentials into the client.
 - Performance advisor currently reports unused indexes. Do not remove them just because the project is young; re-check after real query volume.
 - Android release workflow run #1070 completed successfully and published a signed APK asset: https://github.com/luokai25/ultran/releases/download/android-v3.0.4-b1070/ultron-3.0.4.apk. This release was built from commit 1af9e62, before the current MCP registry commits.
 

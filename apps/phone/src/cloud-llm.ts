@@ -28,7 +28,7 @@ const PROVIDERS: Record<CloudProviderId, string> = {
   cohere: "Cohere",
   google_ai_studio: "Google AI Studio",
 };
-const SUPPORTED_ON_VERCEL = new Set<CloudProviderId>(["openrouter", "mistral", "cerebras", "groq", "google_ai_studio"]);
+const SUPPORTED_ON_VERCEL = new Set<CloudProviderId>(["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio"]);
 
 async function invokeVercelBrain(payload: Record<string, unknown>): Promise<Response> {
   return fetch(API_PATH, {
@@ -46,6 +46,7 @@ function freeModel(provider: CloudProviderId, model: string): boolean {
   if (provider === "cerebras") return false;
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
   if (provider === "mistral") return /^(mistral|codestral)[-_]/.test(id);
+  if (provider === "cohere") return /c4ai-aya-expanse-32b|command-a-03-2025|command-a-reasoning-08-2025|command-r-08-2024|command-r-plus-08-2024|command-r7b-12-2024|command-r7b-arabic-02-2025/.test(id);
   if (provider === "google_ai_studio") return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
   return false;
 }

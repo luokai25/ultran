@@ -2261,9 +2261,6 @@ async function remoteReply(
   const run = async (): Promise<ChatReply> => {
     const taskMessage = text;
     const agentId = await ensureAgent();
-    let cloudSession: Awaited<ReturnType<typeof getCloudSession>> = null;
-    try { cloudSession = await getCloudSession(); }
-    catch (error) { console.warn("[ULTRON Supabase session]", error); }
     const nativePhoneIntent = Capacitor.getPlatform() === "android"
       && /\b(whatsapp|text message|send (?:a )?(?:text|message)|open (?:the )?(?:app|whatsapp|telegram|messages)|telegram)\b|واتساب|رسالة واتساب|ابعت رسالة|ارسل رسالة|افتح التطبيق/i.test(text);
     const body = JSON.stringify({
@@ -2274,7 +2271,8 @@ async function remoteReply(
       session_id: convo.sessionId ?? null,
       client_capabilities: [
         ...(Capacitor.getPlatform() === "android" ? ["android_phone_actions"] : []),
-        ...(cloudSession ? ["ultron_supabase_capabilities", "ultron_supabase_runtime"] : []),
+        "ultron_supabase_capabilities",
+        "ultron_supabase_runtime",
       ],
       allow_tools: !nativeToolFollowup && !nativePhoneIntent,
       max_tool_calls: nativeToolFollowup || nativePhoneIntent ? 0 : 8,

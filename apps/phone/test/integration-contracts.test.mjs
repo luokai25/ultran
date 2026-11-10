@@ -185,7 +185,8 @@ test("Android companion uses scoped user handoffs and optional notifications wit
   assert.match(main, /parsed\.tool === "app\.open"/);
   assert.match(main, /client_capabilities: \[/);
   assert.match(main, /Capacitor\.getPlatform\(\) === "android" \? \["android_phone_actions"\] : \[\]/);
-  assert.match(main, /cloudSession \? \["ultron_supabase_capabilities", "ultron_supabase_runtime"\] : \[\]/);
+  assert.match(main, /"ultron_supabase_capabilities",\s*"ultron_supabase_runtime"/);
+  assert.doesNotMatch(main, /cloudSession \? \["ultron_supabase_capabilities"/);
   assert.match(main, /getCloudSession\(\)/);
   assert.match(main, /nativePhoneIntent/);
   assert.match(main, /handleNativeTool/);
@@ -554,7 +555,9 @@ test("Supabase is the default shared runtime for ULTRON-authored tools and skill
   assert.match(main, /cloudToolDepth/);
   assert.match(main, /Maximum eight tool calls total/);
   assert.match(main, /invokeUltronRuntime/);
-  assert.match(runtimeCloud, /functions\.invoke\("ultron-runtime"/);
+  assert.match(runtimeCloud, /fetch\(/);
+  assert.match(runtimeCloud, /apikey:\s*ULTRON_SUPABASE_PUBLISHABLE_KEY/);
+  assert.doesNotMatch(runtimeCloud, /getCloudSession|functions\.invoke\("ultron-runtime"/);
   assert.match(capabilityPanel, /runtimeInvoke\("list_tools"/);
   assert.match(capabilityPanel, /runtimeInvoke\("list_tool_runs"/);
   assert.match(capabilityPanel, /runtimeInvoke\("list_skills"/);

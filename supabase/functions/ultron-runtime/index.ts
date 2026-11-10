@@ -295,7 +295,6 @@ Deno.serve(async (req: Request) => {
   if(req.method==="OPTIONS")return new Response("ok",{headers});
   if(req.method!=="POST")return reply({error:"method_not_allowed"},405);
   const auth=req.headers.get("Authorization")??"";
-  const token=auth.match(/^Bearer\s+(.+)$/i)?.[1];
   const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_PUBLISHABLE_KEY")??Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??Deno.env.get("SUPABASE_SECRET_KEY");
   if(!url||!key||!serviceKey)return reply({error:"server_configuration_missing"},500);

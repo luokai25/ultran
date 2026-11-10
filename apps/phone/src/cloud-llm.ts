@@ -2,6 +2,7 @@ import {
   getLocalProviderKeyCandidates,
   listLocalProviderKeys,
   removeLocalProviderKey,
+  recordLocalProviderKeyResult,
   saveLocalProviderKey,
   updateLocalProviderKey,
   type LocalProviderId,
@@ -70,7 +71,7 @@ export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderG
     const keys: CloudKeyRow[] = rows.filter((row) => row.provider === provider).map((row) => ({
       id: row.id, label: row.label, status: row.status, enabled: row.enabled, priority: row.priority,
       models: row.models, free_model_count: row.models.filter((model) => freeModel(provider, model)).length,
-      request_count: 0, tokens_used: 0, cooldown_until: null, last_used_at: null,
+      request_count: row.request_count, tokens_used: row.tokens_used, cooldown_until: row.cooldown_until, last_used_at: row.last_used_at,
       last_checked_at: row.last_checked_at, last_error: row.last_error, created_at: row.created_at,
     }));
     return { id: provider, label: PROVIDERS[provider], key_count: keys.length, connected_count: keys.filter((key) => key.enabled && key.status === "connected").length, keys };
@@ -212,7 +213,20 @@ export async function streamUltronSupabaseChat(
         const result: Record<string, unknown> = await parseJsonResponse(response).catch((error): Record<string, unknown> => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
         const message = String(result.message ?? result.error ?? "Provider request failed.");
         lastError = new Error(`ULTRON Brain HTTP ${response.status}: ${message.slice(0, 400)}`);
-        if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;
+        const outcome = response.status === 401 ? "invalid"
+          : response.status === 403 ? (/model|only available/i.test(message) ? "model_error" : "expired")
+          : response.status === 404 ? "model_error"
+          : response.status === 429 ? "rate_limited"
+          : response.status >= 500 || response.status === 408 ? "transient" : null;
+        if (outcome) {
+          const retryHeader = response.headers.get("retry-after");
+          const retryAfterMs = retryHeader && /^\\d+(?:\\.\\d+)?$/.test(retryHeader)
+            ? Number(retryHeader) * 1000 : 900_000;
+          await recordLocalProviderKeyResult(selectedProvider, candidate.id, {
+            outcome, error: message, retryAfterMs,
+          }).catch(() => undefined);
+        }
+        if (![401, 403, 404, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;
         continue;
       }
       if (!response.body) throw new Error("ULTRON Brain did not return a readable response stream.");
@@ -258,6 +272,7 @@ export async function streamUltronSupabaseChat(
         await reader.cancel().catch(() => undefined);
       }
       if (!content.trim()) throw new Error("ULTRON Brain completed without returning any text.");
+      await recordLocalProviderKeyResult(selectedProvider, candidate.id, { outcome: "success", tokens: Math.max(1, Math.ceil(content.length / 4)) }).catch(() => undefined);
       return content.trim();
     }
     if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");

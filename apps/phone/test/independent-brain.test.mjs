@@ -9,6 +9,7 @@ const gateway = readFileSync(resolve(root, "../../api/ultron-brain.ts"), "utf8")
 const cloud = readFileSync(resolve(root, "src/cloud-llm.ts"), "utf8");
 const vault = readFileSync(resolve(root, "src/local-llm-vault.ts"), "utf8");
 const sync = readFileSync(resolve(root, "src/cloud-sync.ts"), "utf8");
+const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
 
 test("Vercel Brain gateway handles provider verification and streaming without Supabase", () => {
   assert.match(gateway, /action === "verify_key"/);

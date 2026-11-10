@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { nativeSecureStorage } from "./cloud-sync";
+import { nativeSecureStorage } from "./native-secure-storage";
 
 export type LocalProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 export type LocalProviderKey = {

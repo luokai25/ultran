@@ -65,7 +65,7 @@ async function readBody(req: VercelRequest): Promise<RequestBody> {
 }
 
 function isProvider(value: unknown): value is Provider {
-  return typeof value === "string" && Object.hasOwn(PROVIDERS, value);
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PROVIDERS, value);
 }
 
 function compatibleModels(payload: unknown): string[] {

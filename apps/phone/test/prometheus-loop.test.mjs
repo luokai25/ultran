@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
 const capabilities = await readFile(new URL('../../../supabase/functions/ultron-capabilities/index.ts', import.meta.url), 'utf8');
 const brain = await readFile(new URL('../../../supabase/functions/ultron-brain/index.ts', import.meta.url), 'utf8');
+const jobs = await readFile(new URL('../../../supabase/functions/ultron-jobs/index.ts', import.meta.url), 'utf8');
 
 test('Prometheus Supabase provider runs a bounded tool loop with durable checkpoints', () => {
   assert.match(source, /PROMETHEUS GOAL LOOP:/);
@@ -27,4 +28,7 @@ test('Supabase cloud brain ranks eligible free models by task complexity and fal
   assert.match(brain, /for \(const candidate of candidates\)/);
   assert.doesNotMatch(brain, /candidates\.slice\(0,\s*8\)/);
   assert.match(brain, /fallbackGroups = new Map/);
+  assert.ok(brain.includes('if (/(?:audio|tts|speech|transcri|live|realtime|bidi)/i.test(id)) return false;'), 'chat routing must exclude non-chat audio and realtime models');
+  assert.ok(brain.includes('only supports.{0,100}(real.?time|bidirectional|websocket)'), 'modality-incompatible HTTP 400 responses must block the model rather than poison the API key');
+  assert.ok(jobs.includes('if (/(?:audio|tts|speech|transcri|live|realtime|bidi)/i.test(id)) return false;'), 'background memory routing must exclude non-chat audio and realtime models');
 });

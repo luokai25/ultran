@@ -7,11 +7,10 @@ The Ultron phone client. A Vite + three.js shell wrapped by Capacitor, and the
 
 The production website and Android APK use this same Vite client. The public
 web endpoint is
-[`https://ultron-app-web.luo-chat-ops.workers.dev/`](https://ultron-app-web.luo-chat-ops.workers.dev/).
-GitHub Actions builds `apps/phone`, publishes one immutable release bundle,
-and the single Cloudflare Worker serves it. Do not deploy a second public
-ULTRON site from `apps/web`; that Next.js console is a non-production
-prototype and is not the APK-matched client.
+[`https://ultron-pied-gamma.vercel.app/`](https://ultron-pied-gamma.vercel.app/).
+Vercel Git integration deploys the `apps/phone` client from `main`. GitHub
+Actions typechecks and builds the same client; it does not publish Cloudflare
+assets or route visitors through a Worker.
 
 ## Relationship to `apps/mobile`
 

@@ -57,7 +57,7 @@ export function openUltronDatabase(): Promise<IDBDatabase> {
   }
   if (databasePromise) return databasePromise;
 
-  databasePromise = new Promise((resolve, reject) => {
+  const pending: Promise<IDBDatabase> = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -85,7 +85,8 @@ export function openUltronDatabase(): Promise<IDBDatabase> {
     throw storageError(error);
   });
 
-  return databasePromise;
+  databasePromise = pending;
+  return pending;
 }
 
 function transactionDone(transaction: IDBTransaction): Promise<void> {

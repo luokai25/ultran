@@ -729,7 +729,7 @@ async function initializeDurableChatStore(): Promise<void> {
           id: draft.value.messageId,
           role: "assistant",
           content: partial
-            ? partial + "\\n\\n[This response was interrupted. The saved text above is partial.]"
+            ? partial + "\n\n[This response was interrupted. The saved text above is partial.]"
             : "[Generation was interrupted before ULTRON produced a response.]",
         });
         conversation.updatedAt = Date.now();

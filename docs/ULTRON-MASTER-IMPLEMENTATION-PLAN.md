@@ -279,12 +279,15 @@ Priority order is intentional. Do not expand autonomous capabilities while the b
 ## 6. Current session log
 
 ### 2026-11-10 — Master plan created
-- Added this document as the canonical end-to-end implementation plan.
+- Added this document as the canonical end-to-end implementation plan (initial commit: `e8acba2ba6862547498191c811b9b9161f980d0d`).
+- Linked it from `docs/README.md` (commit: `013c45c2d312419d610d9fd7a1481601fcf2b21f`).
+- Corrected the root README's stale Supabase-brain/key-vault claims (commit: `509ecae4ad7376bf3048270cf43d833ad94793d9`).
+- Rewrote `docs/architecture.md` to distinguish current transition state from the target design (commit: `1b5a715a052083a75aafdad24238be26ae9ee802`).
 - Captured the local-first/Vercel brain/optional Supabase architecture decision.
 - Captured the unified streaming protocol and Prometheus live-streaming requirement.
 - Recorded source-audit findings: Prometheus buffers model output; Cohere delimiter parsing needs repair; cloud attachment payloads are incomplete; local persistence relies heavily on localStorage; memory embeddings are currently feature-hash based; several runtime/connector/artifact paths still depend on Supabase; README/architecture docs are stale.
 - No implementation or production behavior is declared fixed by creating this plan.
-- Next action: update README and architecture documentation, then establish a reproducible baseline and start Phase 1 P0 fixes.
+- Documentation alignment is complete. Next action: establish a reproducible baseline and start Phase 1 P0 fixes.
 
 ### 2026-11-10 — Continuity requirement reaffirmed
 - Reaffirmed the standing requirement that every ULTRON conversation resumes from this plan and current `main`, then continues implementation, repair and verification rather than restarting planning or stopping at a checklist.

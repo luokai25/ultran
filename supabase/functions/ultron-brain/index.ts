@@ -32,10 +32,6 @@ const PROVIDERS: Record<Provider, { label: string; base: string; modelsUrl: stri
 const PROVIDER_IDS = Object.keys(PROVIDERS) as Provider[];
 const tableFor = (provider: Provider) => `ultron_${provider}_keys`;
 const service = () => createClient(PROJECT_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const userClient = (authorization: string) => createClient(PROJECT_URL, PUBLISHABLE_KEY, {
-  global: { headers: { Authorization: authorization } },
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-});
 const clean = (value: unknown, max = 240) => typeof value === "string" ? value.trim().slice(0, max) : "";
 const isProvider = (value: unknown): value is Provider => typeof value === "string" && PROVIDER_IDS.includes(value as Provider);
 const modelId = (value: unknown) => clean(value, 180);
@@ -144,15 +140,11 @@ async function updateKey(db: ReturnType<typeof service>, ownerId: string, provid
   const { error } = await db.from(tableFor(provider)).update(patch).eq("owner_id", ownerId).eq("id", id);
   if (error) throw error;
 }
-async function requireOwner(authorization: string): Promise<{ id: string; email?: string }> {
-  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!token) throw new Response("unauthorized", { status: 401 });
-  const client = userClient(authorization);
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) throw new Response("unauthorized", { status: 401 });
-  const { data: owner, error: ownerError } = await service().from("ultron_instance").select("owner_id").eq("owner_id", data.user.id).eq("id", true).maybeSingle();
-  if (ownerError || !owner) throw new Response("owner_instance_required", { status: 403 });
-  return { id: data.user.id, email: data.user.email ?? undefined };
+async function getInstanceOwnerId(db: ReturnType<typeof service>): Promise<string> {
+  const { data: instance, error } = await db.from("ultron_instance")
+    .select("owner_id").eq("id", true).maybeSingle();
+  if (error || !instance?.owner_id) throw new Response("ultron_instance_required", { status: 503 });
+  return String(instance.owner_id);
 }
 async function keyRows(db: ReturnType<typeof service>, ownerId: string): Promise<Array<{ provider: Provider; key: KeyRow }>> {
   const all = await Promise.all(PROVIDER_IDS.map(async (provider) => (await listProviderKeys(db, ownerId, provider)).map((key) => ({ provider, key }))));
@@ -685,8 +677,9 @@ Deno.serve(async (request: Request) => {
       if (!["checkpoint_before_change", "commit_change", "abort_change", "mark_change_crashed"].includes(body.action)) return json({ error: "worker_action_not_allowed" }, 403);
       ownerId = internalOwnerId;
     } else {
-      const owner = await requireOwner(request.headers.get("Authorization") ?? "");
-      ownerId = owner.id;
+      // ULTRON is a single public instance: the browser does not create or sign in
+      // to user accounts. Resolve its fixed backend workspace server-side.
+      ownerId = await getInstanceOwnerId(db);
     }
     if (body.action === "checkpoint_before_change") {
       const fingerprint = clean(body.fingerprint, 128);

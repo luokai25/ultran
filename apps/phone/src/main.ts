@@ -66,7 +66,7 @@ import {
   nativeSecureStorage,
 } from "./cloud-sync";
 import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
-import { listDurableRecords, putDurableRecords } from "./durable-store";
+import { listDurableRecords, putDurableRecords, type DurableBucket } from "./durable-store";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
@@ -685,16 +685,16 @@ let durableChatStoreReady = false;
 let durableChatWriteQueue: Promise<void> = Promise.resolve();
 
 function persistChatToIndexedDb(snapshot: Store): Promise<void> {
-  const records = snapshot.conversations.map((conversation) => ({
-    bucket: "conversations" as const,
+  const records: Array<{ bucket: DurableBucket; id: string; value: unknown }> = snapshot.conversations.map((conversation) => ({
+    bucket: "conversations",
     id: conversation.id,
     value: conversation,
   }));
   records.push({
-    bucket: "metadata" as const,
+    bucket: "metadata",
     id: "chat-state",
     value: { activeId: snapshot.activeId, conversationIds: snapshot.conversations.map((conversation) => conversation.id) },
-  } as typeof records[number]);
+  });
   return putDurableRecords(records);
 }
 

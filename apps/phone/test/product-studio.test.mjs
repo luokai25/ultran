@@ -111,8 +111,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /editorial\.review\.completed/);
   assert.match(source, /editorial_review_passed/);
   assert.match(source, /editorial\.revision\.started/);
-  assert.ok(source.includes("withSearch ? 12_000 : 30_000"));
-  assert.ok(source.includes("Math.min(withSearch ? 12_000 : 30_000"));
+  assert.match(source, /AbortSignal\.timeout\(Math\.max\(1000, deadline - Date\.now\(\)\)\)/);
+  assert.match(source, /const deadline = Date\.now\(\) \+ 105_000/);
   assert.ok(source.includes("const deadline = Date.now() + 105_000"));
   assert.match(source, /product_project_stopped/);
   assert.ok(source.includes('.eq("status", "validating")'));

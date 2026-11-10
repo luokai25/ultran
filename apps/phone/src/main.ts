@@ -4056,24 +4056,32 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       convo.prometheusGoal = goal.slice(0, 8000);
       saveStore();
     }
+    let checkpointPersistenceAvailable = true;
     const savePrometheusCheckpoint = async (phase: string, status: "running" | "paused" | "waiting_approval" | "completed" | "failed", result?: Record<string, unknown>): Promise<void> => {
-      const saved = await invokeUltronCapabilities("checkpoint_run", {
-        id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
-        iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
-        checkpoint: {
-          schema_version: 2, mode: "prometheus", conversation_id: convo.id,
-          goal: goal.slice(0, 4000), task: task.slice(0, 2000),
-          system_prompt: messages.find((message) => message.role === "system")?.content.slice(0, 12000) ?? "",
-          messages: messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({
-            role: message.role, content: message.content.slice(0, 2000),
-          })),
-          completed_tools: toolHistory.slice(-iterationLimit),
-          updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
-        },
-        status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
-        ...(result ? { result } : {}),
-      });
-      if (saved.ok !== true) throw new Error("Prometheus could not persist its Supabase checkpoint.");
+      try {
+        const saved = await invokeUltronCapabilities("checkpoint_run", {
+          id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
+          iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
+          checkpoint: {
+            schema_version: 2, mode: "prometheus", conversation_id: convo.id,
+            goal: goal.slice(0, 4000), task: task.slice(0, 2000),
+            system_prompt: messages.find((message) => message.role === "system")?.content.slice(0, 12000) ?? "",
+            messages: messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({
+              role: message.role, content: message.content.slice(0, 2000),
+            })),
+            completed_tools: toolHistory.slice(-iterationLimit),
+            updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
+          },
+          status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
+          ...(result ? { result } : {}),
+        });
+        if (saved.ok !== true) throw new Error("Prometheus could not persist its Supabase checkpoint.");
+      } catch (error) {
+        // Checkpoint infrastructure is important, but it must never erase a
+        // perfectly valid model answer. Keep the turn alive and report telemetry.
+        checkpointPersistenceAvailable = false;
+        console.warn("[ULTRON chat checkpoint]", error instanceof Error ? error.message : "checkpoint_unavailable");
+      }
     };
     try {
       await savePrometheusCheckpoint(priorRun ? "resuming" : "planning", "running");

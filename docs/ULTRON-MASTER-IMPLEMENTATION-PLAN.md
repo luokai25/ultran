@@ -311,3 +311,13 @@ Priority order is intentional. Do not expand autonomous capabilities while the b
 
 - Follow-up source changes after the last successful Vercel build: Prometheus now forwards ordinary final-answer tokens as they arrive while buffering possible tool-call envelopes until they can be parsed safely; the Vercel Brain chat-history mapper now includes extracted text from attached files and explicitly labels image bytes as unsupported on that text-only route. These changes are on `main` but are not yet deployment-verified because Vercel returned a build-rate-limit status.
 - A read-only browser check of the canonical production alias later failed before page load with `ERR_SOCKS_CONNECTION_FAILED`; this is a verification-network failure, not evidence of an app runtime regression. The successful IndexedDB persistence smoke test remains tied to the specific preview deployment documented above.
+
+
+### 2026-11-10 — Cohere gateway stream repair
+- Audited the independent Vercel Brain gateway after the previous session's streaming review.
+- Found a concrete Cohere SSE defect in `api/ultron-brain.ts`: the parser searched for the literal escaped sequence `\\n` rather than newline boundaries, and emitted escaped delimiters instead of actual SSE frame separators. This prevented normal event framing.
+- Fixed the parser to split on actual newline boundaries, normalize CRLF lines, process a final unterminated data line, preserve the OpenAI-compatible downstream event shape, and respect response backpressure while forwarding tokens.
+- Changes were pushed to `main` only. Final source commit: `4845534ca98cdab5d0ede86796ad64cac14553c9`.
+- Source inspection confirms the final file contains actual newline escapes in the TypeScript string literals. No runtime test or deployment verification is claimed yet.
+- The Vercel status for the latest commit still reports the build-rate-limit failure. Production remains on the older successful commit `5227d2b9fe3d0a2a64e51fd21f81d91652d76891`; the Cohere repair and later streaming/attachment work are not live until a new successful deployment is observed.
+- Local repository execution was unavailable in this environment because outbound GitHub DNS resolution failed. The cache unit tests and full CI/build therefore remain unverified and must be run when a build/test environment is available.

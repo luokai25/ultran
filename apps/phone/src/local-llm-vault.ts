@@ -30,6 +30,11 @@ function fromBase64(value: string): Uint8Array {
   const binary = atob(value);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
 
 function openCryptoDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -76,7 +81,7 @@ async function readEncryptedVault(): Promise<LocalProviderKey[]> {
   if (!crypto.subtle || typeof indexedDB === "undefined") throw new Error("This browser cannot unlock the encrypted local API-key vault.");
   const envelope = JSON.parse(stored) as { iv: string; ciphertext: string };
   const key = await getCryptoKey();
-  const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(envelope.iv) }, key, fromBase64(envelope.ciphertext));
+  const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: asArrayBuffer(fromBase64(envelope.iv)) }, key, asArrayBuffer(fromBase64(envelope.ciphertext)));
   return JSON.parse(new TextDecoder().decode(clear)) as LocalProviderKey[];
 }
 
@@ -90,7 +95,7 @@ async function writeEncryptedVault(keys: LocalProviderKey[]): Promise<void> {
   if (!crypto.subtle || typeof indexedDB === "undefined") throw new Error("This browser cannot encrypt the local API-key vault.");
   const key = await getCryptoKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(serialized));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(iv) }, key, asArrayBuffer(new TextEncoder().encode(serialized)));
   localStorage.setItem(VAULT_KEY, JSON.stringify({ iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(ciphertext)) }));
 }
 

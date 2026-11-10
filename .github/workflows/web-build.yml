@@ -1,4 +1,4 @@
-name: ULTRON Web Build
+name: ULTRON Web Build (Vercel)
 
 on:
   push:
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ultron-web-main
@@ -44,74 +44,22 @@ jobs:
           path: apps/phone/dist/
           if-no-files-found: error
           retention-days: 7
-      - name: Publish immutable web assets for the Cloudflare edge
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if ! gh release view ultron-web-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create ultron-web-latest \
-              --target "$GITHUB_SHA" \
-              --title "ULTRON Web" \
-              --notes "Mutable asset bundle consumed by the ULTRON Cloudflare edge worker." \
-              --prerelease \
-              --repo "$GITHUB_REPOSITORY"
-          fi
-          gh release upload ultron-web-latest \
-            apps/phone/dist/index.html \
-            apps/phone/dist/assets/* \
-            --clobber \
-            --repo "$GITHUB_REPOSITORY"
-      - name: Smoke-test the live Cloudflare web app and its bundles
+      - name: Verify the account-free direct chat contract
         run: |
           node --input-type=module <<'NODE'
-          import { readFile, readdir } from "node:fs/promises";
-          const localHtml = await readFile("apps/phone/dist/index.html", "utf8");
-          const base = "https://ultron-app-web.luo-chat-ops.workers.dev";
-          const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-          async function fetchWithRetry(url, label, readBody) {
-            let lastError;
-            for (let attempt = 0; attempt < 6; attempt++) {
-              try {
-                const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-                if (!response.ok) {
-                  await response.body?.cancel();
-                  throw new Error(`${label} returned HTTP ${response.status}`);
-                }
-                const body = await readBody(response);
-                return { response, body };
-              } catch (error) {
-                lastError = error;
-                if (attempt < 5) {
-                  console.warn(`${label} attempt ${attempt + 1}/6 failed: ${error instanceof Error ? error.message : String(error)}`);
-                  await sleep(1500 * (attempt + 1));
-                }
-              }
-            }
-            throw new Error(`${label} failed after 6 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+          import { readFile } from "node:fs/promises";
+          const html = await readFile("apps/phone/dist/index.html", "utf8");
+          const source = await readFile("apps/phone/src/cloud-llm.ts", "utf8");
+          const brain = await readFile("supabase/functions/ultron-brain/index.ts", "utf8");
+          if (!html.includes("Message Ultron")) throw new Error("ULTRON composer is missing");
+          if (source.includes("getCloudSession()") || source.includes("Sign in with the ULTRON owner account")) {
+            throw new Error("Cloud chat still has an account gate");
           }
-
-          const { body: liveHtml } = await fetchWithRetry(
-            base + "/", "Cloudflare app", response => response.text()
-          );
-          if (!liveHtml.includes("ULTRON") || !liveHtml.includes("Message Ultron")) {
-            throw new Error("Cloudflare app did not serve the clean APK-matched ULTRON conversation shell");
+          if (!source.includes("apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY")) {
+            throw new Error("Public chat is missing its publishable project key");
           }
-
-          const assets = await readdir("apps/phone/dist/assets");
-          for (let offset = 0; offset < assets.length; offset += 6) {
-            const batch = assets.slice(offset, offset + 6);
-            await Promise.all(batch.map(async name => {
-              await fetchWithRetry(
-                `${base}/assets/${name}`,
-                `Cloudflare asset ${name}`,
-                async response => {
-                  const bytes = await response.arrayBuffer();
-                  if (!bytes.byteLength) throw new Error("asset body was empty");
-                  return bytes;
-                }
-              );
-            }));
+          if (!brain.includes("getInstanceOwnerId")) {
+            throw new Error("Cloud brain does not resolve the single ULTRON instance");
           }
-          console.log(`Cloudflare web smoke test passed: ${assets.length} built assets, ${liveHtml.length} HTML bytes; local bundle ${localHtml.length} bytes`);
+          console.log("Account-free ULTRON chat contract passed.");
           NODE

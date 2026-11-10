@@ -303,6 +303,7 @@ Deno.serve(async (req: Request) => {
   let db:ReturnType<typeof createClient>;
   let owner_id="";
   let internalWorker=false;
+  let systemAccess=false;
   try{
     const cronSecret=req.headers.get("x-ultron-cron-secret")??"";
     if(cronSecret){
@@ -310,15 +311,11 @@ Deno.serve(async (req: Request) => {
       if(secretError||typeof expected!=="string"||expected!==cronSecret)return reply({error:"unauthorized_worker"},401);
       const {data:instance,error:ownerError}=await serviceDb.from("ultron_instance").select("owner_id").eq("id",true).maybeSingle();
       if(ownerError||!instance?.owner_id)return reply({error:"owner_instance_required"},403);
-      db=serviceDb;owner_id=instance.owner_id;internalWorker=true;
+      db=serviceDb;owner_id=instance.owner_id;internalWorker=true;systemAccess=true;
     }else{
-      if(!token)return reply({error:"unauthorized"},401);
-      const userDb=createClient(url,key,{global:{headers:{Authorization:auth}},auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-      const {data:authData,error:authError}=await userDb.auth.getUser(token);const user=authData?.user;
-      if(authError||!user)return reply({error:"unauthorized"},401);
-      const {data:owner,error:ownerError}=await userDb.from("ultron_instance").select("owner_id").eq("owner_id",user.id).maybeSingle();
-      if(ownerError||!owner)return reply({error:"owner_instance_required"},403);
-      db=userDb;owner_id=user.id;
+      const {data:instance,error:ownerError}=await serviceDb.from("ultron_instance").select("owner_id").eq("id",true).maybeSingle();
+      if(ownerError||!instance?.owner_id)return reply({error:"owner_instance_required"},503);
+      db=serviceDb;owner_id=instance.owner_id;systemAccess=true;
     }
     const raw=await req.text();if(new TextEncoder().encode(raw).byteLength>100000)return reply({error:"payload_too_large"},413);
     const body:unknown=JSON.parse(raw);if(!isObject(body)||typeof body.action!=="string")return reply({error:"invalid_request"},400);
@@ -327,7 +324,7 @@ Deno.serve(async (req: Request) => {
     if(action==="search_memory"){
       const vector=Array.isArray(body.query_embedding)?body.query_embedding.map(Number):embedMemoryText(String(body.query??""));
       if(vector.length!==96||vector.some(value=>!Number.isFinite(value)))return reply({error:"query_embedding_must_have_96_finite_values"},400);
-      const {data,error}=internalWorker
+      const {data,error}=systemAccess
         ? await db.rpc("ultron_match_local_memories_system",{p_owner_id:owner_id,query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))})
         : await db.rpc("ultron_match_local_memories",{query_embedding:vector,match_count:Math.min(20,Math.max(1,Number(body.limit)||8)),min_similarity:Math.max(0,Math.min(1,Number(body.min_similarity)||0.08))});
       if(error)throw error;return reply({ok:true,matches:data});

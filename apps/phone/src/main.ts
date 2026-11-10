@@ -4255,13 +4255,15 @@ async function openChatModelMenu(): Promise<void> {
   chatModelMenu.hidden = false;
   chatModelButton.setAttribute("aria-expanded", "true");
   const modelButtonRect = chatModelButton.getBoundingClientRect();
-  const modelMenuWidth = Math.min(modelButtonRect.width, window.innerWidth - 20);
+  const modelMenuWidth = Math.min(248, window.innerWidth - 20);
+  const modelMenuLeft = Math.max(10, Math.min(modelButtonRect.left, window.innerWidth - modelMenuWidth - 10));
   chatModelMenu.style.width = modelMenuWidth + "px";
-  chatModelMenu.style.left = Math.max(10, Math.min(modelButtonRect.left, window.innerWidth - modelMenuWidth - 10)) + "px";
+  chatModelMenu.style.left = modelMenuLeft + "px";
   chatModelMenu.style.right = "auto";
   chatModelMenu.style.top = "auto";
-  chatModelMenu.style.bottom = (window.innerHeight - modelButtonRect.top + 10) + "px";
-  chatModelMenu.style.maxHeight = Math.max(180, modelButtonRect.top - 20) + "px";
+  chatModelMenu.style.bottom = (window.innerHeight - modelButtonRect.top + 8) + "px";
+  chatModelMenu.style.maxHeight = Math.min(210, Math.max(132, modelButtonRect.top - 18)) + "px";
+  chatModelMenu.style.transform = "none";
   chatModelOptions.replaceChildren();
   chatModelStatus.textContent = "ULTRON Automatic is the default. Checking Supabase and imported local models…";
   syncChatModelLabel();
@@ -4292,12 +4294,6 @@ async function openChatModelMenu(): Promise<void> {
     syncChatModelLabel();
     closeChatModelMenu();
     try {
-      const session = await getCloudSession();
-      if (!session) {
-        chatModelStatus.textContent = "Automatic is selected. Sign in once to the ULTRON owner account in Settings; the session is then securely persisted and refreshed automatically.";
-        openSheet();
-        return;
-      }
       const status = await getUltronCloudStatus();
       const connected = Number(status.connected_keys ?? 0);
       chatModelStatus.textContent = connected > 0
@@ -4358,18 +4354,13 @@ async function openChatModelMenu(): Promise<void> {
   }
 
   try {
-    const session = await getCloudSession();
-    if (!session) {
-      chatModelStatus.textContent = "ULTRON · Automatic is ready, but the owner session needs one initial sign-in in Settings.";
-    } else {
-      const status = await getUltronCloudStatus();
-      const connected = Number(status.connected_keys ?? 0);
-      chatModelStatus.textContent = connected > 0
-        ? "Automatic cloud brain ready · " + connected + " connected key(s). " + (Capacitor.getPlatform() === "android" ? "Imported local models are listed below." : "No provider or API-key list is shown here.")
-        : "Automatic is selected. No usable provider keys are currently available; add them in LLM API Keys.";
-    }
+    const status = await getUltronCloudStatus();
+    const connected = Number(status.connected_keys ?? 0);
+    chatModelStatus.textContent = connected > 0
+      ? "Automatic cloud brain ready · " + connected + " connected key(s). " + (Capacitor.getPlatform() === "android" ? "Imported local models are listed below." : "No provider or API-key list is shown here.")
+      : "Automatic is selected. No usable provider keys are currently available; add them in LLM API Keys.";
   } catch {
-    chatModelStatus.textContent = "Automatic is selected. Supabase will reconnect when the network or owner session is available.";
+    chatModelStatus.textContent = "Automatic is selected. Supabase will reconnect when the network is available.";
   }
   syncChatModelLabel();
 }

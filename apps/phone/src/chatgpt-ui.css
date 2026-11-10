@@ -503,3 +503,54 @@ progress { width:100%; accent-color:var(--accent); }
 .feature-screen a:hover,
 #connectors-panel a:hover,
 #workspace-panel a:hover { color:var(--accent-hover); }
+
+
+/* Compact, correctly anchored phone model picker and right-aligned user turns. */
+.chat-model-menu {
+  display: block;
+  inset: auto auto 0 0;
+  width: min(248px, calc(100vw - 20px));
+  max-width: calc(100vw - 20px);
+  max-height: min(210px, 34vh);
+  overflow: hidden;
+  padding: 7px;
+  transform: none;
+  border-radius: 12px;
+  background: #202020;
+}
+.chat-model-menu-head, #chat-model-status, .chat-model-menu-actions { display: none !important; }
+.chat-model-options {
+  width: 100%;
+  max-height: min(194px, calc(34vh - 14px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+.chat-model-options button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 26px 6px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.chat-model-options button strong { font-size: 12px; font-weight: 550; }
+.chat-model-options button small { display: none !important; }
+.chat-model-option-marker { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; }
+.chat-model-empty { margin: 0; padding: 7px 9px; font-size: 11px; line-height: 1.35; }
+.msg.user {
+  align-self: flex-end;
+  margin-left: auto;
+  margin-right: 0;
+  width: fit-content;
+  max-width: min(86%, 720px);
+}
+.msg.user .actions { justify-content: flex-end; margin-top: 1px; }
+.msg.user .actions button { min-height: 26px; padding: 3px 7px; font-size: 10px; }

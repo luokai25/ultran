@@ -43,42 +43,34 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return response({ error: "method_not_allowed" }, 405);
 
-  const authorization = req.headers.get("Authorization") ?? "";
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  if (!match) return response({ error: "unauthorized" }, 401);
-
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
-  if (!url || !key) return response({ error: "server_configuration_missing" }, 500);
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
+  if (!url || !key || !serviceKey) return response({ error: "server_configuration_missing" }, 500);
 
-  const supabase = createClient(url, key, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  // ULTRON is a single public instance. Resolve its fixed workspace on the
+  // server; never trust an owner id supplied by the browser.
+  const supabase = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   let changeStarted = false;
   let changeName = "capability_change";
   try {
-    const { data: authData, error: authError } = await supabase.auth.getUser(match[1]);
-    const user = authData?.user;
-    if (authError || !user) return response({ error: "unauthorized" }, 401);
-
     const { data: owner, error: ownerError } = await supabase
       .from("ultron_instance")
       .select("owner_id,display_name")
-      .eq("owner_id", user.id)
+      .eq("id", true)
       .maybeSingle();
-    if (ownerError || !owner) return response({ error: "owner_instance_required" }, 403);
+    if (ownerError || !owner?.owner_id) return response({ error: "owner_instance_required" }, 503);
 
     const raw = await req.text();
     if (new TextEncoder().encode(raw).byteLength > 65536) return response({ error: "payload_too_large" }, 413);
     const body: unknown = JSON.parse(raw);
     if (!object(body) || typeof body.action !== "string") return response({ error: "invalid_request" }, 400);
-    const owner_id = user.id;
+    const owner_id = String(owner.owner_id);
     const beginChange = async (name: string, sourceFingerprint = "") => {
       changeName = name;
       const fingerprint = sourceFingerprint ? await sha256(`${name}:${sourceFingerprint}`) : "";
-      await callBrainCheckpoint(url, key, authorization, "checkpoint_before_change", { change: name, fingerprint });
+      await callBrainCheckpoint(url, key, `Bearer ${key}`, "checkpoint_before_change", { change: name, fingerprint });
       changeStarted = true;
     };
     const finishChange = async () => {

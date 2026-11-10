@@ -128,9 +128,19 @@ export async function streamUltronSupabaseChat(
   const abortFromCaller = (): void => controller.abort();
   if (signal.aborted) controller.abort();
   else signal.addEventListener("abort", abortFromCaller, { once: true });
+  let idleTimedOut = false;
+  let idleTimer = 0;
+  const resetIdleTimeout = (): void => {
+    if (idleTimer) window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => {
+      idleTimedOut = true;
+      controller.abort(new DOMException("ULTRON cloud response timed out.", "TimeoutError"));
+    }, 120_000);
+  };
   try {
+    resetIdleTimeout();
     let session = await getCloudSession();
-    if (!session) throw new Error("Sign in to ULTRON Supabase before starting a cloud chat.");
+    if (!session) throw new Error("Sign in once to the ULTRON owner account in Settings. The secure session is persisted and refreshed automatically.");
     const safeMessages = prepareCloudChatMessages(messages);
     if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
       throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
@@ -147,7 +157,16 @@ export async function streamUltronSupabaseChat(
       body: requestBody,
       signal: controller.signal,
     });
-    let response = await send(session.access_token);
+    let response: Response;
+    try {
+      response = await send(session.access_token);
+    } catch (error) {
+      // A transport failure before response headers is safe to retry once.
+      if (controller.signal.aborted) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      if (controller.signal.aborted) throw error;
+      response = await send(session.access_token);
+    }
     if (response.status === 401 && !controller.signal.aborted) {
       const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
       if (!refreshError && refreshed.session) {
@@ -212,6 +231,7 @@ export async function streamUltronSupabaseChat(
     while (true) {
       if (controller.signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       const chunk = await reader.read();
+      if (!chunk.done) resetIdleTimeout();
       buffer += decoder.decode(chunk.value, { stream: !chunk.done });
       let boundary = buffer.search(/\r?\n\r?\n/);
       while (boundary >= 0) {
@@ -226,8 +246,10 @@ export async function streamUltronSupabaseChat(
     if (!content.trim()) throw new Error("ULTRON Supabase completed without returning any text.");
     return content.trim();
   } catch (error) {
+    if (idleTimedOut) throw new Error("ULTRON's cloud model stopped streaming for 120 seconds. The message is saved; retry when the connection is stable.");
     throw error;
   } finally {
+    if (idleTimer) window.clearTimeout(idleTimer);
     signal.removeEventListener("abort", abortFromCaller);
   }
 }

@@ -590,3 +590,31 @@ test("Supabase is the default shared runtime for ULTRON-authored tools and skill
   assert.match(html, /id="capability-tool-runs"/);
   assert.match(html, /id="capability-cloud-skills"/);
 });
+
+
+test("chat uses Automatic by default and exposes only imported local models in the picker", async () => {
+  const [main, cloudLlm, brain] = await Promise.all([
+    read("src/main.ts"),
+    read("src/cloud-llm.ts"),
+    read("../../supabase/functions/ultron-brain/index.ts"),
+  ]);
+  assert.match(main, /ultron\.chat\.auto-routing-migrated\.v1/);
+  assert.match(main, /ULTRON · Automatic/);
+  const menuStart = main.indexOf("async function openChatModelMenu(): Promise<void>");
+  const menuEnd = main.indexOf("\nfunction openSheet(): void", menuStart);
+  assert.ok(menuStart >= 0 && menuEnd > menuStart, "chat model picker exists");
+  const menu = main.slice(menuStart, menuEnd);
+  assert.match(menu, /NativeLocalAI\.listModels\(\)/);
+  assert.doesNotMatch(menu, /getUltronCloudModels|listUltronCloudKeys|providerDirectory|More providers/);
+  assert.match(menu, /selectedCloudModelId = ""/);
+  assert.match(menu, /writeJson\("ultron\.cloud-brain\.active\.v1", true\)/);
+  const nativeRoute = main.indexOf('if (!cloudBrainActive && nativeModelLoaded && Capacitor.getPlatform() === "android")');
+  const cloudRoute = main.indexOf("} else if (cloudBrainActive ||", nativeRoute);
+  assert.ok(nativeRoute >= 0 && cloudRoute > nativeRoute, "Automatic cloud routing takes precedence over an already loaded local model");
+  assert.match(cloudLlm, /resetIdleTimeout/);
+  assert.match(cloudLlm, /idleTimedOut/);
+  assert.match(cloudLlm, /response = await send\(session\.access_token\)/);
+  assert.match(main, /checkpointPersistenceAvailable/);
+  assert.match(main, /checkpoint storage was temporarily unavailable/);
+  assert.match(brain, /const automaticCandidates = eligibleRows\.flatMap/);
+});

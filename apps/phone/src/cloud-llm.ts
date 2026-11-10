@@ -156,7 +156,7 @@ export function prepareCloudChatMessages(
   return normalized;
 }
 
-export async function streamUltronSupabaseChat(
+export async function streamUltronBrainChat(
   modelId: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   maxTokens: number,

@@ -38,6 +38,8 @@ test("provider credentials are encrypted locally and Android uses native secure 
   assert.match(vault, /native-secure-storage/);
   assert.doesNotMatch(vault, /cloud-sync/);
   assert.match(vault, /indexedDB/);
+  assert.match(vault, /blocked_models/);
+  assert.match(vault, /cooldown_until/);
   assert.doesNotMatch(vault, /localStorage\.setItem\(VAULT_KEY, serialized/);
 });
 

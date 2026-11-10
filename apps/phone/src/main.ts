@@ -717,8 +717,31 @@ async function initializeDurableChatStore(): Promise<void> {
     } else {
       await persistChatToIndexedDb(store);
     }
+    const recoveredDraftIds: string[] = [];
+    const drafts = await listDurableRecords<{ conversationId: string; messageId: string; content: string }>("checkpoints");
+    for (const draft of drafts) {
+      if (!draft.id.startsWith("chat-draft:")) continue;
+      const conversation = store.conversations.find((item) => item.id === draft.value.conversationId);
+      if (!conversation) continue;
+      if (!conversation.messages.some((item) => item.id === draft.value.messageId)) {
+        const partial = draft.value.content.trim();
+        conversation.messages.push({
+          id: draft.value.messageId,
+          role: "assistant",
+          content: partial
+            ? partial + "\\n\\n[This response was interrupted. The saved text above is partial.]"
+            : "[Generation was interrupted before ULTRON produced a response.]",
+        });
+        conversation.updatedAt = Date.now();
+      }
+      recoveredDraftIds.push(draft.id);
+    }
     try { await navigator.storage?.persist?.(); } catch { /* browser may decline persistent-storage status */ }
     durableChatStoreReady = true;
+    if (recoveredDraftIds.length) {
+      await persistChatToIndexedDb(store);
+      for (const id of recoveredDraftIds) await deleteDurableRecord("checkpoints", id);
+    }
     // Reconcile only after the IndexedDB snapshot has been read successfully.
     writeJson(STORE_KEY, store);
     cloudSyncStatusEl.dataset.state = "local";

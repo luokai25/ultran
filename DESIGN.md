@@ -58,7 +58,7 @@ motion:
 - Product: ULTRON, a personal AI agent that can chat, reason, use approved tools, manage models, connect services, and work across files and memory.
 - Primary user: one owner operating ULTRON from an Android phone and a desktop browser.
 - Canonical shared client: `apps/phone`. It is the Vite + TypeScript client used by both the production web URL and the Capacitor Android APK. Changes here must work in both surfaces.
-- Production web endpoint: `https://ultron-app-web.luo-chat-ops.workers.dev/` serves the canonical `apps/phone` bundle from the `ultron-web-latest` release; the Capacitor Android APK uses the same client. The legacy Cloudflare Pages project `ultron-web` was deleted on 2026-11-06 after the Worker served the new bundle and assets successfully. Do not recreate a second public site.
+- Production web endpoint: `https://ultron-pied-gamma.vercel.app/` serves the canonical `apps/phone` Vite client from Vercel Git integration; the Capacitor Android APK uses the same client. Do not route the public site through Cloudflare.
 - Secondary web application: `apps/web`, a non-production Next.js prototype/console. It is not deployed and must not be configured as a second public ULTRON site or reported as feature parity with `apps/phone`.
 - Backend: Supabase. Design changes must not weaken auth, RLS, secret storage, connector scopes, or approval gates.
 

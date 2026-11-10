@@ -95,6 +95,7 @@ async function parseJsonResponse(response: Response): Promise<Record<string, unk
 
 export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderGroup[]; total_keys: number; connected_keys: number }> {
   const rows = await listLocalProviderKeys();
+  const now = Date.now();
   const providers = (Object.keys(PROVIDERS) as CloudProviderId[]).map((provider) => {
     const keys: CloudKeyRow[] = rows.filter((row) => row.provider === provider).map((row) => ({
       id: row.id, label: row.label, status: row.status, enabled: row.enabled, priority: row.priority,
@@ -102,10 +103,10 @@ export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderG
       request_count: row.request_count, tokens_used: row.tokens_used, cooldown_until: row.cooldown_until, last_used_at: row.last_used_at,
       last_checked_at: row.last_checked_at, last_error: row.last_error, created_at: row.created_at,
     }));
-    return { id: provider, label: PROVIDERS[provider], key_count: keys.length, connected_count: keys.filter((key) => key.enabled && key.status === "connected").length, keys };
+    return { id: provider, label: PROVIDERS[provider], key_count: keys.length, connected_count: keys.filter((key) => key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length, keys };
   });
   const all = providers.flatMap((provider) => provider.keys);
-  return { providers, total_keys: all.length, connected_keys: all.filter((key) => key.enabled && key.status === "connected").length };
+  return { providers, total_keys: all.length, connected_keys: all.filter((key) => key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)).length };
 }
 
 export async function addUltronCloudKey(provider: CloudProviderId, key: string, label: string): Promise<Record<string, unknown>> {
@@ -253,6 +254,7 @@ export async function streamUltronBrainChat(
         if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
         if (controller.signal.aborted) break;
         lastError = error instanceof Error ? error : new Error("ULTRON Brain could not reach the provider.");
+        await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, { outcome: "transient", error: lastError.message }).catch(() => undefined);
         continue;
       }
       if (!response.ok) {
@@ -269,7 +271,7 @@ export async function streamUltronBrainChat(
           const retryAfterMs = retryHeader && /^\\d+(?:\\.\\d+)?$/.test(retryHeader)
             ? Number(retryHeader) * 1000 : 900_000;
           await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, {
-            outcome, error: message, retryAfterMs,
+            outcome, error: message, retryAfterMs, model: candidate.model,
           }).catch(() => undefined);
         }
         if (![401, 403, 404, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;

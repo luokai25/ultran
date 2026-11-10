@@ -35,7 +35,9 @@ type VercelResponse = {
 
 const allowedOrigin = (origin: string) =>
   origin === "https://localhost" ||
+  origin === "capacitor://localhost" ||
   origin === "http://localhost:5173" ||
+  origin === "http://localhost" ||
   origin === "http://127.0.0.1:5173" ||
   /^https:\/\/[a-z0-9-]+(?:-[a-z0-9-]+)*\.vercel\.app$/i.test(origin) ||
   origin === "https://ultron-pied-gamma.vercel.app" ||

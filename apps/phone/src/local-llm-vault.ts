@@ -18,6 +18,7 @@ export type LocalProviderKey = {
   tokens_used: number;
   cooldown_until: string | null;
   last_used_at: string | null;
+  blocked_models?: Record<string, string>;
 };
 
 const VAULT_KEY = "ultron.local.llm.vault.v1";
@@ -123,7 +124,7 @@ export async function getLocalProviderKeyCandidates(provider: LocalProviderId, m
   const now = Date.now();
   return keys.filter((key) => key.provider === provider && key.enabled && key.status === "connected" &&
     (!key.cooldown_until || Date.parse(key.cooldown_until) <= now) &&
-    (!modelId || key.models.includes(modelId)))
+    (!modelId || (key.models.includes(modelId) && Date.parse(key.blocked_models?.[modelId] ?? "1970-01-01") <= now)))
     .sort((a, b) => b.priority - a.priority || Date.parse(a.last_used_at ?? "1970-01-01") - Date.parse(b.last_used_at ?? "1970-01-01"));
 }
 
@@ -170,7 +171,7 @@ export async function updateLocalProviderKey(provider: LocalProviderId, id: stri
 export async function recordLocalProviderKeyResult(
   provider: LocalProviderId,
   id: string,
-  result: { outcome: "success" | "invalid" | "expired" | "rate_limited" | "transient" | "model_error"; error?: string; retryAfterMs?: number; tokens?: number },
+  result: { outcome: "success" | "invalid" | "expired" | "rate_limited" | "transient" | "model_error"; error?: string; retryAfterMs?: number; tokens?: number; model?: string },
 ): Promise<void> {
   await serializeVaultMutation(async () => {
     const keys = await readEncryptedVault();
@@ -187,7 +188,11 @@ export async function recordLocalProviderKeyResult(
         ...(result.outcome === "expired" ? { status: "expired", last_error: (result.error ?? "Provider access was denied.").slice(0, 400), last_checked_at: now, cooldown_until: null } : {}),
         ...(result.outcome === "rate_limited" ? { status: "rate_limited", last_error: (result.error ?? "Provider rate limit reached.").slice(0, 400), last_checked_at: now, cooldown_until: cooldown } : {}),
         ...(result.outcome === "transient" ? { last_error: (result.error ?? "Temporary provider error.").slice(0, 400), cooldown_until: cooldown } : {}),
-        ...(result.outcome === "model_error" ? { last_error: (result.error ?? "The selected model is unavailable for this key.").slice(0, 400), last_checked_at: now } : {}),
+        ...(result.outcome === "model_error" ? {
+          last_error: (result.error ?? "The selected model is unavailable for this key.").slice(0, 400),
+          last_checked_at: now,
+          ...(result.model ? { blocked_models: { ...(key.blocked_models ?? {}), [result.model]: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() } } : {}),
+        } : {}),
       };
     }));
   });

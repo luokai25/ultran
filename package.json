@@ -2,32 +2,23 @@
   "name": "ultron",
   "version": "0.2.0",
   "private": true,
-  "description": "Ultron - local-first AI agent platform monorepo",
+  "description": "ULTRON personal AI workspace: shared Vite/Capacitor client and Supabase cloud runtime",
   "license": "Apache-2.0",
-  "engines": {
-    "node": ">=20.11.0",
-    "pnpm": ">=9.0.0"
-  },
+  "engines": { "node": ">=20.11.0", "pnpm": ">=9.0.0" },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "dev": "pnpm --filter @ultron/phone dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test && node --test supabase/tests/*.test.mjs",
-    "typecheck": "turbo run typecheck",
+    "build": "pnpm --filter @ultron/connectors build && pnpm --filter @ultron/phone build",
+    "lint": "pnpm --filter @ultron/phone lint",
+    "test": "pnpm --filter @ultron/phone test && node --test supabase/tests/*.test.mjs",
+    "typecheck": "pnpm --filter @ultron/connectors build && pnpm --filter @ultron/phone typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yaml,yml}\"",
-    "clean": "turbo run clean && rm -rf node_modules",
-    "dev:workspace": "turbo run dev --parallel"
+    "clean": "pnpm --filter @ultron/phone clean && pnpm --filter @ultron/connectors clean && rm -rf node_modules"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
-    "turbo": "^2.1.3",
     "typescript": "^5.6.2"
   },
-  "pnpm": {
-    "overrides": {
-      "rollup": "4.66.0"
-    }
-  }
+  "pnpm": { "overrides": { "rollup": "4.66.0" } }
 }

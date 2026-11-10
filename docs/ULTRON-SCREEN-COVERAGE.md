@@ -1,9 +1,8 @@
 # ULTRON screen coverage ledger
 
-This is the working inventory for complete web and Android design coverage. It is deliberately a ledger, not a claim that every screen has already passed visual QA.
+This is the working inventory for complete shared web and Android client design coverage. It is deliberately a ledger, not a claim that every screen has already passed visual QA.
 
 **Canonical client:** `apps/phone` (production web bundle and Capacitor Android APK).  
-**Secondary web surface:** `apps/web` (Next.js console; shared design language, separate feature coverage).  
 **Design authority:** root `DESIGN.md`.  
 **Workflow:** `.agents/skills/ultron-gstack/SKILL.md` followed by `.agents/skills/ultron-design/SKILL.md`.
 
@@ -146,8 +145,6 @@ These selectors are grounded in the current `apps/phone/index.html` source. Rech
 | Voice and presence | `#voice-status`, `#proactive-updates-toggle`, `#voice-updates-toggle` |
 | Workspace tray | `#workspace-tray`, `#workspace-tray-items` |
 | Navigation | `#drawer`, `.bottom-nav`, `#nav-chat`, `#nav-models`, `#nav-vault`, `#nav-connectors`, `#nav-settings` |
-
-The secondary Next.js surface currently has one route at `apps/web/src/app/page.tsx`, composed by `UltronConsole` with `AvatarHero`, `ModelHub` and `UltronVoice`. Treat its navigation anchors, internal tabs, API-key flow, browser-speech fallback and 3D/WebGL fallback as part of that page's coverage; do not report this surface as feature-parity with the canonical client.
 
 - 2026-11-06, cinematic redesign pass: Added a dedicated gstack-reviewed motion layer to the shared `apps/phone` client used by the production web app and Capacitor APK. It adds the animated grid/nebula atmosphere, orbital core movement, glass-metal surfaces, responsive 92px desktop rail, wide desktop chat composition, and animated secondary-page entry. The WebGL-unavailable CSS core fallback remains round. All motion honors reduced-motion preferences.
 - 2026-11-06, Supabase connection resilience: `getCloudSession()` now proactively refreshes expiring sessions with a single-flight guard. The cloud-brain function gateway retries one authenticated 401 after refresh; direct SSE chat does the same. LLM API key inventory and worker health now load independently so a transient health endpoint failure cannot hide saved Vault keys. Auth state changes update connection status, and the key screen has an explicit refresh/reconnect action.

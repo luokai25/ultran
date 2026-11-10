@@ -7,7 +7,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, orchestrator, policyGate, ledger, runState, modelLibrary, nativeBuild, nativeJni, nativeLlamaJava, nativePluginJava, brainRuntime, agentRuntime, styles] = await Promise.all([
+const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKernel, persona, companion, voiceService, taskMonitor, manifest, fileProviderPaths, modelLibrary, nativeBuild, nativeJni, nativeLlamaJava, nativePluginJava, brainRuntime, agentRuntime, styles] = await Promise.all([
   read("index.html"),
   read("src/main.ts"),
   read("src/semantic-graph.ts"),
@@ -21,10 +21,6 @@ const [html, main, semanticGraph, skillsEngine, localAI, runtime, capabilityKern
   read("android/app/src/main/java/app/ultron/mobile/UltronTaskMonitorWorker.java"),
   read("android/app/src/main/AndroidManifest.xml"),
   read("android/app/src/main/res/xml/file_paths.xml"),
-  read("../../services/agent-core/src/orchestrator/orchestrator.ts"),
-  read("../../services/agent-core/src/monetization/policy-gate.ts"),
-  read("../../services/agent-core/src/monetization/ledger.ts"),
-  read("../../services/agent-core/src/orchestrator/run-state.ts"),
   read("src/model-library.ts"),
   read("android/app/src/main/cpp/CMakeLists.txt"),
   read("android/app/src/main/cpp/ultron_llama_jni.cpp"),
@@ -135,30 +131,6 @@ test("conversation context is budgeted and task complexity adjusts inference", (
   assert.match(main, /function boundToolResult/);
   assert.match(main, /maxTokens: Math\.min\(profile\.maxTokens, 384\)/);
   assert.match(main, /boundToolResult\(toolResult, 2400\)/);
-});
-
-test("agent-core uses one brain-independent plan-act-reflect loop with bounded model retries", () => {
-  assert.match(orchestrator, /private async plan\(/);
-  assert.match(orchestrator, /private async selectTool\(/);
-  assert.match(orchestrator, /private async reflect\(/);
-  assert.match(orchestrator, /this\.opts\.brain\.infer\(this\.opts\.planModelId/);
-  assert.match(orchestrator, /for \(let attempt = 0; attempt < 2; attempt \+= 1\)/);
-  assert.match(orchestrator, /validateBasicArgs\(tool\.inputSchema, call\.args\)/);
-  assert.match(orchestrator, /step\.candidates\.includes\(call\.toolId\)/);
-  assert.match(orchestrator, /No human-approval resolver is configured; the tool was not invoked/);
-  assert.match(orchestrator, /this\.opts\.authorizeTool\(/);
-  assert.match(orchestrator, /type: 'run\.result'/);
-  assert.doesNotMatch(orchestrator, /TODO: real constrained-decoding call/);
-});
-
-test("agent-core usage limits account for projected calls and replay-stable metering", () => {
-  assert.match(policyGate, /used \+ amount > limit/);
-  assert.match(policyGate, /recordUsage\(/);
-  assert.match(orchestrator, /recordUsage\(\s*state\.runId, 'tool\.calls', 1/);
-  assert.match(ledger, /idempotencyKey\?: string/);
-  assert.match(ledger, /reading\.idempotencyKey \?\?/);
-  assert.match(runState, /type: 'approval\.required'/);
-  assert.match(runState, /type: 'step\.failed'/);
 });
 
 

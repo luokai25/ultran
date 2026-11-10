@@ -1,22 +1,23 @@
+```markdown
 # Documentation
 
-| Document | What it covers |
+| Document | Purpose |
 | --- | --- |
-| [architecture.md](architecture.md) | The layered design, layer contracts, data flow, trust boundaries, and the ADR log. **Start here.** |
+| [Architecture](architecture.md) | The actual web, Android, Supabase and optional Python runtime topology |
+| [Screen coverage](ULTRON-SCREEN-COVERAGE.md) | Canonical client screen and state inventory |
+| [Product Studio](AI-DIGITAL-PRODUCT-STUDIO.md) | Research and digital-product generation workflow |
+| [Offer Builder](ULTRON-OFFER-BUILDER.md) | Durable product-generation stages and worker behavior |
+| [Prometheus runtime](ultron-prometheus-runtime.md) | Background reasoning, memory and self-improvement loop |
+| [Constitution](constitution/IMPLEMENTATION_MAP.md) | Mapping the owner-provided ULTRON source to implementation |
+| [Mobile inference](airllm-mobile-engine.md) | Low-memory local model execution design |
+| [Google Workspace connector](GOOGLE-WORKSPACE-CONNECTOR.md) | Connector setup and behavior |
 
-## Reading order
+## Start here
 
-If you are new to the codebase, read in this order:
+1. Read [Architecture](architecture.md).
+2. Read [the phone app guide](../apps/phone/README.md).
+3. Read [Supabase cloud infrastructure](../supabase/README.md).
+4. Read [the optional Python backend guide](../ultron-backend/README.md).
 
-1. **Layered view** in `architecture.md` section 2 - the five layers and why
-   dependencies only point downward.
-2. **Layer contracts** section 3 - the interface each layer exposes, and its
-   invariants.
-3. **Data flow** section 5 - follow a single turn from input to output.
-4. **Trust boundaries** section 6 - where the security model lives.
-
-## Conventions
-
-- Layers are referred to as L0-L5, matching the architecture document.
-- Every architectural change appends to the decision log in section 10.
-- Diagrams are ASCII: they survive code review diffs and terminal viewing.
+The Vercel web app and Android APK share the same `apps/phone` client. There is no separate Next.js or Expo app.
+```

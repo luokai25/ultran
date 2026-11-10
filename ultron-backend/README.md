@@ -1,7 +1,8 @@
 # Ultron Backend
 
-FastAPI control plane for Ultron agents, provider connections, MCP connectors,
-credential storage, workspace operations, and deployment workflows.
+Optional FastAPI control plane for ULTRON agent sessions, background tasks,
+MCP connectors, workspace operations and connector execution. Primary cloud
+chat runs through Supabase and does not depend on this service.
 
 ## Local development
 
@@ -19,8 +20,7 @@ are available at `/v1/health` and `/v1/readiness`.
 
 ## Configuration
 
-Configuration is read from environment variables. See the repository's
-`infra/hetzner/.env.example` for the production deployment variables and
+Configuration is read from environment variables. See `ultron-backend/.env.example` for the local environment template and
 `ultron_backend/config.py` for the complete settings model.
 
 Production requires `ULTRON_CREDENTIAL_ENCRYPTION_KEY`. Generate a Fernet key

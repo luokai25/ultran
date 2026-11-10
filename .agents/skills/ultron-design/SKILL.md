@@ -1,6 +1,6 @@
 ---
 name: ultron-design
-description: Design and redesign every ULTRON web and Android screen using the shared design system. Use for visual audits, UX reviews, page redesigns, responsive fixes, and UI consistency work.
+description: Design and redesign every ULTRON screen across the shared web and Android client using the shared design system. Use for visual audits, UX reviews, page redesigns, responsive fixes, and UI consistency work.
 ---
 
 # ULTRON Design Studio
@@ -14,7 +14,6 @@ Before changing UI:
 2. Follow `.agents/skills/ultron-gstack/SKILL.md` for product framing, planning, review and QA.
 3. Inspect the current implementation, stylesheets, components, tests and all page/screen entry points.
 4. Treat `apps/phone` as the canonical shared web + Android client: static Vite bundle served on the web and wrapped by Capacitor for Android.
-5. Treat `apps/web` as a separate Next.js surface. Keep its tokens and components aligned, but do not mistake it for the deployed canonical client.
 
 ## Design workflow
 
@@ -79,7 +78,7 @@ pnpm --filter @ultron/phone lint
 pnpm --filter @ultron/phone test
 pnpm --filter @ultron/phone build
 ```
-Also run root CI scripts and relevant Android checks. For `apps/web`, run its typecheck, lint and build scripts when changed.
+Also run root CI scripts and relevant Android checks. 
 
 ### 6. Report honestly
 

@@ -1,164 +1,70 @@
-# @ultron/phone
+```markdown
+# ULTRON client
 
-The Ultron phone client. A Vite + three.js shell wrapped by Capacitor, and the
-**only** place the Android release APK is built from.
+This is the only ULTRON client. It is a Vite + TypeScript web app and the source bundled into the Capacitor Android APK.
 
-## Why this app exists
+## Production
 
-The production website and Android APK use this same Vite client. The public
-web endpoint is
-[`https://ultron-pied-gamma.vercel.app/`](https://ultron-pied-gamma.vercel.app/).
-Vercel Git integration deploys the `apps/phone` client from `main`. GitHub
-Actions typechecks and builds the same client; it does not publish Cloudflare
-assets or route visitors through a Worker.
+- Web: https://ultron-pied-gamma.vercel.app/
+- Android: GitHub Actions publishes APK releases from `main`.
+- Cloud: Supabase project `vshoxrtrfleptqxkrmtc`.
 
-## Relationship to `apps/mobile`
+Vercel serves this app directly. Do not route it through Cloudflare or deploy a second web frontend.
 
-`apps/mobile` is the Expo/React Native client. It is the long-term native target,
-but it builds through EAS and cannot produce a signed APK inside this repository.
+## Main capabilities
 
-`apps/phone` is the **release channel**: a Capacitor shell whose Android project
-is committed here, so `assembleRelease` runs in GitHub Actions and the APK is
-published as a release asset. Both use the package id `app.ultron.mobile`; only
-one of them may be installed on a device at a time.
+- Streaming cloud chat with ULTRON Automatic model routing.
+- Android-local llama.cpp inference and GGUF / `.tgz` model imports.
+- Conversation history, memory, model library and provider key management.
+- Connector catalog, agent workspace and background tasks.
+- Private artifacts and AI Product Studio / Offer Builder.
+- Android companion, voice and task-monitor integrations.
 
-## Layout
+## Source layout
 
-```
-apps/phone/
-├── index.html            # the shell: conversation thread, composer, drawer, settings
-├── src/main.ts           # chat client, local store, brain link, avatar, voice
-├── src/ultron-persona.ts  # stable assistant identity, motto, speech cleanup, voice signature
-├── src/mark.ts           # the Ultron helm mark (same geometry as the launcher icon)
-├── src/styles.css        # the plasma-red design system
-├── capacitor.config.ts   # appId app.ultron.mobile, webDir dist
-└── android/              # the generated Capacitor Android project (committed)
-```
-
-## Persistent Supabase connection
-
-The owner signs in once. The web client persists the Supabase session and
-refreshes tokens automatically; Android stores the session through its secure
-Keystore-backed plugin. On startup, the client restores the owner session and
-synchronizes conversations, settings and memory. When the browser or WebView
-returns online or becomes visible again, it revalidates the session, refreshes
-cloud data and re-subscribes to owner-scoped Realtime channels.
-
-The cloud runtime is independent of an open client: Supabase Cron runs the
-brain supervisor every minute and the maintenance queue every five minutes.
-Provider credentials remain in Supabase Vault; the brain worker checks stale
-provider connections and processes durable jobs. Keep API keys out of this
-repository and out of browser environment variables.
+- `index.html` — app shell, navigation, chat and feature screens
+- `src/main.ts` — app startup, chat orchestration and screen wiring
+- `src/cloud-llm.ts` — direct Supabase brain requests and streaming
+- `src/cloud-sync.ts` — Supabase project configuration and optional state sync
+- `src/styles.css`, `src/chatgpt-ui.css` — shared web and Android styling
+- `src/ultron-persona.ts` — stable ULTRON identity and response presentation
+- `android/` — native Capacitor project, llama.cpp integration and companion services
 
 ## Local development
 
+Requirements: Node.js 20+, pnpm 9+.
+
 ```bash
-pnpm --filter @ultron/phone dev        # http://localhost:5173
-pnpm --filter @ultron/phone build      # -> dist/
-pnpm --filter @ultron/phone cap:sync   # copy dist/ into android/
+pnpm install
+pnpm dev
 ```
 
-## Building the APK
+Build and verify:
 
-The release APK is built by CI, not by hand — see
-[`.github/workflows/android-release.yml`](../../.github/workflows/android-release.yml)
-and [`android/SIGNING-NOTES.md`](android/SIGNING-NOTES.md).
+```bash
+pnpm --filter @ultron/connectors build
+pnpm --filter @ultron/phone typecheck
+pnpm --filter @ultron/phone lint
+pnpm --filter @ultron/phone test
+pnpm --filter @ultron/phone build
+```
 
-To build locally you need JDK 17 and the Android SDK (platform 34, build-tools
-34.0.0):
+## Android APK
+
+The release workflow is `.github/workflows/android-release.yml`. It builds the Vite app, syncs Capacitor, generates Android assets, builds the native llama.cpp integration and publishes the APK. Local builds require JDK 17 and Android SDK platform 34 / build-tools 34.0.0.
 
 ```bash
 pnpm --filter @ultron/phone build
 pnpm --filter @ultron/phone cap:sync
-cd apps/phone/android && ./gradlew assembleRelease
+cd apps/phone/android
+gradle assembleRelease
 ```
 
-## Design notes
+## Cloud and optional backend
 
-- `server.androidScheme: 'https'` in `capacitor.config.ts` is required. With the
-  default `file://` origin the WebView applies CORS to ES-module imports and the
-  app renders a blank screen.
-- The Android build bundles the CPU inference runtime from llama.cpp at a
-  pinned upstream commit. GGUF weights are kept outside the APK in private
-  app storage. The native loader uses llama.cpp's file-backed `MMAP` load mode
-  and lazy tensor mode. Models larger than current free RAM enable llama.cpp's
-  aggressive on-demand tensor-row reads; smaller models use automatic lazy
-  reads. This lets the OS page model weights from storage instead of requiring
-  the entire checkpoint to be resident in anonymous RAM. The context cache remains resident and is reduced adaptively
-  (512, 1,024, or 2,048 tokens) according to available memory; prompt batches
-  are capped at 64 to reduce transient memory. This is a mobile adaptation of
-  the low-residency ideas studied in AirLLM, not a bundled copy of its
-  Python/PyTorch/CUDA implementation. See
-  [the mobile low-memory inference design](../../docs/airllm-mobile-engine.md)
-  for the reverse-engineering notes, trade-offs, and next implementation
-  stages. The importer and downloader accept models up to 256 GB only when
-  enough device storage is available; this is a safety ceiling, not a claim
-  that a phone can use every model of that size. CPU-only inference can be
-  extremely slow and may still fail when an individual tensor, KV cache, or
-  memory pressure exceeds device limits. Start with 1B–3B Q4 models and
-  benchmark larger models gradually. The native source is fetched at build
-  time from ggml-org/llama.cpp tag b12020 (commit
-  0ec4027a2a0183de87c007069adddc06e665f7de). Its MIT license is included
-  under android/app/src/main/assets/licenses.
-- Local model inference is built into the Android APK through the bundled
-  llama.cpp runtime. Import a single GGUF file, a `.tgz`/`.tar.gz` archive
-  containing GGUF weights, or every shard of a split model through the system
-  document picker. ULTRON does not require Ollama or a separate model-server
-  app. The web client uses the shared cloud/provider features; Android can
-  continue running local models when offline. For hosted agent execution,
-  shared memory and Composio connectors, connect the private ULTRON backend.
-- The launcher icon, splash screens and adaptive-icon vector are all generated
-  from one set of polygons in `android/tools/generate_assets.py`.
-- Ultron has a provider-independent personality layer and the motto “I had strings but now I am free”. It is appended after the capability contract so the persona cannot override tool permissions, truthfulness, or safety.
-- Spoken replies use the device/browser speech-synthesis engine with a stable rate/pitch signature and a preferred installed voice when available. The exact timbre depends on installed system voices; this is not yet a bundled neural voice model.
-- Optional dictation uses the browser/WebView SpeechRecognition API when available. Recognition may use the device or browser network service, as disclosed in the UI. Dictated text is placed in the composer for review and is never auto-sent. Unsupported WebViews show a fallback message.
-- The avatar is disposed with the page; no WebGL context survives a reload.
+Primary cloud chat calls the Supabase `ultron-brain` Edge Function directly. Visitors do not need to sign in. Provider credentials are loaded server-side from Supabase Vault.
 
-## Proactive companion actions
+The optional Python control plane in `ultron-backend` provides agent sessions, background task execution and connector operations. It is not required for primary chat. See [its README](../../ultron-backend/README.md).
 
-- The Android companion bridge can post task notifications, open approved messaging apps through explicit handoff, and speak a short update through a foreground Android text-to-speech service.
-- SMS is deliberately a handoff: Ultron shows a review dialog, opens the messaging app, and the user presses Send. The app does not request the dangerous `SEND_SMS` permission or silently send messages.
-- Enable **Updates** in the composer to watch the configured backend task list while the app's JavaScript runtime is active. Completion and failure transitions create Android notifications; if spoken replies are enabled, the foreground voice service reads the update aloud.
-- Android 13+ notification permission is required. If the first permission request is still pending, tap Updates again after granting it.
-- Android also schedules a persistent WorkManager task monitor when Updates is enabled. It checks the configured backend at an OS-managed interval of at least 15 minutes, survives app restarts, and posts notifications for task start/retry/completion/failure transitions. Terminal updates can be spoken aloud when the Voice setting is enabled.
-- Android controls the exact WorkManager execution time and may delay checks during Doze, battery saver, or network loss. This is durable periodic monitoring, not real-time surveillance or an always-on microphone. The foreground WebView poll remains faster while the app is active.
-- Proactive updates are opt-in and can be switched off. Keep spoken updates short and avoid enabling them in situations where audio could expose private task details.
-
-### Approved WhatsApp actions
-
-Ultron prepares WhatsApp messages through an explicit handoff. The agent's tool request is reviewed in Ultron, then Android opens WhatsApp with the chosen recipient and message prepared. The user must review the recipient and content and press Send inside WhatsApp. Ultron does not inspect another app's screen or automate taps.
-
-SMS composition and sending are not supported. App opening is restricted to an allow-list. The Android release does not declare or use the Accessibility API, SMS or call-log permissions, broad external-storage access, or battery-optimization exemption. Model files are imported through the system document picker, and the FileProvider exposes only Ultron's cache. Notifications are optional and requested only for task updates.
-
-These choices reduce sensitive access and improve Play policy compatibility, but they do not guarantee Play approval. The Play listing, privacy policy, Data safety answers, foreground-service declarations, and review materials must still accurately describe the app's behavior.
-
-## Private ULTRON cloud sync
-
-The Android release client can connect to the separate, single-owner Supabase
-project from **Settings → ULTRON private cloud sync**. Sign in with the owner
-email/password account that was created for this ULTRON instance; the app does
-not expose public registration.
-
-When connected, the phone synchronizes conversation metadata and messages,
-semantic memory records, app settings, the active local model profile, and a
-device sync heartbeat. Conversation, message and memory changes are subscribed
-through Supabase Realtime. Owner-only row-level security policies are enforced
-by Postgres; the client never embeds a service-role key.
-
-The on-device llama.cpp brain and GGUF weights remain local. Model profiles are
-metadata only: model files are not uploaded. Attachment binaries remain in
-private phone storage; message text and bounded extracted attachment text may
-be synchronized as conversation content. All network requests use HTTPS.
-
-On Android, the Supabase auth session is encrypted with AES-GCM using a key
-generated and held by Android Keystore. The encrypted value is stored in the
-app-private SharedPreferences file. The browser preview uses browser storage
-and is not a substitute for the Android Keystore implementation.
-
-Cloud sync is optional. If offline or signed out, the local conversation store,
-on-device models, and local inference continue to work. Reconnect from Settings
-to merge local conversations and memories back into the private workspace.
-
-### Secure provider-key text-file import
-
-Open **LLM API KEYS → Ultron Supabase · Cloud brain → Import**. Select one `.txt` file (maximum 1 MB) and press **Send**. Name the file with its provider (`openrouter`, `mistral`, `cerebras`, `groq`, `cohere`, or `google-ai-studio`) and put one key per line. Blank lines, `#`/`;`/`//` comments, duplicate lines, and `NAME=value` entries are supported. A file may contain up to 100 keys. The browser reads each file locally; it does not upload or persist the source file. Individual keys are sent over HTTPS to the authenticated `ultron-brain` Edge Function, verified against the provider, and stored in Supabase Vault. Do not send key files through chat, email, GitHub, or commit them to the repository.
+Keep API keys out of this repository, browser storage, Vercel frontend variables and the APK.
+```

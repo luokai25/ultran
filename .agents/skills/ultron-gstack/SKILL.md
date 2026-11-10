@@ -142,7 +142,7 @@ pnpm --filter @ultron/phone test
 pnpm --filter @ultron/phone build
 ```
 
-When `apps/web` changes, run its typecheck, lint and build scripts too. For Android changes, run the available Gradle validation/build. If a browser, emulator or Android device is unavailable, report that limitation and do not mark the relevant visual check as passed.
+The canonical `apps/phone` checks cover both web and Android client source. For Android changes, run the available Gradle validation/build. If a browser, emulator or Android device is unavailable, report that limitation and do not mark the relevant visual check as passed.
 
 ### 7. SHIP — safe integration
 

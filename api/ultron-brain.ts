@@ -1,3 +1,4 @@
+import { createCohereSseParser } from "./cohere-sse";
 export const config = { maxDuration: 60 };
 
 type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
@@ -184,38 +185,17 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
       }
     } else {
       const decoder = new TextDecoder();
-      let buffer = "";
-      const emitLine = async (rawLine: string): Promise<void> => {
-        const line = rawLine.replace(/\r$/, "").trim();
-        if (!line.startsWith("data:")) return;
-        const raw = line.slice(5).trim();
-        if (!raw || raw === "[DONE]") return;
-        try {
-          const event = JSON.parse(raw) as { type?: string; delta?: { message?: { content?: { text?: string } }; text?: string } };
-          const token = event.delta?.message?.content?.text ?? event.delta?.text ?? "";
-          if (token) {
-            const chunk = "data: " + JSON.stringify({ choices: [{ delta: { content: token } }] }) + "\n\n";
-            if (!res.write(chunk)) await new Promise<void>((resolve) => res.once("drain", resolve));
-          }
-        } catch { /* Ignore non-JSON Cohere event payloads. */ }
-      };
+      const parser = createCohereSseParser();
       while (true) {
         const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        let newline = buffer.indexOf("\n");
-        while (newline >= 0) {
-          const line = buffer.slice(0, newline);
-          buffer = buffer.slice(newline + 1);
-          await emitLine(line);
-          newline = buffer.indexOf("\n");
+        const tokens = parser.push(decoder.decode(value, { stream: !done }), done);
+        for (const token of tokens) {
+          const chunk = "data: " + JSON.stringify({ choices: [{ delta: { content: token } }] }) + "\n\n";
+          if (!res.write(chunk)) await new Promise<void>((resolve) => res.once("drain", resolve));
         }
-        if (done) {
-          if (buffer.length) await emitLine(buffer);
-          break;
-        }
+        if (done) break;
       }
       res.write("data: [DONE]\n\n");
-    }
     res.end();
   } catch {
     try { await reader.cancel(); } catch { /* client disconnected */ }

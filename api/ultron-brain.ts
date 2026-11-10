@@ -185,28 +185,35 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
     } else {
       const decoder = new TextDecoder();
       let buffer = "";
+      const emitLine = async (rawLine: string): Promise<void> => {
+        const line = rawLine.replace(/\r$/, "").trim();
+        if (!line.startsWith("data:")) return;
+        const raw = line.slice(5).trim();
+        if (!raw || raw === "[DONE]") return;
+        try {
+          const event = JSON.parse(raw) as { type?: string; delta?: { message?: { content?: { text?: string } }; text?: string } };
+          const token = event.delta?.message?.content?.text ?? event.delta?.text ?? "";
+          if (token && !res.write(\`data: \${JSON.stringify({ choices: [{ delta: { content: token } }] })}\n\n\`)) {
+            await new Promise<void>((resolve) => res.once("drain", resolve));
+          }
+        } catch { /* Ignore non-JSON Cohere event payloads. */ }
+      };
       while (true) {
         const { done, value } = await reader.read();
         buffer += decoder.decode(value, { stream: !done });
-        let newline = buffer.indexOf("\\n");
+        let newline = buffer.indexOf("\n");
         while (newline >= 0) {
-          const line = buffer.slice(0, newline).trim();
+          const line = buffer.slice(0, newline);
           buffer = buffer.slice(newline + 1);
-          if (line.startsWith("data:")) {
-            const raw = line.slice(5).trim();
-            if (raw && raw !== "[DONE]") {
-              try {
-                const event = JSON.parse(raw) as { type?: string; delta?: { message?: { content?: { text?: string } }; text?: string } };
-                const token = event.delta?.message?.content?.text ?? event.delta?.text ?? "";
-                if (token) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: token } }] })}\\n\\n`);
-              } catch { /* Ignore non-JSON Cohere event payloads. */ }
-            }
-          }
-          newline = buffer.indexOf("\\n");
+          await emitLine(line);
+          newline = buffer.indexOf("\n");
         }
-        if (done) break;
+        if (done) {
+          if (buffer.length) await emitLine(buffer);
+          break;
+        }
       }
-      res.write("data: [DONE]\\n\\n");
+      res.write("data: [DONE]\n\n");
     }
     res.end();
   } catch {

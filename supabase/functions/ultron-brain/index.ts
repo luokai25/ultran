@@ -42,7 +42,7 @@ const service = () => createClient(PROJECT_URL, SERVICE_KEY, { auth: { persistSe
 const clean = (value: unknown, max = 240) => typeof value === "string" ? value.trim().slice(0, max) : "";
 const isProvider = (value: unknown): value is Provider => typeof value === "string" && PROVIDER_IDS.includes(value as Provider);
 const modelId = (value: unknown) => clean(value, 180);
-const chatModelFilter = (ids: string[]) => [...new Set(ids.filter((id) => id && id.length < 180 && !/embed|moderation|whisper|tts|speech|transcri|image|rerank|classify/i.test(id)))].sort();
+const chatModelFilter = (ids: string[]) => [...new Set(ids.filter((id) => id && id.length < 180 && !/embed|moderation|whisper|audio|tts|speech|transcri|live|realtime|bidi|image|rerank|classify/i.test(id)))].sort();
 
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -89,6 +89,8 @@ function bestFreeModel(provider: Provider, models: string[], complexity: number)
 }
 function isFreeModel(provider: Provider, model: string): boolean {
   const id = model.toLowerCase().replace(/^models\//, "");
+  // Audio, speech, live and realtime endpoints do not implement the chat-completions stream contract.
+  if (/(?:audio|tts|speech|transcri|live|realtime|bidi)/i.test(id)) return false;
   if (provider === "openrouter") return id.endsWith(":free");
   if (provider === "cerebras") return false; // One-time trial only; exclude from recurring zero-cost routing.
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
@@ -356,7 +358,7 @@ type ChatFailureClass = "model" | "key" | "transient";
 function classifyChatFailure(status: number, detail: string): ChatFailureClass {
   if (status === 404) return "model";
   if (status === 403 && /\bmodel\b|only available/i.test(detail)) return "model";
-  if (status === 400 && /decommission|deprecat|(model[^.]{0,80}(not found|does not exist|not supported|unavailable))/i.test(detail)) return "model";
+  if (status === 400 && /decommission|deprecat|(model[^.]{0,80}(not found|does not exist|not supported|unavailable))|only supports.{0,100}(real.?time|bidirectional|websocket)|(?:audio|speech|tts).{0,100}(not supported|unsupported|only supports)/i.test(detail)) return "model";
   if (status === 401 || status === 403 || status === 429) return "key";
   return "transient";
 }

@@ -287,7 +287,8 @@ Priority order is intentional. Do not expand autonomous capabilities while the b
 - Captured the unified streaming protocol and Prometheus live-streaming requirement.
 - Recorded source-audit findings: Prometheus buffers model output; Cohere delimiter parsing needs repair; cloud attachment payloads are incomplete; local persistence relies heavily on localStorage; memory embeddings are currently feature-hash based; several runtime/connector/artifact paths still depend on Supabase; README/architecture docs are stale.
 - No implementation or production behavior is declared fixed by creating this plan.
-- Documentation alignment is complete. Next action: establish a reproducible baseline and start Phase 1 P0 fixes.
+- Baseline inspection: root scripts expose build, typecheck, lint and test; CI workflow runs phone/connector checks, Python backend tests, Supabase artifact/stream-preflight tests and structure checks. The combined status for the latest plan update showed Vercel pending; no passing CI result was established in this session.
+- Documentation alignment is complete. Next action: establish full test evidence and start Phase 1 P0 fixes.
 
 ### 2026-11-10 — Continuity requirement reaffirmed
 - Reaffirmed the standing requirement that every ULTRON conversation resumes from this plan and current `main`, then continues implementation, repair and verification rather than restarting planning or stopping at a checklist.

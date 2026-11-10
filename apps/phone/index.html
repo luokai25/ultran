@@ -94,12 +94,12 @@
       </section>
       <section id="llm-api-keys-screen" class="feature-screen llm-api-keys-screen" aria-label="LLM API keys" hidden>
         <header class="feature-head">
-          <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>One secure place for compatible model-provider keys.</p></div>
+          <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>Existing provider keys are loaded automatically from the server-side Vault.</p></div>
           <div class="llm-key-header-actions"><button id="cloud-llm-refresh" class="ghost" type="button">Refresh connection</button><button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></div>
         </header>
         <section class="llm-key-card llm-cloud-card">
           <div class="llm-key-heading"><strong>Ultron Supabase · Cloud brain</strong><span id="cloud-brain-state">Checking cloud…</span></div>
-          <p id="cloud-brain-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">Sign in to connect provider keys to the private ULTRON cloud runtime.</p>
+          <p id="cloud-brain-status" class="llm-api-key-status" data-state="missing" role="status" aria-live="polite">Public ULTRON cloud runtime. No account or sign-in is required.</p>
           <div class="ultron-universal-key-entry">
             <label class="llm-key-field"><span>Paste API key</span><input id="cloud-llm-key" type="password" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste any supported API key…" /></label>
             <p id="cloud-llm-detected" class="ultron-key-detected" aria-live="polite">Provider is detected automatically. If the key format is ambiguous, choose its provider below.</p>
@@ -152,7 +152,7 @@
           <div><span class="feature-eyebrow">ULTRON · PRODUCT STUDIO</span><h1>AI Digital Products Generating</h1><p>Find an opportunity, research the evidence, then create an original product.</p></div>
           <div class="product-studio-head-actions"><button id="product-studio-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button><button id="product-studio-refresh" class="icon-btn" type="button" aria-label="Refresh projects">↻</button></div>
         </header>
-        <div id="product-studio-notice" class="product-studio-notice" role="status" aria-live="polite">Connect your ULTRON cloud account to begin.</div>
+        <div id="product-studio-notice" class="product-studio-notice" role="status" aria-live="polite">ULTRON cloud runtime ready. Start a new product project.</div>
         <section id="product-studio-start">
           <div class="product-studio-intro">
             <span class="section-eyebrow">FROM PROBLEM TO PRODUCT</span>
@@ -397,7 +397,7 @@
           <label class="field"><span class="toggle-label"><input id="voice-updates-toggle" type="checkbox" /> Spoken telemetry</span><small>Speak important proactive status updates only. ULTRON will not automatically read ordinary chat replies aloud. Microphone listening remains manual and user-started.</small></label>
           <p id="presence-settings-status" class="native-model-status" role="status">Voice backend: device speech fallback. ULTRON's dedicated local neural voice model is not installed yet.</p>
         </section>
-        <section class="field" aria-labelledby="cloud-sync-heading">
+        <section class="field" aria-labelledby="cloud-sync-heading" hidden>
           <span id="cloud-sync-heading">ULTRON private cloud sync</span>
           <small>Connect the owner account you already created. Your on-device brain and local conversations continue to work without internet; this account enables encrypted-in-transit backup and synchronization through your private ULTRON database.</small>
           <label class="field"><span>Email address</span><input id="cloud-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Owner email" /></label>

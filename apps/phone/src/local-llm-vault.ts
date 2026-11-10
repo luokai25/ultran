@@ -14,12 +14,26 @@ export type LocalProviderKey = {
   created_at: string;
   last_checked_at: string | null;
   last_error: string | null;
+  request_count: number;
+  tokens_used: number;
+  cooldown_until: string | null;
+  last_used_at: string | null;
 };
 
 const VAULT_KEY = "ultron.local.llm.vault.v1";
 const DB_NAME = "ultron-local-crypto";
 const STORE_NAME = "keys";
 const CRYPTO_KEY_ID = "llm-vault-aes-gcm-v1";
+let vaultMutationQueue: Promise<void> = Promise.resolve();
+
+async function serializeVaultMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = vaultMutationQueue;
+  let release!: () => void;
+  vaultMutationQueue = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try { return await operation(); }
+  finally { release(); }
+}
 
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -106,38 +120,75 @@ export async function listLocalProviderKeys(): Promise<Array<Omit<LocalProviderK
 
 export async function getLocalProviderKeyCandidates(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey[]> {
   const keys = await readEncryptedVault();
+  const now = Date.now();
   return keys.filter((key) => key.provider === provider && key.enabled && key.status === "connected" &&
+    (!key.cooldown_until || Date.parse(key.cooldown_until) <= now) &&
     (!modelId || key.models.includes(modelId)))
-    .sort((a, b) => b.priority - a.priority || a.created_at.localeCompare(b.created_at));
+    .sort((a, b) => b.priority - a.priority || Date.parse(a.last_used_at ?? "1970-01-01") - Date.parse(b.last_used_at ?? "1970-01-01"));
 }
 
 export async function getLocalProviderKey(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey | null> {
   return (await getLocalProviderKeyCandidates(provider, modelId))[0] ?? null;
 }
 
-export async function saveLocalProviderKey(input: Omit<LocalProviderKey, "id" | "created_at">): Promise<{ key: Omit<LocalProviderKey, "apiKey">; duplicate: boolean }> {
-  const keys = await readEncryptedVault();
-  const duplicate = keys.find((key) => key.provider === input.provider && key.apiKey === input.apiKey);
-  if (duplicate) {
-    const { apiKey: _secret, ...metadata } = duplicate;
-    return { key: metadata, duplicate: true };
-  }
-  const saved: LocalProviderKey = { ...input, id: crypto.randomUUID(), created_at: new Date().toISOString() };
-  await writeEncryptedVault([...keys, saved]);
-  const { apiKey: _secret, ...metadata } = saved;
-  return { key: metadata, duplicate: false };
+export async function saveLocalProviderKey(input: Omit<LocalProviderKey, "id" | "created_at" | "request_count" | "tokens_used" | "cooldown_until" | "last_used_at">): Promise<{ key: Omit<LocalProviderKey, "apiKey">; duplicate: boolean }> {
+  return serializeVaultMutation(async () => {
+    const keys = await readEncryptedVault();
+    const duplicate = keys.find((key) => key.provider === input.provider && key.apiKey === input.apiKey);
+    if (duplicate) {
+      const { apiKey: _secret, ...metadata } = duplicate;
+      return { key: metadata, duplicate: true };
+    }
+    const saved: LocalProviderKey = {
+      ...input, id: crypto.randomUUID(), created_at: new Date().toISOString(),
+      request_count: 0, tokens_used: 0, cooldown_until: null, last_used_at: null,
+    };
+    await writeEncryptedVault([...keys, saved]);
+    const { apiKey: _secret, ...metadata } = saved;
+    return { key: metadata, duplicate: false };
+  });
 }
 
 export async function removeLocalProviderKey(provider: LocalProviderId, id: string): Promise<void> {
-  const keys = await readEncryptedVault();
-  await writeEncryptedVault(keys.filter((key) => key.provider !== provider || key.id !== id));
+  await serializeVaultMutation(async () => {
+    const keys = await readEncryptedVault();
+    await writeEncryptedVault(keys.filter((key) => key.provider !== provider || key.id !== id));
+  });
 }
 
 export async function updateLocalProviderKey(provider: LocalProviderId, id: string, patch: { enabled?: boolean; priority?: number }): Promise<void> {
-  const keys = await readEncryptedVault();
-  await writeEncryptedVault(keys.map((key) => key.provider !== provider || key.id !== id ? key : {
-    ...key,
-    ...(typeof patch.enabled === "boolean" ? { enabled: patch.enabled } : {}),
-    ...(typeof patch.priority === "number" ? { priority: Math.max(1, Math.min(5, Math.trunc(patch.priority))) } : {}),
-  }));
+  await serializeVaultMutation(async () => {
+    const keys = await readEncryptedVault();
+    await writeEncryptedVault(keys.map((key) => key.provider !== provider || key.id !== id ? key : {
+      ...key,
+      ...(typeof patch.enabled === "boolean" ? { enabled: patch.enabled } : {}),
+      ...(typeof patch.priority === "number" ? { priority: Math.max(1, Math.min(5, Math.trunc(patch.priority))) } : {}),
+    }));
+  });
+}
+
+export async function recordLocalProviderKeyResult(
+  provider: LocalProviderId,
+  id: string,
+  result: { outcome: "success" | "invalid" | "expired" | "rate_limited" | "transient" | "model_error"; error?: string; retryAfterMs?: number; tokens?: number },
+): Promise<void> {
+  await serializeVaultMutation(async () => {
+    const keys = await readEncryptedVault();
+    const now = new Date().toISOString();
+    const cooldown = result.outcome === "rate_limited"
+      ? new Date(Date.now() + Math.max(30_000, Math.min(86_400_000, result.retryAfterMs ?? 900_000))).toISOString()
+      : result.outcome === "transient" ? new Date(Date.now() + 60_000).toISOString() : null;
+    await writeEncryptedVault(keys.map((key) => {
+      if (key.provider !== provider || key.id !== id) return key;
+      return {
+        ...key,
+        ...(result.outcome === "success" ? { status: "connected", last_error: null, cooldown_until: null, last_used_at: now, last_checked_at: now, request_count: (key.request_count ?? 0) + 1, tokens_used: (key.tokens_used ?? 0) + Math.max(0, result.tokens ?? 0) } : {}),
+        ...(result.outcome === "invalid" ? { status: "invalid", last_error: (result.error ?? "Provider rejected this API key.").slice(0, 400), last_checked_at: now, cooldown_until: null } : {}),
+        ...(result.outcome === "expired" ? { status: "expired", last_error: (result.error ?? "Provider access was denied.").slice(0, 400), last_checked_at: now, cooldown_until: null } : {}),
+        ...(result.outcome === "rate_limited" ? { status: "rate_limited", last_error: (result.error ?? "Provider rate limit reached.").slice(0, 400), last_checked_at: now, cooldown_until: cooldown } : {}),
+        ...(result.outcome === "transient" ? { last_error: (result.error ?? "Temporary provider error.").slice(0, 400), cooldown_until: cooldown } : {}),
+        ...(result.outcome === "model_error" ? { last_error: (result.error ?? "The selected model is unavailable for this key.").slice(0, 400), last_checked_at: now } : {}),
+      };
+    }));
+  });
 }

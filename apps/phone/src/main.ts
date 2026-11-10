@@ -326,11 +326,20 @@ function buildCapabilityPrompt(task: string, provider: string, executionLedger?:
   return [resolveIdentityPrompt(identityState), core, PROMETHEUS_GOAL_LOOP_PROMPT, expressiveIdentity, selfModel, brain, cognition, calibrationContext, goalPrompt, ledgerPrompt, buildUltronCheckpointPrompt(checkpoint ?? null), buildKnowledgePrompt(active()?.knowledgeState ?? null), memoryContext, learningContext, distilledSkillsContext, cloudMemoryContext, cloudSkillContext].filter(Boolean).join("\n\n");
 }
 
+function reportLocalStorageFailure(action: "read" | "save", key: string, error: unknown): void {
+  const detail = error instanceof Error ? error.message : "browser storage is unavailable";
+  const message = `Local ${action} failed for ${key}: ${detail}. ULTRON has not confirmed this data is safely stored.`;
+  console.error("[ULTRON storage]", message, error);
+  cloudSyncStatusEl.dataset.state = "error";
+  cloudSyncStatusEl.textContent = message;
+}
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
+  } catch (error) {
+    reportLocalStorageFailure("read", key, error);
     return fallback;
   }
 }
@@ -338,8 +347,8 @@ function readJson<T>(key: string, fallback: T): T {
 function writeJson(key: string, value: unknown): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage full or blocked: the session still works in memory */
+  } catch (error) {
+    reportLocalStorageFailure("save", key, error);
   }
 }
 

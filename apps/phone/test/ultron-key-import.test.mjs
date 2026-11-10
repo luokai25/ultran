@@ -36,7 +36,7 @@ test("single pasted cloud API key is auto-detected, verified through Vercel and 
   assert.match(main, /cloudLlmKeyInput\.addEventListener\("paste"/);
   assert.match(main, /addUltronCloudKey\(provider, key, label\)/);
   assert.match(main, /cloudLlmKeyInput\.value = ""/);
-  assert.match(main, /Accepted · securely saved and enabled/);
+  assert.match(main, /Accepted · encrypted and saved on this device/);
   assert.match(cloud, /\/api\/ultron-brain/);
   assert.match(cloud, /saveLocalProviderKey/);
   assert.match(cloud, /action: "verify_key"/);

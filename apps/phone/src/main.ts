@@ -66,7 +66,7 @@ import {
   nativeSecureStorage,
 } from "./cloud-sync";
 import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
-import { listDurableRecords, putDurableRecords, type DurableBucket } from "./durable-store";
+import { deleteDurableRecord, listDurableRecords, putDurableRecord, putDurableRecords, type DurableBucket } from "./durable-store";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
@@ -3209,7 +3209,6 @@ async function submitTurn(raw: string): Promise<void> {
   }
   convo.messages.push({ role: "user", content: text, ...(turnAttachments.length ? { attachments: turnAttachments } : {}) });
   const message: Message = { id: uid(), role: "assistant", content: "" };
-  convo.messages.push(message);
   activeAssistantMessage = message;
   let draftSaveTimer: number | null = null;
   let streamedText = "";
@@ -3219,7 +3218,13 @@ async function submitTurn(raw: string): Promise<void> {
     draftSaveTimer = window.setTimeout(() => {
       draftSaveTimer = null;
       convo!.updatedAt = Date.now();
-      saveStore();
+      if (durableChatStoreReady) {
+        durableChatWriteQueue = durableChatWriteQueue
+          .then(() => putDurableRecord("checkpoints", `chat-draft:${convo!.id}`, {
+            conversationId: convo!.id, messageId: message.id, content: message.content, updatedAt: Date.now(),
+          }))
+          .catch((error) => reportLocalStorageFailure("save", "streaming response checkpoint", error));
+      }
     }, 500);
   };
   const knowledgeCapture = captureExplicitKnowledge(convo.knowledgeState ?? emptyKnowledgeState(), { id: `user-evidence-${convo.id}-${Date.now().toString(36)}`, text, source: "user_statement", observedAt: Date.now() });
@@ -3231,6 +3236,12 @@ async function submitTurn(raw: string): Promise<void> {
   // Do not send the prompt to a model until its user message and empty assistant
   // draft have been committed to the local database.
   await durableChatWriteQueue;
+  if (durableChatStoreReady) {
+    durableChatWriteQueue = durableChatWriteQueue.then(() => putDurableRecord("checkpoints", `chat-draft:${convo!.id}`, {
+      conversationId: convo!.id, messageId: message.id, content: "", startedAt: Date.now(),
+    }));
+    await durableChatWriteQueue;
+  }
 
   promptEl.value = "";
   busy = true;
@@ -3261,7 +3272,6 @@ async function submitTurn(raw: string): Promise<void> {
   await loadOptionalCloudTurnContext(text, turnController);
 
   let result: ChatReply;
-  let streamedText = "";
   if (!cloudBrainActive && nativeModelLoaded && Capacitor.getPlatform() === "android") {
     try {
       const profile = profileTask(requestText);
@@ -3280,6 +3290,7 @@ async function submitTurn(raw: string): Promise<void> {
       renderLiveEvent(reply.body, { type: "thinking", stage: "drafting", label: requestedArtifactFormat(text) ? "Drafting the requested document" : "Working on your request" });
       const response = await generateNativeStreaming(messages, Math.min(profile.maxTokens, 384), (token) => {
         streamedText += token;
+        persistStreamDraft();
         renderStreamedReply(reply.body, streamedText);
         if (nearBottom()) scrollToEnd(false);
       });
@@ -3371,6 +3382,7 @@ async function submitTurn(raw: string): Promise<void> {
     try {
       result = await providerModelReply(convo, turnController.signal, (token) => {
         streamedText += token;
+        persistStreamDraft();
         scheduleStreamPaint();
       }, executionLedger, priorCheckpoint ?? undefined);
       flushStreamPaint();
@@ -3392,6 +3404,7 @@ async function submitTurn(raw: string): Promise<void> {
         : await remoteReply(convo, remoteRequestText, (event) => {
           if (event.type === "assistant_stream_delta" && typeof event.delta === "string") {
             streamedText += event.delta;
+            persistStreamDraft();
             renderStreamedReply(reply.body, streamedText);
             if (nearBottom()) scrollToEnd(false);
           } else {
@@ -3419,6 +3432,7 @@ async function submitTurn(raw: string): Promise<void> {
       result = await localModelReply(convo, undefined, reply.body, turnController.signal, (token) => {
         if (token === null) { streamedText = ""; reply.body.replaceChildren(); return; }
         streamedText += token;
+        persistStreamDraft();
         renderStreamedReply(reply.body, streamedText);
         if (nearBottom()) scrollToEnd(false);
       }, executionLedger, priorCheckpoint ?? undefined);
@@ -3528,9 +3542,11 @@ async function submitTurn(raw: string): Promise<void> {
   }
   message.content = result.content;
   if (result.tool_calls?.length) message.tools = result.tool_calls.map((t) => ({ connector: t.connector, action: t.action, ok: t.ok, latency_ms: t.latency_ms, detail: t.detail, approval_required: t.approval_required, approval_id: t.approval_id, artifact: t.artifact }));
+  convo.messages.push(message);
   convo.updatedAt = Date.now();
   saveStore();
   await durableChatWriteQueue;
+  if (durableChatStoreReady) await deleteDurableRecord("checkpoints", `chat-draft:${convo.id}`);
   const deliveryStep = executionLedger.steps.find((step) => step.kind === "deliver" && step.status === "running");
   if (deliveryStep) {
     const delivered = transitionUltronLedger(executionLedger, deliveryStep.id, "completed", {

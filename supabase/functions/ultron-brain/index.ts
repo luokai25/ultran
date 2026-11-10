@@ -346,19 +346,50 @@ function openAIMessageStream(response: Response, db: ReturnType<typeof service>,
   return new Response(stream, { status: 200, headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" } });
 }
 
+const MODEL_BLOCK_MS = 6 * 60 * 60 * 1000;
+type ChatFailureClass = "model" | "key" | "transient";
+
+/** Decide whether a failed chat call says something about the model or about the key.
+ * Live data showed eight OpenRouter keys marked "expired" by one model-specific 403
+ * ("<model>:free is only available on agentic harnesses"); the key was fine, the
+ * automatic router kept choosing that model, and every key was disabled in turn. */
+function classifyChatFailure(status: number, detail: string): ChatFailureClass {
+  if (status === 404) return "model";
+  if (status === 403 && /\bmodel\b|only available/i.test(detail)) return "model";
+  if (status === 400 && /decommission|deprecat|(model[^.]{0,80}(not found|does not exist|not supported|unavailable))/i.test(detail)) return "model";
+  if (status === 401 || status === 403 || status === 429) return "key";
+  return "transient";
+}
+
+async function loadBlockedModels(db: ReturnType<typeof service>, ownerId: string): Promise<Record<string, string>> {
+  const setting = await getSetting(db, ownerId, "brain_model_blocklist").catch(() => null);
+  const items = isObject(setting?.items) ? setting.items : {};
+  const now = Date.now();
+  return Object.fromEntries(Object.entries(items).filter(([, until]) => typeof until === "string" && Date.parse(until) > now)) as Record<string, string>;
+}
+
+async function blockModel(db: ReturnType<typeof service>, ownerId: string, blocked: Record<string, string>, provider: Provider, model: string): Promise<void> {
+  blocked[`${provider}::${model}`] = new Date(Date.now() + MODEL_BLOCK_MS).toISOString();
+  await saveSetting(db, ownerId, "brain_model_blocklist", { items: blocked }).catch(() => undefined);
+}
+
 /** Record a failed chat attempt without punishing a healthy key for model- or request-level errors.
- * Only credential (401/403) and quota (429) failures change a key's status. A retired model (404)
- * or a rejected request (400/413/422) leaves the key usable for other models, and transient
- * 5xx/timeouts cool the key down for a minute instead of marking it unreachable for five. */
-async function markChatFailure(db: ReturnType<typeof service>, ownerId: string, provider: Provider, key: KeyRow, status: number, detail: string, retryAfter: string | null): Promise<void> {
+ * Only credential (401/403) and quota (429) failures change a key's status. A model the provider
+ * refuses (404, model-specific 403/400) is blocklisted for six hours and the key stays usable;
+ * transient 5xx/timeouts cool the key down for a minute instead of marking it unreachable for five. */
+async function markChatFailure(db: ReturnType<typeof service>, ownerId: string, provider: Provider, key: KeyRow, status: number, detail: string, retryAfter: string | null): Promise<ChatFailureClass> {
+  const failureClass = classifyChatFailure(status, detail);
   const now = new Date().toISOString();
   const patch: Json = { last_error: detail.slice(0, 500) };
-  if (status === 401) Object.assign(patch, { status: "invalid", last_checked_at: now });
-  else if (status === 403) Object.assign(patch, { status: "expired", last_checked_at: now });
-  else if (status === 429) Object.assign(patch, { status: "rate_limited", last_checked_at: now, cooldown_until: new Date(Date.now() + retryAfterMs(retryAfter)).toISOString() });
-  else if (status === 404) patch.last_checked_at = null; // Ask the supervisor to refresh this key's model list.
-  else if (status >= 500 || status === 408 || status === 409 || status === 425) patch.cooldown_until = new Date(Date.now() + 60_000).toISOString();
+  if (failureClass === "key") {
+    if (status === 401) Object.assign(patch, { status: "invalid", last_checked_at: now });
+    else if (status === 403) Object.assign(patch, { status: "expired", last_checked_at: now });
+    else Object.assign(patch, { status: "rate_limited", last_checked_at: now, cooldown_until: new Date(Date.now() + retryAfterMs(retryAfter)).toISOString() });
+  } else if (failureClass === "transient" && (status >= 500 || status === 408 || status === 409 || status === 425)) {
+    patch.cooldown_until = new Date(Date.now() + 60_000).toISOString();
+  }
   await updateKey(db, ownerId, provider, key.id, patch).catch(() => undefined);
+  return failureClass;
 }
 
 async function handleChat(db: ReturnType<typeof service>, ownerId: string, body: Json, request: Request): Promise<Response> {
@@ -389,19 +420,22 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   const allRows = await keyRows(db, ownerId);
   const now = Date.now();
   const complexity = taskComplexity(messages);
+  const blockedModels = await loadBlockedModels(db, ownerId);
+  const isBlocked = (provider: Provider, model: string) => Date.parse(blockedModels[`${provider}::${model}`] ?? "") > Date.now();
+  const usableModels = (provider: Provider, key: KeyRow) => (key.models ?? []).filter((model) => !isBlocked(provider, model));
   const compareCandidates = (a: { provider: Provider; key: KeyRow; chosenModel: string; modelScore: number }, b: { provider: Provider; key: KeyRow; chosenModel: string; modelScore: number }) =>
     b.modelScore - a.modelScore || b.key.priority - a.key.priority || Date.parse(a.key.last_used_at ?? "1970-01-01") - Date.parse(b.key.last_used_at ?? "1970-01-01");
   const eligibleRows = allRows.filter(({ key }) =>
     key.enabled && key.status === "connected" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now)
   );
   const automaticCandidates = eligibleRows.flatMap(({ provider, key }) => {
-    const chosenModel = bestFreeModel(provider, key.models ?? [], complexity);
+    const chosenModel = bestFreeModel(provider, usableModels(provider, key), complexity);
     if (!chosenModel) return [];
     return [{ provider, key, chosenModel, modelScore: modelCapabilityScore(chosenModel, complexity) }];
   }).sort(compareCandidates);
   const preferredCandidates = requestedModel ? eligibleRows.flatMap(({ provider, key }) => {
     if (requestedProvider && provider !== requestedProvider) return [];
-    if (!(key.models ?? []).includes(requestedModel) || !isFreeModel(provider, requestedModel)) return [];
+    if (!(key.models ?? []).includes(requestedModel) || !isFreeModel(provider, requestedModel) || isBlocked(provider, requestedModel)) return [];
     return [{ provider, key, chosenModel: requestedModel, modelScore: modelCapabilityScore(requestedModel, complexity) + 10000 }];
   }).sort(compareCandidates) : [];
   // Honor the selected model first, but reserve capacity for cross-provider
@@ -437,7 +471,13 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
   for (const candidate of candidates) {
     if (request.signal.aborted) return json({ error: "client_closed_request" }, 499);
     if (attempts.length && Date.now() - selectionStarted > CHAT_SELECTION_BUDGET_MS) break;
-    const { provider, key, chosenModel } = candidate;
+    const { provider, key } = candidate;
+    let chosenModel = candidate.chosenModel;
+    // An earlier key in this request may have just learned this model is refused.
+    if (isBlocked(provider, chosenModel)) {
+      chosenModel = bestFreeModel(provider, usableModels(provider, key), complexity);
+      if (!chosenModel) continue;
+    }
     let secret: string;
     try { secret = await getKeySecret(db, key.vault_secret_id); }
     catch { await updateKey(db, ownerId, provider, key.id, { status: "unreachable", last_error: "Vault credential could not be read." }); attempts.push({ provider, model: chosenModel, outcome: "vault_unavailable" }); continue; }
@@ -475,7 +515,8 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
       const detail = (await upstream.text().catch(() => "")).slice(0, 500);
       lastError = `${config.label} returned HTTP ${upstream.status}.`;
       attempts.push({ provider, model: chosenModel, outcome: `http_${upstream.status}` });
-      await markChatFailure(db, ownerId, provider, key, upstream.status, `HTTP ${upstream.status}: ${detail}`, upstream.headers.get("retry-after"));
+      const failureClass = await markChatFailure(db, ownerId, provider, key, upstream.status, `HTTP ${upstream.status}: ${detail}`, upstream.headers.get("retry-after"));
+      if (failureClass === "model") await blockModel(db, ownerId, blockedModels, provider, chosenModel);
       continue;
     }
     // HTTP 200 does not prove generation started. Wait for the first real event so an
@@ -486,7 +527,8 @@ async function handleChat(db: ReturnType<typeof service>, ownerId: string, body:
       if (request.signal.aborted) return json({ error: "client_closed_request" }, 499);
       lastError = `${config.label}: ${checked.reason}`;
       attempts.push({ provider, model: chosenModel, outcome: checked.providerStatus ? `stream_error_${checked.providerStatus}` : "stream_failed" });
-      await markChatFailure(db, ownerId, provider, key, checked.providerStatus ?? 503, `Stream: ${checked.reason}`, null);
+      const streamClass = await markChatFailure(db, ownerId, provider, key, checked.providerStatus ?? 503, `Stream: ${checked.reason}`, null);
+      if (streamClass === "model") await blockModel(db, ownerId, blockedModels, provider, chosenModel);
       continue;
     }
     await updateKey(db, ownerId, provider, key.id, { last_used_at: new Date().toISOString(), last_error: null });

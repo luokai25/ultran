@@ -35,3 +35,11 @@ test("trimming a long conversation keeps the leading system prompt", () => {
   assert.doesNotMatch(chat, /\.slice\(-80\) : \[\];/, "plain slice(-80) drops ULTRON's system prompt after message 80");
   assert.match(chat, /leadingSystem/);
 });
+
+test("a model-specific 403 blocklists the model instead of expiring the key", () => {
+  // Regression: eight OpenRouter keys were marked expired by "<model>:free is only available on agentic harnesses".
+  assert.match(brain, /function classifyChatFailure\(/);
+  assert.match(brain, /status === 403 && \/\\bmodel\\b\|only available\/i\.test\(detail\)\) return "model"/);
+  assert.match(chat, /blockModel\(db, ownerId, blockedModels, provider, chosenModel\)/);
+  assert.match(chat, /usableModels\(provider, key\)/, "automatic routing must skip blocklisted models");
+});

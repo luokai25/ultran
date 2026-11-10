@@ -1,7 +1,7 @@
 import { normalizeToolCall } from "@ultron/connectors/tool-contract";
 import { CURATED_MODELS } from "./model-library";
 import { detectProvider, classifyProviderResponse, selectChatModels, providerStatusLabel, type ProviderProfile, type ProviderState } from "./llm-provider";
-import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, getUltronCloudModels, removeUltronCloudKey, setUltronCloudKey, streamUltronSupabaseChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
+import { addUltronCloudKey, getUltronCloudStatus, getUltronFreeProviders, listUltronCloudKeys, getUltronCloudModels, removeUltronCloudKey, setUltronCloudKey, streamUltronBrainChat, type CloudProviderId, type CloudProviderGroup } from "./cloud-llm";
 import { parseProviderKeyFile, providerFromKeyFilename, validateProviderKeyFiles } from "./ultron-key-import.mjs";
 import { buildMindMap, renderMindMap, exportObsidianMarkdown, type MindNode, type MindMap } from "./mind-map";
 import { EMPTY_GRAPH, graphPrompt, mergeGraphProposal, type SemanticGraph } from "./semantic-graph";
@@ -4039,7 +4039,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       ...history.map((item) => ({ role: item.role, content: item.content })),
     ];
     if (!usePrometheus) {
-      const content = await streamUltronSupabaseChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, onToken, selectedCloudProvider ?? undefined);
+      const content = await streamUltronBrainChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, onToken, selectedCloudProvider ?? undefined);
       return { content, session_id: "" };
     }
     const runId = typeof priorRun?.id === "string" ? priorRun.id : crypto.randomUUID();
@@ -4103,7 +4103,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       // Up to eight verified tool actions, followed by one final model turn.
       for (let modelTurn = 0; modelTurn <= iterationLimit; modelTurn++) {
         let generated = "";
-        await streamUltronSupabaseChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; }, selectedCloudProvider ?? undefined);
+        await streamUltronBrainChat(selectedCloudModelId, messages, cloudMaxTokens, externalSignal, (token) => { if (token) generated += token; }, selectedCloudProvider ?? undefined);
         tokensUsed += Math.max(1, Math.ceil(generated.length / 4));
         const request = parseLocalToolRequest(generated);
         if (!request) {

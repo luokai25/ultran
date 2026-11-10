@@ -4013,14 +4013,16 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     if (continuation && convo.prometheusRunId) {
       const localRun = convo.prometheusCheckpoint;
       if (localRun && ["running", "paused", "waiting_approval"].includes(String(localRun.status))) priorRun = localRun;
-      try {
-        const found = await invokeUltronCapabilities("get_run", { id: convo.prometheusRunId });
-        if (found.run && typeof found.run === "object" && !Array.isArray(found.run)) {
-          const candidate = found.run as Record<string, unknown>;
-          if (["running", "paused", "waiting_approval"].includes(String(candidate.status))) priorRun = candidate;
+      if (!priorRun && cloudAccountConnected) {
+        try {
+          const found = await invokeUltronCapabilities("get_run", { id: convo.prometheusRunId });
+          if (found.run && typeof found.run === "object" && !Array.isArray(found.run)) {
+            const candidate = found.run as Record<string, unknown>;
+            if (["running", "paused", "waiting_approval"].includes(String(candidate.status))) priorRun = candidate;
+          }
+        } catch (error) {
+          console.warn("[ULTRON Prometheus optional cloud resume lookup]", error);
         }
-      } catch (error) {
-        console.warn("[ULTRON Prometheus optional cloud resume lookup]", error);
       }
     }
     const goal = priorRun && typeof priorRun.goal === "string" ? priorRun.goal : task;
@@ -4079,6 +4081,10 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
         ...(result ? { result } : {}),
       };
       saveStore();
+      if (!cloudAccountConnected) {
+        cloudCheckpointAvailable = false;
+        return;
+      }
       try {
         const saved = await invokeUltronCapabilities("checkpoint_run", {
           id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),

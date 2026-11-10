@@ -37,7 +37,9 @@ test("single pasted cloud API key is auto-detected, verified and sent through th
   assert.match(main, /addUltronCloudKey\(provider, key, label\)/);
   assert.match(main, /cloudLlmKeyInput\.value = ""/);
   assert.match(main, /Accepted · securely saved and enabled/);
-  assert.match(cloud, /functions\.invoke\("ultron-brain"/);
+  assert.match(cloud, /functions\/v1\/ultron-brain/);
+  assert.match(cloud, /apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY/);
+  assert.doesNotMatch(cloud, /getCloudSession\(\)/);
   assert.match(cloud, /invokeUltronBrain\("add_key"/);
 });
 

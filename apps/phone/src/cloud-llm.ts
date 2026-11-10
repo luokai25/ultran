@@ -176,73 +176,94 @@ export async function streamUltronSupabaseChat(
     throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
   }
 
+  const controller = new AbortController();
+  const abortFromCaller = (): void => controller.abort();
+  if (signal.aborted) controller.abort();
+  else signal.addEventListener("abort", abortFromCaller, { once: true });
+  let timedOut = false;
+  const deadline = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("ULTRON Brain request timed out.", "TimeoutError"));
+  }, 58_000);
   let lastError: Error | null = null;
-  for (const candidate of candidates) {
-    if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
-    let response: Response;
-    try {
-      response = await fetch(API_PATH, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "text/event-stream, application/json" },
-        cache: "no-store",
-        body: JSON.stringify({
-          action: "chat", provider: selectedProvider, model_id: selectedModel,
-          api_key: candidate.apiKey, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3,
-        }),
-        signal,
-      });
-    } catch (error) {
-      if (signal.aborted) throw error;
-      lastError = error instanceof Error ? error : new Error("ULTRON Brain could not reach the provider.");
-      continue;
-    }
-    if (!response.ok) {
-      const result: Record<string, unknown> = await parseJsonResponse(response).catch((error): Record<string, unknown> => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
-      const message = String(result.message ?? result.error ?? "Provider request failed.");
-      lastError = new Error(`ULTRON Brain HTTP ${response.status}: ${message.slice(0, 400)}`);
-      if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;
-      continue;
-    }
-    if (!response.body) throw new Error("ULTRON Brain did not return a readable response stream.");
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let content = "";
-    const consume = (block: string): void => {
-      const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith("data:"));
-      const data = dataLines.map((line) => line.slice(5).trim()).join("\n");
-      const rawPayload = data || block.trim();
-      if (!rawPayload || rawPayload === "[DONE]") return;
-      if (!data && !rawPayload.startsWith("{") && !rawPayload.startsWith("[")) return;
-      let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> }; message?: { content?: string | Array<{ text?: string }> }; text?: string }>; output_text?: string; response?: string; content?: string | Array<{ text?: string }>; error?: string | { message?: string }; message?: string };
-      try { event = JSON.parse(rawPayload) as typeof event; }
-      catch { throw new Error("ULTRON received an invalid event from the model stream."); }
-      if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
-      const choice = event.choices?.[0];
-      const delta = choice?.delta?.content ?? choice?.message?.content ?? choice?.text ?? event.output_text ?? event.response ?? event.content;
-      const token = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
-      if (token) { content += token; onToken(token); }
-    };
-    try {
-      while (true) {
+  try {
+    for (const candidate of candidates) {
+      if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
+      if (controller.signal.aborted) break;
+      let response: Response;
+      try {
+        response = await fetch(API_PATH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "text/event-stream, application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            action: "chat", provider: selectedProvider, model_id: selectedModel,
+            api_key: candidate.apiKey, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3,
+          }),
+          signal: controller.signal,
+        });
+      } catch (error) {
         if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
-        const chunk = await reader.read();
-        buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-        let boundary = buffer.search(/\r?\n\r?\n/);
-        while (boundary >= 0) {
-          const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
-          consume(buffer.slice(0, boundary));
-          buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
-          boundary = buffer.search(/\r?\n\r?\n/);
-        }
-        if (chunk.done) break;
+        if (controller.signal.aborted) break;
+        lastError = error instanceof Error ? error : new Error("ULTRON Brain could not reach the provider.");
+        continue;
       }
-      if (buffer.trim()) consume(buffer);
+      if (!response.ok) {
+        const result: Record<string, unknown> = await parseJsonResponse(response).catch((error): Record<string, unknown> => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
+        const message = String(result.message ?? result.error ?? "Provider request failed.");
+        lastError = new Error(`ULTRON Brain HTTP ${response.status}: ${message.slice(0, 400)}`);
+        if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;
+        continue;
+      }
+      if (!response.body) throw new Error("ULTRON Brain did not return a readable response stream.");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let content = "";
+      const consume = (block: string): void => {
+        const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith("data:"));
+        const data = dataLines.map((line) => line.slice(5).trim()).join("\n");
+        const rawPayload = data || block.trim();
+        if (!rawPayload || rawPayload === "[DONE]") return;
+        if (!data && !rawPayload.startsWith("{") && !rawPayload.startsWith("[")) return;
+        let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> }; message?: { content?: string | Array<{ text?: string }> }; text?: string }>; output_text?: string; response?: string; content?: string | Array<{ text?: string }>; error?: string | { message?: string }; message?: string };
+        try { event = JSON.parse(rawPayload) as typeof event; }
+        catch { throw new Error("ULTRON received an invalid event from the model stream."); }
+        if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
+        const choice = event.choices?.[0];
+        const delta = choice?.delta?.content ?? choice?.message?.content ?? choice?.text ?? event.output_text ?? event.response ?? event.content;
+        const token = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
+        if (token) { content += token; onToken(token); }
+      };
+      try {
+        while (true) {
+          if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
+          if (controller.signal.aborted) {
+            if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");
+            throw new DOMException("Generation stopped", "AbortError");
+          }
+          const chunk = await reader.read();
+          buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+          let boundary = buffer.search(/\r?\n\r?\n/);
+          while (boundary >= 0) {
+            const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
+            consume(buffer.slice(0, boundary));
+            buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+            boundary = buffer.search(/\r?\n\r?\n/);
+          }
+          if (chunk.done) break;
+        }
+        if (buffer.trim()) consume(buffer);
+      } finally {
+        await reader.cancel().catch(() => undefined);
+      }
       if (!content.trim()) throw new Error("ULTRON Brain completed without returning any text.");
       return content.trim();
-    } finally {
-      await reader.cancel().catch(() => undefined);
     }
+    if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");
+    throw lastError ?? new Error("No provider key could complete this request.");
+  } finally {
+    window.clearTimeout(deadline);
+    signal.removeEventListener("abort", abortFromCaller);
   }
-  throw lastError ?? new Error("No provider key could complete this request.");
 }

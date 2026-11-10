@@ -42,6 +42,8 @@ const CLOUD_PROVIDERS: Array<{ id: CloudProvider; base: string; protocol: "opena
 ];
 function isFreeModel(provider: CloudProvider, model: string): boolean {
   const id = model.toLowerCase().replace(/^models\//, "");
+  // Memory generation uses ordinary chat completions, never audio/live/realtime endpoints.
+  if (/(?:audio|tts|speech|transcri|live|realtime|bidi)/i.test(id)) return false;
   if (provider === "openrouter") return id.endsWith(":free");
   if (provider === "cerebras") return false; // One-time trial only; exclude from recurring zero-cost routing.
   if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);

@@ -693,7 +693,7 @@ function persistChatToIndexedDb(snapshot: Store): Promise<void> {
   records.push({
     bucket: "metadata",
     id: "chat-state",
-    value: { activeId: snapshot.activeId, conversationIds: snapshot.conversations.map((conversation) => conversation.id) },
+    value: { activeId: snapshot.activeId, conversationIds: snapshot.conversations.map((conversation) => conversation.id), updatedAt: Date.now() },
   });
   return putDurableRecords(records);
 }
@@ -701,14 +701,20 @@ function persistChatToIndexedDb(snapshot: Store): Promise<void> {
 async function initializeDurableChatStore(): Promise<void> {
   try {
     // The old localStorage copy remains untouched until the IndexedDB snapshot is restored.
-    const metadata = await listDurableRecords<{ activeId: string | null; conversationIds: string[] }>("metadata");
+    const metadata = await listDurableRecords<{ activeId: string | null; conversationIds: string[]; updatedAt?: number }>("metadata");
     const chatState = metadata.find((record) => record.id === "chat-state")?.value;
     if (chatState && Array.isArray(chatState.conversationIds)) {
       const durableRows = await listDurableRecords<Conversation>("conversations");
       const durableById = new Map(durableRows.map((row) => [row.id, row.value]));
       const durableConversations = chatState.conversationIds.map((id) => durableById.get(id) ?? null);
       const restored = durableConversations.filter((conversation): conversation is Conversation => Boolean(conversation));
-      if (restored.length || chatState.conversationIds.length === 0) {
+      const legacyNewest = Math.max(0, ...store.conversations.map((conversation) => conversation.updatedAt || 0));
+      const durableNewest = chatState.updatedAt ?? 0;
+      // localStorage is the compatibility journal. If the app was terminated
+      // between its write and the IndexedDB transaction, prefer the newer copy.
+      if (legacyNewest > durableNewest) {
+        await persistChatToIndexedDb(store);
+      } else if (restored.length || chatState.conversationIds.length === 0) {
         store.conversations = restored;
         store.activeId = restored.some((conversation) => conversation.id === chatState.activeId)
           ? chatState.activeId

@@ -196,7 +196,7 @@ export async function streamUltronSupabaseChat(
       continue;
     }
     if (!response.ok) {
-      const result = await parseJsonResponse(response).catch((error) => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
+      const result: Record<string, unknown> = await parseJsonResponse(response).catch((error): Record<string, unknown> => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
       const message = String(result.message ?? result.error ?? "Provider request failed.");
       lastError = new Error(`ULTRON Brain HTTP ${response.status}: ${message.slice(0, 400)}`);
       if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;

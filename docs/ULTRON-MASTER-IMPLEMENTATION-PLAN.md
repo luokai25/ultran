@@ -321,3 +321,12 @@ Priority order is intentional. Do not expand autonomous capabilities while the b
 - Source inspection confirms the final file contains actual newline escapes in the TypeScript string literals. No runtime test or deployment verification is claimed yet.
 - The Vercel status for the latest commit still reports the build-rate-limit failure. Production remains on the older successful commit `5227d2b9fe3d0a2a64e51fd21f81d91652d76891`; the Cohere repair and later streaming/attachment work are not live until a new successful deployment is observed.
 - Local repository execution was unavailable in this environment because outbound GitHub DNS resolution failed. The cache unit tests and full CI/build therefore remain unverified and must be run when a build/test environment is available.
+
+
+### 2026-11-10 — Cohere SSE parser extraction and regression coverage
+- Extracted Cohere event framing into \`api/cohere-sse.ts\` as a small incremental parser so chunk boundaries and final flush behavior can be tested independently from the Vercel request/response runtime.
+- Updated \`api/ultron-brain.ts\` to use the parser while retaining OpenAI-compatible downstream SSE frames and backpressure handling.
+- Added \`apps/phone/test/cohere-sse.test.mjs\` to cover complete events, partial network chunks, CRLF, multiple events per chunk, final unterminated event, metadata lines, malformed payloads and [DONE].
+- Source and test files are committed on \`main\`. Latest test addition commit: \`aee2678a09cb4860cff77c9e1368acd207590978\`.
+- Tests have **not** been executed in this environment; do not mark the parser verified until CI or a local test run passes.
+- Vercel continues to report a build-rate-limit failure on the latest source. Production deployment remains unchanged until a successful deployment of the current main commit is observed.

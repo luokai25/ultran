@@ -4096,6 +4096,9 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
           convo.prometheusRunId = undefined;
           convo.prometheusGoal = undefined;
           saveStore();
+          if (!checkpointPersistenceAvailable && toolHistory.length) {
+            generated += "\n\nULTRON note: the requested actions completed, but Supabase checkpoint storage was temporarily unavailable.";
+          }
           onToken(generated);
           return { content: generated, session_id: "" };
         }

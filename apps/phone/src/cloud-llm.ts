@@ -54,11 +54,11 @@ function freeModel(provider: CloudProviderId, model: string): boolean {
 }
 
 function taskComplexity(messages: Array<{ role: string; content: string }>): number {
-  const task = messages.filter((message) => message.role === "user").slice(-6).map((message) => message.content.slice(0, 24000)).join("\\n").toLowerCase();
+  const task = messages.filter((message) => message.role === "user").slice(-6).map((message) => message.content.slice(0, 24000)).join("\n").toLowerCase();
   let score = 0;
-  if (/\\b(build|implement|debug|refactor|architecture|research|compare|analy[sz]e|design|migrate|deploy|multi.step|step.by.step|investigate|prove|optimi[sz]e)\\b/.test(task)) score += 2;
-  if (/\\b(code|typescript|javascript|python|sql|android|supabase|github|compiler|stack trace|test suite)\\b/.test(task)) score += 2;
-  if (/\\b(reasoning|mathematical proof|derive|formal|algorithm|security review|large codebase)\\b/.test(task)) score += 2;
+  if (/\b(build|implement|debug|refactor|architecture|research|compare|analy[sz]e|design|migrate|deploy|multi.step|step.by.step|investigate|prove|optimi[sz]e)\b/.test(task)) score += 2;
+  if (/\b(code|typescript|javascript|python|sql|android|supabase|github|compiler|stack trace|test suite)\b/.test(task)) score += 2;
+  if (/\b(reasoning|mathematical proof|derive|formal|algorithm|security review|large codebase)\b/.test(task)) score += 2;
   if (task.length > 5000) score += 1;
   if (messages.length > 5) score += 1;
   return Math.min(7, score);
@@ -66,13 +66,13 @@ function taskComplexity(messages: Array<{ role: string; content: string }>): num
 
 function modelCapabilityScore(model: string, complexity: number): number {
   const id = model.toLowerCase();
-  const params = Number(id.match(/(?:^|[-_.])(\\d+(?:\\.\\d+)?)b(?:[-_.]|$)/)?.[1] ?? 0);
+  const params = Number(id.match(/(?:^|[-_.])(\d+(?:\.\d+)?)b(?:[-_.]|$)/)?.[1] ?? 0);
   let score = 100 + Math.min(160, params) * 5;
   if (/gpt-oss-120b/.test(id)) score += 1200;
   if (/llama-4-maverick/.test(id)) score += 1600;
   if (/command-a-/.test(id)) score += 1000;
   if (/llama-4-scout/.test(id)) score += 450;
-  if (/llama-3\\.3-70b|llama-3\\.1-70b|qwen3-32b|command-r-plus/.test(id)) score += 180;
+  if (/llama-3\.3-70b|llama-3\.1-70b|qwen3-32b|command-r-plus/.test(id)) score += 180;
   if (/reason|r1|qwq|deepseek/.test(id) && complexity >= 3) score += 150;
   if (/coder|codestral|qwen.*coder|deepseek-coder/.test(id) && complexity >= 2) score += 180;
   if (/vision|vl|llava/.test(id) && complexity >= 2) score += 80;
@@ -269,7 +269,7 @@ export async function streamUltronBrainChat(
           : response.status >= 500 || response.status === 408 ? "transient" : null;
         if (outcome) {
           const retryHeader = response.headers.get("retry-after");
-          const retryAfterMs = retryHeader && /^\\d+(?:\\.\\d+)?$/.test(retryHeader)
+          const retryAfterMs = retryHeader && /^\d+(?:\.\d+)?$/.test(retryHeader)
             ? Number(retryHeader) * 1000 : 900_000;
           await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, {
             outcome, error: message, retryAfterMs, model: candidate.model,

@@ -285,3 +285,9 @@ Priority order is intentional. Do not expand autonomous capabilities while the b
 - Recorded source-audit findings: Prometheus buffers model output; Cohere delimiter parsing needs repair; cloud attachment payloads are incomplete; local persistence relies heavily on localStorage; memory embeddings are currently feature-hash based; several runtime/connector/artifact paths still depend on Supabase; README/architecture docs are stale.
 - No implementation or production behavior is declared fixed by creating this plan.
 - Next action: update README and architecture documentation, then establish a reproducible baseline and start Phase 1 P0 fixes.
+
+### 2026-11-10 — Continuity requirement reaffirmed
+- Reaffirmed the standing requirement that every ULTRON conversation resumes from this plan and current `main`, then continues implementation, repair and verification rather than restarting planning or stopping at a checklist.
+- Continue across sessions until acceptance criteria are verified, except where a genuine external blocker requires owner action. Record blockers and keep advancing independent work.
+- Created a daily scheduled check for the Vercel deployment and streaming status. It must report evidence and must never expose or use uploaded credential files.
+- The documentation index now links to this master plan (commit `e8c5ef2883e7cec842897d68ddfdc2522659014d`).

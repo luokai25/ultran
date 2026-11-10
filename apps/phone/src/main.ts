@@ -2194,12 +2194,12 @@ function updateHeroCloudStatus(checking = false): void {
   const state = !navigator.onLine ? "offline" : checking ? "checking" : cloudAccountConnected || publicWebMode ? "cloud" : "local";
   heroStatusEl.dataset.connection = state;
   coreStatusLabelEl.textContent = state === "cloud"
-    ? publicWebMode ? "ULTRON CLOUD READY · NO ACCOUNT" : "SUPABASE CLOUD LINKED"
+    ? publicWebMode ? "ULTRON CLOUD READY · NO ACCOUNT" : "CLOUD SYNC LINKED"
     : state === "checking"
-      ? "CHECKING SUPABASE"
+      ? "CHECKING OPTIONAL CLOUD SYNC"
       : state === "offline"
         ? "OFFLINE · LOCAL AVAILABLE"
-        : "LOCAL MODE · CLOUD NOT LINKED";
+        : "LOCAL MODE · CLOUD SYNC NOT LINKED";
 }
 
 function setLink(state: LinkState, label?: string): void {

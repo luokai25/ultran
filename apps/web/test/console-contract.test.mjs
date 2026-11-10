@@ -10,7 +10,7 @@ const read = (file) => readFile(path.join(root, file), "utf8");
 test("legacy Next.js entrypoint redirects to the single canonical web and APK client", async () => {
   const page = await read("src/app/page.tsx");
   assert.match(page, /import \{ redirect \} from "next\/navigation"/);
-  assert.match(page, /redirect\("https:\/\/ultron-app-web\.luo-chat-ops\.workers\.dev\/"\)/);
+  assert.match(page, /redirect\("https:\/\/ultron-pied-gamma\.vercel\.app\/"\)/);
   assert.doesNotMatch(page, /UltronConsole|AvatarHero|UltronVoice/);
 });
 

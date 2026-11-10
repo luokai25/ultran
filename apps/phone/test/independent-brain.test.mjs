@@ -16,6 +16,7 @@ test("Vercel Brain gateway handles provider verification and streaming without S
   assert.match(gateway, /action !== "chat"/);
   assert.match(gateway, /text\/event-stream/);
   assert.match(gateway, /api\.cohere\.com\/v2\/chat/);
+  assert.match(gateway, /maxDuration = 60/);
   assert.doesNotMatch(gateway, /supabase|SUPABASE/i);
 });
 
@@ -23,6 +24,7 @@ test("cloud model routing no longer calls Supabase Edge Functions", () => {
   assert.match(cloud, /\/api\/ultron-brain/);
   assert.match(cloud, /getLocalProviderKeyCandidates/);
   assert.match(cloud, /api_key: candidate\.apiKey/);
+  assert.match(cloud, /58_000/);
   assert.doesNotMatch(cloud, /functions\/v1\/ultron-brain/);
   assert.doesNotMatch(cloud, /ULTRON_SUPABASE/);
   assert.doesNotMatch(cloud, /getCloudSession/);
@@ -33,11 +35,15 @@ test("provider credentials are encrypted locally and Android uses native secure 
   assert.match(vault, /generateKey/);
   assert.match(vault, /nativeSecureStorage\.get/);
   assert.match(vault, /nativeSecureStorage\.set/);
+  assert.match(vault, /native-secure-storage/);
+  assert.doesNotMatch(vault, /cloud-sync/);
   assert.match(vault, /indexedDB/);
   assert.doesNotMatch(vault, /localStorage\.setItem\(VAULT_KEY, serialized/);
 });
 
-test("the Supabase data client is isolated in cloud-sync rather than imported by the brain gateway", () => {
+test("Supabase data sync is optional and local Prometheus checkpoints survive disconnection", () => {
   assert.match(sync, /createClient\(ULTRON_SUPABASE_URL/);
   assert.doesNotMatch(cloud, /@supabase\/supabase-js/);
+  assert.match(main, /prometheusCheckpoint/);
+  assert.match(main, /if \(!cloudAccountConnected\)/);
 });

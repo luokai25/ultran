@@ -1,4 +1,4 @@
-type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "google_ai_studio";
+type Provider = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 type RequestBody = {
   action?: string;
@@ -10,11 +10,12 @@ type RequestBody = {
   temperature?: number;
 };
 
-const PROVIDERS: Record<Provider, { models: string; chat: string }> = {
+const PROVIDERS: Record<Provider, { models: string; chat: string; cohere?: boolean }> = {
   openrouter: { models: "https://openrouter.ai/api/v1/models", chat: "https://openrouter.ai/api/v1/chat/completions" },
   mistral: { models: "https://api.mistral.ai/v1/models", chat: "https://api.mistral.ai/v1/chat/completions" },
   cerebras: { models: "https://api.cerebras.ai/v1/models", chat: "https://api.cerebras.ai/v1/chat/completions" },
   groq: { models: "https://api.groq.com/openai/v1/models", chat: "https://api.groq.com/openai/v1/chat/completions" },
+  cohere: { models: "https://api.cohere.com/v2/models?endpoint=chat&limit=100", chat: "https://api.cohere.com/v2/chat", cohere: true },
   google_ai_studio: { models: "https://generativelanguage.googleapis.com/v1beta/openai/models", chat: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" },
 };
 
@@ -136,6 +137,8 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
 
   let upstream: Response;
   try {
+    const maxTokens = Math.max(64, Math.min(16_384, Number(body.max_tokens ?? 2048) || 2048));
+    const temperature = Math.max(0, Math.min(2, Number(body.temperature ?? 0.3) || 0.3));
     upstream = await fetch(config.chat, {
       method: "POST",
       headers: {
@@ -144,13 +147,9 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
         Accept: "text/event-stream, application/json",
         ...(provider === "openrouter" ? { "HTTP-Referer": "https://ultron-pied-gamma.vercel.app", "X-Title": "ULTRON" } : {}),
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-        max_tokens: Math.max(64, Math.min(16_384, Number(body.max_tokens ?? 2048) || 2048)),
-        temperature: Math.max(0, Math.min(2, Number(body.temperature ?? 0.3) || 0.3)),
-      }),
+      body: JSON.stringify(config.cohere
+        ? { model, messages, stream: true, max_tokens: maxTokens, temperature }
+        : { model, messages, stream: true, max_tokens: maxTokens, temperature }),
       signal: AbortSignal.timeout(110_000),
     });
   } catch {
@@ -172,10 +171,37 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader("X-Accel-Buffering", "no");
   const reader = upstream.body.getReader();
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!res.write(value)) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (!config.cohere) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!res.write(value)) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    } else {
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        let newline = buffer.indexOf("\\n");
+        while (newline >= 0) {
+          const line = buffer.slice(0, newline).trim();
+          buffer = buffer.slice(newline + 1);
+          if (line.startsWith("data:")) {
+            const raw = line.slice(5).trim();
+            if (raw && raw !== "[DONE]") {
+              try {
+                const event = JSON.parse(raw) as { type?: string; delta?: { message?: { content?: { text?: string } }; text?: string } };
+                const token = event.delta?.message?.content?.text ?? event.delta?.text ?? "";
+                if (token) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: token } }] })}\\n\\n`);
+              } catch { /* Ignore non-JSON Cohere event payloads. */ }
+            }
+          }
+          newline = buffer.indexOf("\\n");
+        }
+        if (done) break;
+      }
+      res.write("data: [DONE]\\n\\n");
     }
     res.end();
   } catch {

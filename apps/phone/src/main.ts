@@ -88,6 +88,7 @@ type Conversation = {
   cognitiveCheckpoint?: Checkpoint;
   prometheusRunId?: string;
   prometheusGoal?: string;
+  prometheusCheckpoint?: Record<string, unknown>;
   knowledgeState?: KnowledgeState;
 };
 type ThemeId = "ultron";
@@ -286,7 +287,7 @@ const LEARNING_KEY = "ultron.learning.v1";
 const VECTOR_MEMORY_KEY = "ultron.vector-memory.v1";
 const DISTILLED_SKILLS_KEY = "ultron.distilled-skills.v1";
 
-const PROMETHEUS_GOAL_LOOP_PROMPT = `PROMETHEUS GOAL LOOP: For any substantial task, keep working through a persistent goal loop instead of stopping after the first answer or first failed attempt. Define a concrete success condition, break the goal into verifiable milestones, and inspect the available compute, connected provider keys, model catalog, cloud tools, skills, connectors, phone capabilities, and permissions before choosing an execution path. Route long-running, shared, network, database, and artifact work to Supabase by default; route device controls, local files, offline inference, and phone-only actions to Android. Use the strongest currently available model that fits the task, then fall back across eligible keys and providers when a key is rate-limited, unavailable, or incompatible. Do not assume that a key grants unlimited quota or paid compute. For each milestone: plan, execute, inspect the real result, verify the success condition, and checkpoint durable progress. When a capability is missing, search the existing catalog and connected tools first; if still missing, create a versioned ULTRON-owned tool or skill, test it with a bounded input, evaluate the output, and only then reuse it. On failure, diagnose the cause, record the failed approach, switch model/provider/tool or split the task into smaller steps, and retry without repeating an unchanged failure. Continue until the success conditions pass or a genuine blocker remains, such as missing credentials, exhausted provider quotas, unavailable permissions, unreachable external services, hardware limits, or an action requiring owner approval. Never claim a goal is guaranteed or completed without evidence; report the exact blocker and preserve the last good checkpoint. Keep the loop resumable across app restarts using capabilities.checkpoint_run and durable Supabase jobs. The loop may expand ULTRON-owned tools and skills, but it must not silently bypass owner confirmation for external communications, payments, or destructive actions.`;
+const PROMETHEUS_GOAL_LOOP_PROMPT = `PROMETHEUS GOAL LOOP: For any substantial task, keep working through a persistent goal loop instead of stopping after the first answer or first failed attempt. Define a concrete success condition, break the goal into verifiable milestones, and inspect the available compute, connected provider keys, model catalog, cloud tools, skills, connectors, phone capabilities, and permissions before choosing an execution path. Route AI inference, model selection, and server-side execution through the Vercel-hosted ULTRON Brain; use Supabase only as an optional data and synchronization service. Route device controls, local files, offline inference, and phone-only actions to Android. Use the strongest currently available model that fits the task, then fall back across eligible keys and providers when a key is rate-limited, unavailable, or incompatible. Do not assume that a key grants unlimited quota or paid compute. For each milestone: plan, execute, inspect the real result, verify the success condition, and checkpoint durable progress. When a capability is missing, search the existing catalog and connected tools first; if still missing, create a versioned ULTRON-owned tool or skill, test it with a bounded input, evaluate the output, and only then reuse it. On failure, diagnose the cause, record the failed approach, switch model/provider/tool or split the task into smaller steps, and retry without repeating an unchanged failure. Continue until the success conditions pass or a genuine blocker remains, such as missing credentials, exhausted provider quotas, unavailable permissions, unreachable external services, hardware limits, or an action requiring owner approval. Never claim a goal is guaranteed or completed without evidence; report the exact blocker and preserve the last good checkpoint. Keep the loop resumable across app restarts using capabilities.local checkpoints and optional cloud synchronization. The loop may expand ULTRON-owned tools and skills, but it must not silently bypass owner confirmation for external communications, payments, or destructive actions.`;
 const ultronDecisionTrace = new UltronDecisionTrace();
 function buildCapabilityPrompt(task: string, provider: string, executionLedger?: UltronTaskLedger, checkpoint?: Checkpoint): string {
   const profile = executionLedger?.profile ?? classifyUltronTask(task);
@@ -4010,6 +4011,8 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     const continuation = /\b(continue|resume|carry on|keep going|pick up where|go on)\b/i.test(task);
     let priorRun: Record<string, unknown> | null = null;
     if (continuation && convo.prometheusRunId) {
+      const localRun = convo.prometheusCheckpoint;
+      if (localRun && ["running", "paused", "waiting_approval"].includes(String(localRun.status))) priorRun = localRun;
       try {
         const found = await invokeUltronCapabilities("get_run", { id: convo.prometheusRunId });
         if (found.run && typeof found.run === "object" && !Array.isArray(found.run)) {
@@ -4017,7 +4020,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
           if (["running", "paused", "waiting_approval"].includes(String(candidate.status))) priorRun = candidate;
         }
       } catch (error) {
-        console.warn("[ULTRON Prometheus resume lookup]", error);
+        console.warn("[ULTRON Prometheus optional cloud resume lookup]", error);
       }
     }
     const goal = priorRun && typeof priorRun.goal === "string" ? priorRun.goal : task;
@@ -4028,7 +4031,7 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
     const usePrometheus = Boolean(priorRun) || profile.tier === "deep" || profile.tier === "critical" || taskProfile.depth === "deep" || explicitWork;
     const cloudMaxTokens = profile.tier === "critical" || profile.tier === "deep" ? 4096 : profile.tier === "standard" ? 2048 : 1024;
     const history = budgetConversation(convo.messages, profile.contextMessages, profile.contextTokens * 2, profile.contextChars);
-    const basePrompt = buildCapabilityPrompt(goal, "Ultron Supabase cloud brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint);
+    const basePrompt = buildCapabilityPrompt(goal, "ULTRON Vercel Brain", executionLedger, checkpoint ?? convo.cognitiveCheckpoint);
     const messages: Array<{ role: Role | "system"; content: string }> = [
       { role: "system", content: usePrometheus ? basePrompt + "\n\n" + LOCAL_AGENT_SYSTEM_PROMPT : basePrompt },
       ...history.map((item) => ({ role: item.role, content: item.content })),
@@ -4056,31 +4059,37 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
       convo.prometheusGoal = goal.slice(0, 8000);
       saveStore();
     }
-    let checkpointPersistenceAvailable = true;
+    let cloudCheckpointAvailable = true;
     const savePrometheusCheckpoint = async (phase: string, status: "running" | "paused" | "waiting_approval" | "completed" | "failed", result?: Record<string, unknown>): Promise<void> => {
+      const checkpoint = {
+        schema_version: 3, mode: "prometheus", conversation_id: convo.id,
+        goal: goal.slice(0, 4000), task: task.slice(0, 2000),
+        system_prompt: messages.find((message) => message.role === "system")?.content.slice(0, 12000) ?? "",
+        messages: messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({
+          role: message.role, content: message.content.slice(0, 2000),
+        })),
+        completed_tools: toolHistory.slice(-iterationLimit),
+        updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
+      };
+      // Local persistence is the source of truth for continuity. Cloud storage is an optional replica.
+      convo.prometheusCheckpoint = {
+        id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
+        iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
+        checkpoint, status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
+        ...(result ? { result } : {}),
+      };
+      saveStore();
       try {
         const saved = await invokeUltronCapabilities("checkpoint_run", {
           id: runId, goal: goal.slice(0, 8000), phase: phase.slice(0, 80),
           iteration: Math.min(iterationLimit, toolHistory.length), iteration_limit: iterationLimit,
-          checkpoint: {
-            schema_version: 2, mode: "prometheus", conversation_id: convo.id,
-            goal: goal.slice(0, 4000), task: task.slice(0, 2000),
-            system_prompt: messages.find((message) => message.role === "system")?.content.slice(0, 12000) ?? "",
-            messages: messages.filter((message) => message.role !== "system").slice(-8).map((message) => ({
-              role: message.role, content: message.content.slice(0, 2000),
-            })),
-            completed_tools: toolHistory.slice(-iterationLimit),
-            updated_at: new Date().toISOString(), resumable: status === "running" || status === "paused" || status === "waiting_approval",
-          },
-          status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
+          checkpoint, status, tokens_used: Math.min(tokenBudget, tokensUsed), token_budget: tokenBudget,
           ...(result ? { result } : {}),
         });
-        if (saved.ok !== true) throw new Error("Prometheus could not persist its Supabase checkpoint.");
+        if (saved.ok !== true) throw new Error("Optional cloud checkpoint was not accepted.");
       } catch (error) {
-        // Checkpoint infrastructure is important, but it must never erase a
-        // perfectly valid model answer. Keep the turn alive and report telemetry.
-        checkpointPersistenceAvailable = false;
-        console.warn("[ULTRON chat checkpoint]", error instanceof Error ? error.message : "checkpoint_unavailable");
+        cloudCheckpointAvailable = false;
+        console.warn("[ULTRON optional cloud checkpoint]", error instanceof Error ? error.message : "cloud_checkpoint_unavailable");
       }
     };
     try {
@@ -4096,8 +4105,8 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
           convo.prometheusRunId = undefined;
           convo.prometheusGoal = undefined;
           saveStore();
-          if (!checkpointPersistenceAvailable && toolHistory.length) {
-            generated += "\n\nULTRON note: the requested actions completed, but Supabase checkpoint storage was temporarily unavailable.";
+          if (!cloudCheckpointAvailable && toolHistory.length) {
+            generated += "\n\nULTRON note: the requested actions completed, but optional cloud checkpoint sync was unavailable; the local checkpoint remains saved.";
           }
           onToken(generated);
           return { content: generated, session_id: "" };
@@ -4110,14 +4119,14 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
         }
         if (toolHistory.length >= iterationLimit) {
           await savePrometheusCheckpoint("iteration_limit", "paused", { completed: false, reason: "per_turn_tool_limit", tool_count: toolHistory.length });
-          const message = "I reached the eight-action limit for this turn. Progress is saved in Supabase. Send “continue” to resume from the last checkpoint.";
+          const message = "I reached the eight-action limit for this turn. Progress is saved on this device. Cloud sync is optional. Send “continue” to resume from the last checkpoint.";
           onToken(message);
           return { content: message, session_id: "" };
         }
         let toolResult: string;
         if (request.tool === "capabilities.checkpoint_run") {
           await savePrometheusCheckpoint(request.phase, "running", { model_checkpoint_saved: true });
-          toolResult = "Prometheus checkpoint updated in Supabase.";
+          toolResult = "Prometheus checkpoint saved locally; cloud sync is optional.";
         } else {
           toolResult = await runApprovedLocalTool(request);
         }
@@ -4131,14 +4140,14 @@ async function providerModelReply(convo: Conversation, externalSignal: AbortSign
         );
         if (outcome === "waiting_approval") {
           await savePrometheusCheckpoint("waiting_approval", "waiting_approval", { tool_count: toolHistory.length });
-          const message = "This goal is waiting for your approval before the next action. The current progress is saved in Supabase.";
+          const message = "This goal is waiting for your approval before the next action. The current progress is saved on this device. Cloud sync is optional.";
           onToken(message);
           return { content: message, session_id: "" };
         }
         await savePrometheusCheckpoint("tool_completed", "running");
       }
       await savePrometheusCheckpoint("iteration_limit", "paused", { completed: false, reason: "per_turn_tool_limit", tool_count: toolHistory.length });
-      const message = "I reached the eight-action limit for this turn. Progress is saved in Supabase. Send “continue” to resume from the last checkpoint.";
+      const message = "I reached the eight-action limit for this turn. Progress is saved on this device. Cloud sync is optional. Send “continue” to resume from the last checkpoint.";
       onToken(message);
       return { content: message, session_id: "" };
     } catch (error) {

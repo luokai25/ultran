@@ -1,7 +1,9 @@
 import { mergeCloudWorkspace, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
 export { mergeCloudWorkspace, type CloudAttachment, type CloudConversation, type CloudMessage, type LocalConversationForSync } from './cloud-workspace';
 import { createClient, type Session } from '@supabase/supabase-js';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
+import { nativeSecureStorage } from './native-secure-storage';
+export { nativeSecureStorage } from './native-secure-storage';
 import { fetchAllPages } from './cloud-pagination';
 
 
@@ -11,33 +13,26 @@ export const ULTRON_SUPABASE_PUBLISHABLE_KEY =
   import.meta.env.VITE_ULTRON_SUPABASE_PUBLISHABLE_KEY ??
   'sb_publishable_OuRYpP7YP76xv4mfUgd_ng_NF4nWVoV';
 
-type UltronSecureStoragePlugin = {
-  get(options: { key: string }): Promise<{ value: string | null }>;
-  set(options: { key: string; value: string }): Promise<{ stored: boolean }>;
-  remove(options: { key: string }): Promise<{ removed: boolean }>;
-};
 
-const NativeSecureStorage = registerPlugin<UltronSecureStoragePlugin>('UltronSecureStorage');
-export const nativeSecureStorage = NativeSecureStorage;
 
 const secureSessionStorage = {
   async getItem(key: string): Promise<string | null> {
     if (Capacitor.getPlatform() === 'android') {
-      const result = await NativeSecureStorage.get({ key });
+      const result = await nativeSecureStorage.get({ key });
       return result.value;
     }
     return window.localStorage.getItem(key);
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Capacitor.getPlatform() === 'android') {
-      await NativeSecureStorage.set({ key, value });
+      await nativeSecureStorage.set({ key, value });
       return;
     }
     window.localStorage.setItem(key, value);
   },
   async removeItem(key: string): Promise<void> {
     if (Capacitor.getPlatform() === 'android') {
-      await NativeSecureStorage.remove({ key });
+      await nativeSecureStorage.remove({ key });
       return;
     }
     window.localStorage.removeItem(key);

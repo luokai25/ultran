@@ -1,3 +1,4 @@
+import { RuntimeCache } from "./runtime-cache";
 import {
   getLocalProviderKeyCandidates,
   listLocalProviderKeys,
@@ -31,6 +32,8 @@ const PROVIDERS: Record<CloudProviderId, string> = {
   google_ai_studio: "Google AI Studio",
 };
 const SUPPORTED_ON_VERCEL = new Set<CloudProviderId>(["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio"]);
+const cloudModelCache = new RuntimeCache<CloudModel[]>(16, 500_000);
+const CLOUD_MODEL_CACHE_TTL_MS = 15_000;
 
 async function invokeVercelBrain(payload: Record<string, unknown>): Promise<Response> {
   return fetch(API_PATH, {
@@ -123,24 +126,31 @@ export async function addUltronCloudKey(provider: CloudProviderId, key: string, 
     provider, label: label.trim() || "API key", apiKey: secret, status: "connected",
     enabled: true, priority: 3, models, last_checked_at: new Date().toISOString(), last_error: null,
   });
+  cloudModelCache.clear();
   return { ok: true, duplicate: saved.duplicate, provider, key: saved.key, models_found: models.length, free_models_found: models.filter((model) => freeModel(provider, model)).length };
 }
 
 export async function removeUltronCloudKey(provider: CloudProviderId, id: string): Promise<void> {
   await removeLocalProviderKey(provider, id);
+  cloudModelCache.clear();
 }
 
 export async function setUltronCloudKey(provider: CloudProviderId, id: string, patch: { enabled?: boolean; priority?: number }): Promise<void> {
   await updateLocalProviderKey(provider, id, patch);
+  cloudModelCache.clear();
 }
 
 export async function getUltronCloudModels(): Promise<CloudModel[]> {
+  const cached = cloudModelCache.get("available-models");
+  if (cached) return cached.map((model) => ({ ...model }));
   const { providers } = await listUltronCloudKeys();
-  return providers.flatMap((group) => group.keys.filter((key) => key.enabled && key.status === "connected")
+  const models = providers.flatMap((group) => group.keys.filter((key) => key.enabled && key.status === "connected")
     .flatMap((key) => key.models.map((model) => ({
       id: `${group.id}::${model}`, model_id: model, provider: group.id,
       provider_label: group.label, key_count: 1, status: "connected",
     }))));
+  cloudModelCache.set("available-models", models, CLOUD_MODEL_CACHE_TTL_MS);
+  return models.map((model) => ({ ...model }));
 }
 
 export async function getUltronCloudStatus(): Promise<{ status: CloudBrainStatus; total_keys: number; connected_keys: number }> {

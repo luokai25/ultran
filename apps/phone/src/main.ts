@@ -407,14 +407,14 @@ let selectedCloudProvider = readJson<CloudProviderId | null>("ultron.cloud-brain
 
 // One-time migration: existing installs default to Automatic after this chat
 // routing rebuild. An explicit local-model choice remains persistent afterwards.
-if (!readJson<boolean>("ultron.chat.auto-routing-migrated.v1", false)) {
+if (!readJson<boolean>("ultron.chat.auto-routing-migrated.v2", false)) {
   cloudBrainActive = true;
   selectedCloudModelId = "";
   selectedCloudProvider = null;
   writeJson("ultron.cloud-brain.active.v1", true);
   writeJson("ultron.cloud-brain.model.v1", "");
   writeJson("ultron.cloud-brain.provider.v1", null);
-  writeJson("ultron.chat.auto-routing-migrated.v1", true);
+  writeJson("ultron.chat.auto-routing-migrated.v2", true);
 }
 
 const store: Store = { conversations: [], activeId: null, ...readJson<Partial<Store>>(STORE_KEY, {}) };

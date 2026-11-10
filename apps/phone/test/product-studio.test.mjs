@@ -57,8 +57,8 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /"openrouter", "groq", "google_ai_studio"/);
   assert.match(source, /isFreeProviderModel/);
   assert.match(source, /isFreeGoogleSearchModel/);
-  assert.match(source, /free_google_search_daily_cap_reached/);
-  assert.ok(source.includes("count ?? 0) >= 25"));
+  assert.doesNotMatch(source, /free_google_search_daily_cap_reached/);
+  assert.doesNotMatch(source, /count \?\? 0\) >= 25/);
   assert.match(source, /x-goog-api-key/);
   assert.ok(!source.includes("generateContent?key="));
   assert.match(source, /callStudioStreaming/);
@@ -113,7 +113,7 @@ test("Product Studio routes free inference across existing Vault-backed provider
   assert.match(source, /editorial\.revision\.started/);
   assert.ok(source.includes("withSearch ? 12_000 : 30_000"));
   assert.ok(source.includes("Math.min(withSearch ? 12_000 : 30_000"));
-  assert.ok(source.includes("const deadline = Date.now() + 55_000"));
+  assert.ok(source.includes("const deadline = Date.now() + 105_000"));
   assert.match(source, /product_project_stopped/);
   assert.ok(source.includes('.eq("status", "validating")'));
   assert.match(source, /waiting_for_provider/);

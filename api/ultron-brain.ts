@@ -196,6 +196,7 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
         if (done) break;
       }
       res.write("data: [DONE]\n\n");
+    }
     res.end();
   } catch {
     try { await reader.cancel(); } catch { /* client disconnected */ }

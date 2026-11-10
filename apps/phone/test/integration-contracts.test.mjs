@@ -598,7 +598,7 @@ test("chat uses Automatic by default and exposes only imported local models in t
     read("src/cloud-llm.ts"),
     read("../../supabase/functions/ultron-brain/index.ts"),
   ]);
-  assert.match(main, /ultron\.chat\.auto-routing-migrated\.v1/);
+  assert.match(main, /ultron\.chat\.auto-routing-migrated\.v2/);
   assert.match(main, /ULTRON · Automatic/);
   const menuStart = main.indexOf("async function openChatModelMenu(): Promise<void>");
   const menuEnd = main.indexOf("\nfunction openSheet(): void", menuStart);

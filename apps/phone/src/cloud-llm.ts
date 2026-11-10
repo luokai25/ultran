@@ -1,4 +1,4 @@
-import { cloudClient, getCloudSession, ULTRON_SUPABASE_PUBLISHABLE_KEY, ULTRON_SUPABASE_URL } from "./cloud-sync";
+import { ULTRON_SUPABASE_PUBLISHABLE_KEY, ULTRON_SUPABASE_URL } from "./cloud-sync";
 
 export type CloudProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
 export type CloudKeyRow = {
@@ -22,32 +22,23 @@ function cloudFunctionError(error: unknown): { status: number; message: string }
 }
 
 export async function invokeUltronBrain(action: string, payload: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  let session = await getCloudSession();
-  if (!session) throw new Error("Sign in with the ULTRON owner account before using the cloud brain.");
-  let attempt = 0;
-  while (true) {
-    const { data, error } = await cloudClient.functions.invoke("ultron-brain", { body: { ...payload, action } });
-    if (!error) {
-      if (!data || typeof data !== "object") throw new Error("ULTRON cloud brain returned an invalid response.");
-      const result = data as Record<string, unknown>;
-      if (result.error) throw new Error(String(result.message ?? result.error));
-      return result;
-    }
-    const detail = cloudFunctionError(error);
-    if (attempt === 0 && detail.status === 401) {
-      const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
-      if (refreshError || !refreshed.session) throw new Error("Your ULTRON cloud session expired. Reconnect the owner account in Settings.");
-      session = refreshed.session;
-      attempt += 1;
-      continue;
-    }
-    const context = (error as { context?: unknown }).context;
-    if (context instanceof Response) {
-      const body = await context.clone().json().catch(() => ({})) as Record<string, unknown>;
-      throw new Error(String(body.message ?? body.error ?? error.message));
-    }
-    throw error;
+  const response = await fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
+    method: "POST",
+    headers: {
+      apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ ...payload, action }),
+  });
+  const raw = await response.text();
+  let result: Record<string, unknown> = {};
+  try { result = raw ? JSON.parse(raw) as Record<string, unknown> : {}; }
+  catch { throw new Error(`ULTRON cloud brain returned invalid JSON (HTTP ${response.status}).`); }
+  if (!response.ok || result.error) {
+    throw new Error(String(result.message ?? result.error ?? `ULTRON cloud brain returned HTTP ${response.status}.`));
   }
+  return result;
 }
 
 export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderGroup[]; total_keys: number; connected_keys: number }> {
@@ -139,40 +130,30 @@ export async function streamUltronSupabaseChat(
   };
   try {
     resetIdleTimeout();
-    let session = await getCloudSession();
-    if (!session) throw new Error("Sign in once to the ULTRON owner account in Settings. The secure session is persisted and refreshed automatically.");
     const safeMessages = prepareCloudChatMessages(messages);
     if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
       throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
     }
     const requestBody = JSON.stringify({ action: "chat", model_id: modelId, provider, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3 });
-    const send = (accessToken: string) => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
+    const send = () => fetch(`${ULTRON_SUPABASE_URL}/functions/v1/ultron-brain`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY,
         "Content-Type": "application/json",
-        Accept: "text/event-stream",
+        Accept: "text/event-stream, application/json",
       },
       body: requestBody,
       signal: controller.signal,
     });
     let response: Response;
     try {
-      response = await send(session.access_token);
+      response = await send();
     } catch (error) {
       // A transport failure before response headers is safe to retry once.
       if (controller.signal.aborted) throw error;
       await new Promise((resolve) => window.setTimeout(resolve, 450));
       if (controller.signal.aborted) throw error;
-      response = await send(session.access_token);
-    }
-    if (response.status === 401 && !controller.signal.aborted) {
-      const { data: refreshed, error: refreshError } = await cloudClient.auth.refreshSession();
-      if (!refreshError && refreshed.session) {
-        session = refreshed.session;
-        response = await send(session.access_token);
-      }
+      response = await send();
     }
     // Supabase occasionally fails before it can establish the streaming response.
     // Retry only its generic Edge Runtime failure, never a provider's own error.
@@ -180,7 +161,7 @@ export async function streamUltronSupabaseChat(
       const gatewayBody = await response.clone().text().catch(() => "");
       const gatewayCode = response.headers.get("sb-error-code") ?? response.headers.get("x-sb-error-code") ?? "";
       if (gatewayCode === "EDGE_FUNCTION_ERROR" || /EDGE_FUNCTION_ERROR|edge function.*failed|gateway error/i.test(gatewayBody)) {
-        response = await send(session.access_token);
+        response = await send();
       }
     }
     if (!response.ok) {

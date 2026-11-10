@@ -194,7 +194,7 @@ async function handle(req: VercelRequest, res: VercelResponse): Promise<void> {
           const event = JSON.parse(raw) as { type?: string; delta?: { message?: { content?: { text?: string } }; text?: string } };
           const token = event.delta?.message?.content?.text ?? event.delta?.text ?? "";
           if (token) {
-            const chunk = "data: " + JSON.stringify({ choices: [{ delta: { content: token } }] }) + "\\n\\n";
+            const chunk = "data: " + JSON.stringify({ choices: [{ delta: { content: token } }] }) + "\n\n";
             if (!res.write(chunk)) await new Promise<void>((resolve) => res.once("drain", resolve));
           }
         } catch { /* Ignore non-JSON Cohere event payloads. */ }

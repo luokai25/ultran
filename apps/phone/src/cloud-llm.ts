@@ -19,7 +19,8 @@ export type CloudModel = { id: string; model_id: string; provider: CloudProvider
 export type CloudBrainStatus = { state: string; connected_keys?: number; enabled_keys?: number; last_worker_at?: string; registry_providers?: number; registry_synced_at?: string };
 export type CloudProviderRegistry = { source: string; synced_at: string; providers: Array<{ name: string; url: string }> };
 
-const API_PATH = "/api/ultron-brain";
+// Use the production Vercel endpoint from both the web app and Capacitor's https://localhost origin.
+const API_PATH = import.meta.env.VITE_ULTRON_BRAIN_URL ?? "https://ultron-pied-gamma.vercel.app/api/ultron-brain";
 const PROVIDERS: Record<CloudProviderId, string> = {
   openrouter: "OpenRouter",
   mistral: "Mistral",

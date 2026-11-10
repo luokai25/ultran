@@ -122,7 +122,8 @@ export async function listLocalProviderKeys(): Promise<Array<Omit<LocalProviderK
 export async function getLocalProviderKeyCandidates(provider: LocalProviderId, modelId?: string): Promise<LocalProviderKey[]> {
   const keys = await readEncryptedVault();
   const now = Date.now();
-  return keys.filter((key) => key.provider === provider && key.enabled && key.status === "connected" &&
+  return keys.filter((key) => key.provider === provider && key.enabled &&
+    (key.status === "connected" || (key.status === "rate_limited" && (!key.cooldown_until || Date.parse(key.cooldown_until) <= now))) &&
     (!key.cooldown_until || Date.parse(key.cooldown_until) <= now) &&
     (!modelId || (key.models.includes(modelId) && Date.parse(key.blocked_models?.[modelId] ?? "1970-01-01") <= now)))
     .sort((a, b) => b.priority - a.priority || Date.parse(a.last_used_at ?? "1970-01-01") - Date.parse(b.last_used_at ?? "1970-01-01"));
@@ -137,7 +138,13 @@ export async function saveLocalProviderKey(input: Omit<LocalProviderKey, "id" | 
     const keys = await readEncryptedVault();
     const duplicate = keys.find((key) => key.provider === input.provider && key.apiKey === input.apiKey);
     if (duplicate) {
-      const { apiKey: _secret, ...metadata } = duplicate;
+      const refreshed: LocalProviderKey = {
+        ...duplicate, ...input, status: "connected", enabled: true,
+        last_checked_at: new Date().toISOString(), last_error: null,
+        cooldown_until: null, blocked_models: {},
+      };
+      await writeEncryptedVault(keys.map((key) => key.id === duplicate.id ? refreshed : key));
+      const { apiKey: _secret, ...metadata } = refreshed;
       return { key: metadata, duplicate: true };
     }
     const saved: LocalProviderKey = {

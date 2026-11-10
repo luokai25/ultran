@@ -73,10 +73,9 @@ underlying reasoning ceiling.
 ```
 
 The single production web entrypoint is
-[`https://ultron-app-web.luo-chat-ops.workers.dev/`](https://ultron-app-web.luo-chat-ops.workers.dev/).
-It serves the same `apps/phone` bundle used by the Android APK. The legacy
-Cloudflare Pages project was retired on 2026-11-06; do not deploy a second
-public ULTRON site.
+[`https://ultron-pied-gamma.vercel.app/`](https://ultron-pied-gamma.vercel.app/).
+It serves the same `apps/phone` bundle used by the Android APK. Vercel Git
+integration deploys `main`; no Cloudflare Worker is part of the public route.
 
 Dependencies point **downward only**. Read the full design in
 [docs/architecture.md](docs/architecture.md).

@@ -66,7 +66,7 @@ import {
   nativeSecureStorage,
 } from "./cloud-sync";
 import { createUltronCloudArtifact, getUltronCloudArtifactUrl, listUltronCloudArtifacts, deleteUltronCloudArtifact, type UltronCloudArtifact } from "./cloud-artifacts";
-import { listDurableRecords, migrateLegacyLocalStorage, putDurableRecords } from "./durable-store";
+import { listDurableRecords, putDurableRecords } from "./durable-store";
 
 /* ------------------------------------------------------------------ *
  * Types + themes
@@ -700,15 +700,13 @@ function persistChatToIndexedDb(snapshot: Store): Promise<void> {
 
 async function initializeDurableChatStore(): Promise<void> {
   try {
-    // Preserve the legacy source first. The migration deliberately never deletes it.
-    await migrateLegacyLocalStorage([STORE_KEY]);
+    // The old localStorage copy remains untouched until the IndexedDB snapshot is restored.
     const metadata = await listDurableRecords<{ activeId: string | null; conversationIds: string[] }>("metadata");
     const chatState = metadata.find((record) => record.id === "chat-state")?.value;
     if (chatState && Array.isArray(chatState.conversationIds)) {
-      const durableConversations = await Promise.all(
-        chatState.conversationIds.map((id) => listDurableRecords<Conversation>("conversations")
-          .then((rows) => rows.find((row) => row.id === id)?.value ?? null)),
-      );
+      const durableRows = await listDurableRecords<Conversation>("conversations");
+      const durableById = new Map(durableRows.map((row) => [row.id, row.value]));
+      const durableConversations = chatState.conversationIds.map((id) => durableById.get(id) ?? null);
       const restored = durableConversations.filter((conversation): conversation is Conversation => Boolean(conversation));
       if (restored.length || chatState.conversationIds.length === 0) {
         store.conversations = restored;
@@ -719,9 +717,9 @@ async function initializeDurableChatStore(): Promise<void> {
     } else {
       await persistChatToIndexedDb(store);
     }
+    try { await navigator.storage?.persist?.(); } catch { /* browser may decline persistent-storage status */ }
     durableChatStoreReady = true;
-    // Reconcile after restore so the legacy localStorage copy is updated only
-    // from a successfully read durable snapshot.
+    // Reconcile only after the IndexedDB snapshot has been read successfully.
     writeJson(STORE_KEY, store);
     cloudSyncStatusEl.dataset.state = "local";
     cloudSyncStatusEl.textContent = "Local history is stored on this device. Cloud sync is optional.";

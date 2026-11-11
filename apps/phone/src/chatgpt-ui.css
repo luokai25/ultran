@@ -557,7 +557,7 @@ progress { width:100%; accent-color:var(--accent); }
 
 
 /* ULTRON focused workspace: chat, projects, product studio, plugins and API keys only. */
-#drawer-foot .drawer-link:not(#workspace-btn):not(#drawer-product-studio):not(#connectors-btn):not(#drawer-llm-api-keys) { display:none !important; }
+.drawer-foot .drawer-link:not(#workspace-btn):not(#drawer-product-studio):not(#connectors-btn):not(#drawer-llm-api-keys) { display:none !important; }
 #drawer .drawer-label { display:none !important; }
 #drawer .drawer-foot { gap:4px; }
 #nav-vault, #nav-settings { display:none !important; }

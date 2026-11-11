@@ -73,7 +73,7 @@
         <p id="voice-status" class="voice-status" role="status" aria-live="polite" hidden></p>
         <p class="footnote"><span class="footnote-lock">◆</span> Private by design · Review actions before they run.</p>
       </footer>
-      <section id="agent-identities-screen" class="feature-screen" aria-label="Agents and identities" hidden>
+      <section id="agent-identities-screen" class="feature-screen" aria-label="Agents and identities" hidden inert>
         <header class="feature-head"><div><span class="feature-eyebrow">ONE BRAIN · DISTINCT IDENTITIES</span><h1>Agents &amp; Identities</h1><p>ULTRON is the operating identity. The imported model is its reasoning brain.</p></div><button id="identity-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></header>
         <div id="identity-cards" class="identity-cards">
           <button class="identity-card is-active" data-identity="ultron" type="button"><span class="identity-symbol">✳</span><span><strong>ULTRON</strong><small>Primary personal intelligence</small></span><i>Active</i></button>
@@ -96,7 +96,7 @@
       <section id="llm-api-keys-screen" class="feature-screen llm-api-keys-screen" aria-label="LLM API keys" hidden>
         <header class="feature-head">
           <div><span class="feature-eyebrow">MODEL CONNECTIONS</span><h1>LLM API KEYS</h1><p>Existing provider keys are loaded automatically from the server-side Vault.</p></div>
-          <div class="llm-key-header-actions"><button id="cloud-llm-refresh" class="ghost" type="button">Refresh connection</button><button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></div>
+          <div class="llm-key-header-actions"><button id="llm-api-keys-back" class="icon-btn" type="button" aria-label="Back to chat">‹</button></div>
         </header>
         <section class="llm-key-card llm-cloud-card">
           <div class="llm-key-heading"><strong>Ultron Supabase · Cloud brain</strong><span id="cloud-brain-state">Checking cloud…</span></div>
@@ -133,7 +133,7 @@
           <a hidden class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>
           <small class="llm-key-note">Keys are encrypted on this device and never saved in Supabase. The Vercel Brain gateway verifies provider keys and streams model responses without persisting your credentials. Keep a secure backup of your keys because they do not automatically sync between devices.</small>
         </section>
-        <section class="llm-key-card" hidden>
+        <section class="llm-key-card">
           <div class="llm-key-heading"><strong>Device-only provider key</strong><span id="llm-api-key-provider">No provider detected</span></div>
           <label class="llm-key-field">
             <span>Paste your API key</span>

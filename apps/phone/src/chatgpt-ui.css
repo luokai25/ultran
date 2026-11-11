@@ -554,3 +554,17 @@ progress { width:100%; accent-color:var(--accent); }
 }
 .msg.user .actions { justify-content: flex-end; margin-top: 1px; }
 .msg.user .actions button { min-height: 26px; padding: 3px 7px; font-size: 10px; }
+
+
+/* ULTRON focused workspace: chat, projects, product studio, plugins and API keys only. */
+#drawer-foot .drawer-link:not(#workspace-btn):not(#drawer-product-studio):not(#connectors-btn):not(#drawer-llm-api-keys) { display:none !important; }
+#drawer .drawer-label { display:none !important; }
+#drawer .drawer-foot { gap:4px; }
+#nav-vault, #nav-settings { display:none !important; }
+#agent-identities-screen, #mind-map-screen, #learning-review-screen, #capabilities-screen { display:none !important; }
+.llm-api-keys-screen .llm-cloud-card { display:none !important; }
+.llm-api-keys-screen .llm-key-header-actions #cloud-llm-refresh { display:none !important; }
+.llm-api-keys-screen .llm-key-note { color:var(--muted); }
+#workspace-panel .workspace-team-builder, #workspace-panel .workspace-stats { display:none !important; }
+#workspace-panel .workspace-team-open { display:none !important; }
+#workspace-panel .workspace-synthesis-bar { display:none !important; }

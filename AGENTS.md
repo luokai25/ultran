@@ -19,7 +19,7 @@ For substantial engineering work, follow `.agents/skills/ultron-gstack/SKILL.md`
 3. Inspect current `main` and relevant tests before every write.
 4. Preserve working features, provider routing, streaming, local model import, memory, artifacts and background jobs.
 5. The public client is single-instance: no visitor sign-up or login flow. Do not add user-account setup screens.
-6. Provider API keys stay in Supabase Vault and are used server-side. Never expose, echo, commit or log provider keys, service-role credentials, signing keys or tokens.
+6. Provider API keys stay in the on-device encrypted vault (Android Keystore-backed) and are sent only to the provider they belong to. Never expose, echo, commit or log provider keys, service-role credentials, signing keys or tokens.
 7. Do not remove Vault, database ownership integrity, connector permission checks or tool approval boundaries as a shortcut.
 8. Delete a code path only after checking its runtime imports, build references, tests and docs. Remove its tests and docs in the same change.
 9. Keep dependencies minimal. Do not add frameworks or services when the existing Vite, Capacitor, Supabase and Python stack is sufficient.

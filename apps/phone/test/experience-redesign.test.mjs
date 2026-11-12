@@ -316,11 +316,10 @@ test("the replacement interface avoids ambient motion and decorative atmosphere"
 });
 
 
-test("LLM API Keys exposes an explicit owner-session and provider-pool reconnect action", async () => {
+test("LLM API Keys screen keeps keys local and has no obsolete cloud reconnect action", async () => {
   const [html, main, css] = await Promise.all([read("index.html"), read("src/main.ts"), read("src/chatgpt-ui.css")]);
-  assert.match(html, /id="cloud-llm-refresh"/);
-  assert.match(main, /#cloud-llm-refresh/);
-  assert.match(main, /Reconnecting…/);
+  assert.doesNotMatch(html, /id="cloud-llm-refresh"/);
+  assert.doesNotMatch(main, /#cloud-llm-refresh/);
   assert.match(css, /\.llm-key-card/);
   assert.match(css, /\.llm-key-actions/);
 });

@@ -89,8 +89,16 @@ When these checks pass, tell the owner explicitly that it is safe to delete proj
 
 - Current `main`: `18240db5d2b0fca196634855de3d1c9d5dc20e85`.
 - Existing Android local inference foundation and local encrypted provider-key vault are present in source; GGUF and supported archive import paths exist.
-- Current chat still calls `https://ultron-pied-gamma.vercel.app/api/ultron-brain`.
+- Chat and key verification previously called `https://ultron-pied-gamma.vercel.app/api/ultron-brain`; see the Gate 2 status below for the replacement.
 - Current app still imports Supabase and uses cloud auth/sync, Supabase runtime/capabilities/jobs/artifacts/connectors/Product Studio, and cloud realtime.
 - Current Android release workflow exists and publishes APKs from `main`.
 - Latest observed CI at the baseline commit is failing: 8 phone tests and 1 Deno stream-preflight leak test. The phone typecheck and lint steps passed; the web build was skipped because tests failed. Fix and re-run these checks before claiming a green build.
 - No migration gate has passed yet. No project deletion is authorized by this document alone.
+
+## Gate 2 status (implemented, not yet device-verified)
+
+- `apps/phone/src/provider-adapters.ts` verifies keys, lists models and streams chat directly against OpenRouter, Mistral, Cerebras, Groq, Cohere (v2 chat) and Google AI Studio. `cloud-llm.ts` no longer calls any ULTRON server.
+- Android uses `UltronProviderHttpPlugin` (HTTPS only, provider host allowlist, request-header allowlist, cancellable streaming). A development browser uses `fetch` and is subject to each provider's CORS policy.
+- A failure after tokens were already shown never falls through to another provider.
+- Automated coverage: adapter, SSE decoding, error mapping, Java host allowlist parity. **Still required before Gate 2 can pass:** add one real key per provider on an Android device, confirm verify, model discovery, streaming and Stop for each, and run the Android release workflow.
+- `api/ultron-brain.ts` and the Supabase code are untouched and still present; they are removed under Gates 3–5.

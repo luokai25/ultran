@@ -57,13 +57,13 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   assert.match(css, /\.feature-screen > :not\(\.feature-head\)/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(html, /src\/(?:styles|workspace|experience|finish|learning|design-system|quiet-ui|motion-experience|product-studio)\.css/);
-  assert.match(main, /streamUltronSupabaseChat/);
+  assert.match(main, /streamUltronBrainChat/);
   assert.match(main, /getCloudSession/);
   assert.match(main, /addUltronCloudKey/);
   assert.doesNotMatch(main, /initializeAvatar|import\(["']three["']\)|markSvg|markDataUrl/);
   assert.match(main, /nativeSecureStorage/);
   assert.doesNotMatch(main, /registerPlugin[^;]+UltronSecureStorage/);
-  assert.equal((cloudSync.match(/registerPlugin<UltronSecureStoragePlugin>\(['"]UltronSecureStorage['"]\)/g) ?? []).length, 1);
+  assert.equal(((await read("apps/phone/src/native-secure-storage.ts")).match(/registerPlugin<UltronSecureStoragePlugin>\(['"]UltronSecureStorage['"]\)/g) ?? []).length, 1);
   assert.match(main, /app\.dataset\.health = state === "online" \? "ready" : state === "connecting" \? "checking" : "local"/);
 });
 

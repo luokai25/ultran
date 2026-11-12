@@ -25,7 +25,7 @@ test("shared model runtime receives the owner constitution", () => {
 });
 
 test("Prometheus checkpoints retain bounded context for cloud continuation", () => {
-  assert.ok(source.includes("schema_version: 2, mode: \"prometheus\""));
+  assert.ok(source.includes("schema_version: 3, mode: \"prometheus\""));
   assert.ok(source.includes("system_prompt: messages.find"));
   assert.ok(source.includes("messages: messages.filter"));
   assert.ok(source.includes("slice(-8)"));

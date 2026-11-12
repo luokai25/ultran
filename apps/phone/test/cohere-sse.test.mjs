@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
-const source = await readFile(new URL("../../../api/cohere-sse.ts", import.meta.url), "utf8");
+const source = await readFile(new URL("../src/cohere-sse.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ES2022 },
 }).outputText;

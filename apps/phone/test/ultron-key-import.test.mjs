@@ -27,7 +27,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
 const cloud = readFileSync(resolve(root, "src/cloud-llm.ts"), "utf8");
-test("single pasted cloud API key is auto-detected, verified through Vercel and saved in the local encrypted vault", () => {
+test("single pasted cloud API key is auto-detected, verified directly with the provider and saved in the local encrypted vault", () => {
   assert.match(html, /id="cloud-llm-key"/);
   assert.match(html, /id="cloud-llm-detected"/);
   assert.match(html, /Paste any supported API key/);
@@ -37,9 +37,9 @@ test("single pasted cloud API key is auto-detected, verified through Vercel and 
   assert.match(main, /addUltronCloudKey\(provider, key, label\)/);
   assert.match(main, /cloudLlmKeyInput\.value = ""/);
   assert.match(main, /Accepted · encrypted and saved on this device/);
-  assert.match(cloud, /\/api\/ultron-brain/);
+  assert.match(cloud, /verifyProviderKey/);
   assert.match(cloud, /saveLocalProviderKey/);
-  assert.match(cloud, /action: "verify_key"/);
+  assert.doesNotMatch(cloud, /api\/ultron-brain|verify_key/);
   assert.doesNotMatch(cloud, /functions\/v1\/ultron-brain/);
   assert.doesNotMatch(cloud, /ULTRON_SUPABASE_PUBLISHABLE_KEY/);
   assert.doesNotMatch(cloud, /getCloudSession\(\)/);

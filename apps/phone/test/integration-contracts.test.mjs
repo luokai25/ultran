@@ -586,12 +586,11 @@ test("chat uses Automatic by default and exposes only imported local models in t
   const nativeRoute = main.indexOf('if (!cloudBrainActive && nativeModelLoaded && Capacitor.getPlatform() === "android")');
   const cloudRoute = main.indexOf("} else if (cloudBrainActive ||", nativeRoute);
   assert.ok(nativeRoute >= 0 && cloudRoute > nativeRoute, "Automatic cloud routing takes precedence over an already loaded local model");
-  assert.match(cloudLlm, /resetIdleTimeout/);
-  assert.match(cloudLlm, /idleTimedOut/);
-  assert.match(cloudLlm, /functions\/v1\/ultron-brain/);
-  assert.match(cloudLlm, /apikey: ULTRON_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(cloudLlm, /REQUEST_DEADLINE_MS/);
+  assert.match(cloudLlm, /streamProviderChat/);
+  assert.doesNotMatch(cloudLlm, /functions\/v1\/ultron-brain|ULTRON_SUPABASE_PUBLISHABLE_KEY/);
   assert.doesNotMatch(cloudLlm, /getCloudSession\(\)|session\.access_token/, "public chat must not require a visitor account");
-  assert.match(main, /checkpointPersistenceAvailable/);
-  assert.match(main, /checkpoint storage was temporarily unavailable/);
+  assert.match(main, /cloudCheckpointAvailable/);
+  assert.match(main, /optional cloud checkpoint sync was unavailable/);
   assert.match(brain, /const automaticCandidates = eligibleRows\.flatMap/);
 });

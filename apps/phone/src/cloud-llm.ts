@@ -1,4 +1,6 @@
 import { RuntimeCache } from "./runtime-cache";
+import { ProviderHttpError, streamProviderChat, verifyProviderKey } from "./provider-adapters";
+import { defaultProviderTransport } from "./provider-transport";
 import {
   getLocalProviderKeyCandidates,
   listLocalProviderKeys,
@@ -21,8 +23,6 @@ export type CloudModel = { id: string; model_id: string; provider: CloudProvider
 export type CloudBrainStatus = { state: string; connected_keys?: number; enabled_keys?: number; last_worker_at?: string; registry_providers?: number; registry_synced_at?: string };
 export type CloudProviderRegistry = { source: string; synced_at: string; providers: Array<{ name: string; url: string }> };
 
-// Use the production Vercel endpoint from both the web app and Capacitor's https://localhost origin.
-const API_PATH = import.meta.env.VITE_ULTRON_BRAIN_URL ?? "https://ultron-pied-gamma.vercel.app/api/ultron-brain";
 const PROVIDERS: Record<CloudProviderId, string> = {
   openrouter: "OpenRouter",
   mistral: "Mistral",
@@ -31,18 +31,9 @@ const PROVIDERS: Record<CloudProviderId, string> = {
   cohere: "Cohere",
   google_ai_studio: "Google AI Studio",
 };
-const SUPPORTED_ON_VERCEL = new Set<CloudProviderId>(["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio"]);
+const SUPPORTED_PROVIDERS = new Set<CloudProviderId>(Object.keys(PROVIDERS) as CloudProviderId[]);
 const cloudModelCache = new RuntimeCache<CloudModel[]>(16, 500_000);
 const CLOUD_MODEL_CACHE_TTL_MS = 15_000;
-
-async function invokeVercelBrain(payload: Record<string, unknown>): Promise<Response> {
-  return fetch(API_PATH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-    cache: "no-store",
-    body: JSON.stringify(payload),
-  });
-}
 
 function freeModel(provider: CloudProviderId, model: string): boolean {
   const id = model.toLowerCase();
@@ -84,16 +75,21 @@ function modelCapabilityScore(model: string, complexity: number): number {
   return score;
 }
 
-async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
-  const raw = await response.text();
-  let result: Record<string, unknown> = {};
-  try { result = raw ? JSON.parse(raw) as Record<string, unknown> : {}; }
-  catch { throw new Error(`ULTRON Brain returned an invalid response (HTTP ${response.status}).`); }
-  if (!response.ok) {
-    const detail = String(result.message ?? result.error ?? result.msg ?? `ULTRON Brain returned HTTP ${response.status}.`);
-    throw new Error(detail.slice(0, 500));
+const REQUEST_DEADLINE_MS = 180_000;
+const DEADLINE_MESSAGE = "The provider did not finish within 3 minutes. Your message remains saved; retry or choose another provider.";
+
+function describeKeyFailure(provider: CloudProviderId, error: unknown): string {
+  const label = PROVIDERS[provider];
+  if (error instanceof ProviderHttpError) {
+    const detail = error.message && !/^HTTP \d+$/.test(error.message) ? ` ${error.message}` : "";
+    if (error.status === 401) return `${label} rejected this API key (HTTP 401).${detail}`;
+    if (error.status === 403) return `${label} denied access for this API key (HTTP 403).${detail}`;
+    if (error.status === 429) return `${label} is rate limiting this key right now (HTTP 429). Try again shortly.`;
+    if (error.status >= 500) return `${label} is temporarily unavailable (HTTP ${error.status}). Try again shortly.`;
+    return `${label} could not verify this key (HTTP ${error.status}).${detail}`;
   }
-  return result;
+  if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return `${label} did not answer within 15 seconds. Check the connection and try again.`;
+  return `Could not reach ${label} from this device${error instanceof Error && error.message ? `: ${error.message.slice(0, 160)}` : "."}`;
 }
 
 export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderGroup[]; total_keys: number; connected_keys: number }> {
@@ -113,14 +109,14 @@ export async function listUltronCloudKeys(): Promise<{ providers: CloudProviderG
 }
 
 export async function addUltronCloudKey(provider: CloudProviderId, key: string, label: string): Promise<Record<string, unknown>> {
-  if (!SUPPORTED_ON_VERCEL.has(provider)) {
-    throw new Error(`${PROVIDERS[provider]} is not connected to the independent Vercel gateway yet.`);
+  if (!SUPPORTED_PROVIDERS.has(provider)) {
+    throw new Error(`${PROVIDERS[provider]} is not a supported provider.`);
   }
   const secret = key.trim();
   if (secret.length < 8) throw new Error("Enter a valid provider API key.");
-  const response = await invokeVercelBrain({ action: "verify_key", provider, api_key: secret });
-  const result = await parseJsonResponse(response);
-  const models = Array.isArray(result.models) ? result.models.filter((value): value is string => typeof value === "string") : [];
+  let models: string[];
+  try { models = await verifyProviderKey(provider, secret, defaultProviderTransport(), AbortSignal.timeout(15_000)); }
+  catch (error) { throw new Error(describeKeyFailure(provider, error)); }
   if (!models.length) throw new Error("The provider accepted the key but returned no compatible chat models.");
   const saved = await saveLocalProviderKey({
     provider, label: label.trim() || "API key", apiKey: secret, status: "connected",
@@ -207,15 +203,15 @@ export async function streamUltronBrainChat(
   const qualifiedProvider = separator > 0 ? modelId.slice(0, separator) as CloudProviderId : undefined;
   const selectedProvider = provider ?? qualifiedProvider;
   const selectedModel = separator > 0 ? modelId.slice(separator + 2) : modelId;
-  if (selectedProvider && !SUPPORTED_ON_VERCEL.has(selectedProvider)) {
-    throw new Error("The selected provider is not supported by the independent ULTRON Brain gateway.");
+  if (selectedProvider && !SUPPORTED_PROVIDERS.has(selectedProvider)) {
+    throw new Error("The selected provider is not supported by ULTRON.");
   }
   const safeMessages = prepareCloudChatMessages(messages);
   if (!safeMessages.length || !safeMessages.some((message) => message.role === "user")) {
     throw new Error("ULTRON needs a non-empty user message before starting a cloud chat.");
   }
   const complexity = taskComplexity(safeMessages);
-  const providers = selectedProvider ? [selectedProvider] : [...SUPPORTED_ON_VERCEL];
+  const providers = selectedProvider ? [selectedProvider] : [...SUPPORTED_PROVIDERS];
   const candidateGroups = await Promise.all(providers.map(async (candidateProvider) => {
     const keys = await getLocalProviderKeyCandidates(candidateProvider, selectedModel || undefined);
     return keys.flatMap((key) => {
@@ -242,99 +238,54 @@ export async function streamUltronBrainChat(
   let timedOut = false;
   const deadline = window.setTimeout(() => {
     timedOut = true;
-    controller.abort(new DOMException("ULTRON Brain request timed out.", "TimeoutError"));
-  }, 58_000);
+    controller.abort(new DOMException("Provider request timed out.", "TimeoutError"));
+  }, REQUEST_DEADLINE_MS);
+  const transport = defaultProviderTransport();
   let lastError: Error | null = null;
   try {
     for (const candidate of candidates) {
       if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       if (controller.signal.aborted) break;
-      let response: Response;
+      let emitted = false;
+      let content = "";
       try {
-        response = await fetch(API_PATH, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "text/event-stream, application/json" },
-          cache: "no-store",
-          body: JSON.stringify({
-            action: "chat", provider: candidate.provider, model_id: candidate.model,
-            api_key: candidate.key.apiKey, messages: safeMessages, max_tokens: maxTokens, temperature: 0.3,
-          }),
-          signal: controller.signal,
-        });
+        content = await streamProviderChat(
+          candidate.provider, candidate.key.apiKey,
+          { model: candidate.model, messages: safeMessages, maxTokens, temperature: 0.3 },
+          transport, (token) => { emitted = true; onToken(token); }, controller.signal,
+        );
       } catch (error) {
         if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
         if (controller.signal.aborted) break;
-        lastError = error instanceof Error ? error : new Error("ULTRON Brain could not reach the provider.");
-        await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, { outcome: "transient", error: lastError.message }).catch(() => undefined);
+        if (error instanceof ProviderHttpError) {
+          const message = error.message;
+          lastError = new Error(`${PROVIDERS[candidate.provider]} HTTP ${error.status}: ${message.slice(0, 400)}`);
+          const status = error.status;
+          const outcome = status === 401 ? "invalid"
+            : status === 403 ? (/model|only available/i.test(message) ? "model_error" : "expired")
+            : status === 404 ? "model_error"
+            : status === 429 ? "rate_limited"
+            : status >= 500 || status === 408 ? "transient" : null;
+          if (outcome) {
+            await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, {
+              outcome, error: message, retryAfterMs: error.retryAfterMs ?? 900_000, model: candidate.model,
+            }).catch(() => undefined);
+          }
+          if (![401, 403, 404, 429, 500, 502, 503, 504].includes(status)) throw lastError;
+          continue;
+        }
+        const failed = error instanceof Error ? error : new Error("The provider request failed.");
+        // Never splice another provider's answer into text the user has already seen.
+        if (emitted) throw failed;
+        lastError = failed;
+        await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, { outcome: "transient", error: failed.message }).catch(() => undefined);
         continue;
       }
-      if (!response.ok) {
-        const result: Record<string, unknown> = await parseJsonResponse(response).catch((error): Record<string, unknown> => ({ message: error instanceof Error ? error.message : "Provider request failed." }));
-        const message = String(result.message ?? result.error ?? "Provider request failed.");
-        lastError = new Error(`ULTRON Brain HTTP ${response.status}: ${message.slice(0, 400)}`);
-        const outcome = response.status === 401 ? "invalid"
-          : response.status === 403 ? (/model|only available/i.test(message) ? "model_error" : "expired")
-          : response.status === 404 ? "model_error"
-          : response.status === 429 ? "rate_limited"
-          : response.status >= 500 || response.status === 408 ? "transient" : null;
-        if (outcome) {
-          const retryHeader = response.headers.get("retry-after");
-          const retryAfterMs = retryHeader && /^\d+(?:\.\d+)?$/.test(retryHeader)
-            ? Number(retryHeader) * 1000 : 900_000;
-          await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, {
-            outcome, error: message, retryAfterMs, model: candidate.model,
-          }).catch(() => undefined);
-        }
-        if (![401, 403, 404, 429, 500, 502, 503, 504].includes(response.status)) throw lastError;
-        continue;
-      }
-      if (!response.body) throw new Error("ULTRON Brain did not return a readable response stream.");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let content = "";
-      const consume = (block: string): void => {
-        const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith("data:"));
-        const data = dataLines.map((line) => line.slice(5).trim()).join("\n");
-        const rawPayload = data || block.trim();
-        if (!rawPayload || rawPayload === "[DONE]") return;
-        if (!data && !rawPayload.startsWith("{") && !rawPayload.startsWith("[")) return;
-        let event: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> }; message?: { content?: string | Array<{ text?: string }> }; text?: string }>; output_text?: string; response?: string; content?: string | Array<{ text?: string }>; error?: string | { message?: string }; message?: string };
-        try { event = JSON.parse(rawPayload) as typeof event; }
-        catch { throw new Error("ULTRON received an invalid event from the model stream."); }
-        if (event.error) throw new Error(typeof event.error === "string" ? event.message ?? event.error : event.error.message ?? "Cloud model generation failed.");
-        const choice = event.choices?.[0];
-        const delta = choice?.delta?.content ?? choice?.message?.content ?? choice?.text ?? event.output_text ?? event.response ?? event.content;
-        const token = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((part) => part.text ?? "").join("") : "";
-        if (token) { content += token; onToken(token); }
-      };
-      try {
-        while (true) {
-          if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
-          if (controller.signal.aborted) {
-            if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");
-            throw new DOMException("Generation stopped", "AbortError");
-          }
-          const chunk = await reader.read();
-          buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-          let boundary = buffer.search(/\r?\n\r?\n/);
-          while (boundary >= 0) {
-            const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
-            consume(buffer.slice(0, boundary));
-            buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
-            boundary = buffer.search(/\r?\n\r?\n/);
-          }
-          if (chunk.done) break;
-        }
-        if (buffer.trim()) consume(buffer);
-      } finally {
-        await reader.cancel().catch(() => undefined);
-      }
-      if (!content.trim()) throw new Error("ULTRON Brain completed without returning any text.");
+      if (!content.trim()) throw new Error("The provider completed without returning any text.");
       await recordLocalProviderKeyResult(candidate.provider, candidate.key.id, { outcome: "success", tokens: Math.max(1, Math.ceil(content.length / 4)) }).catch(() => undefined);
       return content.trim();
     }
-    if (timedOut) throw new Error("ULTRON Brain timed out after 58 seconds. Your message remains saved; retry or choose another provider.");
+    if (timedOut) throw new Error(DEADLINE_MESSAGE);
     throw lastError ?? new Error("No provider key could complete this request.");
   } finally {
     window.clearTimeout(deadline);

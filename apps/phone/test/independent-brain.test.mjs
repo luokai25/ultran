@@ -5,29 +5,18 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const gateway = readFileSync(resolve(root, "../../api/ultron-brain.ts"), "utf8");
 const cloud = readFileSync(resolve(root, "src/cloud-llm.ts"), "utf8");
 const vault = readFileSync(resolve(root, "src/local-llm-vault.ts"), "utf8");
 const sync = readFileSync(resolve(root, "src/cloud-sync.ts"), "utf8");
 const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
 
-test("Vercel Brain gateway handles provider verification and streaming without Supabase", () => {
-  assert.match(gateway, /action === "verify_key"/);
-  assert.match(gateway, /action !== "chat"/);
-  assert.match(gateway, /text\/event-stream/);
-  assert.match(gateway, /api\.cohere\.com\/v2\/chat/);
-  assert.match(gateway, /maxDuration = 60/);
-  assert.doesNotMatch(gateway, /supabase|SUPABASE/i);
-});
-
-test("cloud model routing no longer calls Supabase Edge Functions", () => {
-  assert.match(cloud, /\/api\/ultron-brain/);
+test("provider verification and streaming run directly from the device with no hosted gateway", () => {
+  assert.match(cloud, /verifyProviderKey\(provider, secret, defaultProviderTransport\(\)/);
+  assert.match(cloud, /streamProviderChat\(/);
   assert.match(cloud, /getLocalProviderKeyCandidates/);
-  assert.match(cloud, /api_key: candidate\.apiKey/);
-  assert.match(cloud, /58_000/);
-  assert.doesNotMatch(cloud, /functions\/v1\/ultron-brain/);
-  assert.doesNotMatch(cloud, /ULTRON_SUPABASE/);
-  assert.doesNotMatch(cloud, /getCloudSession/);
+  assert.match(cloud, /REQUEST_DEADLINE_MS = 180_000/);
+  assert.doesNotMatch(cloud, /vercel|\/api\/ultron-brain|functions\/v1\/ultron-brain/i);
+  assert.doesNotMatch(cloud, /ULTRON_SUPABASE|getCloudSession|@supabase\/supabase-js/);
 });
 
 test("provider credentials are encrypted locally and Android uses native secure storage", () => {

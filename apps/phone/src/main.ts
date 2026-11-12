@@ -3996,7 +3996,7 @@ async function addCloudLlmKeyFromScreen(): Promise<void> {
     cloudLlmDetected.textContent = "Accepted · encrypted and saved on this device. Paste another key whenever you are ready.";
     cloudLlmKeyInput.focus();
     cloudBrainStatusEl.dataset.state = "connected";
-    cloudBrainStatusEl.textContent = `Saved in the local encrypted vault. ${String(result.free_models_found ?? 0)} free-tier chat models are available for automatic routing.`;
+    cloudBrainStatusEl.textContent = `Saved in the local encrypted vault. ${String(result.models_found ?? 0)} chat models found (${String(result.free_models_found ?? 0)} known free-tier) for automatic routing.`;
     await refreshCloudLlmScreen();
   } catch (error) {
     cloudLlmProviderFallback.hidden = Boolean(detectedProvider);

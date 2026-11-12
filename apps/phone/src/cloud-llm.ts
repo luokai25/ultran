@@ -1,6 +1,7 @@
 import { RuntimeCache } from "./runtime-cache";
 import { ProviderHttpError, streamProviderChat, verifyProviderKey } from "./provider-adapters";
 import { defaultProviderTransport } from "./provider-transport";
+import { automaticModels, freeModel } from "./model-eligibility";
 import {
   getLocalProviderKeyCandidates,
   listLocalProviderKeys,
@@ -35,17 +36,6 @@ const SUPPORTED_PROVIDERS = new Set<CloudProviderId>(Object.keys(PROVIDERS) as C
 const cloudModelCache = new RuntimeCache<CloudModel[]>(16, 500_000);
 const CLOUD_MODEL_CACHE_TTL_MS = 15_000;
 
-function freeModel(provider: CloudProviderId, model: string): boolean {
-  const id = model.toLowerCase();
-  if (/(?:audio|tts|speech|transcri|live|realtime|bidi)/i.test(id)) return false;
-  if (provider === "openrouter") return id.endsWith(":free");
-  if (provider === "cerebras") return false;
-  if (provider === "groq") return /allam.*2.*7b|llama.?3[.-]1.*8b|llama.?3[.-]3.*70b|llama.?4.*scout|groq\/compound|gpt-oss-(120|20)b|qwen3-32b/.test(id);
-  if (provider === "mistral") return /^(mistral|codestral)[-_]/.test(id);
-  if (provider === "cohere") return /c4ai-aya-expanse-32b|command-a-03-2025|command-a-reasoning-08-2025|command-r-08-2024|command-r-plus-08-2024|command-r7b-12-2024|command-r7b-arabic-02-2025/.test(id);
-  if (provider === "google_ai_studio") return /^gemini-(?:2\.5-(?:flash|flash-lite)|3(?:\.[678])?-flash|3\.5-flash(?:-lite)?|3-flash-preview|3\.1-flash-lite)/.test(id);
-  return false;
-}
 
 function taskComplexity(messages: Array<{ role: string; content: string }>): number {
   const task = messages.filter((message) => message.role === "user").slice(-6).map((message) => message.content.slice(0, 24000)).join("\n").toLowerCase();
@@ -212,14 +202,15 @@ export async function streamUltronBrainChat(
   }
   const complexity = taskComplexity(safeMessages);
   const providers = selectedProvider ? [selectedProvider] : [...SUPPORTED_PROVIDERS];
+  const keyCounts = { connected: 0, models: 0 };
   const candidateGroups = await Promise.all(providers.map(async (candidateProvider) => {
     const keys = await getLocalProviderKeyCandidates(candidateProvider, selectedModel || undefined);
+    keyCounts.connected += keys.length;
     return keys.flatMap((key) => {
-      const model = selectedModel || key.models.filter((id) => freeModel(candidateProvider, id) &&
-        Date.parse(key.blocked_models?.[id] ?? "1970-01-01") <= Date.now())
-        .sort((a, b) => modelCapabilityScore(b, complexity) - modelCapabilityScore(a, complexity))[0] || "";
-      if (!model || (!selectedModel && !freeModel(candidateProvider, model))) return [];
-      return [{ provider: candidateProvider, key, model, score: modelCapabilityScore(model, complexity) }];
+      const models = selectedModel ? [selectedModel] : automaticModels(candidateProvider, key.models, key.blocked_models)
+        .sort((x, y) => modelCapabilityScore(y, complexity) - modelCapabilityScore(x, complexity)).slice(0, 3);
+      keyCounts.models += models.length;
+      return models.map((model) => ({ provider: candidateProvider, key, model, score: modelCapabilityScore(model, complexity) + (freeModel(candidateProvider, model) ? 5000 : 0) }));
     });
   }));
   const candidates = candidateGroups.flat().sort((a, b) =>
@@ -228,8 +219,11 @@ export async function streamUltronBrainChat(
   if (!candidates.length) {
     throw new Error(selectedModel
       ? "No active local provider key supports the selected model. Add or enable a compatible key in LLM API Keys."
-      : "No eligible free-tier chat model is available. Add a provider key or choose a local model.");
+      : keyCounts.connected === 0
+        ? "No working provider key is available. Add a key in LLM API Keys (a rate-limited key becomes usable again after its cooldown), or choose a local model."
+        : "Your saved key lists no chat models that Automatic can use. OpenRouter keys only use models ending in :free; pick a specific model or add another provider key.");
   }
+  const skippedKeys = new Set<string>();
 
   const controller = new AbortController();
   const abortFromCaller = (): void => controller.abort();
@@ -246,6 +240,7 @@ export async function streamUltronBrainChat(
     for (const candidate of candidates) {
       if (signal.aborted) throw new DOMException("Generation stopped", "AbortError");
       if (controller.signal.aborted) break;
+      if (skippedKeys.has(candidate.key.id)) continue;
       let emitted = false;
       let content = "";
       try {
@@ -271,6 +266,7 @@ export async function streamUltronBrainChat(
               outcome, error: message, retryAfterMs: error.retryAfterMs ?? 900_000, model: candidate.model,
             }).catch(() => undefined);
           }
+          if (outcome === "invalid" || outcome === "expired" || outcome === "rate_limited") skippedKeys.add(candidate.key.id);
           if (![401, 403, 404, 429, 500, 502, 503, 504].includes(status)) throw lastError;
           continue;
         }

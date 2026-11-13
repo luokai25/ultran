@@ -102,3 +102,15 @@ When these checks pass, tell the owner explicitly that it is safe to delete proj
 - A failure after tokens were already shown never falls through to another provider.
 - Automated coverage: adapter, SSE decoding, error mapping, Java host allowlist parity. **Still required before Gate 2 can pass:** add one real key per provider on an Android device, confirm verify, model discovery, streaming and Stop for each, and run the Android release workflow.
 - `api/ultron-brain.ts` and the Supabase code are untouched and still present; they are removed under Gates 3–5.
+
+## Plugins (rebuilt, on-device)
+
+- The Plugins screen (`apps/phone/src/plugins-ui.ts`, `plugins/catalog.ts`, `plugins/engine.ts`) replaces the Composio/MCP gateway screen. It has no server dependency.
+- **Sign-in:** `UltronGoogleAuthPlugin` uses Google Play services' Identity Authorization API. The first connect shows Google's consent sheet; later calls return a fresh access token silently, so a plugin stays connected until it is removed. Tokens are held in memory only (45-minute cache) and never written to disk by ULTRON.
+- **Removal:** removing a plugin deletes it locally. Removing the last Google plugin also revokes ULTRON's Google grant, because Google grants are per app, not per scope.
+- **Shipped plugins:** Gmail (search, read, send), Google Calendar (list, create), Google Drive (search, read text). Tools that change data are flagged `read_only: false` and go through the existing native approval step.
+- **One-time owner setup in Google Cloud (required, cannot be done from code):**
+  1. Create a project, enable the Gmail, Google Calendar and Google Drive APIs.
+  2. OAuth consent screen: add the three scope groups above and your Google account as a test user. Set publishing status to **In production** (an unverified app is fine for personal use); in *Testing* Google expires the grant after 7 days.
+  3. Create an **Android** OAuth client with package `app.ultron.mobile` and the signing certificate SHA-1 printed in each GitHub release's notes.
+- Still to do: GitHub, Notion, Slack, Dropbox and Linear plugins (each needs its own sign-in method), and a device test of the consent flow.

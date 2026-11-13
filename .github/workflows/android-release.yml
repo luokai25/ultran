@@ -206,6 +206,9 @@ jobs:
           fi
           "$BT/apksigner" verify --verbose --print-certs "$APK"
           echo "::notice::APK signature verified"
+          # Public certificate fingerprint; register it with the Android OAuth client in Google Cloud for plugin sign-in.
+          SHA1=$("$BT/apksigner" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-1 digest: //p' | head -1)
+          echo "sha1=${SHA1}" >> "$GITHUB_OUTPUT"
 
           # Android's package installer expects a correctly aligned, intact APK.
           "$BT/zipalign" -c -v 4 "$APK"
@@ -386,6 +389,7 @@ jobs:
             | versionCode | `${{ steps.version.outputs.code }}` |
             | Package | `app.ultron.mobile` |
             | Signed | `${{ steps.keystore.outputs.signed }}` |
+            | Signing certificate SHA-1 | `${{ steps.verify.outputs.sha1 }}` |
             | Commit | `${{ github.sha }}` |
 
             **Assets**

@@ -22,5 +22,5 @@ test("agent can retrieve durable Supabase job results after queueing tools", asy
   assert.match(main, /runtime\.cloud\.jobs/);
   assert.match(main, /runtime\.cloud\.status/);
   assert.match(main, /listUltronJobs/);
-  assert.match(main, /never report success while its status is queued or running/);
+  assert.match(main, /never claim an action succeeded unless the result says so/);
 });

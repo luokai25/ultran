@@ -217,13 +217,13 @@ test("WhatsApp handoff never sends or taps automatically", () => {
 
 test("Escape closes the topmost ULTRON surface, including settings and connectors", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  const connectors = await readFile(new URL("../src/connectors-ui.ts", import.meta.url), "utf8");
+  const plugins = await readFile(new URL("../src/plugins-ui.ts", import.meta.url), "utf8");
   const chatUi = await readFile(new URL("../src/chatgpt-ui.css", import.meta.url), "utf8");
   assert.match(main, /if \(!sheetWrap\.hidden\) closeSheet\(\)/);
   assert.match(main, /if \(!workspacePanel\.hidden\) closeWorkspace\(\)/);
   assert.match(main, /if \(!connectorsPanel\.hidden\) connectorsBackButton\.click\(\)/);
   assert.match(main, /drawer\.getAttribute\("aria-hidden"\) === "false"\) closeDrawer\(\)/);
-  assert.match(connectors, /event\.stopPropagation\(\);\s*closeDetail\(\)/);
+  assert.match(plugins, /event\.key === "Escape" && !wrap\.hidden && openId\) closeSheet\(\)/);
   assert.match(main, /navModelsButton\.addEventListener\("click", event => \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?openChatModelMenu\(\)/);
   assert.match(chatUi, /\.feature-screen,\s*#connectors-panel[\s\S]*?position:\s*fixed/);
   assert.match(chatUi, /\.sheet-wrap\s*\{[^}]*z-index:\s*80/s);
@@ -512,16 +512,6 @@ test("Termux bootstrap patches the blocked Dialog host only to a SHA-256-identic
   assert.ok(script.includes("ftp.debian.org/debian/pool/main/d/dialog"));
   assert.match(script, /62bdf59057d4f760a1cc2217827f07887b4a3eebf694c25eacd4803d2171cdc6/);
   assert.match(script, /refusing to use an unverified mirror/);
-});
-
-
-test("connector refreshes run concurrently, discard stale panel responses and bound connection requests", async () => {
-  const connectors = await read("src/connectors-ui.ts");
-  assert.match(connectors, /Promise\.allSettled\(\[refreshEnabled\(\), refreshOAuthConnections\(\), refreshApprovals\(\), refreshMcpServers\(\), refreshMcpAudit\(\)\]\)/);
-  assert.match(connectors, /generation !== refreshGeneration/);
-  assert.match(connectors, /refreshInFlight\?\.generation === generation/);
-  assert.match(connectors, /}, 20_000\)/);
-  assert.match(connectors, /}, 15_000\)/);
 });
 
 

@@ -194,7 +194,7 @@ test("version 3 uses a neutral ULTRON identity and retains native capability ent
   assert.ok(main.includes('type ThemeId = "ultron"'));
   assert.ok(main.includes("accent: 0x10a37f"));
   assert.ok(main.includes("importNativeModel()"));
-  assert.ok(main.includes("initConnectors("));
+  assert.ok(main.includes("initPlugins("));
   assert.ok(main.includes("NativeRuntime"));
   assert.ok(main.includes("NativeCompanion"));
   assert.ok(html.includes('id="chat-model-import"'));

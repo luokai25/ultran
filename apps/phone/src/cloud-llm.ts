@@ -31,6 +31,9 @@ const PROVIDERS: Record<CloudProviderId, string> = {
   groq: "Groq",
   cohere: "Cohere",
   google_ai_studio: "Google AI Studio",
+  github_models: "GitHub Models",
+  huggingface: "Hugging Face",
+  nvidia: "NVIDIA NIM",
 };
 const SUPPORTED_PROVIDERS = new Set<CloudProviderId>(Object.keys(PROVIDERS) as CloudProviderId[]);
 const cloudModelCache = new RuntimeCache<CloudModel[]>(16, 500_000);
@@ -144,8 +147,23 @@ export async function getUltronCloudStatus(): Promise<{ status: CloudBrainStatus
   return { status: { state: keys.connected_keys ? "ready" : "no_keys", connected_keys: keys.connected_keys, enabled_keys: keys.connected_keys }, total_keys: keys.total_keys, connected_keys: keys.connected_keys };
 }
 
+/** Built-in directory of the free-tier providers ULTRON can call directly. It is compiled into the app, not fetched. */
 export async function getUltronFreeProviders(_refresh = false): Promise<CloudProviderRegistry | null> {
-  return null;
+  return {
+    source: "Built in; researched from cheahjs/free-llm-api-resources, GitHub Models and Hugging Face Inference Providers documentation",
+    synced_at: "2026-11-13T00:00:00Z",
+    providers: [
+      { name: "OpenRouter (:free models)", url: "https://openrouter.ai/settings/keys" },
+      { name: "Google AI Studio (Gemini free tier)", url: "https://aistudio.google.com/apikey" },
+      { name: "Groq", url: "https://console.groq.com/keys" },
+      { name: "GitHub Models", url: "https://github.com/settings/personal-access-tokens/new" },
+      { name: "Hugging Face Inference Providers", url: "https://huggingface.co/settings/tokens/new?tokenType=fineGrained" },
+      { name: "NVIDIA NIM", url: "https://build.nvidia.com/settings/api-keys" },
+      { name: "Mistral (free plan)", url: "https://console.mistral.ai/api-keys/" },
+      { name: "Cohere (trial key)", url: "https://dashboard.cohere.com/api-keys" },
+      { name: "Cerebras (stored; not auto-routed)", url: "https://cloud.cerebras.ai" },
+    ],
+  };
 }
 
 const MAX_CLOUD_MESSAGE_CHARS = 22_000;
@@ -203,6 +221,7 @@ export async function streamUltronBrainChat(
   const complexity = taskComplexity(safeMessages);
   const providers = selectedProvider ? [selectedProvider] : [...SUPPORTED_PROVIDERS];
   const keyCounts = { connected: 0, models: 0 };
+  const ineligible = new Set<string>();
   const candidateGroups = await Promise.all(providers.map(async (candidateProvider) => {
     const keys = await getLocalProviderKeyCandidates(candidateProvider, selectedModel || undefined);
     keyCounts.connected += keys.length;
@@ -210,6 +229,7 @@ export async function streamUltronBrainChat(
       const models = selectedModel ? [selectedModel] : automaticModels(candidateProvider, key.models, key.blocked_models)
         .sort((x, y) => modelCapabilityScore(y, complexity) - modelCapabilityScore(x, complexity)).slice(0, 3);
       keyCounts.models += models.length;
+      if (!selectedModel && !models.length) ineligible.add(PROVIDERS[candidateProvider]);
       return models.map((model) => ({ provider: candidateProvider, key, model, score: modelCapabilityScore(model, complexity) + (freeModel(candidateProvider, model) ? 5000 : 0) }));
     });
   }));
@@ -221,7 +241,7 @@ export async function streamUltronBrainChat(
       ? "No active local provider key supports the selected model. Add or enable a compatible key in LLM API Keys."
       : keyCounts.connected === 0
         ? "No working provider key is available. Add a key in LLM API Keys (a rate-limited key becomes usable again after its cooldown), or choose a local model."
-        : "Your saved key lists no chat models that Automatic can use. OpenRouter keys only use models ending in :free; pick a specific model or add another provider key.");
+        : `${[...ineligible].join(" and ")} ${ineligible.size > 1 ? "keys are" : "key is"} saved, but none of ${ineligible.size > 1 ? "their" : "its"} models are on ULTRON's free-tier list, so Automatic skips ${ineligible.size > 1 ? "them" : "it"} to avoid charges. Pick a model by hand in the model picker, or add a key for another free provider.`);
   }
   const skippedKeys = new Set<string>();
 

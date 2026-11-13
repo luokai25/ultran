@@ -3910,7 +3910,7 @@ async function refreshFreeProviderDirectory(refresh = false): Promise<void> {
   cloudFreeProviderCountEl.textContent = "Reading public provider directory…";
   try {
     const registry = await getUltronFreeProviders(refresh);
-    cloudFreeProviderCountEl.textContent = registry ? `${registry.providers.length} free providers listed · synced ${new Date(registry.synced_at).toLocaleString()}` : "Provider directory is unavailable.";
+    cloudFreeProviderCountEl.textContent = registry ? `${registry.providers.length} providers supported directly from this device · built-in list, ${new Date(registry.synced_at).toLocaleDateString()}` : "Provider directory is unavailable.";
   } catch (error) {
     cloudFreeProviderCountEl.textContent = "Could not refresh provider directory: " + (error instanceof Error ? error.message : "unknown error");
   } finally { cloudFreeProvidersRefreshButton.disabled = false; }
@@ -3955,6 +3955,9 @@ function detectCloudLlmProvider(key: string): CloudProviderId | null {
   if (/^gsk_[A-Za-z0-9]{16,}$/i.test(value)) return "groq";
   if (/^(?:AQ\.|AIza)[A-Za-z0-9_-]{16,}$/i.test(value)) return "google_ai_studio";
   if (/^csk-[A-Za-z0-9_-]{16,}$/i.test(value)) return "cerebras";
+  if (/^hf_[A-Za-z0-9]{16,}$/.test(value)) return "huggingface";
+  if (/^nvapi-[A-Za-z0-9_-]{16,}$/.test(value)) return "nvidia";
+  if (/^(?:ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})$/.test(value)) return "github_models";
   return null;
 }
 
@@ -5048,6 +5051,9 @@ cloudLlmProvider.addEventListener("change", () => {
     groq: { url: "https://console.groq.com/keys", label: "Open Groq API keys ↗" },
     cohere: { url: "https://dashboard.cohere.com/api-keys", label: "Open Cohere API keys ↗" },
     google_ai_studio: { url: "https://aistudio.google.com/apikey", label: "Open Google AI Studio API keys ↗" },
+    github_models: { url: "https://github.com/settings/personal-access-tokens/new", label: "Create a GitHub token (Models: read) ↗" },
+    huggingface: { url: "https://huggingface.co/settings/tokens/new?tokenType=fineGrained", label: "Create a Hugging Face token ↗" },
+    nvidia: { url: "https://build.nvidia.com/settings/api-keys", label: "Open NVIDIA API keys ↗" },
   };
   const selected = links[cloudLlmProvider.value] ?? { url: "https://openrouter.ai/settings/keys", label: "Open OpenRouter API keys ↗" };
   cloudLlmProviderConsoleLink.href = selected.url;
@@ -5058,6 +5064,12 @@ cloudLlmProvider.addEventListener("change", () => {
       ? "Cerebras currently offers a one-time $5 trial after adding a verified payment method. It expires after 30 days, so ULTRON will verify and store this key but will not use it for automatic zero-cost routing."
       : cloudLlmProvider.value === "cohere"
         ? "Cohere trial keys are free but limited to 1,000 calls per month and 20 chat requests per minute."
+        : cloudLlmProvider.value === "github_models"
+          ? "GitHub Models is free and rate-limited for any GitHub account. Create a fine-grained token with the Models: read permission; no repository access is needed."
+          : cloudLlmProvider.value === "huggingface"
+            ? "Hugging Face Inference Providers include a small free monthly quota for signed-in accounts. Create a fine-grained token with Make calls to Inference Providers."
+            : cloudLlmProvider.value === "nvidia"
+              ? "NVIDIA's hosted catalog is free with developer credits and a per-minute rate limit. Keys start with nvapi-."
         : cloudLlmProvider.value === "google_ai_studio"
           ? "Gemini API keys from Google AI Studio use Google’s OpenAI-compatible endpoint. ULTRON routes only model IDs identified as free-tier eligible; quotas depend on your Google project."
           : "Automatic routing uses the provider's eligible free-tier models where available. Rate limits trigger key rotation and cooldown.";

@@ -18,7 +18,7 @@ const {
   buildChatRequest, buildModelsRequest, createOpenAiSseDecoder, verifyProviderKey, streamProviderChat,
 } = adapters;
 
-const ALL = ["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio"];
+const ALL = ["openrouter", "mistral", "cerebras", "groq", "cohere", "google_ai_studio", "github_models", "huggingface", "nvidia"];
 
 function fakeTransport({ request, stream } = {}) {
   const calls = [];
@@ -40,7 +40,7 @@ test("every adapter host is in the native Android allowlist, and nothing else is
   const java = readFileSync(new URL("../android/app/src/main/java/app/ultron/mobile/UltronProviderHttpPlugin.java", import.meta.url), "utf8");
   const block = java.match(/ALLOWED_HOSTS = new HashSet<>\(Arrays\.asList\(([\s\S]*?)\)\);/)?.[1] ?? "";
   const allowed = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
-  const used = [...new Set(ALL.flatMap((id) => [DIRECT_PROVIDERS[id].modelsUrl, DIRECT_PROVIDERS[id].chatUrl].map((u) => new URL(u).hostname)))].sort();
+  const used = [...new Set(ALL.flatMap((id) => [DIRECT_PROVIDERS[id].modelsUrl, DIRECT_PROVIDERS[id].chatUrl, DIRECT_PROVIDERS[id].verifyUrl].filter(Boolean).map((u) => new URL(u).hostname)))].sort();
   assert.deepEqual(allowed, used);
   assert.match(java, /"https"\.equalsIgnoreCase\(url\.getProtocol\(\)\)/);
   assert.match(java, /ALLOWED_HEADERS/);

@@ -121,7 +121,7 @@
               <span>Choose provider for this key</span>
               <select id="cloud-llm-provider">
                 <option value="" selected disabled>Select provider…</option>
-                <option value="openrouter">OpenRouter</option><option value="mistral">Mistral</option><option value="cerebras">Cerebras</option><option value="groq">Groq</option><option value="cohere">Cohere</option><option value="google_ai_studio">Google AI Studio</option>
+                <option value="openrouter">OpenRouter</option><option value="mistral">Mistral</option><option value="cerebras">Cerebras</option><option value="groq">Groq</option><option value="cohere">Cohere</option><option value="google_ai_studio">Google AI Studio</option><option value="github_models">GitHub Models</option><option value="huggingface">Hugging Face</option><option value="nvidia">NVIDIA NIM</option>
               </select>
             </label>
             <small id="cloud-llm-provider-note">Only needed when a provider uses an ambiguous key format.</small>
@@ -129,7 +129,7 @@
             <input id="cloud-llm-label" type="text" hidden />
           </div>
           <div id="cloud-llm-keys" class="cloud-llm-keys" aria-live="polite"><small>Loading saved provider keys…</small></div>
-          <div class="cloud-provider-directory" hidden><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button">Refresh list</button></div>
+          <div class="cloud-provider-directory"><div><strong>Free provider directory</strong><small id="cloud-free-provider-count">Checking public provider list…</small></div><button id="cloud-free-providers-refresh" class="text-action" type="button" hidden>Refresh list</button></div>
           <a hidden class="model-source-link" href="https://github.com/raullenchai/free-llm-api-resources" target="_blank" rel="noopener noreferrer">Read free LLM API resources ↗</a>
           <small class="llm-key-note">Keys are encrypted on this device and never saved in Supabase. The Vercel Brain gateway verifies provider keys and streams model responses without persisting your credentials. Keep a secure backup of your keys because they do not automatically sync between devices.</small>
         </section>

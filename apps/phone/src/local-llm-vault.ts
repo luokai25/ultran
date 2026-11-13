@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { nativeSecureStorage } from "./native-secure-storage";
 
-export type LocalProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio";
+export type LocalProviderId = "openrouter" | "mistral" | "cerebras" | "groq" | "cohere" | "google_ai_studio" | "github_models" | "huggingface" | "nvidia";
 export type LocalProviderKey = {
   id: string;
   provider: LocalProviderId;

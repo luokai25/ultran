@@ -21,8 +21,10 @@ type ProviderConfig = {
   label: string;
   modelsUrl: string;
   chatUrl: string;
-  format: "openai" | "cohere";
+  format: "openai" | "cohere" | "gemini";
   headers?: Record<string, string>;
+  /** How the key is sent. Default is a Bearer token. Gemini uses x-goog-api-key so new AQ. keys work. */
+  auth?: "bearer" | "x-goog-api-key";
   /** An authenticated call that proves the token is valid, for providers whose model list is public. */
   verifyUrl?: string;
   /** Client-side format check that rejects an obviously wrong key before it is sent anywhere. */
@@ -56,10 +58,11 @@ export const DIRECT_PROVIDERS: Record<DirectProviderId, ProviderConfig> = {
     modelsUrl: "https://api.cohere.com/v2/models?endpoint=chat&limit=100",
     chatUrl: "https://api.cohere.com/v2/chat",
   },
+  // Native Gemini API. Google's new AQ. keys are rejected by the OpenAI-compatible endpoint but accepted here, and AIza keys work too.
   google_ai_studio: {
-    label: "Google AI Studio", format: "openai",
-    modelsUrl: "https://generativelanguage.googleapis.com/v1beta/openai/models",
-    chatUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    label: "Google AI Studio", format: "gemini", auth: "x-goog-api-key",
+    modelsUrl: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+    chatUrl: "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse",
   },
   // GitHub Models: free, rate-limited inference for any GitHub account. The token needs the "models:read" permission.
   github_models: {
@@ -106,7 +109,8 @@ export function parseModelList(payload: unknown): string[] {
   const rows = Array.isArray(payload) ? payload : Array.isArray(record.data) ? record.data : Array.isArray(record.models) ? record.models : [];
   const ids = rows.flatMap((item): string[] => {
     if (!item || typeof item !== "object") return [];
-    const row = item as { id?: unknown; name?: unknown };
+    const row = item as { id?: unknown; name?: unknown; supportedGenerationMethods?: unknown };
+    if (Array.isArray(row.supportedGenerationMethods) && !row.supportedGenerationMethods.includes("generateContent")) return [];
     const id = String(row.id ?? row.name ?? "").replace(/^models\//, "").trim();
     if (!id || id.length > 180 || NON_CHAT_MODEL.test(id)) return [];
     return [id];
@@ -141,9 +145,28 @@ function failure(response: ProviderResponse): ProviderHttpError {
   return new ProviderHttpError(response.status, extractProviderError(response.body) || `HTTP ${response.status}`, response.retryAfterMs);
 }
 
+function authHeaders(config: ProviderConfig, apiKey: string): Record<string, string> {
+  return config.auth === "x-goog-api-key" ? { "x-goog-api-key": apiKey } : { Authorization: `Bearer ${apiKey}` };
+}
+
 export function buildModelsRequest(provider: DirectProviderId, apiKey: string): ProviderRequest {
   const config = DIRECT_PROVIDERS[provider];
-  return { url: config.modelsUrl, method: "GET", headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json", ...(config.headers ?? {}) } };
+  return { url: config.modelsUrl, method: "GET", headers: { ...authHeaders(config, apiKey), Accept: "application/json", ...(config.headers ?? {}) } };
+}
+
+/** Gemini wants system text separately and strictly "user"/"model" turns; consecutive turns of one role are merged. */
+export function toGeminiContents(messages: ChatMessage[]): { systemInstruction?: { parts: Array<{ text: string }> }; contents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> } {
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const contents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+  for (const message of messages) {
+    if (message.role === "system" || !message.content.trim()) continue;
+    const role = message.role === "assistant" ? "model" : "user";
+    const last = contents[contents.length - 1];
+    if (last && last.role === role) last.parts[0]!.text += "\n\n" + message.content;
+    else contents.push({ role, parts: [{ text: message.content }] });
+  }
+  if (!contents.length || contents[0]!.role !== "user") contents.unshift({ role: "user", parts: [{ text: system ? "Begin." : "Hello." }] });
+  return { ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}), contents };
 }
 
 export type ChatParams = { model: string; messages: ChatMessage[]; maxTokens: number; temperature: number };
@@ -152,11 +175,20 @@ export function buildChatRequest(provider: DirectProviderId, apiKey: string, par
   const config = DIRECT_PROVIDERS[provider];
   const maxTokens = Math.max(64, Math.min(16_384, Math.trunc(Number(params.maxTokens)) || 2048));
   const temperature = Math.max(0, Math.min(2, Number.isFinite(Number(params.temperature)) ? Number(params.temperature) : 0.3));
+  if (config.format === "gemini") {
+    if (!/^[A-Za-z0-9._-]{1,120}$/.test(params.model)) throw new Error("That Gemini model name is not valid.");
+    return {
+      url: config.chatUrl.replace("{model}", params.model),
+      method: "POST",
+      headers: { ...authHeaders(config, apiKey), "Content-Type": "application/json", Accept: "text/event-stream", ...(config.headers ?? {}) },
+      body: JSON.stringify({ ...toGeminiContents(params.messages), generationConfig: { maxOutputTokens: maxTokens, temperature } }),
+    };
+  }
   return {
     url: config.chatUrl,
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...authHeaders(config, apiKey),
       "Content-Type": "application/json",
       Accept: "text/event-stream, application/json",
       ...(config.headers ?? {}),
@@ -209,8 +241,37 @@ export function createOpenAiSseDecoder(): { push(chunk: string, final?: boolean)
   };
 }
 
+/** Incremental decoder for Gemini's streamGenerateContent SSE (`alt=sse`). */
+export function createGeminiSseDecoder(): { push(chunk: string, final?: boolean): string[] } {
+  let buffer = "";
+  const parseLine = (rawLine: string): string[] => {
+    const line = rawLine.replace(/\r$/, "").trim();
+    if (!line.startsWith("data:")) return [];
+    const raw = line.slice(5).trim();
+    if (!raw) return [];
+    let event: { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown; thought?: unknown }> }; finishReason?: string }>; promptFeedback?: { blockReason?: string }; error?: { message?: string } };
+    try { event = JSON.parse(raw); } catch { throw new Error("The provider sent an invalid event in the model stream."); }
+    if (event.error) throw new Error(event.error.message ?? "Gemini generation failed.");
+    if (event.promptFeedback?.blockReason) throw new Error(`Gemini blocked this prompt (${event.promptFeedback.blockReason}).`);
+    const parts = event.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.filter((part) => part.thought !== true).map((part) => (typeof part.text === "string" ? part.text : "")).join("");
+    return text ? [text] : [];
+  };
+  return {
+    push(chunk: string, final = false): string[] {
+      buffer += chunk;
+      const tokens: string[] = [];
+      let newline = buffer.indexOf("\n");
+      while (newline >= 0) { tokens.push(...parseLine(buffer.slice(0, newline))); buffer = buffer.slice(newline + 1); newline = buffer.indexOf("\n"); }
+      if (final && buffer.length) { tokens.push(...parseLine(buffer)); buffer = ""; }
+      return tokens;
+    },
+  };
+}
+
 export function createChatStreamDecoder(provider: DirectProviderId): { push(chunk: string, final?: boolean): string[] } {
-  return DIRECT_PROVIDERS[provider].format === "cohere" ? createCohereSseParser() : createOpenAiSseDecoder();
+  const format = DIRECT_PROVIDERS[provider].format;
+  return format === "cohere" ? createCohereSseParser() : format === "gemini" ? createGeminiSseDecoder() : createOpenAiSseDecoder();
 }
 
 /** Verifies a key against the provider's own model endpoint and returns the chat-capable model ids. */

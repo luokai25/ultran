@@ -24,6 +24,7 @@ import { pluginEngine } from "./plugins/engine";
 import { Browser } from "@capacitor/browser";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { initPlugins } from "./plugins-ui";
+import { seedBundledKeys } from "./bundled-keys";
 import { budgetConversation, buildCapabilityPrompt as buildBaseCapabilityPrompt, buildReviewPrompt, profileTask, shouldVerifyDraft } from "./capability-kernel";
 import { buildUltronSystemPrompt, prepareUltronSpeech, ULTRON_MOTTO, ULTRON_VOICE } from "./ultron-persona";
 import { buildPresenceIdentityPrompt, selectCommunicationMode, evaluatePresenceEvent, shouldSpeakPresence, createPresenceDeliveryGate, type PresenceEventKind } from "./ultron-presence";
@@ -5243,6 +5244,7 @@ if (synth) {
 initProductStudio({ openScreen: () => showFeatureScreen("product-studio-screen", navChatButton), closeScreen: () => navChatButton.click(), openCloudSettings: () => { closeDrawer(); navSettingsButton.click(); window.setTimeout(() => req<HTMLElement>("#cloud-sync-heading").scrollIntoView({ behavior: "smooth", block: "center" }), 120); }, wakeWorker: () => processUltronJobs(1) });
 
 initPlugins();
+void seedBundledKeys().then((seeded) => { if (seeded.added > 0) void refreshCloudLlmScreen(); }).catch(() => undefined);
 buildThemes();
 applyTheme(settings.theme);
 setLink("offline", settings.endpoint ? "ready" : "local");

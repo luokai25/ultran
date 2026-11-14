@@ -40,23 +40,24 @@ test("desktop sidebar, feature screens, and transient sheets have a safe stackin
   assert.match(css, /\.sheet-wrap\s*\{[\s\S]*?z-index:\s*80/);
 });
 
-test("monochrome orb identity stays aligned across web, Android generator, and adaptive icon", async () => {
-  const [mark, generator, vector, background] = await Promise.all([
-    read("src/mark.ts"),
+test("the Ø launcher identity stays aligned between the Android generator, the adaptive icon and the favicon", async () => {
+  const [generator, vector, favicon, adaptive, strings, capacitor] = await Promise.all([
     read("android/tools/generate_assets.py"),
-    read("android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml"),
-    read("android/app/src/main/res/drawable/ic_launcher_background.xml"),
+    read("android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml").catch(() => ""),
+    read("favicon.svg"),
+    read("android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"),
+    read("android/app/src/main/res/values/strings.xml"),
+    read("capacitor.config.ts"),
   ]);
-  assert.match(mark, /ultron-core/);
-  assert.match(mark, /<circle cx="54" cy="54" r="11"/);
-  assert.ok(generator.includes("ORBIT_CENTER = (54.0, 54.0)"));
-  assert.ok(generator.includes("Two orbital ellipses and a three-layer plasma nucleus"));
-  assert.doesNotMatch(generator, /U_START|U_CURVE|U_STROKE|CREST/);
-  assert.match(vector, /android:strokeColor="#AEB4BD" android:strokeWidth="2.5"/);
-  assert.match(vector, /android:strokeColor="#E2E5E9" android:strokeWidth="2.4"/);
-  assert.doesNotMatch(mark, /M34 34v21/);
-  assert.match(background, /#080609/);
-  assert.ok(generator.includes("Poly = list[tuple[float, float]]"));
+  assert.ok(generator.includes("O_RING_RX = 19.0") && generator.includes("O_RING_RY = 26.0"));
+  assert.ok(generator.includes("O_SLASH = ((31.0, 80.0), (77.0, 28.0))"));
+  assert.match(generator, /Image\.new\("RGBA", \(big, big\), \(0, 0, 0, 0\)\)/, "launcher icons are drawn on transparency");
+  assert.match(favicon, /rx="19" ry="26"/);
+  assert.match(favicon, /M31 80L77 28/);
+  assert.match(adaptive, /<background android:drawable="@android:color\/transparent"\/>/, "the adaptive icon has no background");
+  assert.match(strings, /<string name="app_name">ultron<\/string>/);
+  assert.match(capacitor, /appName: "ultron"/);
+  if (vector) assert.match(vector, /android:strokeColor="#E52D41"/);
 });
 
 

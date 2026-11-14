@@ -10,7 +10,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const config: CapacitorConfig = {
   appId: "app.ultron.mobile",
-  appName: "Ultron",
+  appName: "ultron",
   webDir: "dist",
   android: {
     backgroundColor: "#050505",

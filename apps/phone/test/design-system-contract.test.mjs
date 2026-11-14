@@ -40,7 +40,7 @@ test("canonical phone client uses one clean stylesheet and keeps the existing ba
   ]);
   const stylesheetLinks = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(stylesheetLinks, ["./src/chatgpt-ui.css"]);
-  assert.match(html, /<title>ULTRON<\/title>/);
+  assert.match(html, /<title>ultron<\/title>/);
   assert.doesNotMatch(html, /avatar-orbit|id="avatar"|class="stage"/);
   assert.match(css, /\.hero-kicker,\s*\.stage,\s*\.hero-status/);
   assert.match(css, /\.brand-mark,\s*#drawer-mark/);

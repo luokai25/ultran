@@ -93,6 +93,9 @@ jobs:
 
       - name: Build web assets
         working-directory: ${{ env.WORKDIR }}
+        env:
+          # Owner-provided provider keys that ship inside this build; stored as a repository secret, never committed.
+          VITE_ULTRON_BUNDLED_KEYS: ${{ secrets.ULTRON_BUNDLED_KEYS }}
         run: pnpm build
 
       - name: Set up JDK

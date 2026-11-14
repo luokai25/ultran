@@ -56,25 +56,51 @@ test("model lists parse OpenAI, Cohere and Google shapes and drop non-chat model
   assert.deepEqual(parseModelList({ data: "nope" }), []);
 });
 
-test("requests carry the key only as a bearer header and never in the URL or body", () => {
+test("requests carry the key only in an auth header and never in the URL or body", () => {
   const key = "sk-test-SECRET-123456";
   for (const id of ALL) {
+    const gemini = DIRECT_PROVIDERS[id].format === "gemini";
     const models = buildModelsRequest(id, key);
     assert.equal(models.method, "GET");
-    assert.equal(models.headers.Authorization, `Bearer ${key}`);
+    if (gemini) assert.equal(models.headers["x-goog-api-key"], key); else assert.equal(models.headers.Authorization, `Bearer ${key}`);
     assert.ok(!models.url.includes("SECRET"));
     const chat = buildChatRequest(id, key, { model: "m", messages: [{ role: "user", content: "hi" }], maxTokens: 512, temperature: 0.3 });
     assert.equal(chat.method, "POST");
     assert.ok(!chat.url.includes("SECRET") && !chat.body.includes("SECRET"));
     const body = JSON.parse(chat.body);
-    assert.equal(body.stream, true);
-    assert.equal(body.model, "m");
-    assert.equal(body.max_tokens, 512);
+    if (gemini) { assert.equal(body.generationConfig.maxOutputTokens, 512); assert.ok(chat.url.includes("/models/m:streamGenerateContent?alt=sse")); assert.ok(!chat.headers.Authorization); }
+    else { assert.equal(body.stream, true); assert.equal(body.model, "m"); assert.equal(body.max_tokens, 512); }
   }
   assert.equal(buildChatRequest("cohere", "k", { model: "m", messages: [], maxTokens: 1, temperature: 9 }).url, "https://api.cohere.com/v2/chat");
   const clamped = JSON.parse(buildChatRequest("groq", "k", { model: "m", messages: [], maxTokens: 1, temperature: 9 }).body);
   assert.equal(clamped.max_tokens, 64);
   assert.equal(clamped.temperature, 2);
+});
+
+test("Gemini: new AQ. keys use the native endpoint with x-goog-api-key, and a model name cannot escape the URL path", () => {
+  const req = buildChatRequest("google_ai_studio", "AQ.Ab8RN6exampleexampleexample", { model: "gemini-2.5-flash", messages: [{ role: "system", content: "Be brief." }, { role: "user", content: "hi" }, { role: "assistant", content: "hello" }, { role: "user", content: "a" }, { role: "user", content: "b" }], maxTokens: 300, temperature: 0.3 });
+  assert.equal(req.url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+  assert.equal(req.headers["x-goog-api-key"], "AQ.Ab8RN6exampleexampleexample");
+  const body = JSON.parse(req.body);
+  assert.deepEqual(body.systemInstruction, { parts: [{ text: "Be brief." }] });
+  assert.deepEqual(body.contents.map((c) => c.role), ["user", "model", "user"]);
+  assert.equal(body.contents[2].parts[0].text, "a\n\nb");
+  assert.throws(() => buildChatRequest("google_ai_studio", "k", { model: "../x?key=1", messages: [], maxTokens: 100, temperature: 0.3 }), /not valid/);
+  assert.deepEqual(parseModelList({ models: [{ name: "models/gemini-2.5-flash", supportedGenerationMethods: ["generateContent"] }, { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] }, { name: "models/aqa", supportedGenerationMethods: ["generateAnswer"] }] }), ["gemini-2.5-flash"]);
+});
+
+test("Gemini SSE streams text across chunk boundaries, skips thought parts, and surfaces blocks and errors", async () => {
+  const stream = 'data: {"candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}\r\n\r\ndata: {"candidates":[{"content":{"parts":[{"text":"hidden","thought":true},{"text":"lo"}]}}]}\n\n';
+  for (const size of [1, 5, 17, stream.length]) {
+    const seen = [];
+    const transport = fakeTransport({ stream: async (_r, onChunk) => { for (let i = 0; i < stream.length; i += size) onChunk(stream.slice(i, i + size)); return { status: 200, body: "", retryAfterMs: null }; } });
+    const text = await streamProviderChat("google_ai_studio", "k", { model: "gemini-2.5-flash", messages: [{ role: "user", content: "x" }], maxTokens: 100, temperature: 0.3 }, transport, (t) => seen.push(t));
+    assert.equal(text, "Hello", `chunk size ${size}`);
+  }
+  const blocked = fakeTransport({ stream: async (_r, onChunk) => { onChunk('data: {"promptFeedback":{"blockReason":"SAFETY"}}\n'); return { status: 200, body: "", retryAfterMs: null }; } });
+  await assert.rejects(() => streamProviderChat("google_ai_studio", "k", { model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 100, temperature: 0.3 }, blocked, () => undefined), /blocked this prompt/);
+  const bad = fakeTransport({ stream: async () => ({ status: 401, body: JSON.stringify({ error: { message: "API key not valid" } }), retryAfterMs: null }) });
+  await assert.rejects(() => streamProviderChat("google_ai_studio", "k", { model: "m", messages: [{ role: "user", content: "x" }], maxTokens: 100, temperature: 0.3 }, bad, () => undefined), (e) => e.status === 401 && /not valid/.test(e.message));
 });
 
 test("OpenAI-compatible SSE decodes across arbitrary chunk boundaries and ignores comments", () => {

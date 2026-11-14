@@ -46,7 +46,7 @@ public final class UltronProviderHttpPlugin extends Plugin {
         "integrate.api.nvidia.com"
     ));
     private static final Set<String> ALLOWED_HEADERS = new HashSet<>(Arrays.asList(
-        "authorization", "content-type", "accept", "http-referer", "x-title", "x-github-api-version"
+        "authorization", "content-type", "accept", "http-referer", "x-title", "x-github-api-version", "x-goog-api-key"
     ));
     private static final int MAX_BODY_BYTES = 1_500_000;
     private static final int MAX_PLAIN_RESPONSE_CHARS = 2_000_000;

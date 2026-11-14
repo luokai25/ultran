@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Generate the Ultron launcher icons and splash screens.
+"""Generate the ultron launcher icons and splash screens.
 
 The Android project is committed as text. Its raster assets are generated here
 instead of being checked in, so the repository carries no opaque binaries and
 the artwork is reviewable as code.
+
+The mark is the Ø sign on a transparent background: a tall ring with a slash
+through it. It is drawn from geometry, not a font, so it renders identically
+everywhere.
 
 Run from `apps/phone/android`:
 
@@ -23,9 +27,8 @@ except ImportError:  # pragma: no cover - CI installs Pillow explicitly
     sys.exit("Pillow is required: pip install pillow")
 
 VOID = (7, 8, 9)
-OBSIDIAN = (11, 13, 15)
 PLASMA = (229, 45, 65)
-PLASMA_BRIGHT = (255, 113, 128)
+PLASMA_HEX = "#E52D41"
 
 RES = "app/src/main/res"
 
@@ -46,89 +49,60 @@ SPLASHES = {
 }
 
 # ---------------------------------------------------------------------------
-# Ultron's plasma orb mark. Geometry mirrors apps/phone/src/mark.ts.
+# The Ø mark, in a 108-unit adaptive-icon viewport. The slash passes through
+# the ring's centre. Keep these in step with drawable-v24/ic_launcher_foreground.xml.
 # ---------------------------------------------------------------------------
 
-Poly = list[tuple[float, float]]
 VIEWPORT = 108.0
-ORBIT_CENTER = (54.0, 54.0)
-ORBIT_RADIUS = 37.0
-ORBIT_STROKE = 5.0
+O_CENTER = (54.0, 54.0)
+O_RING_RX = 19.0
+O_RING_RY = 26.0
+O_STROKE = 7.0
+O_SLASH = ((31.0, 80.0), (77.0, 28.0))
 
-SS = 4  # supersampling factor for clean launcher artwork
-
-
-def _scaled_point(point: tuple[float, float], scale: float, ox: float, oy: float) -> tuple[float, float]:
-    return ox + point[0] * scale, oy + point[1] * scale
+SS = 4  # supersampling factor for clean edges
 
 
-def _cubic_points(
-    start: tuple[float, float],
-    control1: tuple[float, float],
-    control2: tuple[float, float],
-    end: tuple[float, float],
-    steps: int = 32,
-) -> list[tuple[float, float]]:
-    points: list[tuple[float, float]] = []
-    for index in range(steps + 1):
-        t = index / steps
-        inverse = 1 - t
-        x = inverse**3 * start[0] + 3 * inverse**2 * t * control1[0] + 3 * inverse * t**2 * control2[0] + t**3 * end[0]
-        y = inverse**3 * start[1] + 3 * inverse**2 * t * control1[1] + 3 * inverse * t**2 * control2[1] + t**3 * end[1]
-        points.append((x, y))
-    return points
-
-
-def draw_mark(img: Image.Image, size: float, ox: float, oy: float) -> None:
-    """Draw the plasma orb into ``img`` using the same paths as the inline SVG."""
+def draw_oslash(img: Image.Image, size: float, ox: float, oy: float, color: tuple[int, int, int] = PLASMA) -> None:
+    """Draw the Ø into ``img`` (RGBA) with its 108-unit viewport scaled to ``size`` pixels."""
     draw = ImageDraw.Draw(img)
-    scale = size / VIEWPORT
-    cx, cy = _scaled_point(ORBIT_CENTER, scale, ox, oy)
-    radius = ORBIT_RADIUS * scale
-    stroke = max(1, round(ORBIT_STROKE * scale))
-    draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=PLASMA, width=stroke)
-    # Two orbital ellipses and a three-layer plasma nucleus: the Ultron orb, no lettermark.
-    for rx, ry, angle, color, width in [(47,17,-32,PLASMA_BRIGHT,2.4),(44,13,48,PLASMA,1.5)]:
-        layer = Image.new("RGBA", img.size, (0,0,0,0))
-        ld = ImageDraw.Draw(layer)
-        box=(cx-rx*scale,cy-ry*scale,cx+rx*scale,cy+ry*scale)
-        ld.ellipse(box, outline=(*color,235), width=max(1,round(width*scale)))
-        layer=layer.rotate(angle, resample=Image.Resampling.BICUBIC, center=(cx,cy))
-        img.alpha_composite(layer) if img.mode == "RGBA" else img.paste(layer, (0,0), layer)
-    glow=max(2,round(27*scale))
-    for rr, color in [(glow,PLASMA),(round(glow*.42),PLASMA_BRIGHT),(round(glow*.18),(255,244,245))]:
-        draw.ellipse((cx-rr,cy-rr,cx+rr,cy+rr), fill=color)
+    s = size / VIEWPORT
+    cx, cy = ox + O_CENTER[0] * s, oy + O_CENTER[1] * s
+    half = O_STROKE * s / 2
+    rx, ry = O_RING_RX * s + half, O_RING_RY * s + half
+    draw.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), outline=color + (255,), width=max(1, round(O_STROKE * s)))
+    (x1, y1), (x2, y2) = O_SLASH
+    p1, p2 = (ox + x1 * s, oy + y1 * s), (ox + x2 * s, oy + y2 * s)
+    draw.line([p1, p2], fill=color + (255,), width=max(1, round(O_STROKE * s)))
+    for px, py in (p1, p2):  # round caps
+        draw.ellipse((px - half, py - half, px + half, py + half), fill=color + (255,))
 
 
-def mark(size: int, background: tuple[int, int, int], fill_ratio: float = 1.0) -> Image.Image:
-    """The plasma orb on a dark field. ``fill_ratio`` scales the 108-unit viewport."""
+def icon(size: int, fill: float) -> Image.Image:
+    """The Ø on transparency. ``fill`` scales the 108-unit viewport (1.0 = adaptive safe zone)."""
     big = size * SS
-    img = Image.new("RGB", (big, big), background)
-    viewport = big * fill_ratio
-    draw_mark(img, viewport, (big - viewport) / 2, (big - viewport) / 2)
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    viewport = big * fill
+    draw_oslash(img, viewport, (big - viewport) / 2, (big - viewport) / 2)
     return img.resize((size, size), Image.LANCZOS)
 
 
 def vector_drawable() -> str:
-    """Adaptive-icon foreground matching the plasma-orb identity."""
-    return """<?xml version="1.0" encoding="utf-8"?>
-<!-- GENERATED by tools/generate_assets.py - edit the paths there. -->
+    """Adaptive-icon foreground vector matching the raster mark."""
+    (x1, y1), (x2, y2) = O_SLASH
+    cx, cy = O_CENTER
+    left, right = cx - O_RING_RX, cx + O_RING_RX
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<!-- GENERATED by tools/generate_assets.py - edit the geometry there. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#00000000" android:strokeColor="#AEB4BD" android:strokeWidth="2.5"
-        android:pathData="M54,15 A39,39 0,1 1,53.99,15 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#E2E5E9" android:strokeWidth="2.4"
-        android:pathData="M9,54 A45,16 0,1 0,99,54 A45,16 0,1 0,9,54" />
-    <path android:fillColor="#00000000" android:strokeColor="#AEB4BD" android:strokeWidth="1.5"
-        android:pathData="M10,54 A44,13 0,1 1,98,54 A44,13 0,1 1,10,54" />
-    <path android:fillColor="#AEB4BD" android:pathData="M81,54 A27,27 0,1 1,27,54 A27,27 0,1 1,81,54" android:fillAlpha="0.48" />
-    <path android:fillColor="#E2E5E9" android:pathData="M65,54 A11,11 0,1 1,43,54 A11,11 0,1 1,65,54" />
-    <path android:fillColor="#FFF4F5" android:pathData="M59,54 A5,5 0,1 1,49,54 A5,5 0,1 1,59,54" />
-    <path android:fillColor="#E2E5E9" android:pathData="M94.5,33 A3.5,3.5 0,1 1,87.5,33 A3.5,3.5 0,1 1,94.5,33" />
+    <path android:fillColor="#00000000" android:strokeColor="{PLASMA_HEX}" android:strokeWidth="{O_STROKE:g}"
+        android:pathData="M{right:g},{cy:g} A{O_RING_RX:g},{O_RING_RY:g} 0,1 1,{left:g},{cy:g} A{O_RING_RX:g},{O_RING_RY:g} 0,1 1,{right:g},{cy:g}" />
+    <path android:fillColor="#00000000" android:strokeColor="{PLASMA_HEX}" android:strokeWidth="{O_STROKE:g}"
+        android:strokeLineCap="round" android:pathData="M{x1:g},{y1:g} L{x2:g},{y2:g}" />
 </vector>
 """
-
 
 
 def splash(width: int, height: int) -> Image.Image:
@@ -140,34 +114,14 @@ def splash(width: int, height: int) -> Image.Image:
     for step in range(28, 0, -1):
         t = step / 28
         radius = min(width, height) * 0.42 * t
-        shade = (
-            int(5 + 18 * (1 - t)),
-            int(5 + 14 * (1 - t)),
-            int(5 + 6 * (1 - t)),
-        )
+        shade = (int(5 + 18 * (1 - t)), int(5 + 14 * (1 - t)), int(5 + 6 * (1 - t)))
         draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=shade)
 
-    # Draw the plasma orb directly on the glow (supersampled), not as a pasted tile,
-    # so no square edge shows against the gradient.
-    side = min(width, height) * 0.46
-    big = img.resize((width * 2, height * 2), Image.LANCZOS)
-    draw_mark(big, side * 2, cx * 2 - side, cy * 2 - side)
-    return big.resize((width, height), Image.LANCZOS)
-
-
-def transparent_foreground(size: int) -> Image.Image:
-    """Adaptive-icon foreground: the mark on transparency, inside the safe zone."""
-    logo = mark(int(size * 0.92), OBSIDIAN).convert("RGBA")
-    pixels = logo.load()
-    for y in range(logo.height):
-        for x in range(logo.width):
-            r, g, b, _ = pixels[x, y]
-            if abs(r - OBSIDIAN[0]) < 6 and abs(g - OBSIDIAN[1]) < 6 and abs(b - OBSIDIAN[2]) < 6:
-                pixels[x, y] = (0, 0, 0, 0)
-
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    canvas.paste(logo, ((size - logo.width) // 2, (size - logo.height) // 2), logo)
-    return canvas
+    # The Ø drawn directly on the glow (supersampled) so no square edge shows.
+    side = min(width, height) * 0.85
+    big = img.resize((width * 2, height * 2), Image.LANCZOS).convert("RGBA")
+    draw_oslash(big, side * 2, cx * 2 - side, cy * 2 - side)
+    return big.convert("RGB").resize((width, height), Image.LANCZOS)
 
 
 def main() -> None:
@@ -177,19 +131,16 @@ def main() -> None:
     for density, px in DENSITIES.items():
         out = os.path.join(RES, f"mipmap-{density}")
         os.makedirs(out, exist_ok=True)
-        mark(px, OBSIDIAN, 0.86).save(os.path.join(out, "ic_launcher.png"), optimize=True)
-        mark(px, OBSIDIAN, 0.78).save(os.path.join(out, "ic_launcher_round.png"), optimize=True)
-        transparent_foreground(px).save(
-            os.path.join(out, "ic_launcher_foreground.png"), optimize=True
-        )
+        # Legacy launchers draw the file as-is: transparent background, Ø filling most of the tile.
+        icon(px, 1.32).save(os.path.join(out, "ic_launcher.png"), optimize=True)
+        icon(px, 1.2).save(os.path.join(out, "ic_launcher_round.png"), optimize=True)
+        # Adaptive foreground: inside the 66-unit safe zone.
+        icon(px, 1.0).save(os.path.join(out, "ic_launcher_foreground.png"), optimize=True)
 
     for path, (width, height) in SPLASHES.items():
         full = os.path.join(RES, path)
         os.makedirs(os.path.dirname(full), exist_ok=True)
-        # A flat dark field with a small mark quantises to a tiny palette PNG.
-        splash(width, height).quantize(colors=64, method=Image.MEDIANCUT).save(
-            full, optimize=True
-        )
+        splash(width, height).quantize(colors=64, method=Image.MEDIANCUT).save(full, optimize=True)
 
     vector = os.path.join(RES, "drawable-v24", "ic_launcher_foreground.xml")
     os.makedirs(os.path.dirname(vector), exist_ok=True)

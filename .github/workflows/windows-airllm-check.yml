@@ -1,0 +1,106 @@
+name: Windows AirLLM bridge check
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/airllm-windows/**"
+      - "apps/desktop/**"
+      - "docs/windows-airllm.md"
+      - ".github/workflows/windows-airllm-check.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "tools/airllm-windows/**"
+      - "apps/desktop/**"
+      - "docs/windows-airllm.md"
+      - ".github/workflows/windows-airllm-check.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+jobs:
+  syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Compile bridge syntax
+        run: python -m py_compile tools/airllm-windows/server.py tools/airllm-windows/test_server.py tools/airllm-windows/smoke_test.py
+      - name: Validate PowerShell runtime installer syntax
+        shell: pwsh
+        run: |
+          $files = @("tools/airllm-windows/setup-airllm-runtime.ps1", "tools/airllm-windows/start-ultran-airllm.ps1")
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_ }
+              throw "PowerShell syntax validation failed for $file"
+            }
+          }
+      - name: Install lightweight bridge test dependencies
+        run: python -m pip install --disable-pip-version-check "fastapi>=0.115,<1" "pydantic>=2.8,<3"
+      - name: Exercise streaming, cancellation and model-code policy with a fake model
+        run: python -m unittest discover -s tools/airllm-windows -p test_server.py -v
+      - name: Check Electron JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check apps/desktop/src/main.cjs
+          node --check apps/desktop/src/agent-host.cjs
+          node --check apps/desktop/src/agent-task-store.cjs
+          node --check apps/desktop/src/skill-library.cjs
+          node --check apps/desktop/src/preload.cjs
+          node --check apps/desktop/src/renderer.js
+      - name: Run conversation storage regression tests
+        run: node --test apps/desktop/src/conversation-store.test.cjs apps/desktop/src/tool-engine.test.cjs apps/desktop/src/agent-runtime.test.cjs apps/desktop/src/agent-host.test.cjs apps/desktop/src/agent-task-store.test.cjs apps/desktop/src/skill-library.test.cjs
+      - name: Check launcher and dependency files exist
+        shell: pwsh
+        run: |
+          if (!(Test-Path "tools/airllm-windows/start-ultran-airllm.ps1")) { throw "Launcher missing" }
+          if (!(Test-Path "tools/airllm-windows/requirements.txt")) { throw "Requirements missing" }
+  desktop-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile
+      - name: Build portable Windows executable
+        run: pnpm --filter @ultran/desktop dist:win
+      - name: Smoke-test packaged desktop startup
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "apps/desktop/dist/win-unpacked/Ultran.exe"
+          $log = Join-Path $env:RUNNER_TEMP "ultran-electron-startup.log"
+          $launcher = Start-Process -FilePath $exe -ArgumentList @("--enable-logging", "--log-file=$log") -PassThru
+          Start-Sleep -Seconds 12
+          $app = Get-CimInstance Win32_Process | Where-Object {
+            $_.Name -eq "Ultran.exe" -and $_.ExecutablePath -eq $exe.Path
+          } | Select-Object -First 1
+          if (!$app) {
+            if (Test-Path $log) { Get-Content $log }
+            if ($launcher.HasExited) { Write-Host "Ultran.exe exited with code $($launcher.ExitCode)" }
+            else { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
+            throw "Packaged Ultran application failed its startup smoke test."
+          }
+          Stop-Process -Id $app.ProcessId -Force -ErrorAction SilentlyContinue
+          if (!$launcher.HasExited) { Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue }
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultran-windows-desktop
+          path: apps/desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
